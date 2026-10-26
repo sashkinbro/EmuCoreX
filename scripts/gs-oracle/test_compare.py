@@ -4,11 +4,23 @@ import hashlib
 from pathlib import Path
 import tempfile
 import unittest
+import copy
 
 import compare
 
 
 class OracleTests(unittest.TestCase):
+    def build_provenance(self):
+        config = dict(schema=2, target_coverage='all-native-targets-v1', complete=True, build_type='Debug', experimental_ir=False,
+                      abi='arm64-v8a', platform='android-29', ndk=dict(revision='29.0.14206865'),
+                      compilers={language: dict(id='Clang', version='21.0.0', sha256='a' * 64)
+                                 for language in ('C', 'CXX')},
+                      cache_flags={'CMAKE_C_FLAGS_DEBUG': '-O2 -g1', 'CMAKE_CXX_FLAGS_DEBUG': '-O2 -g1'},
+                      compiler_rules=[dict(target='emucore', stage='CXX_COMPILER', command='${CXX_COMPILER} $FLAGS')],
+                      target_flags=[dict(target='emucore', flags='-O2 -g1 -fPIC')])
+        digest = hashlib.sha256(json.dumps(config, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+        return dict(build_configuration=config, build_configuration_sha256=digest)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -84,6 +96,7 @@ class OracleTests(unittest.TestCase):
         old = dict(schema=1, mode='benchmark', backend='vk', complete=True,
                    input_sha256='abc', device='lenovo', settings='native-exact-v1',
                    frames=4, frames_per_replay=4, batch=1, warmup=1, driver_sha256='driver1', samples_ms=[40, 44, 48])
+        old.update(self.build_provenance())
         new = dict(old, samples_ms=[50, 55, 60])
         result = compare.compare_benchmarks(old, new)
         self.assertAlmostEqual(result['median_change_percent'], 25)
@@ -93,6 +106,134 @@ class OracleTests(unittest.TestCase):
                        dict(frames_per_replay=2), dict(batch=0), dict(batch=True)]:
             with self.assertRaises(ValueError):
                 compare.compare_benchmarks(old, dict(new, **change))
+
+    def test_benchmark_rejects_missing_and_changed_build_configuration(self):
+        old = dict(schema=1, mode='benchmark', backend='vk', complete=True,
+                   input_sha256='abc', device='lenovo', settings='native-exact-v1',
+                   frames=4, frames_per_replay=4, batch=1, warmup=1,
+                   driver_sha256='driver1', samples_ms=[40, 44, 48], **self.build_provenance())
+        legacy = {k: v for k, v in old.items() if not k.startswith('build_configuration')}
+        for before, after in ((legacy, old), (old, legacy), (legacy, legacy)):
+            with self.assertRaisesRegex(ValueError, 'build configuration'):
+                compare.compare_benchmarks(before, after)
+        for change in (dict(build_type='Release'), dict(experimental_ir=True),
+                       dict(cache_flags={'CMAKE_CXX_FLAGS_DEBUG': '-g1'})):
+            changed = copy.deepcopy(old)
+            changed['build_configuration'].update(change)
+            config = changed['build_configuration']
+            changed['build_configuration_sha256'] = hashlib.sha256(
+                json.dumps(config, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+            with self.assertRaisesRegex(ValueError, 'build configuration'):
+                compare.compare_benchmarks(old, changed)
+        # A changed code binary is expected when evaluating an optimization.
+        self.assertEqual(compare.compare_benchmarks(dict(old, core_sha256='old'),
+                         dict(old, core_sha256='new'))['median_change_percent'], 0)
+        for change in (dict(build_configuration_sha256='bad'),
+                       dict(build_configuration=dict(old['build_configuration'], complete=False)),
+                       dict(build_configuration={})):
+            with self.assertRaisesRegex(ValueError, 'build configuration'):
+                compare.compare_benchmarks(old, dict(old, **change))
+
+    def configured_build(self, name):
+        root = self.root / name
+        build, source, ndk = root / 'build', root / 'src', root / 'ndk'
+        cmake = build / 'CMakeFiles' / '3.22.1'
+        cmake.mkdir(parents=True)
+        source.mkdir()
+        ndk.mkdir()
+        (ndk / 'source.properties').write_text('Pkg.Revision = 29.0.14206865\n')
+        cache = dict(CMAKE_BUILD_TYPE='Debug', CMAKE_HOME_DIRECTORY=source.as_posix(),
+                     CMAKE_ANDROID_NDK=ndk.as_posix(), ANDROID_ABI='arm64-v8a', ANDROID_PLATFORM='android-29',
+                     EMUCOREX_ENABLE_EXPERIMENTAL_IR='OFF', CMAKE_C_FLAGS='', CMAKE_CXX_FLAGS='',
+                     CMAKE_C_FLAGS_DEBUG='-O2 -g1', CMAKE_CXX_FLAGS_DEBUG=f'-O2 -g1 -I{source.as_posix()}/include')
+        (build / 'CMakeCache.txt').write_text('\n'.join(f'{key}:STRING={value}' for key, value in cache.items()))
+        for language in ('C', 'CXX'):
+            compiler = ndk / (language.lower() + '-compiler')
+            compiler.write_bytes(b'same compiler content for relocated build')
+            (cmake / f'CMake{language}Compiler.cmake').write_text(
+                f'set(CMAKE_{language}_COMPILER "{compiler.as_posix()}")\n'
+                f'set(CMAKE_{language}_COMPILER_ID "Clang")\n'
+                f'set(CMAKE_{language}_COMPILER_VERSION "21.0.0")\n')
+        (build / 'build.ninja').write_text('\n'.join(
+            f'build CMakeFiles/{target}.dir/changed-source.cpp.o: CXX_COMPILER__{target}_Debug source.cpp\n'
+            f'  FLAGS = -O2 -g1 -include {build.as_posix()}/pch.hxx\n'
+            f'  INCLUDES = -I{source.as_posix()}/include\n'
+            for target in ('emucore', 'emucorex_gs_oracle')))
+        (build / 'CMakeFiles/rules.ninja').write_text('\n'.join(
+            f'rule CXX_COMPILER__{target}_Debug\n'
+            f'  command = {(ndk / "cxx-compiler").as_posix()} --target=aarch64-linux-android29 $FLAGS -c $in\n'
+            for target in ('emucore', 'emucorex_gs_oracle')))
+        return build
+
+    def test_configuration_records_compiler_flags_and_is_relocation_stable(self):
+        left = self.configured_build('first location')
+        right = self.configured_build('relocated')
+        a, b = compare.build_configuration(left), compare.build_configuration(right)
+        self.assertEqual(a, b)
+        self.assertEqual(compare.validated_build_configuration(a)['experimental_ir'], False)
+        self.assertEqual(a['build_configuration']['compilers']['CXX']['version'], '21.0.0')
+        self.assertNotIn(str(self.root), json.dumps(a))
+        ninja = right / 'build.ninja'
+        ninja.write_text(ninja.read_text().replace('changed-source.cpp', 'optimized-source.cpp'))
+        self.assertEqual(a, compare.build_configuration(right))
+        for path, before, after in (
+            (right / 'CMakeFiles/3.22.1/CMakeCXXCompiler.cmake', '21.0.0', '22.0.0'),
+            (right.parent / 'ndk/source.properties', '29.0.14206865', '30.0.0'),
+            (right / 'CMakeFiles/rules.ninja', 'android29', 'android30'),
+            (right / 'CMakeCache.txt', '-O2 -g1', '-g1'),
+        ):
+            original_content = path.read_text()
+            path.write_text(original_content.replace(before, after))
+            self.assertNotEqual(a['build_configuration_sha256'], compare.build_configuration(right)['build_configuration_sha256'])
+            path.write_text(original_content)
+        original = ninja.read_text()
+        ninja.write_text(original.replace('-O2', '-O0'))
+        self.assertNotEqual(a['build_configuration_sha256'], compare.build_configuration(right)['build_configuration_sha256'])
+        ninja.write_text(original)
+        cache = right / 'CMakeCache.txt'
+        cache.write_text(cache.read_text().replace('EMUCOREX_ENABLE_EXPERIMENTAL_IR:STRING=OFF', ''))
+        unknown = compare.build_configuration(right)
+        self.assertFalse(unknown['build_configuration']['complete'])
+        self.assertIsNone(unknown['build_configuration']['experimental_ir'])
+        with self.assertRaisesRegex(ValueError, 'build configuration'):
+            compare.validated_build_configuration(unknown)
+
+    def test_transitive_native_targets_and_per_source_flags_are_fingerprinted(self):
+        build = self.configured_build('transitive')
+        ninja = build / 'build.ninja'
+        rules = build / 'CMakeFiles/rules.ninja'
+        for target, source in (('PCSX2', 'GSState.cpp'), ('PCSX2_LTO', 'GSRendererHW.cpp'),
+                               ('common', 'Threading.cpp'), ('zlib', 'inflate.c')):
+            language = 'C' if target == 'zlib' else 'CXX'
+            with ninja.open('a') as stream:
+                stream.write(f'\nbuild CMakeFiles/{target}.dir/{source}.o: {language}_COMPILER__{target}_Debug {source}\n'
+                             '  FLAGS = -O0 -g1\n')
+            with rules.open('a') as stream:
+                stream.write(f'\nrule {language}_COMPILER__{target}_Debug\n'
+                             '  command = compiler --target=aarch64-linux-android29 $FLAGS -c $in\n')
+        before = compare.build_configuration(build)
+        self.assertTrue(before['build_configuration']['complete'])
+        original = ninja.read_text()
+        # Only a GSState per-source compiler setting changes, not global flags.
+        ninja.write_text(original.replace('GSState.cpp\n  FLAGS = -O0', 'GSState.cpp\n  FLAGS = -O3'))
+        after = compare.build_configuration(build)
+        self.assertNotEqual(before['build_configuration_sha256'], after['build_configuration_sha256'])
+        ninja.write_text(original)
+        targets = {row['target'] for row in before['build_configuration']['target_flags']}
+        self.assertTrue({'PCSX2', 'PCSX2_LTO', 'common', 'zlib'} <= targets)
+        # Adding another source with an already represented configuration does
+        # not make ordinary code changes look like compiler-setting changes.
+        with ninja.open('a') as stream:
+            stream.write('\nbuild CMakeFiles/PCSX2.dir/NewGSCode.cpp.o: CXX_COMPILER__PCSX2_Debug NewGSCode.cpp\n'
+                         '  FLAGS = -O0 -g1\n')
+        self.assertEqual(before, compare.build_configuration(build))
+
+    def test_old_target_coverage_schema_cannot_be_a_timing_baseline(self):
+        provenance = self.build_provenance()
+        provenance['build_configuration']['schema'] = 1
+        provenance['build_configuration_sha256'] = compare.configuration_sha256(provenance['build_configuration'])
+        with self.assertRaisesRegex(ValueError, 'build configuration'):
+            compare.validated_build_configuration(provenance)
 
     def test_profile_rejects_missing_duplicate_and_invalid_data(self):
         point = dict(frame=0, packet=3, name='draw', submit_ms=1, wait_ms=2, counters=dict(draw_calls=4))
@@ -111,6 +252,7 @@ class OracleTests(unittest.TestCase):
         (root / 'input.gs').write_bytes(dump)
         meta = dict(backends=['sw', 'vk'], input='input.gs', input_sha256=hashlib.sha256(dump).hexdigest(),
                     device='lenovo', model='TB710FU', core_sha256='core', runner_sha256='runner', warmup=1, repeats=3, cases=0, seed=1)
+        meta.update(self.build_provenance())
         compare.write_json(root / 'metadata.json', meta)
         for backend in meta['backends']:
             base = dict(schema=1, backend=backend, complete=True, settings='native-exact-v2',
@@ -141,6 +283,25 @@ class OracleTests(unittest.TestCase):
             compare.write_json(path, original)
         second = compare.run_report(root, baseline=root)
         self.assertEqual(second['performance_changes']['vk']['median_change_percent'], 0)
+        enriched = json.loads((root / 'vk/profile/profile.json').read_text())
+        self.assertEqual(enriched['build_configuration_sha256'], meta['build_configuration_sha256'])
+        old_coverage = copy.deepcopy(meta)
+        old_coverage['build_configuration']['schema'] = 1
+        old_coverage['build_configuration_sha256'] = compare.configuration_sha256(old_coverage['build_configuration'])
+        compare.write_json(root / 'metadata.json', old_coverage)
+        self.assertTrue(compare.run_report(root)['passed'])
+        self.assertIn('older schema', (root / 'report.md').read_text())
+        with self.assertRaisesRegex(ValueError, 'build configuration'):
+            compare.run_report(root, baseline=root)
+        # Historical evidence remains valid for correctness, but its absent
+        # compiler provenance must never be backfilled from another build.
+        legacy_meta = {k: v for k, v in meta.items() if not k.startswith('build_configuration')}
+        compare.write_json(root / 'metadata.json', legacy_meta)
+        self.assertTrue(compare.run_report(root)['passed'])
+        with self.assertRaisesRegex(ValueError, 'build configuration'):
+            compare.run_report(root, baseline=root)
+        compare.write_json(root / 'metadata.json', meta)
+        compare.run_report(root)
         (root / 'vk' / 'capture' / '000.bin').write_bytes(b'\xff\x20\x30\x80')
         self.assertFalse(compare.run_report(root)['passed'])
         self.assertIn('<details>', (root / 'report.html').read_text())

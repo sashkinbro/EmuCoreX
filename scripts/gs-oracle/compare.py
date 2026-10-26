@@ -4,6 +4,7 @@ import hashlib
 import html
 import json
 import math
+import re
 from pathlib import Path
 import statistics
 import struct
@@ -56,6 +57,142 @@ def compatible(a, b, keys):
     for key in keys:
         if key not in a or key not in b or a[key] != b[key]:
             raise ValueError(f'Incompatible reports: {key}')
+
+
+def configuration_sha256(configuration):
+    return hashlib.sha256(json.dumps(configuration, sort_keys=True, separators=(',', ':'),
+                                     allow_nan=False).encode('utf-8')).hexdigest()
+
+
+def build_configuration(directory):
+    """Read configured native compiler provenance without building or running it.
+
+    Cache flags alone miss target_compile_options. Preserve the emitted Ninja
+    compile/link settings as well, without source filenames or machine roots.
+    """
+    directory = Path(directory).resolve()
+    cache = {}
+    for line in (directory / 'CMakeCache.txt').read_text(encoding='utf-8-sig').splitlines():
+        match = re.match(r'^([^#/:][^:]*):[^=]+=(.*)$', line)
+        if match:
+            cache[match[1]] = match[2]
+    ndk = Path(cache.get('CMAKE_ANDROID_NDK') or cache.get('ANDROID_NDK') or '')
+    roots = [(str(directory), '${BUILD}'), (cache.get('CMAKE_HOME_DIRECTORY', ''), '${SOURCE}'),
+             (str(ndk), '${NDK}')]
+    source = Path(cache.get('CMAKE_HOME_DIRECTORY', directory))
+    for parent in (source, *source.parents):
+        if (parent / '.git').exists():
+            roots.append((str(parent), '${PROJECT}'))
+            break
+    roots = sorted(((root.replace('\\', '/').rstrip('/'), token) for root, token in roots if root),
+                   key=lambda item: len(item[0]), reverse=True)
+
+    def normalize(value):
+        value = re.sub(r'\\(?!["\\])', '/', value)
+        for root, token in roots:
+            # Root replacement only; flag order, case and whitespace stay exact.
+            value = re.sub(re.escape(root) + r'(?=$|[/\s"\'=])', lambda _: token, value,
+                           flags=re.I if re.match(r'^[A-Za-z]:/', root) else 0)
+        return value
+
+    missing, compilers = [], {}
+    for language in ('C', 'CXX'):
+        files = list((directory / 'CMakeFiles').glob(f'*/CMake{language}Compiler.cmake'))
+        if len(files) != 1:
+            raise ValueError(f'Ambiguous or missing {language} compiler provenance')
+        text = files[0].read_text(encoding='utf-8-sig')
+
+        def variable(suffix):
+            match = re.search(r'^set\(CMAKE_' + language + suffix + r' "([^"\r\n]*)"\)', text, re.M)
+            return match[1] if match else ''
+
+        compiler = Path(variable('_COMPILER'))
+        roots.append((str(compiler).replace('\\', '/'), '${' + language + '_COMPILER}'))
+        with compiler.open('rb') as stream:
+            compiler_hash = hashlib.file_digest(stream, 'sha256').hexdigest()
+        compilers[language] = dict(id=variable('_COMPILER_ID'), version=variable('_COMPILER_VERSION'),
+            target=cache.get(f'CMAKE_{language}_COMPILER_TARGET', ''),
+            frontend_variant=variable('_COMPILER_FRONTEND_VARIANT'),
+            sha256=compiler_hash)
+        if not compilers[language]['id'] or not compilers[language]['version']:
+            missing.append(f'{language} compiler identity')
+    roots.sort(key=lambda item: len(item[0]), reverse=True)
+    properties = (ndk / 'source.properties').read_text(encoding='utf-8-sig')
+    revision = re.search(r'^Pkg.Revision\s*=\s*(\S+)\s*$', properties, re.M)
+    if not revision:
+        missing.append('NDK revision')
+    flags = {key: normalize(value) for key, value in cache.items()
+             if re.fullmatch(r'CMAKE_(?:C|CXX|ASM|EXE_LINKER|SHARED_LINKER|MODULE_LINKER|STATIC_LINKER)_FLAGS(?:_[A-Z0-9_]+)?', key)}
+    for key in ('CMAKE_C_FLAGS', 'CMAKE_CXX_FLAGS', 'CMAKE_BUILD_TYPE'):
+        if key not in cache:
+            missing.append(key)
+    for language in ('C', 'CXX'):
+        if f'CMAKE_{language}_FLAGS_{cache.get("CMAKE_BUILD_TYPE", "").upper()}' not in flags:
+            missing.append(f'{language} configuration flags')
+    ninja = (directory / 'build.ninja').read_text(encoding='utf-8-sig')
+    target_flags = {}
+    # GS and common code live in PCSX2/PCSX2_LTO and other linked libraries,
+    # not just emucore. Include every native target, while deduplicating equal
+    # per-source settings so adding a source alone does not change provenance.
+    rule_pattern = (r'((?:C|CXX|ASM)_(?:COMPILER|SHARED_LIBRARY_LINKER|STATIC_LIBRARY_LINKER|EXECUTABLE_LINKER))__'
+                    r'([^\s]+)_' + re.escape(cache.get('CMAKE_BUILD_TYPE') or '<missing>') + r'(?=\s|$)')
+    for block in re.split(r'(?=^build )', ninja, flags=re.M):
+        rule = re.match(r'build .*?: ' + rule_pattern, block)
+        if not rule:
+            continue
+        row = dict(target=rule[2], stage=rule[1])
+        row.update({key.lower(): normalize(value) for key, value in
+                    re.findall(r'^  (FLAGS|DEFINES|INCLUDES|LINK_FLAGS|LINK_LIBRARIES|ARCH_FLAGS|LANGUAGE_COMPILE_FLAGS) = (.*)$', block, re.M)})
+        target_flags[json.dumps(row, sort_keys=True)] = row
+    for target in ('emucore', 'emucorex_gs_oracle'):
+        if not any(row['target'] == target and row['stage'].endswith('COMPILER') for row in target_flags.values()):
+            missing.append(f'{target} emitted compiler settings')
+    # Android's --target and --sysroot are part of the rule command, not FLAGS.
+    rules = (directory / 'CMakeFiles/rules.ninja').read_text(encoding='utf-8-sig')
+    compiler_rules = []
+    for block in re.split(r'(?=^rule )', rules, flags=re.M):
+        rule = re.match(r'rule ' + rule_pattern, block)
+        command = re.search(r'^  command = (.+)$', block, re.M)
+        if rule and command:
+            compiler_rules.append(dict(target=rule[2], stage=rule[1], command=normalize(command[1])))
+    if not compiler_rules:
+        missing.append('compiler command rules')
+    ir = cache.get('EMUCOREX_ENABLE_EXPERIMENTAL_IR', '').upper()
+    if ir not in ('ON', 'OFF', 'TRUE', 'FALSE', '1', '0'):
+        missing.append('experimental IR capability')
+    abi = cache.get('CMAKE_ANDROID_ARCH_ABI', cache.get('ANDROID_ABI'))
+    platform = cache.get('ANDROID_PLATFORM', cache.get('CMAKE_SYSTEM_VERSION'))
+    if not abi or not platform:
+        missing.append('Android ABI/platform')
+    result = dict(schema=2, target_coverage='all-native-targets-v1', complete=not missing, build_type=cache.get('CMAKE_BUILD_TYPE'),
+                  experimental_ir=ir in ('ON', 'TRUE', '1') if ir in ('ON', 'OFF', 'TRUE', 'FALSE', '1', '0') else None,
+                  abi=abi, platform=platform,
+                  ndk=dict(revision=revision[1] if revision else None), compilers=compilers,
+                  cache_flags=flags, target_flags=[target_flags[key] for key in sorted(target_flags)],
+                  compiler_rules=sorted(compiler_rules, key=lambda row: (row['target'], row['stage'])))
+    if missing:
+        result['missing'] = missing
+    return dict(build_configuration=result, build_configuration_sha256=configuration_sha256(result))
+
+
+def validated_build_configuration(value):
+    configuration = value.get('build_configuration')
+    if (not isinstance(configuration, dict) or configuration.get('schema') != 2 or
+        configuration.get('target_coverage') != 'all-native-targets-v1' or
+        configuration.get('complete') is not True or type(configuration.get('experimental_ir')) is not bool or
+        not configuration.get('build_type') or not isinstance(configuration.get('compilers'), dict) or
+        not isinstance(configuration.get('ndk'), dict) or not configuration['ndk'].get('revision') or
+        not configuration.get('abi') or not configuration.get('platform') or not configuration.get('target_flags') or
+        not configuration.get('cache_flags') or not configuration.get('compiler_rules')):
+        raise ValueError('Missing or incomplete build configuration; timing baseline refused')
+    for language in ('C', 'CXX'):
+        compiler = configuration['compilers'].get(language)
+        if (not isinstance(compiler, dict) or not compiler.get('id') or not compiler.get('version') or
+            not re.fullmatch(r'[0-9a-f]{64}', str(compiler.get('sha256', '')))):
+            raise ValueError('Missing compiler build configuration; timing baseline refused')
+    if value.get('build_configuration_sha256') != configuration_sha256(configuration):
+        raise ValueError('Invalid build configuration fingerprint; timing baseline refused')
+    return configuration
 
 
 def compare_captures(reference, candidate, output, tolerance=0):
@@ -142,6 +279,8 @@ def benchmark_stats(value):
 
 def compare_benchmarks(old, new):
     a, b = benchmark_stats(old), benchmark_stats(new)
+    if validated_build_configuration(old) != validated_build_configuration(new):
+        raise ValueError('Incompatible build configuration; timing baseline refused')
     compatible(old, new, ('backend', 'input_sha256', 'device', 'settings', 'frames', 'frames_per_replay', 'batch', 'warmup', 'driver_sha256'))
     return dict(before=a, after=b, median_change_percent=(b['median_ms']/a['median_ms']-1)*100,
                 p95_change_percent=(b['p95_ms']/a['p95_ms']-1)*100)
@@ -220,8 +359,11 @@ def run_report(root, tolerance=0, baseline=None):
             copies = list(root.glob('input.gs*'))
             if len(copies) != 1 or hashlib.sha256(copies[0].read_bytes()).hexdigest() != input_hash:
                 raise ValueError('Dump provenance check failed')
-        for value in (capture, perf):
+        for value in (capture, perf, profile):
             value.update(input_sha256=input_hash, device=meta['device'], core_sha256=meta['core_sha256'])
+            for key in ('build_configuration', 'build_configuration_sha256'):
+                if key in meta:
+                    value[key] = meta[key]
         drivers = [(root / backend / mode / 'driver.txt').read_bytes() for mode in ('capture', 'benchmark', 'profile')]
         if not drivers[0] or any(d != drivers[0] for d in drivers):
             raise ValueError('GPU driver identity changed between passes')
@@ -229,6 +371,7 @@ def run_report(root, tolerance=0, baseline=None):
             value['driver_sha256'] = hashlib.sha256(drivers[0]).hexdigest()
         write_json(capture_dir / 'capture.json', capture)
         write_json(perf_dir / 'benchmark.json', perf)
+        write_json(root / backend / 'profile' / 'profile.json', profile)
         load_capture(capture_dir)
         if capture['frames'] <= 0 or perf.get('warmup') != meta['warmup'] or len(perf.get('samples_ms', [])) != meta['repeats']:
             raise ValueError('Unexpected frame, warmup or sample count')
@@ -248,6 +391,15 @@ def run_report(root, tolerance=0, baseline=None):
              'Software reference; synchronized replay timing. These timings are not game FPS.', '',
              '| Backend | Correctness | Median replay ms | p95 replay ms | Median frame ms |',
              '|---|---|---:|---:|---:|']
+    try:
+        validated_build_configuration(meta)
+        eligible_configuration = True
+    except ValueError:
+        eligible_configuration = False
+    if eligible_configuration:
+        lines[4:4] = [f"Build configuration SHA256: `{meta.get('build_configuration_sha256')}`.", '']
+    else:
+        lines[4:4] = ['Build configuration provenance is missing, incomplete, or from an older schema; these timings cannot serve as a performance baseline.', '']
     for backend in backends:
         stats = summary['benchmarks'][backend]
         result = summary['comparisons'].get(backend)
@@ -313,7 +465,8 @@ def campaign_report(root):
                 set(meta['backends']) != set(expected_backends) or set(report['comparisons']) != set(expected_backends) - {'sw'} or
                 meta['input'] != job['input_name'] or meta['input_sha256'] != job['input_sha256']):
                 raise ValueError('Campaign run provenance mismatch')
-            current_build = (meta['core_sha256'], meta['runner_sha256'], meta['device'])
+            current_build = (meta['core_sha256'], meta['runner_sha256'], meta['device'],
+                             meta.get('build_configuration_sha256'))
             if build_identity is not None and current_build != build_identity:
                 raise ValueError('Campaign build or device changed between runs')
             build_identity = current_build
@@ -371,8 +524,14 @@ def main():
     report.add_argument('--baseline', type=Path)
     campaign = sub.add_parser('campaign')
     campaign.add_argument('root', type=Path)
+    configuration = sub.add_parser('build-configuration')
+    configuration.add_argument('directory', type=Path)
+    configuration.add_argument('output', type=Path)
     args = parser.parse_args()
     try:
+        if args.command == 'build-configuration':
+            write_json(args.output, build_configuration(args.directory))
+            return 0
         if args.command == 'campaign':
             report = campaign_report(args.root)
             return 2 if not report['complete'] else 0 if report['passed'] else 1

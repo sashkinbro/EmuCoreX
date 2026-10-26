@@ -198,3 +198,24 @@ scratch-FBO selection, MRT attachment preservation, full-surface clearing and
 restored state. It retains the extracted body, binary, hashes and device log.
 This focused regression does not cover depth/integer clears or replace full
 renderer replay; its adapters do not exercise production state-cache helpers.
+
+For controllable in-game captures, uncapped performance observations and CPU
+sampling, see [GAMEPLAY.md](GAMEPLAY.md). The gameplay report distinguishes fresh
+samples during active input from the rest of the marked scene and records
+limiter/GPU-timing eligibility explicitly.
+
+New GS runs record a schema-2 build-configuration fingerprint covering native
+compiler/NDK identity, ABI/API, flags and settings for all native targets,
+including PCSX2/PCSX2_LTO and common. Timing baselines require matching complete
+fingerprints; missing or older provenance remains usable for correctness only.
+Binary hashes may differ to compare code changes. This prevents an optimization
+flag change such as `-O0` to `-O2` from being presented as a source-code speedup.
+
+```powershell
+python scripts/gs-oracle/triage.py ./result-directory
+```
+
+The inventory accounts for every strict failure, groups generated selector
+families, identifies changed byte channels and summarizes numeric depth deltas
+and agreement between hardware backends. These groups guide investigation;
+agreement between Vulkan and OpenGL does not establish correctness.

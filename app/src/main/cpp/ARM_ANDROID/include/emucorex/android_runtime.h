@@ -144,6 +144,9 @@ void SetPerformanceMetricsCallbackEnabled(bool enabled, bool detailed, bool gpu_
 bool IsPerformanceGpuTimingRequested();
 void SetPerformanceGpuState(std::string name, bool timing_active);
 std::string GetPerformanceMetricsSnapshot();
+#if defined(EMUCOREX_GS_ORACLE_DEBUG)
+std::string GetGameplayProfilingSample();
+#endif
 void RequestCurrentVmStop();
 void ClearPendingHostCpuTasks();
 void PollPendingPadUpdatesOnCPUThread();

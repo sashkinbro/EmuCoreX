@@ -46,6 +46,8 @@ if (!$SkipBuild) {
     & (Get-GSCache 'CMAKE_COMMAND') --build $buildGS --target emucore emucorex_gs_oracle -j 6
     if ($LASTEXITCODE -ne 0) { throw 'GS oracle build failed.' }
 }
+# A build may regenerate CMake; record the resulting flags, not the earlier cache.
+$cacheGS = Get-Content -LiteralPath (Join-Path $buildGS 'CMakeCache.txt')
 $binGS = Get-GSCache 'CMAKE_LIBRARY_OUTPUT_DIRECTORY'
 $coreGS = Join-Path $binGS ('lib' + (Get-GSCache 'EMUCOREX_NATIVE_LIBRARY_NAME') + '.so')
 $runnerGS = Join-Path (Get-GSCache 'CMAKE_RUNTIME_OUTPUT_DIRECTORY') 'emucorex_gs_oracle'
@@ -54,6 +56,10 @@ $remoteGS = "/data/local/tmp/emucorex-gs-$runIdGS"
 $resultDirGS = Join-Path $OutputDirectory $runIdGS
 New-Item -ItemType Directory -Force -Path $resultDirGS | Out-Null
 $resultDirGS = (Resolve-Path -LiteralPath $resultDirGS).Path
+$configurationPathGS = Join-Path $resultDirGS 'build-configuration.json'
+& $Python "$PSScriptRoot/compare.py" build-configuration $buildGS $configurationPathGS
+if ($LASTEXITCODE -ne 0) { throw 'Cannot record native compiler/build configuration provenance.' }
+$configurationGS = Get-Content -LiteralPath $configurationPathGS -Raw | ConvertFrom-Json
 $modelGS = (Invoke-GSAdb @('shell','getprop','ro.product.model') | Out-String).Trim()
 $fingerprintGS = (Invoke-GSAdb @('shell','getprop','ro.build.fingerprint') | Out-String).Trim()
 $hardwareGS = (Invoke-GSAdb @('shell','getprop','ro.hardware') | Out-String).Trim()
@@ -68,6 +74,8 @@ $metadataGS = [ordered]@{
     backends = @($Backends); warmup = $Warmup; repeats = $Repeats
     cases = $Cases; seed = $Seed
     build_type = 'Debug'; remote_directory = $remoteGS
+    build_configuration = $configurationGS.build_configuration
+    build_configuration_sha256 = $configurationGS.build_configuration_sha256
 }
 $metadataGS | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath "$resultDirGS/metadata.json" -Encoding utf8
 Invoke-GSAdb @('shell','mkdir','-p', $remoteGS) | Out-Null

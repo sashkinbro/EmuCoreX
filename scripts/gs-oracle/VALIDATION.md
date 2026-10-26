@@ -80,3 +80,60 @@ whenever a depth-as-color MRT is active.
   performance failure remains visible and is not treated as a passing suite.
 - OpenGL timing changed by -0.60% median and +1.92% p95 in this paired run.
   No performance improvement is claimed from these measurements.
+
+## Direct recompilers and actual gameplay
+
+- Gradle Debug APK build initially reproduced a configuration failure: the
+  default Release native override conflicted with the Debug-only GS option.
+  Variant-specific configuration now builds and installs optimized Debug
+  (`-O2 -g1`) APKs. Experimental IR is explicitly OFF for both app variants.
+- Runtime-gate tests cover 36 actual production build/property/override
+  combinations; 86 dispatcher cases verify explicit IR-suite unavailability
+  and separate direct selectors.
+- On Lenovo, optimized native guards completed 4,769 checks with zero failures:
+  direct EE stores 726, direct EE 3,132, direct IOP 379, direct VU 441, SPU2 volume
+  9, classifier 53, JIT cache 11, VU cache 18. Output reports compiled IR runtime
+  capability 0. The earlier SPU2 timing gate passes with optimized Debug.
+- NFS Most Wanted gameplay reached a Sprint on Seaside & Power Station in the
+  Golf GTI. Saved state 7 permits starting both hardware backends from the same
+  playable state. Screenshots show the car moving and race progress; startup
+  and menus remain navigation evidence. Both capped diagnostic runs passed the
+  gameplay capture gate, but are not uncapped performance baselines.
+- A separate 15-second driving CPU sample recorded 14,061 samples with zero
+  loss. Hot symbols include GSRendererHW::Draw, the fused STQ/RGBA/XYZF handler,
+  VIF/MTVU, time stretching and SPU2 mixing. Exact data/binaries are retained in
+  `.git/mw-simpleperf-vk1/`; sampling intervals are excluded from ordinary timing.
+- The harness now defaults to unlimited mode and GPU timing off. Native
+  `Target: Max` is required in fresh marked gameplay samples. Save/load and
+  screenshot/dump intervals end the measured phase. Cached samples cannot meet
+  the gameplay gate; active-input statistics exclude time after button expiry.
+- Both uncapped runs from state 7 passed instrumentation and the strict unlimited
+  report check. Each has 46 fresh samples overlapping active Cross input:
+  Vulkan median reported speed 242.962%, OpenGL 193.719%. Native snapshots report
+  `Target: Max`; GPU timing is disabled. Their installed APK hashes and core ELF
+  build IDs match the local artifacts, with schema-2 configuration attached in
+  `host-metadata.json`. These short independent observations cover different
+  emulated distances under wall-clock input and are not a causal speedup or a
+  controlled backend ranking. Evidence: `.git/gameplay-mw-vk-unlimited-01-final/`
+  and `.git/gameplay-mw-gl-unlimited-01-final/`.
+- A maximal synthetic run completed 4,140 scenes / 8,280 checkpoints per backend
+  with zero execution errors. Strict differences remain: Vulkan 670 and OpenGL
+  629. The full 1,299-failure inventory is retained in
+  `results/20261026-112740-077-0c9e88fb/triage.json` and `triage.md`.
+- The six-field driving GS dump completed all replay/capture/profile passes.
+  Both hardware backends produce identical bytes but differ from Software on
+  all six captures. The first field has a large alpha/history difference;
+  later fields have many small color differences and some edge outliers.
+  They remain strict failures requiring investigation. Evidence:
+  `results/20261026-112117-804-dd5bd74b/`.
+- A confirmed format-transition defect has an independent GS-address-table
+  anchor: `matrix-0194` must preserve untouched raw word 0 as `0x80102030`,
+  while both hardware backends return the repacked value `0x88868886`.
+  Z16 layout cases use exact depths 0–3, so their errors cannot be dismissed as
+  floating-point depth precision. These fixes are still in progress.
+
+Older captures use schema-1 compiler provenance and remain correctness evidence.
+They are deliberately refused as timing baselines after the all-native-target
+schema-2 correction. New before/after measurements must use schema 2 with equal
+compiler configuration. No emulator FPS improvement is claimed from instruction
+count reduction, capped gameplay, or mismatched compilation settings.

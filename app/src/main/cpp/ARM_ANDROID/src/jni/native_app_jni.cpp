@@ -674,6 +674,13 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_sbro_emucorex_core_NativeApp_getPe
 	return StringToJString(env, emucorex::android::GetPerformanceMetricsSnapshot());
 }
 
+#if defined(EMUCOREX_GS_ORACLE_DEBUG)
+extern "C" JNIEXPORT jstring JNICALL Java_com_sbro_emucorex_core_GameplayProfilingDeviceTest_readMetricsSample(JNIEnv* env, jobject)
+{
+	return StringToJString(env, emucorex::android::GetGameplayProfilingSample());
+}
+#endif
+
 extern "C" JNIEXPORT jfloatArray JNICALL Java_com_sbro_emucorex_core_NativeApp_getDisplayDrawRect(JNIEnv* env, jclass)
 {
 	if (!AndroidRuntime::Instance().HasValidVm())
