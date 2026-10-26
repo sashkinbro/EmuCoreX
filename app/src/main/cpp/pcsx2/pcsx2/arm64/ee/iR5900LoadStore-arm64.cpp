@@ -194,8 +194,19 @@ static void recStoreAddressToECX_emit_oaknut(bool align16)
 	const oak::WReg addr = oakWRegister(EE_HOST_RCX);
 	if (_Rs_ != 0)
 	{
-		recMoveGPRtoOakW(addr, _Rs_);
-		oakAddSignedImm(addr, addr, _Imm_, oak::util::W4);
+		// Small displacements need no scratch register, so a cached base can
+		// feed ADD/SUB directly even when it occupies W4.
+		const int base = !GPR_IS_CONST1(_Rs_) && _Imm_ >= -4095 && _Imm_ <= 4095
+			? _checkX86reg(X86TYPE_GPR, _Rs_, MODE_READ) : -1;
+		if (base >= 0)
+		{
+			oakAddSignedImm(addr, oakWRegister(base), _Imm_, oak::util::W4);
+		}
+		else
+		{
+			recMoveGPRtoOakW(addr, _Rs_);
+			oakAddSignedImm(addr, addr, _Imm_, oak::util::W4);
+		}
 	}
 	else
 	{
