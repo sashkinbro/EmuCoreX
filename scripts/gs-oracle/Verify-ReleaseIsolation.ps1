@@ -13,6 +13,9 @@ if ((Read-GSCache $DebugBuildDirectory 'CMAKE_BUILD_TYPE') -ne 'Debug' -or
     (Read-GSCache $DebugBuildDirectory 'EMUCOREX_ENABLE_GS_ORACLE') -ne 'ON') { throw 'Expected GS Debug build.' }
 if ((Read-GSCache $ReleaseBuildDirectory 'CMAKE_BUILD_TYPE') -ne 'Release' -or
     (Read-GSCache $ReleaseBuildDirectory 'EMUCOREX_ENABLE_GS_ORACLE') -ne 'OFF') { throw 'Expected GS-free Release build.' }
+if ((Read-GSCache $ReleaseBuildDirectory 'EMUCOREX_ENABLE_NATIVE_SELF_TESTS') -ne 'OFF') {
+    throw 'Native self-tests must be compiled out of Release.'
+}
 $ndkGS = Read-GSCache $DebugBuildDirectory 'CMAKE_ANDROID_NDK'
 $nmGS = Join-Path $ndkGS 'toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-nm.exe'
 foreach ($directoryGS in @($DebugBuildDirectory, $ReleaseBuildDirectory)) {
@@ -26,8 +29,24 @@ foreach ($directoryGS in @($DebugBuildDirectory, $ReleaseBuildDirectory)) {
     if ($hasGS -ne ($directoryGS -eq $DebugBuildDirectory)) { throw "Unexpected GS export state: $libraryGS" }
     $hasGameplayGS = [bool]($symbolsGS -match 'Java_com_sbro_emucorex_core_GameplayProfilingDeviceTest_readMetricsSample$')
     if ($hasGameplayGS -ne ($directoryGS -eq $DebugBuildDirectory)) { throw "Unexpected gameplay profiling export state: $libraryGS" }
+    if ($directoryGS -eq $ReleaseBuildDirectory) {
+        $forbiddenGS = 'EmuCoreXRun.*(?:Oracle|Tests)|GameplayProfilingDeviceTest|' +
+            'NativeApp_(?:queueGsDumpNative|runBootSmokeProbeNative|runJitExecutableMemorySmokeTest|' +
+            'runEeFpuDivRoundingSelfTest|startJitProfiler|stopJitProfiler|isJitProfilerActive|' +
+            'startHangTrace|stopHangTrace|isHangTraceActive)$'
+        if ($symbolsGS -match $forbiddenGS) { throw 'Debug/test JNI or oracle export leaked into Release.' }
+        $fullSymbolsGS = & $nmGS --defined-only --demangle $libraryGS
+        if ($LASTEXITCODE -ne 0) { throw "Cannot inspect internal symbols: $libraryGS" }
+        if ($fullSymbolsGS -match 'JitProfiler::|HangTrace::|GSDumpBase::|GSDumpReplayer::') {
+            throw 'Profiler or GS dumper implementation leaked into Release.'
+        }
+        if (!($symbolsGS -match 'EmuCoreXDumpNativeCrashDiagnostics$') -or
+            !($symbolsGS -match 'NativeApp_setNativeCrashLogFilePath$')) {
+            throw 'Required production crash diagnostics are missing.'
+        }
+    }
 }
-if (Select-String -LiteralPath (Join-Path $ReleaseBuildDirectory 'build.ninja') -Pattern 'src/debug/gs_oracle|emucorex_gs_oracle') {
-    throw 'GS source or executable leaked into the Release build graph.'
+if (Select-String -LiteralPath (Join-Path $ReleaseBuildDirectory 'build.ninja') -Pattern 'ARM_ANDROID[/\\]src[/\\]debug[/\\]|emucorex_(gs|jit)_oracle') {
+    throw 'Oracle source or executable leaked into the Release build graph.'
 }
-Write-Host 'PASS: Debug GS/gameplay profiling exports exist; Release excludes GS oracle sources, executable, and profiling exports. Experimental IR is OFF in both builds.'
+Write-Host 'PASS: Release excludes GS/JIT oracles, test JNI, GS dumpers and JIT/hang profilers; production crash diagnostics remain. Experimental IR is OFF in both builds.'
