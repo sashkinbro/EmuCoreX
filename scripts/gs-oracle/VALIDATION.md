@@ -137,7 +137,69 @@ whenever a depth-as-color MRT is active.
   anchor: `matrix-0194` must preserve untouched raw word 0 as `0x80102030`,
   while both hardware backends return the repacked value `0x88868886`.
   Z16 layout cases use exact depths 0–3, so their errors cannot be dismissed as
-  floating-point depth precision. These fixes are still in progress.
+  floating-point depth precision. Known-clear transitions now preserve old raw
+  bytes and use a tiny immutable GPU pattern instead of a GPU readback. Native
+  color targets reuse their existing allocation when all ownership/size guards
+  permit it. Nonuniform format transitions retain their previous path.
+
+## GS correctness and cost follow-up
+
+- FB_ONLY no longer narrows alpha to passing fragments; failing fragments can
+  also write alpha 255. ZB_ONLY with overlapping varying depths and ALWAYS now
+  preserves primitive order through existing feedback/barriers. Combined DATE
+  cases retain their previous path pending a dedicated regression.
+- Z32 CPU reads can download an authoritative Z16/Z16S target using its old
+  layout instead of skipping it. Unsafe aliases, partial validity and failed
+  transfers retain conservative behavior; ordinary draws gain no GPU readbacks.
+- Maximal seed-1 runs complete 4,140 scenes / 8,280 checkpoints per backend:
+  Vulkan differences fall from 670 to 70; OpenGL from 629 to 73. The initial
+  complete before/after inventory has no new failures and 1,156 corrected failure
+  records. All nine independent golden anchors pass. Remaining differences are
+  still strict failures, not accepted tolerances. Evidence includes
+  `results/20261026-122258-337-5fc6d121/` and the later cache/resize run
+  `results/20261026-124632-895-a04a1aec/`.
+  The final in-place variant repeats the full corpus with one warmup and one
+  benchmark sample in `results/20261026-125900-971-111c1d01/`: identical 70/73
+  differences, no new failures, all nine anchors pass. This final short run is
+  correctness coverage, not a statistical timing baseline.
+- Host tests cover 148 production target-policy/cache/rollback/metadata cases,
+  1,536 depth-order decisions, 32 alpha-range decisions, 147,456 actual address
+  mappings and all 65,536 RGB5A1 round trips through GL/VK alpha conversion.
+  Exact inline resize behavior passes 96,768 cases; actual ARM64 default resize
+  calls skip the slow helper when physical dimensions match. Nine additional
+  native GS suites pass 420 checks. No game-FPS gain is inferred from codegen.
+- The original synchronous fallback was rejected: 36 readbacks caused major
+  synthetic slowdowns. The final path retains the original one readback in the
+  default synthetic profile. Two immutable patterns survive GS resets but are
+  released before device replacement. Allocation failures preserve fallback.
+- Final alternating old/new synthetic timing uses equal schema-2 compiler
+  configuration, three runs per version/backend, eleven samples per run and
+  temporary Android fixed-performance mode, restored afterward. OpenGL run
+  medians are old [270.640, 274.685, 268.344] ms and new
+  [287.317, 281.965, 281.565] ms: **4.18% slower** by median of run medians.
+  Full performance parity is not established. Vulkan run medians vary strongly
+  (old 516–544 ms, new 404–563 ms), so no causal speedup is claimed.
+  Evidence: `.git/gs-final-inplace-paired/`. A transient ADB pull failure was
+  retried for the already-completed final sample; the benchmark was not rerun.
+- The same six-field NFS driving dump retains its counters and zero readbacks;
+  the recorded corrected replay differs by about -1.15% Vulkan / -0.40% OpenGL
+  median, within measurement variability. All six display differences remain.
+  These are replay measurements, not uncapped gameplay FPS.
+- Corrected Debug APK actual Vulkan racing reaches 21% progress at 59 mph.
+  All 62 active-input samples report Target Max, GPU timing off; APK/core/compiler
+  provenance matches. Median reported speed is 213.948%, but this short run
+  traverses a different distance than earlier runs and is not a causal speedup
+  or regression comparison: `.git/gameplay-mw-vk-gs-final-01-final/`.
+- Final APK OpenGL actual racing reaches 18% progress and passes instrumentation
+  with 123 fresh gameplay samples, 50 during active acceleration. Unlimited mode,
+  GPU timing off and installed APK/native provenance are verified. This is a
+  correctness smoke run; its initial measured phase overlaps a short native
+  selector check, so its timing is excluded from performance claims. Evidence:
+  `.git/gameplay-mw-gl-gs-final-01-final/`.
+- Remaining independently proven alpha/blend ordering defects and arithmetic
+  anchors are recorded in `build-support/gs-alpha-triage.txt`; they are not fixed
+  by this checkpoint. Physical RP5 audio-route confirmation is also pending;
+  see `docs/testing/audio-route-recovery.md`.
 
 Older captures use schema-1 compiler provenance and remain correctness evidence.
 They are deliberately refused as timing baselines after the all-native-target

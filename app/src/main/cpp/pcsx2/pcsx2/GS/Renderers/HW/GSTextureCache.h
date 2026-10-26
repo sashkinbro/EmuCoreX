@@ -11,6 +11,7 @@
 #include <utility>
 #include <limits>
 #include <deque>
+#include <cmath>
 
 class GSHwHack;
 
@@ -281,9 +282,20 @@ public:
 		void UpdateValidChannels(u32 psm, u32 fbmsk);
 
 		/// Resizes target texture, DOES NOT RESCALE.
-		bool ResizeTexture(int new_unscaled_width, int new_unscaled_height, bool recycle_old = true, bool require_new_rect = false, GSVector4i new_rect = GSVector4i::zero(), bool keep_old = false);
+		__fi bool ResizeTexture(int new_unscaled_width, int new_unscaled_height, bool recycle_old = true, bool require_new_rect = false, GSVector4i new_rect = GSVector4i::zero(), bool keep_old = false)
+		{
+			const GSVector2i size = m_texture->GetSize();
+			const GSVector2i new_unscaled_size(new_unscaled_width, new_unscaled_height);
+			const GSVector2i new_size = ScaleRenderTargetSize(new_unscaled_size, m_scale);
+			// Most draws keep the same targets. Avoid entering the allocation/copy
+			// implementation, while retaining the physical-size and forced-copy checks.
+			if (size.x == new_size.x && size.y == new_size.y && !require_new_rect)
+				return true;
+			return ResizeTextureImpl(new_unscaled_size, new_size, recycle_old, require_new_rect, new_rect, keep_old);
+		}
 
 	private:
+		bool ResizeTextureImpl(GSVector2i new_unscaled_size, GSVector2i new_size, bool recycle_old, bool require_new_rect, GSVector4i new_rect, bool keep_old);
 		void UpdateTextureDebugName();
 	};
 
@@ -473,6 +485,18 @@ protected:
 	std::deque<PendingDownload> m_pending_downloads;
 	std::vector<std::unique_ptr<GSDownloadTexture>> m_async_download_texture_pool;
 
+	// Immutable decoded patterns are independent of GS VRAM and survive GSReset.
+	// The renderer purge hook releases them before replacing the GS device.
+	struct ClearPatternEntry
+	{
+		GSTexture* texture = nullptr;
+		u32 raw_clear = 0;
+	};
+	ClearPatternEntry m_clear_patterns[2] = {};
+	GSTexture* GetClearPatternTexture(bool depth, u32 raw_clear);
+	bool TryReuseClearPatternTarget(Target* t, GIFRegTEX0 tex0, const GSVector2i& size, float scale, u32 raw_clear);
+
+
 	Source* CreateSource(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA, const GIFRegCLAMP& CLAMP, Target* t, int x_offset, int y_offset, const GSVector2i* lod, const GSVector4i* src_range, GSTexture* gpu_clut, SourceRegion region, bool force_temporary = false);
 	bool HasExpectedStripedMove(u32 sbp, u32 dbp) const;
 	void ClearExpectedStripedMove();
@@ -483,7 +507,11 @@ protected:
 		bool preload, bool preserve_target, const GSVector4i draw_rect, Target* dst, GSTextureCache::Source* src = nullptr);
 
 	// Returns scaled texture size.
-	static GSVector2i ScaleRenderTargetSize(const GSVector2i& sz, float scale);
+	static __fi GSVector2i ScaleRenderTargetSize(const GSVector2i& sz, float scale)
+	{
+		return GSVector2i(static_cast<int>(std::ceil(static_cast<float>(sz.x) * scale)),
+			static_cast<int>(std::ceil(static_cast<float>(sz.y) * scale)));
+	}
 
 	/// Converts one native coordinate to the device grid. Native pixel n owns device pixels
 	/// [ceil(n * scale), ceil((n + 1) * scale)), which is where the rasteriser puts it, so the
@@ -512,6 +540,10 @@ protected:
 
 	/// Resizes the download texture if needed.
 	bool PrepareDownloadTexture(u32 width, u32 height, GSTexture::Format format, std::unique_ptr<GSDownloadTexture>* tex);
+	bool TryReadRawDepthTarget(Target* t, u32 bp, u32 bw, u32 psm, const GSVector4i& r, bool force_synchronous);
+	bool ReadWithStatus(Target* t, const GSVector4i& r, bool force_synchronous);
+	bool UploadClearPattern(Target* dst, const GIFRegTEX0& old_tex0, const GSVector4i& old_drawn, u32 raw_clear);
+	bool ReadClearTarget(Target* t, const GSVector4i& r, u32* raw_clear = nullptr);
 	void ApplyPendingDownload(PendingDownload& download);
 
 	HashCacheEntry* LookupHashCache(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA, bool& paltex, const u32* clut, const GSVector2i* lod, SourceRegion region);
@@ -541,6 +573,7 @@ public:
 	void ProcessPendingDownloads();
 	void DiscardPendingDownloads();
 	void RemoveAll(bool sources, bool targets, bool hash_cache);
+	void ReleaseClearPatterns();
 	void ReadbackAll();
 	static void AddDirtyRectTarget(Target* target, GSVector4i rect, u32 psm, u32 bw, RGBAMask rgba, bool req_linear = false);
 	void ResizeTarget(Target* t, GSVector4i rect, u32 tbp, u32 psm, u32 tbw);

@@ -171,6 +171,7 @@ GSTextureCache::GSTextureCache()
 GSTextureCache::~GSTextureCache()
 {
 	RemoveAll(true, true, true);
+	ReleaseClearPatterns();
 
 	s_hash_cache_purge_list = {};
 	_aligned_free(s_unswizzle_buffer);
@@ -2478,12 +2479,6 @@ GSTextureCache::Target* GSTextureCache::FindTargetOverlap(Target* target, int ty
 	return nullptr;
 }
 
-GSVector2i GSTextureCache::ScaleRenderTargetSize(const GSVector2i& sz, float scale)
-{
-	return GSVector2i(static_cast<int>(std::ceil(static_cast<float>(sz.x) * scale)),
-		static_cast<int>(std::ceil(static_cast<float>(sz.y) * scale)));
-}
-
 int GSTextureCache::ScaleNativeToDevice(int native, float scale)
 {
 	return static_cast<int>(std::ceil(static_cast<float>(native) * scale));
@@ -2636,6 +2631,77 @@ GSTextureCache::Target* GSTextureCache::LookupTarget(GIFRegTEX0 TEX0, const GSVe
 				Target* t = *i;
 				if (bp == t->m_TEX0.TBP0)
 				{
+					// A COPY/DEPTH_COPY followed by changing PSM cannot reinterpret GS
+					// 16/32-bit swizzles: it repacks untouched old pixels on download.
+					// Preserve the old raw layout for plain untextured draws. Shuffles,
+					// active source ownership and other overlapping targets retain
+					// their existing paths until they have separate correctness proofs.
+					if (iteration == 0 && used && !is_frame && !is_shuffle && !src &&
+						IsHardwareDownloadReadbackEnabled(GSConfig.HWDownloadMode) &&
+						TEX0.TBW == t->m_TEX0.TBW && ds != t &&
+						psm_s.depth == GSLocalMemory::m_psm[t->m_TEX0.PSM].depth &&
+						// WritePixel16 has no channel mask: every source bit must be valid.
+						(GSLocalMemory::m_psm[t->m_TEX0.PSM].bpp != 16 ||
+						 (t->m_valid_rgb && t->m_valid_alpha_low && t->m_valid_alpha_high)) &&
+						((psm_s.bpp == 16 && GSLocalMemory::m_psm[t->m_TEX0.PSM].bpp == 32) ||
+						 (psm_s.bpp == 32 && GSLocalMemory::m_psm[t->m_TEX0.PSM].bpp == 16)))
+					{
+						bool other_overlap = false;
+						for (int target_type = 0; target_type < 2 && !other_overlap; ++target_type)
+						{
+							for (Target* other : m_dst[target_type])
+							{
+								// PreloadTarget/CombineAlignedInsideTargets may merge or
+								// delete these GPU-authoritative targets. A later raw
+								// upload must not overwrite data which never reached VRAM.
+								if (other != t &&
+									(other->Overlaps(bp, TEX0.TBW, TEX0.PSM, GSVector4i::loadh(size)) ||
+									 (!t->m_drawn_since_read.rempty() && other->Overlaps(t->m_TEX0.TBP0,
+										 t->m_TEX0.TBW, t->m_TEX0.PSM, t->m_drawn_since_read))))
+								{
+									other_overlap = true;
+									break;
+								}
+							}
+						}
+						if (!other_overlap &&
+							(t->m_drawn_since_read.rempty() ||
+							 (t->m_texture->GetState() == GSTexture::State::Cleared && t->m_dirty.empty())))
+						{
+							// Nonuniform GPU data needs a future GPU reinterpretation path.
+							// Keep its existing cache behavior without extra updates or waits.
+							t->Update();
+							u32 raw_clear = 0;
+							const GIFRegTEX0 old_tex0 = t->m_TEX0;
+							const GSVector4i old_drawn = t->m_drawn_since_read;
+							const bool full_channels = t->m_valid_rgb && t->m_valid_alpha_low && t->m_valid_alpha_high;
+							if (old_drawn.rempty() || ReadClearTarget(t, old_drawn, &raw_clear))
+							{
+								if (full_channels && TryReuseClearPatternTarget(t, TEX0, size, scale, raw_clear))
+								{
+									list->MoveFront(i.Index());
+									return t;
+								}
+								InvalidateSourcesFromTarget(t);
+								i = list->erase(i);
+								delete t;
+								Target* reloaded = CreateTarget(TEX0, size, size, scale, type, used, fbmask,
+									false, true, true, draw_rect, nullptr);
+								if (reloaded && !(full_channels && UploadClearPattern(reloaded, old_tex0, old_drawn, raw_clear)))
+								{
+									// A preceding EE clear is no longer authoritative after
+									// clear materialization. Force raw upload even if normal preload
+									// heuristics recognized that older clear.
+									reloaded->m_dirty.clear();
+									RGBAMask channels;
+									channels._u32 = GSUtil::GetChannelMask(TEX0.PSM);
+									AddDirtyRectTarget(reloaded, GSVector4i::loadh(size), TEX0.PSM, TEX0.TBW, channels, true);
+									reloaded->Update(true);
+								}
+								return reloaded;
+							}
+						}
+					}
 					bool can_use = true;
 
 					if (new_dst && ((GSState::s_n - new_dst->m_last_draw) < (GSState::s_n - t->m_last_draw) && new_dst->m_TEX0.TBP0 <= bp))
@@ -5178,6 +5244,12 @@ void GSTextureCache::InvalidateLocalMem(
 			{
 				Target* t = *it;
 
+				if (TryReadRawDepthTarget(t, bp, bw, psm, r, force_synchronous))
+				{
+					z_found = true;
+					continue;
+				}
+
 				if (t->m_32_bits_fmt && t->m_TEX0.PSM > PSMZ24)
 					t->m_TEX0.PSM = PSMZ32;
 
@@ -7523,11 +7595,293 @@ std::shared_ptr<GSTextureCache::Palette> GSTextureCache::LookupPaletteObject(con
 	return m_palette_map.LookupPalette(clut, pal, need_gs_texture);
 }
 
+bool GSTextureCache::TryReadRawDepthTarget(Target* t, u32 bp, u32 bw, u32 psm,
+	const GSVector4i& r, bool force_synchronous)
+{
+	// A Z32 CPU read consumes raw VRAM words, including both Z16 halfwords.
+	// Read the complete pending OLD layout; request coordinates cannot be reused
+	// as Z16 coordinates. This path runs only for CPU read requests.
+	if (psm != PSMZ32 || t->m_type != DepthStencil || t->m_32_bits_fmt ||
+		(t->m_TEX0.PSM != PSMZ16 && t->m_TEX0.PSM != PSMZ16S) ||
+		bp != t->m_TEX0.TBP0 || bw != t->m_TEX0.TBW ||
+		!t->m_valid_rgb || !t->m_valid_alpha_low || !t->m_valid_alpha_high ||
+		t->m_texture->GetFormat() != GSTexture::Format::DepthStencil ||
+		!IsHardwareDownloadReadbackEnabled(GSConfig.HWDownloadMode))
+		return false;
+
+	for (int type = 0; type < 2; ++type)
+	{
+		for (Target* other : m_dst[type])
+		{
+			if (other != t && (other->Overlaps(bp, bw, psm, r) ||
+				(!t->m_drawn_since_read.rempty() && other->Overlaps(t->m_TEX0.TBP0,
+					t->m_TEX0.TBW, t->m_TEX0.PSM, t->m_drawn_since_read))))
+				return false;
+		}
+	}
+	if (t->m_drawn_since_read.rempty())
+		return true;
+
+	t->Update();
+	const bool materialized_clear = ReadClearTarget(t, t->m_drawn_since_read);
+	if (!materialized_clear && !ReadWithStatus(t, t->m_drawn_since_read, force_synchronous))
+		return false;
+
+	++t->readbacks_since_draw;
+	// An asynchronous snapshot has not updated CPU VRAM yet. Retain pending
+	// ownership until a synchronous read confirms that the data is available.
+	if (materialized_clear || force_synchronous || GSConfig.HWDownloadMode != GSHardwareDownloadMode::Asynchronous)
+		t->m_drawn_since_read = GSVector4i::zero();
+	return true;
+}
+
+bool GSTextureCache::TryReuseClearPatternTarget(Target* t, GIFRegTEX0 tex0,
+	const GSVector2i& size, float scale, u32 raw_clear)
+{
+	// Only the color path has the same fresh-target preload contract here.
+	// Keep depth and all allocation/geometry changes on the established path.
+	if (t->m_type != RenderTarget || t->m_shared_texture ||
+		t->m_TEX0.PSM != PSMCT32 || (tex0.PSM != PSMCT16 && tex0.PSM != PSMCT16S) ||
+		t->m_texture->GetFormat() != GSTexture::Format::Color ||
+		!t->m_valid_rgb || !t->m_valid_alpha_low || !t->m_valid_alpha_high ||
+		scale != 1.0f || t->m_scale != scale ||
+		t->m_unscaled_size.x != size.x || t->m_unscaled_size.y != size.y ||
+		t->m_texture->GetWidth() != size.x || t->m_texture->GetHeight() != size.y)
+		return false;
+
+	const GIFRegTEX0 old_tex0 = t->m_TEX0;
+	const GSVector4i old_drawn = t->m_drawn_since_read;
+	t->m_TEX0 = tex0;
+	if (!UploadClearPattern(t, old_tex0, old_drawn, raw_clear))
+	{
+		// Pattern preparation failed before any GPU or target metadata mutation.
+		t->m_TEX0 = old_tex0;
+		return false;
+	}
+
+	InvalidateSourcesFromTarget(t);
+	// Reproduce PreloadTarget(preload=true)'s matching EE clear consumption.
+	// Leaving that old marker behind could incorrectly clear a later target.
+	auto& transfers = GSRendererHW::GetInstance()->m_draw_transfers;
+	const bool was_clear = !transfers.empty() && transfers.back().zero_clear &&
+		transfers.back().blit.DBP == tex0.TBP0 && transfers.back().blit.DBW == tex0.TBW;
+	if (was_clear)
+		transfers.pop_back();
+
+	// UploadClearPattern resets channels/alpha/dirty/owned pixels. Reset the
+	// remaining fields which a fresh Target/CreateTarget would initialize.
+	t->m_TEXA = GIFRegTEXA{};
+	t->m_age = 0;
+	t->m_32_bits_fmt = false;
+	t->m_was_dst_matched = false;
+	t->m_downscaled = g_gs_renderer->GetUpscaleMultiplier() > 1.0f;
+	t->m_last_draw = GSState::s_n + (was_clear ? 0 : 1);
+	t->m_is_frame = false;
+	t->m_used = true;
+	t->OffsetHack_modxy = 0.0f;
+	t->readbacks_since_draw = 0;
+	// UploadValidity unions rectangles; a new layout needs the exact new end.
+	t->ResizeValidity(GSVector4i::loadh(size));
+	return true;
+}
+
+GSTexture* GSTextureCache::GetClearPatternTexture(bool depth, u32 raw_clear)
+{
+	ClearPatternEntry& entry = m_clear_patterns[depth ? 1 : 0];
+	if (entry.texture && entry.raw_clear == raw_clear)
+		return entry.texture;
+
+	// Never overwrite a sampled texture in place. Prepare a replacement first;
+	// failed allocation/upload leaves the previous immutable cache entry intact.
+	u32 pixels[16];
+	for (int x = 0; x < 16; ++x)
+	{
+		// Halfword address bit zero is x[3] in both 16 and 16S layouts.
+		const u32 half = (raw_clear >> (x < 8 ? 0 : 16)) & 0xffff;
+		pixels[x] = ((half & 0x1f) << 3) | ((half & 0x3e0) << 6) |
+			((half & 0x7c00) << 9) | ((half & 0x8000) << 16);
+	}
+	GSTexture* pattern = g_gs_device->CreateTexture(16, 1, 1, GSTexture::Format::Color);
+	if (!pattern)
+		return nullptr;
+	if (!pattern->Update(GSVector4i(0, 0, 16, 1), pixels, sizeof(pixels)))
+	{
+		g_gs_device->Recycle(pattern);
+		return nullptr;
+	}
+	if (entry.texture)
+		g_gs_device->Recycle(entry.texture);
+	entry.texture = pattern;
+	entry.raw_clear = raw_clear;
+	return pattern;
+}
+
+void GSTextureCache::ReleaseClearPatterns()
+{
+	for (ClearPatternEntry& entry : m_clear_patterns)
+	{
+		if (entry.texture)
+			g_gs_device->Recycle(entry.texture);
+		entry = {};
+	}
+}
+
+bool GSTextureCache::UploadClearPattern(Target* dst, const GIFRegTEX0& old_tex0,
+	const GSVector4i& old_drawn, u32 raw_clear)
+{
+	const GIFRegTEX0& tex0 = dst->m_TEX0;
+	const bool depth = tex0.PSM == PSMZ16 || tex0.PSM == PSMZ16S;
+	const int width = dst->m_unscaled_size.x;
+	const int height = dst->m_unscaled_size.y;
+	// Whole old 32-bit pages must cover every byte of the new 16-bit target.
+	// A same-sized 16->32 target would leave half the destination unowned.
+	if (dst->m_scale != 1.0f || width <= 0 || height <= 0 || tex0.TBW == 0 ||
+		static_cast<u32>(width) > tex0.TBW * 64 || (depth && GetTemporaryZ() != nullptr) ||
+		old_tex0.TBP0 != tex0.TBP0 || old_tex0.TBW != tex0.TBW ||
+		old_tex0.PSM != (depth ? PSMZ32 : PSMCT32) ||
+		(!depth && tex0.PSM != PSMCT16 && tex0.PSM != PSMCT16S) ||
+		dst->m_type != (depth ? DepthStencil : RenderTarget) ||
+		dst->m_texture->GetFormat() != (depth ? GSTexture::Format::DepthStencil : GSTexture::Format::Color) ||
+		old_drawn.x != 0 || old_drawn.y != 0 ||
+		old_drawn.z < ((width + 63) & ~63) || old_drawn.w < (((height + 63) & ~63) / 2))
+		return false;
+
+	GSTexture* pattern = GetClearPatternTexture(depth, raw_clear);
+	if (!pattern)
+		return false;
+
+	std::vector<GSDevice::MultiStretchRect> rects;
+	rects.reserve((width + 15) / 16);
+	for (int x = 0; x < width; x += 16)
+	{
+		GSDevice::MultiStretchRect rect;
+		rect.src = pattern;
+		rect.src_rect = GSVector4(0.0f, 0.0f, static_cast<float>(std::min(16, width - x)) / 16.0f, 1.0f);
+		rect.dst_rect = GSVector4(x, 0, std::min(x + 16, width), height);
+		rect.filter = Nearest;
+		rect.wmask.wrgba = 0xf;
+		rects.push_back(rect);
+	}
+	const ShaderConvertSelector shader = depth ?
+		ShaderConvertSelector(ShaderConvert::RGB5A1_TO_DEPTH16).SetDepthOutput(true) :
+		ShaderConvertSelector(ShaderConvert::RTA_CORRECTION);
+	g_gs_device->DrawMultiStretchRects(rects.data(), static_cast<u32>(rects.size()), dst->m_texture, shader);
+
+	// CreateTarget may have inherited an older EE clear. This complete upload
+	// replaces that metadata with the exact raw pattern. RGB5A1 alpha is only
+	// 0/128, so correction is exact and avoids a later ScaleRTAlpha copy.
+	dst->m_dirty.clear();
+	dst->m_rt_alpha_scale = !depth;
+	dst->m_valid_rgb = dst->m_valid_alpha_low = dst->m_valid_alpha_high = true;
+	dst->UpdateValidity(GSVector4i(0, 0, width, height));
+	dst->m_drawn_since_read = GSVector4i(0, 0, width, height);
+	dst->m_alpha_min = std::min((raw_clear >> 8) & 0x80u, (raw_clear >> 24) & 0x80u);
+	dst->m_alpha_max = std::max((raw_clear >> 8) & 0x80u, (raw_clear >> 24) & 0x80u);
+	dst->m_alpha_range = dst->m_alpha_min != dst->m_alpha_max;
+	return true;
+}
+
+bool GSTextureCache::ReadClearTarget(Target* t, const GSVector4i& r, u32* raw_clear)
+{
+	// Deferred clears already describe the complete GPU value. Materialize that
+	// value in the OLD GS layout without submitting/waiting for a GPU download.
+	// Partial uploads and non-uniform targets keep the existing cache path.
+	if (t->m_texture->GetState() != GSTexture::State::Cleared || !t->m_dirty.empty())
+		return false;
+	if (r.rempty())
+		return true;
+
+	const GIFRegTEX0& TEX0 = t->m_TEX0;
+	switch (TEX0.PSM)
+	{
+		case PSMCT32: case PSMCT24: case PSMCT16: case PSMCT16S:
+		case PSMZ32: case PSMZ24: case PSMZ16: case PSMZ16S:
+			break;
+		default:
+			return false;
+	}
+	const bool is_depth = (TEX0.PSM & 0x30) == 0x30;
+	// Reinterpreted targets can retain a backing texture of the opposite kind.
+	// Reading the wrong clear-value union member would fabricate raw VRAM bits.
+	if (t->m_type != (is_depth ? DepthStencil : RenderTarget) ||
+		t->m_texture->GetFormat() != (is_depth ? GSTexture::Format::DepthStencil : GSTexture::Format::Color))
+		return false;
+	const bool is_16_bit = (TEX0.PSM & 0x7) == 2;
+	if (is_16_bit && !(t->m_valid_rgb && t->m_valid_alpha_low && t->m_valid_alpha_high))
+		return false;
+
+	u32 value;
+	if (is_depth)
+	{
+		const float depth = t->m_texture->GetClearDepth();
+		// Match depth_to_uint only where its conversion is finite and in range.
+		// In particular, a float-rounded maximum Z may equal 1.0f.
+		if (!(depth >= 0.0f && depth < 1.0f))
+			return false;
+		value = static_cast<u32>(depth * 0x1p32f);
+		if (is_16_bit)
+			value &= 0xffff;
+	}
+	else
+	{
+		value = t->m_texture->GetClearColor();
+		if (t->m_rt_alpha_scale)
+		{
+			// These endpoints are exact through RTA_DECORRECTION's UNORM
+			// quantization. Leave intermediate alpha rounding on the existing cache path.
+			const u32 alpha = value >> 24;
+			if (alpha != 0 && alpha != 255)
+				return false;
+			value = (value & 0x00ffffff) | (alpha == 255 ? 0x80000000u : 0);
+		}
+		if (is_16_bit)
+			value = ((value >> 3) & 0x1f) | ((value >> 6) & 0x3e0) |
+				((value >> 9) & 0x7c00) | ((value >> 16) & 0x8000);
+	}
+
+	const u32 write_mask = (t->m_valid_rgb ? 0x00ffffffu : 0) |
+		(t->m_valid_alpha_low ? 0x0f000000u : 0) | (t->m_valid_alpha_high ? 0xf0000000u : 0);
+	if (!write_mask)
+		return true;
+	if (raw_clear)
+		*raw_clear = value;
+	const auto write_clear = [&](GSLocalMemory& memory) {
+		const GSOffset off = memory.GetOffset(TEX0.TBP0, TEX0.TBW, TEX0.PSM);
+		for (int y = r.top; y < r.bottom; ++y)
+		{
+			const auto pixels = off.paMulti(0, y);
+			for (int x = r.left; x < r.right; ++x)
+			{
+				const u32 address = pixels.value(x);
+				if (is_16_bit)
+					memory.vm16()[address] = static_cast<u16>(value);
+				else
+					memory.vm32()[address] = (memory.vm32()[address] & ~write_mask) | (value & write_mask);
+			}
+		}
+	};
+	write_clear(g_gs_renderer->m_mem);
+	if (GSConfig.HWDownloadMode == GSHardwareDownloadMode::Asynchronous)
+	{
+		const std::lock_guard lock(g_gs_renderer->GetAsyncReadbackMutex());
+		write_clear(g_gs_renderer->GetAsyncReadbackMemory());
+		g_gs_renderer->MarkAsyncReadbackPagesWrittenLocked(TEX0, r);
+	}
+	return true;
+}
+
 void GSTextureCache::Read(Target* t, const GSVector4i& r, bool force_synchronous)
 {
+	ReadWithStatus(t, r, force_synchronous);
+}
+
+bool GSTextureCache::ReadWithStatus(Target* t, const GSVector4i& r, bool force_synchronous)
+{
 	g_gs_device->FlushBeforeReadback();
-	if ((!t->m_dirty.empty() && !t->m_dirty.GetTotalRect(t->m_TEX0, t->m_unscaled_size).rintersect(r).rempty()) || r.width() == 0 || r.height() == 0)
-		return;
+	if (!t->m_dirty.empty() && !t->m_dirty.GetTotalRect(t->m_TEX0, t->m_unscaled_size).rintersect(r).rempty())
+		return false;
+	if (r.width() == 0 || r.height() == 0)
+		return true;
 
 	const GIFRegTEX0& TEX0 = t->m_TEX0;
 	const bool is_depth = (t->m_type == DepthStencil);
@@ -7576,7 +7930,7 @@ void GSTextureCache::Read(Target* t, const GSVector4i& r, bool force_synchronous
 		break;
 
 		default:
-			return;
+			return false;
 	}
 
 	// Don't overwrite bits which aren't used in the target's format.
@@ -7585,7 +7939,7 @@ void GSTextureCache::Read(Target* t, const GSVector4i& r, bool force_synchronous
 	if (write_mask == 0)
 	{
 		DbgCon.Warning("Not reading back target %x PSM %s due to no write mask", TEX0.TBP0, GSUtil::GetPSMName(TEX0.PSM));
-		return;
+		return true;
 	}
 
 	GL_PERF("TC: Read Back Target: (0x%x)[fmt: 0x%x]. Size %dx%d", TEX0.TBP0, TEX0.PSM, r.width(), r.height());
@@ -7599,7 +7953,7 @@ void GSTextureCache::Read(Target* t, const GSVector4i& r, bool force_synchronous
 	{
 		// Keep the already-issued copies alive until their fences complete. Dropping an
 		// incoming snapshot is safer than destroying an in-flight staging allocation.
-		return;
+		return false;
 	}
 
 	std::unique_ptr<GSDownloadTexture> asynchronous_dltex;
@@ -7614,7 +7968,7 @@ void GSTextureCache::Read(Target* t, const GSVector4i& r, bool force_synchronous
 	}
 
 	if (!PrepareDownloadTexture(drc.z, drc.w, fmt, dltex))
-		return;
+		return false;
 
 	if (direct_read)
 	{
@@ -7632,7 +7986,7 @@ void GSTextureCache::Read(Target* t, const GSVector4i& r, bool force_synchronous
 		else
 		{
 			Console.Error("Failed to allocate temporary %dx%d target for read.", drc.z, drc.w);
-			return;
+			return false;
 		}
 	}
 
@@ -7641,12 +7995,12 @@ void GSTextureCache::Read(Target* t, const GSVector4i& r, bool force_synchronous
 		m_pending_downloads.push_back(
 			{std::move(asynchronous_dltex), TEX0, drc, r, write_mask,
 				static_cast<u64>(g_perfmon.GetFrame()), g_gs_renderer->CaptureAsyncReadbackGeneration()});
-		return;
+		return true;
 	}
 
 	dltex->get()->Flush();
 	if (!dltex->get()->Map(drc))
-		return;
+		return false;
 
 	// Why does WritePixelNN() not take a const pointer?
 	u8* bits = const_cast<u8*>(dltex->get()->GetMapPointer());
@@ -7685,6 +8039,7 @@ void GSTextureCache::Read(Target* t, const GSVector4i& r, bool force_synchronous
 	}
 
 	dltex->get()->Unmap();
+	return true;
 }
 
 void GSTextureCache::Read(Source* t, const GSVector4i& r)
@@ -8442,15 +8797,9 @@ void GSTextureCache::Target::UpdateValidity(const GSVector4i& rect, bool can_res
 	// GL_CACHE("TC: UpdateValidity (0x%x->0x%x) from R:%d,%d Valid: %d,%d", m_TEX0.TBP0, m_end_block, rect.z, rect.w, m_valid.z, m_valid.w);
 }
 
-bool GSTextureCache::Target::ResizeTexture(int new_unscaled_width, int new_unscaled_height, bool recycle_old, bool require_new_rect, GSVector4i new_rect, bool keep_old)
+bool GSTextureCache::Target::ResizeTextureImpl(GSVector2i new_unscaled_size, GSVector2i new_size, bool recycle_old, bool require_new_rect, GSVector4i new_rect, bool keep_old)
 {
 	const GSVector2i size = m_texture->GetSize();
-	const GSVector2i new_unscaled_size = GSVector2i(new_unscaled_width, new_unscaled_height);
-	const GSVector2i new_size = ScaleRenderTargetSize(new_unscaled_size, m_scale);
-
-	if (size.x == new_size.x && size.y == new_size.y && !require_new_rect)
-		return true;
-
 	const bool clear = (new_size.x > size.x || new_size.y > size.y);
 
 	GSTexture* tex = g_gs_device->CreateCompatible(m_texture, new_size, clear, PreferReusedLabelledTexture());

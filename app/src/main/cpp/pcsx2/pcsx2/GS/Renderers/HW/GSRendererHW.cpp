@@ -25,6 +25,18 @@ __ri static constexpr bool GSHasBarrierFeedbackSupport(const GSDevice::FeatureSu
 	return features.texture_barrier || features.framebuffer_fetch || features.multidraw_fb_copy;
 }
 
+__ri static constexpr bool GSNeedsOrderedZbOnlyFeedback(const GSDevice::FeatureSupport& features,
+	u32 afail, u32 ztst, bool zwrite, bool equal_z, GSRendererHW::PRIM_OVERLAP overlap, bool date)
+{
+	// ZB_ONLY writes depth on both alpha outcomes. Pass-then-fail groups
+	// primitives by alpha and changes the last depth writer when ALWAYS passes
+	// overlapping primitives with different Z. Preserve primitive order instead.
+	// DATE has additional color/depth ordering requirements; retain its existing
+	// route until the combined case has an independent native regression.
+	return !date && afail == AFAIL_ZB_ONLY && ztst == ZTST_ALWAYS && zwrite && !equal_z &&
+		overlap != GSRendererHW::PRIM_OVERLAP_NO && GSHasBarrierFeedbackSupport(features);
+}
+
 __ri static constexpr bool GSNeedsBBoxForMultidrawHazardTracking(const GSDevice::FeatureSupport& features)
 {
 	return !features.texture_barrier && features.multidraw_fb_copy;
@@ -202,6 +214,8 @@ void GSRendererHW::Destroy()
 
 void GSRendererHW::PurgeTextureCache(bool sources, bool targets, bool hash_cache)
 {
+	// Purges can precede GS device replacement while the renderer survives.
+	g_texture_cache->ReleaseClearPatterns();
 	g_texture_cache->RemoveAll(sources, targets, hash_cache);
 }
 
@@ -8289,13 +8303,17 @@ void GSRendererHW::EmulateAlphaTest(DATEOptions& date_options)
 	const bool simple_rgb_only =
 		(afail == AFAIL_RGB_ONLY) && independent_z && independent_rgb && features.dual_source_blend;
 	const bool simple_zb_only = (afail == AFAIL_ZB_ONLY) && independent_z;
+	const bool ordered_zb_feedback = GSNeedsOrderedZbOnlyFeedback(features, afail,
+		m_cached_ctx.TEST.ZTST, zwe, m_vt.m_eq.z, m_prim_overlap, DATE);
 
 	// Determine where RT and/or depth are needed for the feedback methods.
 	const bool afail_needs_rt = (afail == AFAIL_ZB_ONLY) || (afail == AFAIL_RGB_ONLY);
 	const bool afail_needs_depth = (afail == AFAIL_FB_ONLY) || ((afail == AFAIL_RGB_ONLY) && zwe);
 
 	// Determine whether the feedback methods require a single pass.
-	const bool feedback_one_pass = simple_fb_only || simple_rgb_only || simple_zb_only;
+	// Failing color fragments must see preceding passing fragments as well:
+	// a single barrier before the entire draw cannot preserve that color.
+	const bool feedback_one_pass = (simple_fb_only || simple_rgb_only || simple_zb_only) && !ordered_zb_feedback;
 
 	// If we already have the required barriers for the accurate feedback path and
 	// do not require depth feedback.
@@ -8318,11 +8336,11 @@ void GSRendererHW::EmulateAlphaTest(DATEOptions& date_options)
 
 	// Prefer feedback method only if it's free (color only feedback) or enabled.
 	const bool prefer_feedback = free_barrier_feedback || free_fbfetch_feedback ||
-	                             GSConfig.HWAccurateAlphaTest;
+	                             GSConfig.HWAccurateAlphaTest || ordered_zb_feedback;
 
 	// The simple cases can be handle accurately in two passes so no point
 	// in requiring barriers if they are not already required.
-	const bool prefer_two_pass = !(free_fbfetch_feedback || free_barrier_feedback) &&
+	const bool prefer_two_pass = !ordered_zb_feedback && !(free_fbfetch_feedback || free_barrier_feedback) &&
 	                             (simple_fb_only || simple_rgb_only || simple_zb_only);
 	
 	if (prefer_feedback && !prefer_two_pass && !avoid_feedback)
@@ -8732,7 +8750,10 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 	}
 
 	const int afail_type = m_cached_ctx.TEST.GetAFAIL(m_cached_ctx.FRAME.PSM);
-	if (m_cached_ctx.TEST.ATE && ((afail_type != AFAIL_FB_ONLY && afail_type != AFAIL_RGB_ONLY) || !NeedsBlending() || !IsUsingAsInBlend()))
+	// FB_ONLY writes failing fragments' alpha too. Narrowing this range to
+	// passing alpha values can enable RTA scaling and clamp alpha above 128.
+	if (m_cached_ctx.TEST.ATE && afail_type != AFAIL_FB_ONLY &&
+		(afail_type != AFAIL_RGB_ONLY || !NeedsBlending() || !IsUsingAsInBlend()))
 	{
 		const int aref = static_cast<int>(m_cached_ctx.TEST.AREF);
 		CorrectATEAlphaMinMax(m_cached_ctx.TEST.ATST, aref);

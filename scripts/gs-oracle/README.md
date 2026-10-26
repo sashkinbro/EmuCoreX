@@ -219,3 +219,13 @@ The inventory accounts for every strict failure, groups generated selector
 families, identifies changed byte channels and summarizes numeric depth deltas
 and agreement between hardware backends. These groups guide investigation;
 agreement between Vulkan and OpenGL does not establish correctness.
+
+For builtin seed 1 with at least 195 generated cases, also run:
+
+```powershell
+python scripts/gs-oracle/check_regressions.py ./result-directory
+```
+
+This checks independent untouched-VRAM, FB_ONLY alpha and ZB_ONLY depth-order
+anchors in every selected backend. It complements the full strict comparison;
+other differences remain failures.
