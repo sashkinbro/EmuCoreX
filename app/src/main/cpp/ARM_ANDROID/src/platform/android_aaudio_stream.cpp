@@ -11,14 +11,28 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 
 namespace
 {
 constexpr const char* LOG_TAG = "EmuCoreX";
 constexpr int64_t STATE_CHANGE_TIMEOUT_NANOS = 500'000'000;
+constexpr auto RECOVERY_RETRY_DELAY = std::chrono::milliseconds(250);
 
 class AndroidAAudioStream final : public AudioStream
 {
+    static constexpr u64 CALLBACK_SILENT = 1;
+    static constexpr u64 CALLBACK_RECOVERY_PENDING = 2;
+    static constexpr u64 CALLBACK_FLAGS = CALLBACK_SILENT | CALLBACK_RECOVERY_PENDING;
+    struct CallbackContext
+    {
+        AndroidAAudioStream* owner;
+        u64 generation;
+    };
+
 public:
 	AndroidAAudioStream(u32 sample_rate, const AudioStreamParameters& parameters)
 		: AudioStream(sample_rate, parameters)
@@ -27,34 +41,33 @@ public:
 
 	~AndroidAAudioStream() override
 	{
+		{
+			const std::lock_guard lock(m_device_mutex);
+			m_shutdown = true;
+		}
+		m_recovery_cv.notify_one();
+		if (m_recovery_thread.joinable())
+			m_recovery_thread.join();
 		CloseDevice();
 	}
 
 	void SetPaused(bool paused) override
 	{
-		if (!m_stream)
+		const std::lock_guard lock(m_device_mutex);
+		if (m_shutdown)
+			return;
+		const bool was_paused = m_paused;
+		m_paused = paused; // Desired state also survives a failed device reopen.
+		if (paused)
+			SetCallbackSilent(true);
+		m_recovery_cv.notify_one();
+		if (!m_stream || RecoveryPending())
 		{
-			if (!paused && m_disconnected.load(std::memory_order_acquire))
-			{
-				if (ReopenDevice())
-				{
-					m_paused = false;
-					m_callback_silent.store(false, std::memory_order_release);
-				}
-			}
+			if (!paused)
+				RequestRecovery();
 			return;
 		}
-
-		if (!paused && m_disconnected.load(std::memory_order_acquire))
-		{
-			if (!ReopenDevice())
-				return;
-			m_paused = false;
-			m_callback_silent.store(false, std::memory_order_release);
-			return;
-		}
-
-		if (m_paused == paused)
+		if (was_paused == paused)
 			return;
 
 		// AAudio state changes are asynchronous. In particular, requestStart() is not valid while a
@@ -64,8 +77,7 @@ public:
 		// no-op and audio remains silent until the VM is restarted.
 		if (!paused && !WaitForPendingPause())
 		{
-			if (m_disconnected.load(std::memory_order_acquire))
-				ReopenDevice();
+			RequestRecovery();
 			return;
 		}
 		if (!paused)
@@ -75,29 +87,22 @@ public:
 			{
 				// A pause request can lose a race with the initial STARTING transition.
 				// The callback was still silenced, so resuming only needs to make it audible.
-				m_paused = false;
-				m_callback_silent.store(false, std::memory_order_release);
+				SetCallbackSilent(false);
 				return;
 			}
 		}
-
-		if (paused)
-			m_callback_silent.store(true, std::memory_order_release);
 
 		const aaudio_result_t result = paused ? AAudioStream_requestPause(m_stream) : AAudioStream_requestStart(m_stream);
 		if (result != AAUDIO_OK)
 		{
 			__android_log_print(ANDROID_LOG_WARN, LOG_TAG, "AAudio pause/start failed: %s", AAudio_convertResultToText(result));
-			if (AAudioStream_getState(m_stream) == AAUDIO_STREAM_STATE_DISCONNECTED)
-				m_disconnected.store(true, std::memory_order_release);
-			if (paused)
-				m_paused = true;
+			if (!paused || AAudioStream_getState(m_stream) == AAUDIO_STREAM_STATE_DISCONNECTED)
+				RequestRecovery();
 			return;
 		}
 
-		m_paused = paused;
 		if (!paused)
-			m_callback_silent.store(false, std::memory_order_release);
+			SetCallbackSilent(false);
 	}
 
 	bool OpenDevice(bool stretch_enabled, Error* error)
@@ -124,13 +129,18 @@ public:
 		// Initialize the shared mixer buffers before requestStart(), since AAudio may
 		// invoke the data callback immediately after the stream starts.
 		BaseInitialize(sample_readers[static_cast<size_t>(m_parameters.expansion_mode)], stretch_enabled);
-		return StartAAudioDevice(error);
+		if (!StartAAudioDevice(error))
+			return false;
+		m_recovery_thread = std::thread(&AndroidAAudioStream::RecoveryThread, this);
+		return true;
 	}
 
 private:
 	bool OpenAAudioDevice(Error* error)
 	{
 		pxAssert(!m_stream);
+		BeginCallbackGeneration();
+		m_callback_context = std::make_unique<CallbackContext>(CallbackContext{this, m_generation});
 
 		AAudioStreamBuilder* builder = nullptr;
 		aaudio_result_t result = AAudio_createStreamBuilder(&builder);
@@ -150,8 +160,8 @@ private:
 			m_sample_rate, m_parameters.output_latency_ms));
 		if (!m_parameters.minimal_output_latency)
 			AAudioStreamBuilder_setBufferCapacityInFrames(builder, requested_output_frames);
-		AAudioStreamBuilder_setDataCallback(builder, &AndroidAAudioStream::DataCallback, this);
-		AAudioStreamBuilder_setErrorCallback(builder, &AndroidAAudioStream::ErrorCallback, this);
+		AAudioStreamBuilder_setDataCallback(builder, &AndroidAAudioStream::DataCallback, m_callback_context.get());
+		AAudioStreamBuilder_setErrorCallback(builder, &AndroidAAudioStream::ErrorCallback, m_callback_context.get());
 
 		result = AAudioStreamBuilder_openStream(builder, &m_stream);
 		AAudioStreamBuilder_delete(builder);
@@ -183,8 +193,8 @@ private:
 			CloseDevice();
 			return false;
 		}
-		m_disconnected.store(false, std::memory_order_release);
-		m_callback_silent.store(false, std::memory_order_release);
+		// Do not clear a disconnect reported during requestStart().
+		SetCallbackSilent(m_paused);
 
 		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, LOG_TAG,
 			"AAudio stream started rate=%u channels=%u output_buffer=%d/%d frames internal_buffer=%u ms minimal=%d",
@@ -194,19 +204,89 @@ private:
 		return true;
 	}
 
-	bool ReopenDevice()
+	bool ReopenDevice(Error* error)
 	{
 		CloseDevice();
-		Error error;
-		if (!OpenAAudioDevice(&error) || !StartAAudioDevice(&error))
+		if (!OpenAAudioDevice(error) || !StartAAudioDevice(error))
+			return false;
+		if (RecoveryPending())
 		{
-			__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "AAudio stream recovery failed: %s",
-				error.GetDescription().c_str());
+			Error::SetStringFmt(error, "AAudio disconnected while restarting");
 			return false;
 		}
 
 		EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "AAudio stream recovered after disconnect");
 		return true;
+	}
+
+	bool RecoveryPending() const
+	{
+		return (m_callback_state.load(std::memory_order_acquire) & CALLBACK_RECOVERY_PENDING) != 0;
+	}
+
+	void RequestRecovery()
+	{
+		m_callback_state.fetch_or(CALLBACK_SILENT | CALLBACK_RECOVERY_PENDING, std::memory_order_acq_rel);
+		m_recovery_cv.notify_one();
+	}
+
+	void SetCallbackSilent(bool silent)
+	{
+		if (silent)
+		{
+			m_callback_state.fetch_or(CALLBACK_SILENT, std::memory_order_acq_rel);
+			return;
+		}
+		u64 state = m_callback_state.load(std::memory_order_acquire);
+		while (!(state & CALLBACK_RECOVERY_PENDING) &&
+			!m_callback_state.compare_exchange_weak(state, state & ~CALLBACK_SILENT,
+				std::memory_order_acq_rel, std::memory_order_acquire))
+		{
+		}
+	}
+
+	void BeginCallbackGeneration()
+	{
+		m_generation += CALLBACK_FLAGS + 1;
+		m_callback_state.store(m_generation | CALLBACK_SILENT, std::memory_order_release);
+	}
+
+	void RecoveryThread()
+	{
+		std::unique_lock lock(m_device_mutex);
+		std::chrono::steady_clock::time_point next_attempt{};
+		u32 failures = 0;
+		while (!m_shutdown)
+		{
+			// Error callbacks only publish atomics and notify. A bounded wait
+			// also covers notification before the worker actually begins waiting.
+			m_recovery_cv.wait_for(lock, RECOVERY_RETRY_DELAY,
+				[this] { return m_shutdown || (!m_paused && RecoveryPending()); });
+			if (m_shutdown)
+				break;
+			if (m_paused || !RecoveryPending())
+				continue;
+			if (std::chrono::steady_clock::now() < next_attempt)
+			{
+				m_recovery_cv.wait_until(lock, next_attempt, [this] { return m_shutdown || m_paused; });
+				continue;
+			}
+
+			Error error;
+			if (ReopenDevice(&error))
+			{
+				failures = 0;
+				next_attempt = {};
+			}
+			else
+			{
+				RequestRecovery();
+				next_attempt = std::chrono::steady_clock::now() + RECOVERY_RETRY_DELAY;
+				if (++failures == 1 || (failures % 20) == 0)
+					__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "AAudio stream recovery failed (retry %u): %s",
+						failures, error.GetDescription().c_str());
+			}
+		}
 	}
 
 	bool WaitForPendingPause()
@@ -230,7 +310,7 @@ private:
 			state == AAUDIO_STREAM_STATE_CLOSED)
 		{
 			if (state == AAUDIO_STREAM_STATE_DISCONNECTED)
-				m_disconnected.store(true, std::memory_order_release);
+				RequestRecovery();
 			__android_log_print(ANDROID_LOG_WARN, LOG_TAG,
 				"AAudio cannot resume from stream state %d", static_cast<int>(state));
 			return false;
@@ -241,21 +321,30 @@ private:
 
 	void CloseDevice()
 	{
+		// Invalidate the old generation before stop/close can deliver a late
+		// callback. Its context stays alive until AAudio_close has completed.
+		BeginCallbackGeneration();
 		if (!m_stream)
+		{
+			m_callback_context.reset();
 			return;
+		}
 
 		AAudioStream_requestStop(m_stream);
 		AAudioStream_close(m_stream);
 		m_stream = nullptr;
+		m_callback_context.reset();
 	}
 
 	static aaudio_data_callback_result_t DataCallback(
 		AAudioStream*, void* userdata, void* audio_data, int32_t num_frames)
 	{
-		AndroidAAudioStream* stream = static_cast<AndroidAAudioStream*>(userdata);
-		if (!stream || num_frames <= 0)
+		const CallbackContext* context = static_cast<const CallbackContext*>(userdata);
+		if (!context || num_frames <= 0)
 			return AAUDIO_CALLBACK_RESULT_CONTINUE;
-		if (stream->m_callback_silent.load(std::memory_order_acquire))
+		AndroidAAudioStream* stream = context->owner;
+		const u64 state = stream->m_callback_state.load(std::memory_order_acquire);
+		if ((state & ~CALLBACK_FLAGS) != context->generation || (state & CALLBACK_SILENT))
 		{
 			std::fill_n(static_cast<SampleType*>(audio_data),
 				static_cast<size_t>(num_frames) * stream->m_output_channels, static_cast<SampleType>(0));
@@ -268,18 +357,33 @@ private:
 
 	static void ErrorCallback(AAudioStream*, void* userdata, aaudio_result_t error)
 	{
-		AndroidAAudioStream* stream = static_cast<AndroidAAudioStream*>(userdata);
-		if (stream && error == AAUDIO_ERROR_DISCONNECTED)
+		const CallbackContext* context = static_cast<const CallbackContext*>(userdata);
+		if (context && error < 0)
 		{
-			stream->m_callback_silent.store(true, std::memory_order_release);
-			stream->m_disconnected.store(true, std::memory_order_release);
+			AndroidAAudioStream* stream = context->owner;
+			u64 state = stream->m_callback_state.load(std::memory_order_acquire);
+			while ((state & ~CALLBACK_FLAGS) == context->generation)
+			{
+				if (stream->m_callback_state.compare_exchange_weak(state,
+					state | CALLBACK_SILENT | CALLBACK_RECOVERY_PENDING,
+					std::memory_order_acq_rel, std::memory_order_acquire))
+				{
+					stream->m_recovery_cv.notify_one();
+					break;
+				}
+			}
 		}
 		__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "AAudio stream error: %s", AAudio_convertResultToText(error));
 	}
 
 	AAudioStream* m_stream = nullptr;
-	std::atomic_bool m_callback_silent{false};
-	std::atomic_bool m_disconnected{false};
+	std::unique_ptr<CallbackContext> m_callback_context;
+	std::atomic<u64> m_callback_state{CALLBACK_SILENT};
+	u64 m_generation = 0; // Only touched while owning the device lifecycle.
+	std::mutex m_device_mutex;
+	std::condition_variable m_recovery_cv;
+	std::thread m_recovery_thread;
+	bool m_shutdown = false;
 };
 } // namespace
 
