@@ -105,7 +105,8 @@ extern "C" u64 EmuCoreXOracleVUIRMaxMinIInstructions(u32 index)
 
 bool mVUSharedIrEnabled(u32 index)
 {
-#if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && \
+	defined(EMUCOREX_ENABLE_EXPERIMENTAL_IR) && EMUCOREX_ENABLE_EXPERIMENTAL_IR
 	if (index >= 2) return false;
 	const int override_value = s_vuSharedIrOverride[index].load(std::memory_order_relaxed);
 	if (override_value >= 0) return override_value != 0;

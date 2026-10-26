@@ -52,6 +52,7 @@
 #include <cerrno>
 
 #include "jit_oracle_semaphore.inl"
+#include "jit_oracle_ir_policy.h"
 
 // Self-test builds only. The differential oracle enables this so it can run
 // without initializing SPU2, DEV9 and friends. It must default to off: a debug
@@ -2225,7 +2226,8 @@ void VUSharedTransferBenchmarks()
 
 void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin_only = false,
     bool maxmin_route_only = false, bool maxmin_broadcast_only = false,
-    bool maxmin_broadcast_route_only = false, bool maxmin_i_only = false, u32 clip_only = 0, bool pq_only = false)
+    bool maxmin_broadcast_route_only = false, bool maxmin_i_only = false, u32 clip_only = 0,
+    bool pq_only = false, bool direct_only = false)
 {
     struct VUOverrideReset
     {
@@ -2303,41 +2305,51 @@ void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin
         VUSharedMaxMinIBenchmarks();
         return;
     }
-    VUBoundIrTests();
-    VUSharedIrProductionTests();
-    VUSharedImmediateTests();
-    VUBoundVfShuffleTests();
-    VUBoundVfUnaryTests();
-    VUBoundVfConvertTests();
-    VUBoundItofCodegenTests();
-    VUSharedItofIntegrationTests();
-    VUSharedItofBenchmarks();
-    VUBoundVfToIntTests();
-    VUBoundVfMaxMinTests();
-    VUSharedMaxMinIntegrationTests();
-    VUSharedMaxMinBenchmarks();
-    VUBoundVfMaxMinBroadcastTests();
-    VUSharedMaxMinBroadcastIntegrationTests();
-    VUSharedMaxMinBroadcastBenchmarks();
-    VUBoundVfClipTests();
-    VUSharedClipIntegrationTests();
-    VUSharedClipBenchmarks();
-    VUBoundVfMaxMinITests();
-    VUSharedMaxMinIIntegrationTests();
-    VUSharedMaxMinIBenchmarks();
-    VUSharedFtoiIntegrationTests();
-    VUSharedFtoiBenchmarks();
-    VUBoundVfViTransferTests();
-    VUBoundViVfTransferTests();
-    VUSharedMtirProductionTests();
-    VUSharedMfirProductionTests();
-    VUSharedMr32ProductionTests();
-    VUSharedMfirBenchmarks();
-    VUSharedMr32Benchmarks();
-    VUSharedIrBenchmarks();
-    VUSharedTransferBenchmarks();
-    EmuCoreXOracleSetVUIR(0, 1);
-    EmuCoreXOracleSetVUIR(1, 1);
+    if (!direct_only)
+    {
+        VUBoundIrTests();
+        VUSharedIrProductionTests();
+        VUSharedImmediateTests();
+        VUBoundVfShuffleTests();
+        VUBoundVfUnaryTests();
+        VUBoundVfConvertTests();
+        VUBoundItofCodegenTests();
+        VUSharedItofIntegrationTests();
+        VUSharedItofBenchmarks();
+        VUBoundVfToIntTests();
+        VUBoundVfMaxMinTests();
+        VUSharedMaxMinIntegrationTests();
+        VUSharedMaxMinBenchmarks();
+        VUBoundVfMaxMinBroadcastTests();
+        VUSharedMaxMinBroadcastIntegrationTests();
+        VUSharedMaxMinBroadcastBenchmarks();
+        VUBoundVfClipTests();
+        VUSharedClipIntegrationTests();
+        VUSharedClipBenchmarks();
+        VUBoundVfMaxMinITests();
+        VUSharedMaxMinIIntegrationTests();
+        VUSharedMaxMinIBenchmarks();
+        VUSharedFtoiIntegrationTests();
+        VUSharedFtoiBenchmarks();
+        VUBoundVfViTransferTests();
+        VUBoundViVfTransferTests();
+        VUSharedMtirProductionTests();
+        VUSharedMfirProductionTests();
+        VUSharedMr32ProductionTests();
+        VUSharedMfirBenchmarks();
+        VUSharedMr32Benchmarks();
+        VUSharedIrBenchmarks();
+        VUSharedTransferBenchmarks();
+    }
+    else
+    {
+        VUSavePQTests();
+        VULoadPQTests();
+        VUShufflePQTests();
+        std::printf("DIRECT VU: interpreter/direct coverage only; experimental IR diagnostics and integration omitted\n");
+    }
+    EmuCoreXOracleSetVUIR(0, direct_only ? 0 : 1);
+    EmuCoreXOracleSetVUIR(1, direct_only ? 0 : 1);
     // VU1 must use its own operand clamp policy, independent of VU0.
     const std::vector<u32> clampProbe = {0x7f800000, NOP_U | 0x80000000,
         NOP_L, (15u << 21) | (3u << 6) | 0x22,
@@ -9925,8 +9937,25 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     bool fastmem_exit_only = false, bool cop1_maxmin_only = false, bool vu_maxmin_only = false,
     bool scalar_immediates_only = false, bool vu_maxmin_broadcast_only = false,
     bool cold_context_only = false, u32 vu_maxmin_i_only = 0, bool cop1_memory_only = false, bool vu_clip_only = false, bool cop1_compare_only = false,
-    bool branch_immediates_only = false)
+    bool branch_immediates_only = false, const char* direct_suite = nullptr)
 {
+    struct DirectIrOverrideReset
+    {
+        bool active;
+        ~DirectIrOverrideReset()
+        {
+            if (!active) return;
+            EmuCoreXOracleSetEeIrMode(-1);
+            EmuCoreXOracleSetVUIR(0, -1);
+            EmuCoreXOracleSetVUIR(1, -1);
+        }
+    } direct_override_reset{direct_suite != nullptr};
+    if (direct_suite)
+    {
+        EmuCoreXOracleSetEeIrMode(0);
+        EmuCoreXOracleSetVUIR(0, 0);
+        EmuCoreXOracleSetVUIR(1, 0);
+    }
     EmuCoreXOracleSetSkipEvents(1);
     cpuinfo_initialize();
     EmuConfig = Pcsx2Config();
@@ -9957,6 +9986,11 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     psxRegs.pc = IOP_TEST_SCRATCH;
     psxRegs.cycle = 0;
 
+    if (direct_suite && std::strcmp(direct_suite, "ee-direct-stores") == 0)
+    {
+        EELegacyCachedBaseStoreTests();
+        return;
+    }
     if (branch_immediates_only)
     {
         EEBranchImmediateTests();
@@ -10173,6 +10207,16 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     EECoverageFpuModeSemantics();
     EECoverageCop2();
     EECoverageCop2Spec2();
+    if (direct_suite)
+    {
+        EECoverageMmi();
+        EECoverageExceptions();
+        EEUnmappedCompatibilityTests();
+        EETlbRestoreTests();
+        EELegacyCachedBaseStoreTests();
+        std::printf("DIRECT EE: interpreter/direct coverage only; experimental IR integration omitted\n");
+        return;
+    }
     EEVuAbsSharedTests();
     EEVuItofMacroTests();
     EEVuFtoiMacroTests();
@@ -11812,8 +11856,14 @@ void IOPSharedStateTests()
 #include "jit_oracle_iop_avsz_fusion.inl"
 
 void IOPTests(bool cop2_only = false, bool cop2_memory_only = false, bool nclip_only = false,
-    bool avsz_only = false)
+    bool avsz_only = false, bool direct_only = false)
 {
+    struct DirectIrOverrideReset
+    {
+        bool active;
+        ~DirectIrOverrideReset() { if (active) EmuCoreXOracleSetIOPIR(-1); }
+    } direct_override_reset{direct_only};
+    if (direct_only) EmuCoreXOracleSetIOPIR(0);
     EmuCoreXOracleSetSkipEvents(1);
     cpuinfo_initialize();
     EmuConfig = Pcsx2Config();
@@ -11909,6 +11959,11 @@ void IOPTests(bool cop2_only = false, bool cop2_memory_only = false, bool nclip_
 
     IOPCoverage();
     IOPCoverageGte();
+    if (direct_only)
+    {
+        std::printf("DIRECT IOP: interpreter/direct coverage only; experimental IR integration omitted\n");
+        return;
+    }
     IOPCop2FrontendRedTests();
     IOPSharedNclipTests();
     IOPSharedAvszTests();
@@ -12246,6 +12301,13 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXReplayVU1Fallback(
 extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const char* suite)
 {
     failures = checks = 0;
+    std::printf("ORACLE CONFIG experimental_ir_runtime=%u suite=%s\n",
+        OracleExperimentalIrAvailable ? 1u : 0u, suite);
+    if (!OracleExperimentalIrAvailable && OracleSuiteRequiresExperimentalIr(suite))
+    {
+        std::fprintf(stderr, "UNAVAILABLE suite=%s: experimental IR is disabled; use ee-direct, ee-direct-stores, iop-direct or vu-direct for direct recompilers. IR integration requires a separate EMUCOREX_ENABLE_EXPERIMENTAL_IR=ON research build.\n", suite);
+        return 2;
+    }
     if (std::strcmp(suite, "breakpoint-probes") == 0)
         BreakpointProbeTests();
     else if (std::strcmp(suite, "ee-irq-events") == 0)
@@ -12270,6 +12332,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         Threading::UserspaceSemaphoreOracle::Run(Check);
     else if (std::strcmp(suite, "classifier") == 0)
         ClassifierTests();
+    else if (std::strcmp(suite, "vu-direct") == 0)
+        VUTests(false, false, false, false, false, false, false, 0, false, true);
     else if (std::strcmp(suite, "vu") == 0)
         VUTests();
     else if (std::strcmp(suite, "vu-pq") == 0)
@@ -12301,6 +12365,9 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
     else if (std::strcmp(suite, "ee-branch-immediates") == 0)
         EETests(false, false, false, false, false, false, false, false, false,
             false, false, false, false, false, false, 0, false, false, false, true);
+    else if (std::strcmp(suite, "ee-direct") == 0 || std::strcmp(suite, "ee-direct-stores") == 0)
+        EETests(false, false, false, false, false, false, false, false, false,
+            false, false, false, false, false, false, 0, false, false, false, false, suite);
     else if (std::strcmp(suite, "ee") == 0)
         EETests();
     else if (std::strcmp(suite, "ee-cop1-mov") == 0)
@@ -12343,6 +12410,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         EETests(false, false, false, false, true);
     else if (std::strcmp(suite, "ee-hot-loads") == 0)
         EETests(false, false, false, false, false, true);
+    else if (std::strcmp(suite, "iop-direct") == 0)
+        IOPTests(false, false, false, false, true);
     else if (std::strcmp(suite, "iop") == 0)
         IOPTests();
     else if (std::strcmp(suite, "iop-cop2") == 0)

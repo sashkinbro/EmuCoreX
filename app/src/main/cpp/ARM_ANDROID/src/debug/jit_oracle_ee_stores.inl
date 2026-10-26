@@ -288,6 +288,58 @@ void EEIrScalarStoreTests()
     EmuConfig.Cpu.Recompiler = saved_config;
 }
 
+void EELegacyCachedBaseStoreTests()
+{
+    // LW forces a dynamic cached base. Keep that base live after the store,
+    // and exercise the legacy emitter with both fastmem and software VTLB.
+    const bool saved_fastmem = EmuConfig.Cpu.Recompiler.EnableFastmem;
+    for (u32 op : {40u, 41u, 43u, 63u, 31u, 57u}) // SB/SH/SW/SD/SQ/SWC1
+    for (s32 offset : {-32768, -4096, -4095, -16, -1, 0, 1, 16, 4095, 4096, 32767})
+    for (bool alias : {false, true})
+    {
+        if (op == 57 && alias)
+            continue; // SWC1's FPR value cannot alias the GPR base.
+        const u32 target = EE_TEST_SCRATCH + (op == 31 || op == 40 ? 131 : 128);
+        GPR_reg dynamic_initial[32] = {};
+        dynamic_initial[22].UD[0] = EE_TEST_SCRATCH;
+        dynamic_initial[8].UD[0] = target - static_cast<u32>(offset);
+        dynamic_initial[9].UD[0] = 0xfedcba98765432a1ull;
+        dynamic_initial[9].UD[1] = 0x0123456789abcdefull;
+        dynamic_initial[16].UD[1] = 0x8877665544332211ull;
+        std::array<u32, 32> initial_fpr{};
+        initial_fpr[9] = 0x8badf00du;
+        const u32 source = alias ? 16 : 9;
+        const std::vector<u32> dynamic_code = {
+            MipsI(43, 22, 8, 0), MipsI(35, 22, 16, 0),
+            MipsI(op, 16, source, offset), MipsR(16, 0, 18, 0, 0x2d)};
+        EESnapshot vtlb_result{};
+        for (bool fastmem : {false, true})
+        {
+            EmuConfig.Cpu.Recompiler.EnableFastmem = fastmem;
+            const EESnapshot interpreter = RunEEProgram(false, dynamic_code, false,
+                nullptr, nullptr, dynamic_initial, initial_fpr.data());
+            const u64 count_before = EmuCoreXOracleGetEeIrDirectStoreCounts();
+            const EESnapshot legacy = RunEEProgramWithIrMode(0, dynamic_code,
+                dynamic_initial, nullptr, initial_fpr.data(), nullptr);
+            char name[128];
+            std::snprintf(name, sizeof(name), "legacy EE cached-base store op=%u offset=%d alias=%u fastmem=%u",
+                op, offset, static_cast<u32>(alias), static_cast<u32>(fastmem));
+            CompareEE(interpreter, legacy, name);
+            Check(EmuCoreXOracleGetEeIrDirectStoreCounts() == count_before,
+                "legacy cached-base stores keep the shared IR route disabled");
+            if (fastmem)
+            {
+                CompareEE(vtlb_result, legacy, "legacy cached-base fastmem/vtlb complete state");
+                Check(vtlb_result.cycle == legacy.cycle,
+                    "legacy cached-base fastmem/vtlb exact cycles");
+            }
+            else
+                vtlb_result = legacy;
+        }
+    }
+    EmuConfig.Cpu.Recompiler.EnableFastmem = saved_fastmem;
+}
+
 void EEIrScalarStoreGuestTests()
 {
     GPR_reg initial[32] = {};

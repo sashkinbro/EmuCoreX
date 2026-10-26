@@ -2439,10 +2439,9 @@ static u8* recShortBlockLink_emit_oaknut(u32 next_pc, u32 scaled_cycles)
 	return link_patch;
 }
 
-// Enables the IR code path at runtime. The debug property is read once per
-// process so A/B runs only need `adb shell setprop debug.emucorex.ee_ir 1`.
-// The IR is still under development: it is compiled into debug builds only and
-// can never activate in a release build.
+// Experimental IR remains available for separate research builds. App Debug and
+// Release builds keep it disabled even when stale properties or oracle overrides
+// request it; native self-tests alone must never enable the gameplay IR route.
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 static int s_oracleEeIrModeOverride = -1;
 static int s_oracleEeIrFastLoadOverride = -1;
@@ -2529,7 +2528,8 @@ extern "C" bool EmuCoreXOracleGetEeCompiledBlock(u32 guest_pc, const void** host
 
 static bool EeIrEnabled()
 {
-#if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && \
+	defined(EMUCOREX_ENABLE_EXPERIMENTAL_IR) && EMUCOREX_ENABLE_EXPERIMENTAL_IR
 	if (s_oracleEeIrModeOverride >= 0)
 		return s_oracleEeIrModeOverride == 1;
 	static const bool s_enabled = []() {

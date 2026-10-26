@@ -83,7 +83,6 @@ android {
             cmake {
                 arguments(
                     "-DANDROID=true",
-                    "-DCMAKE_BUILD_TYPE=Release",
                     "-DANDROID_STL=c++_static",
                     "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY",
                     "-DEMUCOREX_ANDROID_HOST_PAGE_SIZE=0x1000",
@@ -113,11 +112,25 @@ android {
         debug {
             externalNativeBuild {
                 cmake {
-                    arguments("-DEMUCOREX_ENABLE_NATIVE_SELF_TESTS=ON", "-DEMUCOREX_ENABLE_GS_ORACLE=ON")
+                    // Keep gameplay profiling useful while retaining Debug-only diagnostics.
+                    arguments(
+                        "-DCMAKE_BUILD_TYPE=Debug",
+                        "-DCMAKE_C_FLAGS_DEBUG=-O2 -g1",
+                        "-DCMAKE_CXX_FLAGS_DEBUG=-O2 -g1",
+                        "-DEMUCOREX_ENABLE_NATIVE_SELF_TESTS=ON",
+                        "-DEMUCOREX_ENABLE_EXPERIMENTAL_IR=OFF",
+                        "-DEMUCOREX_ENABLE_GS_ORACLE=ON"
+                    )
                 }
             }
         }
         release {
+            externalNativeBuild {
+                cmake {
+                    arguments("-DCMAKE_BUILD_TYPE=Release", "-DEMUCOREX_ENABLE_NATIVE_SELF_TESTS=OFF",
+                        "-DEMUCOREX_ENABLE_GS_ORACLE=OFF", "-DEMUCOREX_ENABLE_EXPERIMENTAL_IR=OFF")
+                }
+            }
             if (releaseSigningConfigured) {
                 signingConfig = signingConfigs.getByName("release")
             }

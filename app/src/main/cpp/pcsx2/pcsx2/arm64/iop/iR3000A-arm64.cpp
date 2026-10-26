@@ -77,7 +77,8 @@ extern "C" void EmuCoreXOracleGetIopIrGteAvszCounts(u64* avsz3, u64* avsz4)
 
 static bool IopIrEnabled()
 {
-#if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && \
+    defined(EMUCOREX_ENABLE_EXPERIMENTAL_IR) && EMUCOREX_ENABLE_EXPERIMENTAL_IR
     if (s_iopIrOverride >= 0) return s_iopIrOverride != 0;
     static const bool enabled = []() {
         char value[PROP_VALUE_MAX] = {};
