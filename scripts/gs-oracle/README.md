@@ -181,3 +181,20 @@ older CPU-native-self-test option is enabled. Release contains neither GS oracle
 source, entry point nor runner target. The OpenGL surfaceless-context fix and
 general optional strict dump-reader API are renderer/parser support, not runtime
 comparison hooks.
+
+To exercise the production OpenGL clear method on a connected ARM64 Android
+device (requires the Android NDK and GLES 3.2):
+
+```powershell
+python scripts/gs-oracle/run_clear_test.py `
+  --ndk C:/path/to/android-ndk --adb C:/path/to/adb.exe `
+  --serial YOUR_LENOVO_SERIAL --output ./clear-test-results
+```
+
+Use a new output directory for each run. The harness compiles the current
+`CommitClear` method body with minimal texture/state adapters and checks 18
+normalized-color cases: plain, feedback and shader-write targets, explicit
+scratch-FBO selection, MRT attachment preservation, full-surface clearing and
+restored state. It retains the extracted body, binary, hashes and device log.
+This focused regression does not cover depth/integer clears or replace full
+renderer replay; its adapters do not exercise production state-cache helpers.

@@ -52,3 +52,31 @@ Local evidence (ignored by Git):
 Timing values are synchronized Debug replay measurements, not game FPS. No
 performance improvement is claimed by this instrumentation commit. See README
 for the fixed settings, workload coverage, and remaining coverage limitations.
+
+## OpenGL clear correction (2026-10-26)
+
+The oracle exposed a clear operation on a feedback render target that bound an
+empty scratch framebuffer: `GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT`,
+followed by `GL_INVALID_FRAMEBUFFER_OPERATION`. Texture usage is a bitmask;
+enum equality omitted render/depth attachments for combined usages outside the
+existing Haunting Ground special case. The correction uses the existing usage
+predicates for all titles and routes clears through the scratch framebuffer
+whenever a depth-as-color MRT is active.
+
+- Actual production-method regression on Lenovo: old body 9/18 passing; corrected
+  body 18/18 passing. The final harness also verifies that the other MRT texture
+  retains its pixels.
+- Full seed-1 run, 300 scenes / 600 checkpoints per backend: OpenGL mismatches
+  decreased from 308 to 75; Vulkan remains at 77. No previously passing
+  checkpoint became a mismatch in this run. These are checkpoint counts, not
+  independent bug counts. Evidence: `results/20261026-103652-975-8a91c468/`.
+- Debug and Release native builds succeed; compiled Release isolation passes.
+  Host comparator suite: 12 tests pass. Independent review found no important
+  correctness issues in the production fix.
+- CPU oracle guards pass for classifier, JIT cache, VU cache, VIF MPG, VU divide
+  by zero, scalar clamp, semaphore and VU suites. SPU2 volume has one performance
+  assertion failure on both the previous and corrected core in the unoptimized
+  Debug build; all 16,777,216 volume-state transitions pass. This baseline
+  performance failure remains visible and is not treated as a passing suite.
+- OpenGL timing changed by -0.60% median and +1.92% p95 in this paired run.
+  No performance improvement is claimed from these measurements.

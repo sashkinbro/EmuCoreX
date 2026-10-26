@@ -1674,16 +1674,13 @@ void GSDeviceOGL::CommitClear(GSTexture* t, bool use_write_fbo)
 	if (!T->IsRenderTargetOrDepthStencil() || T->GetState() == GSTexture::State::Dirty)
 		return;
 
-	// The widened attachment checks are only needed by the Haunting Ground snapshot path;
-	// other games keep the original FBO selection.
-	const bool haunting_ground_fix = GSIsHauntingGround();
-	const bool is_render_target =
-		haunting_ground_fix ? t->IsRenderTarget() : (t->GetType() == GSTexture::Type::RenderTarget);
-	const bool is_depth_stencil =
-		haunting_ground_fix ? t->IsDepthStencil() : (t->GetType() == GSTexture::Type::DepthStencil);
+	// Usage is a bitmask: feedback/shader-write targets still need their
+	// render-target or depth attachment when clearing through the scratch FBO.
+	const bool is_render_target = t->IsRenderTarget();
+	const bool is_depth_stencil = t->IsDepthStencil();
 
 	// Clearing an MRT attachment through color slot 0 would replace the active RT.
-	use_write_fbo |= (haunting_ground_fix && GLState::ds_as_rt != nullptr);
+	use_write_fbo |= (GLState::ds_as_rt != nullptr);
 	if (use_write_fbo)
 	{
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_fbo_write);
