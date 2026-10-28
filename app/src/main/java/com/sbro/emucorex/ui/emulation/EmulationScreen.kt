@@ -2882,29 +2882,12 @@ private fun OnScreenControls(
         }
     }
 
-    fun dispatchTouchAnalogDirection(key: Int, pressed: Boolean) {
-        val range = if (pressed) 255 else 0
-        currentOnPadInput(key, range, pressed)
-    }
-
     fun dispatchTouchL2() {
-        if (rightStickDownToL2) {
-            currentOnPadInput(PadKey.L2, 0, false)
-            dispatchTouchAnalogDirection(PadKey.RIGHT_STICK_DOWN, touchL2Pressed)
-        } else {
-            currentOnPadInput(PadKey.RIGHT_STICK_DOWN, 0, false)
-            dispatchTouchAnalogDirection(PadKey.L2, touchL2Pressed)
-        }
+        dispatchTouchTrigger(touchL2Pressed, rightStickDownToL2, PadKey.L2, PadKey.RIGHT_STICK_DOWN, currentOnPadInput)
     }
 
     fun dispatchTouchR2() {
-        if (rightStickUpToR2) {
-            currentOnPadInput(PadKey.R2, 0, false)
-            dispatchTouchAnalogDirection(PadKey.RIGHT_STICK_UP, touchR2Pressed)
-        } else {
-            currentOnPadInput(PadKey.RIGHT_STICK_UP, 0, false)
-            dispatchTouchAnalogDirection(PadKey.R2, touchR2Pressed)
-        }
+        dispatchTouchTrigger(touchR2Pressed, rightStickUpToR2, PadKey.R2, PadKey.RIGHT_STICK_UP, currentOnPadInput)
     }
 
     LaunchedEffect(rightStickUpToR2) {
@@ -3759,6 +3742,16 @@ internal fun TouchButtonGroup(
             }
         }
     }
+}
+
+internal fun dispatchTouchTrigger(
+    pressed: Boolean,
+    mappedToStick: Boolean,
+    triggerKey: Int,
+    stickKey: Int,
+    onPadInput: (Int, Int, Boolean) -> Unit
+) {
+    onPadInput(if (mappedToStick) stickKey else triggerKey, if (pressed) 255 else 0, pressed)
 }
 
 private fun updateAnalogStick(
