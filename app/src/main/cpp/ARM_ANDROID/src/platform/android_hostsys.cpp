@@ -2,7 +2,7 @@
 
 #include "common/Assertions.h"
 #include "common/BitUtils.h"
-#include "common/CrashHandler.h"
+#include "emucorex/android_signal_chain.h"
 #include "common/Error.h"
 #include "common/HostSys.h"
 
@@ -161,43 +161,17 @@ namespace PageFaultHandler
 	static std::recursive_mutex s_exception_handler_mutex;
 	static bool s_in_exception_handler = false;
 	static bool s_installed = false;
+	static struct sigaction s_previous_sigsegv = {};
+	static struct sigaction s_previous_sigbus = {};
 	static void SignalHandler(int sig, siginfo_t* info, void* ctx);
 } // namespace PageFaultHandler
 
-[[maybe_unused]] static bool IsStoreInstruction(const void* ptr)
-{
-	u32 bits;
-	std::memcpy(&bits, ptr, sizeof(bits));
-
-	if ((bits & 0x0a000000) != 0x08000000)
-		return false;
-
-	if ((bits & 0x3a000000) == 0x28000000)
-		return (bits & (1 << 22)) == 0;
-
-	switch (bits & 0xC4C00000)
-	{
-		case 0x00000000:
-		case 0x40000000:
-		case 0x80000000:
-		case 0xC0000000:
-		case 0x04000000:
-		case 0x44000000:
-		case 0x84000000:
-		case 0xC4000000:
-		case 0x04800000:
-			return true;
-
-		default:
-			return false;
-	}
-}
-
 void PageFaultHandler::SignalHandler(int sig, siginfo_t* info, void* ctx)
 {
+	const int saved_errno = errno;
 	void* const exception_address = reinterpret_cast<void*>(info->si_addr);
 	void* const exception_pc = reinterpret_cast<void*>(static_cast<ucontext_t*>(ctx)->uc_mcontext.pc);
-	const bool is_write = exception_pc ? IsStoreInstruction(exception_pc) : false;
+	const bool is_write = emucorex::android::IsWriteSignalContext(ctx);
 
 	s_exception_handler_mutex.lock();
 
@@ -212,7 +186,10 @@ void PageFaultHandler::SignalHandler(int sig, siginfo_t* info, void* ctx)
 	s_exception_handler_mutex.unlock();
 
 	if (result == HandlerResult::ContinueExecution)
+	{
+		errno = saved_errno;
 		return;
+	}
 
 	__android_log_print(ANDROID_LOG_ERROR, "EmuCoreX",
 		"Unhandled native signal sig=%d pc=%p addr=%p write=%d handler_result=%d",
@@ -240,7 +217,9 @@ void PageFaultHandler::SignalHandler(int sig, siginfo_t* info, void* ctx)
 		static_cast<unsigned long long>(uctx->uc_mcontext.regs[30]),
 		static_cast<unsigned long long>(uctx->uc_mcontext.sp));
 
-	CrashHandler::CrashSignalHandler(sig, info, ctx);
+	errno = saved_errno;
+	emucorex::android::HandOffFatalSignal(sig, info, ctx,
+		sig == SIGBUS ? s_previous_sigbus : s_previous_sigsegv);
 }
 
 bool PageFaultHandler::Install(Error* error)
@@ -260,20 +239,19 @@ bool PageFaultHandler::Install(Error* error)
 	sa.sa_flags = SA_SIGINFO;
 	sa.sa_sigaction = SignalHandler;
 
-	struct sigaction old_sigsegv = {};
-	if (sigaction(SIGSEGV, &sa, &old_sigsegv) != 0)
+	if (sigaction(SIGSEGV, &sa, &s_previous_sigsegv) != 0)
 	{
 		Error::SetErrno(error, "sigaction() for SIGSEGV failed: ", errno);
 		return false;
 	}
 
-	if (sigaction(SIGBUS, &sa, nullptr) != 0)
+	if (sigaction(SIGBUS, &sa, &s_previous_sigbus) != 0)
 	{
 		const int install_errno = errno;
 		// Do not leave a half-installed page-fault handler behind. In particular,
 		// a later Install() attempt must not unexpectedly chain through this
 		// handler while s_installed is still false.
-		(void)sigaction(SIGSEGV, &old_sigsegv, nullptr);
+		(void)sigaction(SIGSEGV, &s_previous_sigsegv, nullptr);
 		Error::SetErrno(error, "sigaction() for SIGBUS failed: ", install_errno);
 		return false;
 	}

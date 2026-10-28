@@ -13,7 +13,7 @@ int main(int argc, char** argv)
     const bool replay = argc == 4 && (fallback || std::strcmp(argv[2], "replay-vu1") == 0);
     if (argc != 3 && !replay)
     {
-        std::fprintf(stderr, "usage: %s /absolute/path/libemucore_4k.so classifier|jit-cache|vu|vu-pq|vu-itof-codegen|vu-ftoi|vectors|sqrt-flags|div-edges|ee|ee-branch-immediates|ee-cop1-mov|ee-cop1-memory|ee-cop1-compare|ee-vu-clip|ee-vu-abs|ee-stores|ee-vu-itof|ee-vu-ftoi|ee-bc1|ee-hot-loads|ee-fastmem|ee-cop1-unary|ee-cop1-maxmin|ee-vu-maxmin|ir-immediates|iop-nclip|iop-avsz|ee-fastmem-exit|ee-fastmem-cold|vu-maxmin-i|vu-clip|vu-clip-route|ee-vu-maxmin-i|ee-vu-maxmin-i-flags|vu-maxmin|vu-maxmin-route|vu-maxmin-broadcast|vu-maxmin-broadcast-route|ee-vu-maxmin-broadcast|iop|iop-cop2|iop-cop2-memory|gs-prepare|gs-job|gs-job-bridge|gs-job-runtime|gs-job-snapshot|replay-vu1 [capture.vuo]\n", argv[0]);
+        std::fprintf(stderr, "usage: %s /absolute/path/libemucore_4k.so classifier|jit-cache|vu|vu-pq|vu-itof-codegen|vu-ftoi|vectors|sqrt-flags|div-edges|ee|ee-branch-immediates|ee-cop1-mov|ee-cop1-memory|ee-cop1-compare|ee-vu-clip|ee-vu-abs|ee-stores|ee-vu-itof|ee-vu-ftoi|ee-bc1|ee-hot-loads|ee-fastmem|ee-cop1-unary|ee-cop1-maxmin|ee-vu-maxmin|ir-immediates|iop-nclip|iop-avsz|ee-fastmem-exit|ee-fastmem-cold|vu-maxmin-i|vu-clip|vu-clip-route|ee-vu-maxmin-i|ee-vu-maxmin-i-flags|vu-maxmin|vu-maxmin-route|vu-maxmin-broadcast|vu-maxmin-broadcast-route|ee-vu-maxmin-broadcast|iop|iop-cop2|iop-cop2-memory|signal-chain|gs-prepare|gs-job|gs-job-bridge|gs-job-runtime|gs-job-snapshot|replay-vu1 [capture.vuo]\n", argv[0]);
         return 2;
     }
     setvbuf(stdout, nullptr, _IONBF, 0);
@@ -34,7 +34,7 @@ int main(int argc, char** argv)
         std::fprintf(stderr, "dlopen: %s\n", dlerror());
         return 2;
     }
-    const char* symbol = std::strcmp(argv[2], "gs-job-snapshot") == 0 ? "EmuCoreXRunTFXPreparationSnapshotTests" : std::strcmp(argv[2], "gs-job-runtime") == 0 ? "EmuCoreXRunTFXPreparationRuntimeTests" : std::strcmp(argv[2], "gs-job-bridge") == 0 ? "EmuCoreXRunTFXPreparationBridgeTests" : std::strcmp(argv[2], "gs-job") == 0 ? "EmuCoreXRunTFXPreparationJobTests" : fallback ? "EmuCoreXReplayVU1Fallback" : (replay ? "EmuCoreXReplayVU1" : "EmuCoreXRunJitOracle");
+    const char* symbol = std::strcmp(argv[2], "signal-chain") == 0 ? "EmuCoreXRunSignalChainTests" : std::strcmp(argv[2], "gs-job-snapshot") == 0 ? "EmuCoreXRunTFXPreparationSnapshotTests" : std::strcmp(argv[2], "gs-job-runtime") == 0 ? "EmuCoreXRunTFXPreparationRuntimeTests" : std::strcmp(argv[2], "gs-job-bridge") == 0 ? "EmuCoreXRunTFXPreparationBridgeTests" : std::strcmp(argv[2], "gs-job") == 0 ? "EmuCoreXRunTFXPreparationJobTests" : fallback ? "EmuCoreXReplayVU1Fallback" : (replay ? "EmuCoreXReplayVU1" : "EmuCoreXRunJitOracle");
     auto run = reinterpret_cast<int (*)(const char*)>(dlsym(library, symbol));
     if (!run)
     {

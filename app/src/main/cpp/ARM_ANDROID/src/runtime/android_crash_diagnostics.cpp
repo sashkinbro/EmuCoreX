@@ -1,5 +1,6 @@
 #include "common/AndroidLogging.h"
 #include "emucorex/android_crash_diagnostics.h"
+#include "emucorex/android_signal_chain.h"
 
 #include "pcsx2/Gif.h"
 #include "pcsx2/GS.h"
@@ -178,7 +179,7 @@ void WriteStackTrace(int log_fd)
 	write(log_fd, footer, strlen(footer));
 }
 
-void NativeCrashSignalHandler(int sig, siginfo_t* info, void* /*ctx*/)
+void NativeCrashSignalHandler(int sig, siginfo_t* info, void* ctx)
 {
 	// Guard against recursive crashes in the handler itself
 	if (s_in_signal_handler.exchange(true, std::memory_order_acq_rel))
@@ -188,11 +189,13 @@ void NativeCrashSignalHandler(int sig, siginfo_t* info, void* /*ctx*/)
 	}
 
 	void* fault_addr = info ? info->si_addr : nullptr;
+	void* const exception_pc = ctx ? reinterpret_cast<void*>(static_cast<ucontext_t*>(ctx)->uc_mcontext.pc) : nullptr;
 
 	// Write summary line to log file (async-signal-safe)
 	WriteToLogFileFmt("NATIVE_CRASH",
-		"signal=%s(%d) fault_addr=%p launch=%llu phase=%s game=\"%s\" serial=%s",
+		"signal=%s(%d) code=%d pc=%p fault_addr=%p launch=%llu phase=%s game=\"%s\" serial=%s",
 		SignalName(sig), sig,
+		info ? info->si_code : 0, exception_pc,
 		fault_addr,
 		(unsigned long long)s_launch_id.load(std::memory_order_relaxed),
 		s_execute_phase,
@@ -235,9 +238,10 @@ void NativeCrashSignalHandler(int sig, siginfo_t* info, void* /*ctx*/)
 	}
 
 	// Also run full diagnostics to logcat (existing behaviour)
-	EmuCoreXDumpNativeCrashDiagnostics(sig, nullptr, fault_addr, false, 0);
+	EmuCoreXDumpNativeCrashDiagnostics(sig, exception_pc, fault_addr, IsWriteSignalContext(ctx), 0);
 
-	// Re-raise to previous handler so Android generates a proper tombstone
+	// Forward the original fault context; raise() would replace it with SI_TKILL
+	// and a PC inside the crash logger instead of the instruction that failed.
 	struct sigaction* prev = nullptr;
 	switch (sig)
 	{
@@ -249,9 +253,8 @@ void NativeCrashSignalHandler(int sig, siginfo_t* info, void* /*ctx*/)
 	}
 
 	if (prev)
-		sigaction(sig, prev, nullptr);
-
-	raise(sig);
+		HandOffFatalSignal(sig, info, ctx, *prev);
+	s_in_signal_handler.store(false, std::memory_order_release);
 }
 
 void CopyBreadcrumb(char* dest, size_t size, const char* source)
