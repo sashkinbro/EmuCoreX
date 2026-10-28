@@ -57,6 +57,7 @@ import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.RadioButtonChecked
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
@@ -64,6 +65,7 @@ import androidx.compose.material.icons.rounded.SmartDisplay
 import androidx.compose.material.icons.rounded.Star
 import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -1437,6 +1439,8 @@ private fun OnboardingSetupContent(
                 onClick = launchGamePicker
             )
 
+            Spacer(modifier = Modifier.height(8.dp))
+            SupportedConsolesCard()
             gamePaths.forEach { path ->
                 Surface(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 3.dp),
@@ -1904,6 +1908,85 @@ private fun SetupCard(
                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                         color = statusColor
                     )
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
+internal fun SupportedConsolesCard() {
+    var showFormats by remember { mutableStateOf(false) }
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        shape = neonShape(32.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+        tonalElevation = 2.dp,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Box(
+                    modifier = Modifier.size(52.dp).clip(neonShape(18.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Rounded.Gamepad, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.onboarding_supported_consoles),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    val consoleNames = listOf(
+                        stringResource(R.string.home_platform_ps2),
+                        stringResource(R.string.home_platform_arcade)
+                    )
+                    Text(
+                        text = consoleNames.joinToString(" · "),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = { showFormats = !showFormats },
+                shape = neonShape(18.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                ),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+                )
+            ) {
+                Text(stringResource(R.string.formats_title))
+                Icon(
+                    if (showFormats) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = null
+                )
+            }
+            AnimatedVisibility(visible = showFormats) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    listOf(
+                        R.string.home_platform_ps2 to ".bin  .chd  .cso  .elf  .gz  .img  .iso  .mdf  .zso",
+                        R.string.home_platform_arcade to ".acgame"
+                    ).forEach { (platform, formats) ->
+                        Column {
+                            Text(stringResource(platform),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurface)
+                            Text(formats, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
             }
         }

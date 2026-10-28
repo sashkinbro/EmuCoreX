@@ -3013,4 +3013,5 @@
     <string name="settings_shader_presets_remove_title">پیش‌تنظیم‌های انتخاب‌شده حذف شوند؟</string>
     <string name="settings_shader_presets_remove_body">پیش‌تنظیم‌های انتخاب‌شده: %1$d. از فهرست حذف شوند؟</string>
     <string name="settings_shader_presets_remove_failed">پیش‌تنظیم‌های انتخاب‌شده حذف نشدند.</string>
+    <string name="onboarding_supported_consoles">کنسول‌های پشتیبانی‌شده</string>
 </resources>

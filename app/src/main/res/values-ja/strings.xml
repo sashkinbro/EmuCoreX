@@ -2997,4 +2997,5 @@
     <string name="settings_shader_presets_remove_title">選択したプリセットを削除しますか？</string>
     <string name="settings_shader_presets_remove_body">選択したプリセット：%1$d件。リストから削除しますか？</string>
     <string name="settings_shader_presets_remove_failed">選択したプリセットを削除できませんでした。</string>
+    <string name="onboarding_supported_consoles">対応コンソール</string>
 </resources>

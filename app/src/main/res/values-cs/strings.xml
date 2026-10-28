@@ -3018,4 +3018,5 @@
     <string name="settings_shader_presets_remove_title">Odebrat vybrané předvolby?</string>
     <string name="settings_shader_presets_remove_body">Vybrané předvolby: %1$d. Odebrat je ze seznamu?</string>
     <string name="settings_shader_presets_remove_failed">Vybrané předvolby se nepodařilo odebrat.</string>
+    <string name="onboarding_supported_consoles">Podporované konzole</string>
 </resources>

@@ -2997,4 +2997,5 @@
     <string name="settings_shader_presets_remove_title">선택한 프리셋을 삭제할까요?</string>
     <string name="settings_shader_presets_remove_body">선택한 프리셋: %1$d개. 목록에서 삭제할까요?</string>
     <string name="settings_shader_presets_remove_failed">선택한 프리셋을 삭제하지 못했습니다.</string>
+    <string name="onboarding_supported_consoles">지원되는 콘솔</string>
 </resources>

@@ -2998,4 +2998,5 @@
     <string name="settings_shader_presets_remove_title">Seçilen ön ayarlar kaldırılsın mı?</string>
     <string name="settings_shader_presets_remove_body">Seçilen ön ayarlar: %1$d. Listeden kaldırılsın mı?</string>
     <string name="settings_shader_presets_remove_failed">Seçilen ön ayarlar kaldırılamadı.</string>
+    <string name="onboarding_supported_consoles">Desteklenen konsollar</string>
 </resources>

@@ -3012,4 +3012,5 @@
     <string name="settings_shader_presets_remove_title">Hapus preset yang dipilih?</string>
     <string name="settings_shader_presets_remove_body">Preset yang dipilih: %1$d. Hapus dari daftar?</string>
     <string name="settings_shader_presets_remove_failed">Tidak dapat menghapus preset yang dipilih.</string>
+    <string name="onboarding_supported_consoles">Konsol yang didukung</string>
 </resources>

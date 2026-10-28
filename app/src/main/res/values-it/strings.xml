@@ -2998,4 +2998,5 @@
     <string name="settings_shader_presets_remove_title">Rimuovere le preimpostazioni selezionate?</string>
     <string name="settings_shader_presets_remove_body">Preimpostazioni selezionate: %1$d. Rimuoverle dall’elenco?</string>
     <string name="settings_shader_presets_remove_failed">Impossibile rimuovere le preimpostazioni selezionate.</string>
+    <string name="onboarding_supported_consoles">Console supportate</string>
 </resources>

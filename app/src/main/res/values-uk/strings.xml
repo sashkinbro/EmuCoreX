@@ -3003,4 +3003,5 @@
     <string name="settings_shader_presets_remove_title">Прибрати вибрані пресети?</string>
     <string name="settings_shader_presets_remove_body">Вибрано пресетів: %1$d. Прибрати їх зі списку?</string>
     <string name="settings_shader_presets_remove_failed">Не вдалося прибрати вибрані пресети.</string>
+    <string name="onboarding_supported_consoles">Підтримувані консолі</string>
 </resources>

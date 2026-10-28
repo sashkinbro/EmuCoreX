@@ -3002,4 +3002,5 @@
     <string name="settings_shader_presets_remove_title">إزالة الإعدادات المسبقة المحددة؟</string>
     <string name="settings_shader_presets_remove_body">الإعدادات المسبقة المحددة: %1$d. هل تريد إزالتها من القائمة؟</string>
     <string name="settings_shader_presets_remove_failed">تعذرت إزالة الإعدادات المسبقة المحددة.</string>
+    <string name="onboarding_supported_consoles">الأجهزة المدعومة</string>
 </resources>

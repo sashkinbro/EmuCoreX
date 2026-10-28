@@ -3016,4 +3016,5 @@
     <string name="settings_shader_presets_remove_title">Remove selected presets?</string>
     <string name="settings_shader_presets_remove_body">Selected presets: %1$d. Remove them from the list?</string>
     <string name="settings_shader_presets_remove_failed">Could not remove the selected presets.</string>
+    <string name="onboarding_supported_consoles">Supported consoles</string>
 </resources>

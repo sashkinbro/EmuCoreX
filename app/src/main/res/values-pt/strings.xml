@@ -3000,4 +3000,5 @@
     <string name="settings_shader_presets_remove_title">Remover as predefinições selecionadas?</string>
     <string name="settings_shader_presets_remove_body">Predefinições selecionadas: %1$d. Removê-las da lista?</string>
     <string name="settings_shader_presets_remove_failed">Não foi possível remover as predefinições selecionadas.</string>
+    <string name="onboarding_supported_consoles">Consoles compatíveis</string>
 </resources>

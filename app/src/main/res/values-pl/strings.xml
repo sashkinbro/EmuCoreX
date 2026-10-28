@@ -3020,4 +3020,5 @@
     <string name="settings_shader_presets_remove_title">Usunąć wybrane ustawienia shaderów?</string>
     <string name="settings_shader_presets_remove_body">Wybrane ustawienia: %1$d. Usunąć je z listy?</string>
     <string name="settings_shader_presets_remove_failed">Nie udało się usunąć wybranych ustawień shaderów.</string>
+    <string name="onboarding_supported_consoles">Obsługiwane konsole</string>
 </resources>

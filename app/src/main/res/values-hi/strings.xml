@@ -2998,4 +2998,5 @@
     <string name="settings_shader_presets_remove_title">चुने हुए प्रीसेट हटाएँ?</string>
     <string name="settings_shader_presets_remove_body">चुने हुए प्रीसेट: %1$d। उन्हें सूची से हटाएँ?</string>
     <string name="settings_shader_presets_remove_failed">चुने हुए प्रीसेट नहीं हटाए जा सके।</string>
+    <string name="onboarding_supported_consoles">समर्थित कंसोल</string>
 </resources>
