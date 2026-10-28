@@ -150,7 +150,9 @@ object GameLaunchShortcut {
         intent.removeExtra(EXTRA_RENDERER)
         intent.removeExtra(EXTRA_GS_DUMP_FRAMES)
         intent.removeExtra(EXTRA_GS_DUMP_DELAY_MS)
-        if (intent.data?.scheme == SCHEME && intent.data?.host == HOST) {
+        val data = intent.data
+        if ((data?.scheme == SCHEME && data.host == HOST) ||
+            data?.scheme == "content" || data?.scheme == "file") {
             intent.data = null
         }
     }
