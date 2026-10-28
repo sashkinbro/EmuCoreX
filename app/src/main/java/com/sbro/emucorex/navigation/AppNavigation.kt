@@ -287,7 +287,12 @@ fun AppNavigation(
                 BiosValidator.hasUsableBiosFiles(context, biosPath) to
                     SetupValidator.isAnyGameFolderPresentForStartup(context, gamePaths)
             }
-            val shouldOpenHome = onboardingCompleted && hasUsableBios && hasGameFolder
+            // Completed setups always land on Home. Removable/FUSE storage can
+            // be briefly unavailable while the device is still booting, and
+            // relaunching onboarding in that window makes a configured BIOS or
+            // library look lost. Home already has targeted recovery cards for
+            // missing/inaccessible paths.
+            val shouldOpenHome = onboardingCompleted
             Log.i(
                 TAG,
                 "Startup destination onboarding=$onboardingCompleted bios=$hasUsableBios gameFolder=$hasGameFolder launch=${launchRequest != null}"
