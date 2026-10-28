@@ -36,10 +36,8 @@ app/.cxx/
 .externalNativeBuild/
 .angle-build/
 scripts/
-!/scripts/
-/scripts/*
-!/scripts/gs-oracle/
-/scripts/gs-oracle/results/
+/scripts/gs-oracle/
+/build-support/
 captures/
 out/
 dist/
@@ -109,6 +107,7 @@ emulog.txt
 /Windows-MacOS-Linux/
 /.gitmodules
 docs/
+/docs/testing/
 # Local investigation notes and profiling captures
 profiling-runs/
 profiler/
