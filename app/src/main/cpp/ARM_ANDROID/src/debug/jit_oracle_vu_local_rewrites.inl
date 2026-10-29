@@ -191,3 +191,5 @@ void RunVULocalRewriteTests()
     VULocalEbitTargetTests();
     VULocalEmptyFieldTests();
 }
+
+#include "jit_oracle_vu_zero_tail.inl"

@@ -70,6 +70,10 @@ static thread_local bool s_vuLocalIdentityEnabled = true;
 static thread_local u64 s_vuLocalIdentityEmits = 0;
 extern "C" void EmuCoreXOracleSetVULocalIdentity(bool enabled) { s_vuLocalIdentityEnabled = enabled; }
 extern "C" u64 EmuCoreXOracleVULocalIdentityEmits() { return s_vuLocalIdentityEmits; }
+static thread_local bool s_vuLocalZeroTailClampEnabled = true;
+static thread_local u64 s_vuLocalZeroTailClampEmits = 0;
+extern "C" void EmuCoreXOracleSetVUZeroTailClamp(bool enabled) { s_vuLocalZeroTailClampEnabled = enabled; }
+extern "C" u64 EmuCoreXOracleVUZeroTailClampEmits() { return s_vuLocalZeroTailClampEmits; }
 #endif
 
 static __fi bool mVUUpperNatural_oaknut(mV)
@@ -117,6 +121,41 @@ static __fi bool mVUUpperSkipCanonicalLaneMul_oaknut(mV, int Fs, int lane, bool 
 #endif
 	return true;
 }
+
+// Scalar FADD/FSUB/FMUL clear the result's upper 96 bits under this FPCR
+// policy. Clamping those three zeros adds no exception or numerical change,
+// so a vector clamp avoids the scalar path's final lane insertion.
+static __fi void mVUUpperClampZeroTailNumeric_oaknut(int reg)
+{
+	mVUClamp1VectorFast_oaknut(reg);
+}
+
+static __fi void mVUUpperClampZeroTailResult_oaknut(mV, int reg)
+{
+	const FPControlRegister fpcr = isCOP2 ? EmuConfig.Cpu.FPUFPCR :
+		(isVU1 ? EmuConfig.Cpu.VU1FPCR : EmuConfig.Cpu.VU0FPCR);
+	constexpr u64 allowed = FPControlRegister::FZ_BIT | FPControlRegister::RMODE_BITS | (1ULL << 25);
+	bool eligible = mVUlocalRuleEnabled(11) && clampE && !CHECK_VU_SIGN_OVERFLOW(mVU.index) &&
+		mVU.regAlloc->checkVFClamp(reg) && !(fpcr.bitmask & ~allowed);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	eligible &= s_vuLocalZeroTailClampEnabled;
+	if (eligible) ++s_vuLocalZeroTailClampEmits;
+#endif
+	if (eligible) mVUUpperClampZeroTailNumeric_oaknut(reg);
+	else mVUUpperClamp4Scalar_oaknut(mVU, reg);
+}
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" u32 EmuCoreXOracleEmitZeroTailClamp(bool optimized)
+{
+	const u8* start = oakGetCurrentCodePointer();
+	recBeginOaknutEmit();
+	if (optimized) mVUUpperClampZeroTailNumeric_oaknut(0);
+	else mVUClamp1ScalarFast_oaknut(0);
+	recEndOaknutEmit();
+	return static_cast<u32>(oakGetCurrentCodePointer() - start);
+}
+#endif
 
 // Within a natural-lane body each private operand is consumed full width.
 static __fi void mVUUpperClampOperandScalar_oaknut(mV, int reg, bool extra)
@@ -192,7 +231,7 @@ static __fi void mVUUpperAddSs_oaknut(mV, int to, int from)
 	mVUUpperClamp3Scalar_oaknut(mVU, from);
 	const int source = mVUUpperStepSource_oaknut(mVU, to);
 	oakAsm->FADD(oakSRegister(to), oakSRegister(source), oakSRegister(from == to ? source : from));
-	mVUUpperClamp4Scalar_oaknut(mVU, to);
+	mVUUpperClampZeroTailResult_oaknut(mVU, to);
 }
 
 static __fi bool mVUUpperPrepareVectorClampLimits_oaknut(mV, int first, int second, int third = -1)
@@ -232,7 +271,7 @@ static __fi void mVUUpperSubSs_oaknut(mV, int to, int from)
 	mVUUpperClamp3Scalar_oaknut(mVU, from);
 	const int source = mVUUpperStepSource_oaknut(mVU, to);
 	oakAsm->FSUB(oakSRegister(to), oakSRegister(source), oakSRegister(from == to ? source : from));
-	mVUUpperClamp4Scalar_oaknut(mVU, to);
+	mVUUpperClampZeroTailResult_oaknut(mVU, to);
 }
 
 static __fi void mVUUpperMulPs_oaknut(mV, int to, int from)
@@ -268,7 +307,7 @@ static __fi void mVUUpperMulSs_oaknut(mV, int to, int from)
 	mVUUpperClamp3Scalar_oaknut(mVU, from);
 	const int source = mVUUpperStepSource_oaknut(mVU, to);
 	oakAsm->FMUL(oakSRegister(to), oakSRegister(source), oakSRegister(from == to ? source : from));
-	mVUUpperClamp4Scalar_oaknut(mVU, to);
+	mVUUpperClampZeroTailResult_oaknut(mVU, to);
 }
 
 static __fi void mVUUpperFmlaPs_oaknut(mV, int acc, int left, int right)
