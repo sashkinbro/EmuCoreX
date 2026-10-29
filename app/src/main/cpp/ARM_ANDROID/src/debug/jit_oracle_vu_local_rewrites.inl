@@ -4,6 +4,7 @@ extern "C" u32 EmuCoreXOracleEmitVULocalPrimitive(u32 kind, u32 argument, bool a
 
 
 #include "jit_oracle_vu_local_integration.inl"
+#include "jit_oracle_vu_local_natural.inl"
 
 void RunVULocalRewriteTests()
 {
@@ -157,4 +158,5 @@ void RunVULocalRewriteTests()
     Check(vf0_bits, "VU MAX/MINI with VF0 on either side preserves all raw ordering edge bits");
     Check(vf0_sizes, "VU MAX/MINI with a nonnegative VF0 operand is one SMAX/SMIN");
     VULocalArchitecturalTests();
+    VULocalNaturalParityTests();
 }

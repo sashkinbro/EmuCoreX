@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 // Independent lane/alias and full-state regressions for local emitter rewrites.
+extern "C" u64 EmuCoreXOracleVULocalNaturalEmits();
 void VULocalArchitecturalTests()
 {
     const auto move = [](u32 fs, u32 ft, u32 mask, bool rotate = false) {
@@ -93,7 +94,11 @@ void VULocalArchitecturalTests()
                 const std::vector<u32> program = {move(1, 20, 15), NOP_U,
                     move(2, 21, 15), NOP_U, NOP_L, upper,
                     NOP_L, NOP_U | 0x40000000u, NOP_L, NOP_U};
+                const u64 natural_before = EmuCoreXOracleVULocalNaturalEmits();
                 const auto actual = RunVU(vu, true, program, 0x80, 0, 128, false, nullptr, finite.data(), acc.data());
+                if (vu == 1 && clamp < 2 && (mask == 1 || mask == 2 || mask == 4))
+                    Check(EmuCoreXOracleVULocalNaturalEmits() > natural_before,
+                        "local one-lane VU1 FMAC emits arithmetic in its natural lane below extra clamp mode");
                 const auto expected = RunVU(vu, false, program, 0x80, 0, 128, false, nullptr, finite.data(), acc.data());
                 Compare(expected, actual, "local FMAC all lane/clamp/rounding combinations preserve flags and architectural state");
                 bool bits = true;

@@ -353,6 +353,7 @@ struct microMapXMM
 	int  count;    // Count of when last used
 	bool isNeeded; // Is needed for current instruction
 	bool isZero;   // Register was loaded from VF00 and doesn't need clamping
+	bool natural = false; // One-lane result remains at its guest lane, rather than S0.
 };
 
 struct microMapGPR
@@ -380,6 +381,7 @@ protected:
 
 	int         counter; // Current allocation count
 	int         index;   // VU0 or VU1
+	int naturalLane = -1; // Per-emitter scope; never part of pipeline state.
 
 	// DO NOT REMOVE THIS.
 	// This is here for a reason. MSVC likes to turn global writes into a load+conditional move+store.
@@ -523,6 +525,14 @@ protected:
 	// END_LOCAL_CLONE_STATE
 
 public:
+	int getNaturalLane() const { return naturalLane; }
+	int setNaturalLane(int lane)
+	{
+		const int previous = naturalLane;
+		naturalLane = lane;
+		return previous;
+	}
+
 	// Local copy-fold hooks. Consumers must completely overwrite dst.
 	void noteClone(int dst, int src)
 	{
@@ -596,6 +606,7 @@ public:
 	// Fully resets the regalloc by clearing all cached data
 	void reset(bool cop2mode)
 	{
+		naturalLane = -1;
 		cloneCount = 0;
 		gprClone = {-1, -1, nullptr};
 		// we run this at the of cop2, so don't free fprs
@@ -681,6 +692,15 @@ public:
 		}
 
 		return false;
+	}
+
+	void rebindFullWrite(int reg, int vfreg)
+	{
+		microMapXMM& map = xmmMap[reg];
+		pxAssert(map.isNeeded && map.VFreg == 0 && map.xyzw == 0xf);
+		map.VFreg = vfreg;
+		map.isZero = false;
+		map.count = counter;
 	}
 
 	bool isCachedWhole(int vfreg) const
@@ -828,11 +848,11 @@ public:
                 }
 				else if (mapX.VFreg == 32) {
 //                    mVUsaveReg(xmm(i), ptr[&regs().ACC], mapX.xyzw, 1);
-					mVUIrSaveReg_oaknut(i, static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[index].ACC)), mapX.xyzw, true);
+					mVUIrSaveReg_oaknut(i, static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[index].ACC)), mapX.xyzw, !mapX.natural);
                 }
 				else {
 //                    mVUsaveReg(xmm(i), ptr[&getVF(mapX.VFreg)], mapX.xyzw, 1);
-					mVUIrSaveReg_oaknut(i, static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[index].VF[mapX.VFreg])), mapX.xyzw, true);
+					mVUIrSaveReg_oaknut(i, static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[index].VF[mapX.VFreg])), mapX.xyzw, !mapX.natural);
                 }
 			}
 		}
@@ -933,12 +953,12 @@ public:
 				recEndOaknutEmit();
             }
 			else if (mapX.VFreg == 32) {
-//                mVUsaveReg(reg, ptr[&regs().ACC], mapX.xyzw, true);
-				mVUIrSaveReg_oaknut(reg_code, static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[index].ACC)), mapX.xyzw, true);
+//                mVUsaveReg(reg, ptr[&regs().ACC], mapX.xyzw, !mapX.natural);
+				mVUIrSaveReg_oaknut(reg_code, static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[index].ACC)), mapX.xyzw, !mapX.natural);
             }
 			else {
-//                mVUsaveReg(reg, ptr[&getVF(mapX.VFreg)], mapX.xyzw, true);
-				mVUIrSaveReg_oaknut(reg_code, static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[index].VF[mapX.VFreg])), mapX.xyzw, true);
+//                mVUsaveReg(reg, ptr[&getVF(mapX.VFreg)], mapX.xyzw, !mapX.natural);
+				mVUIrSaveReg_oaknut(reg_code, static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[index].VF[mapX.VFreg])), mapX.xyzw, !mapX.natural);
             }
 
 			if (invalidateRegs)
@@ -1010,8 +1030,9 @@ public:
 						}
 						if (mergeRegs == 1)
 						{
-							mVUIrMergeRegs_oaknut(i, reg_code, clear.xyzw, true);
+							mVUIrMergeRegs_oaknut(i, reg_code, clear.xyzw, !clear.natural);
 							mapI.xyzw  = 0xf;
+							mapI.natural = false;
 							mapI.count = counter;
 							mergeRegs  = 2;
 							updateCOP2AllocState(i);
@@ -1047,6 +1068,8 @@ public:
 	int allocRegId(int vfLoadReg = -1, int vfWriteReg = -1, int xyzw = 0, bool cloneWrite = true)
 	{
 		counter++;
+		const bool natural = naturalLane >= 0 && _XYZWss(xyzw);
+		const int shuffleMask = natural ? 0 : xyzw;
 		if (vfLoadReg >= 0) // Search For Cached Regs
 		{
             int i;
@@ -1065,17 +1088,17 @@ public:
 							z = findFreeReg(vfWriteReg);
 							writeBackXmmRegId(z);
 
-                            if (xyzw == 4) {
+                            if (shuffleMask == 4) {
 								recBeginOaknutEmit();
 								mVUIrPshufd_oaknut(z, i, 1);
 								recEndOaknutEmit();
                             }
-                            else if (xyzw == 2) {
+                            else if (shuffleMask == 2) {
 								recBeginOaknutEmit();
 								mVUIrPshufd_oaknut(z, i, 2);
 								recEndOaknutEmit();
                             }
-                            else if (xyzw == 1) {
+                            else if (shuffleMask == 1) {
 								recBeginOaknutEmit();
 								mVUIrPshufd_oaknut(z, i, 3);
 								recEndOaknutEmit();
@@ -1094,17 +1117,17 @@ public:
 							if ((vfLoadReg != vfWriteReg) || (xyzw != 0xf))
 								writeBackXmmRegId(i);
 
-                            if (xyzw == 4) {
+                            if (shuffleMask == 4) {
 								recBeginOaknutEmit();
 								mVUIrPshufd_oaknut(i, i, 1);
 								recEndOaknutEmit();
                             }
-                            else if (xyzw == 2) {
+                            else if (shuffleMask == 2) {
 								recBeginOaknutEmit();
 								mVUIrPshufd_oaknut(i, i, 2);
 								recEndOaknutEmit();
                             }
-                            else if (xyzw == 1) {
+                            else if (shuffleMask == 1) {
 								recBeginOaknutEmit();
 								mVUIrPshufd_oaknut(i, i, 3);
 								recEndOaknutEmit();
@@ -1112,6 +1135,7 @@ public:
 						}
 						xmmMap[z].VFreg = vfWriteReg;
 						xmmMap[z].xyzw = xyzw;
+						xmmMap[z].natural = natural;
 						xmmMap[z].isZero = (vfLoadReg == 0);
 					}
 					xmmMap[z].count = counter;
@@ -1134,19 +1158,20 @@ public:
 				recEndOaknutEmit();
             }
 			else if (vfLoadReg == 33) {
-                loadIreg(x, xyzw);
+                loadIreg(x, natural ? 0xf : xyzw);
             }
 			else if (vfLoadReg == 32) {
 //                mVUloadReg(xmmX, ptr[&regs().ACC], xyzw);
-				mVUIrLoadReg_oaknut(x, static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[index].ACC)), xyzw);
+				mVUIrLoadReg_oaknut(x, static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[index].ACC)), natural ? 0xf : xyzw);
             }
 			else if (vfLoadReg >= 0) {
 //                mVUloadReg(xmmX, ptr[&getVF(vfLoadReg)], xyzw);
-				mVUIrLoadReg_oaknut(x, static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[index].VF[vfLoadReg])), xyzw);
+				mVUIrLoadReg_oaknut(x, static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[index].VF[vfLoadReg])), natural ? 0xf : xyzw);
             }
 
 			xmmMap[x].VFreg = vfWriteReg;
 			xmmMap[x].xyzw  = xyzw;
+			xmmMap[x].natural = natural;
 		}
 		else // Reg Will Not Be Modified (always load full reg for caching)
 		{
@@ -1162,6 +1187,7 @@ public:
 
 			xmmMap[x].VFreg = vfLoadReg;
 			xmmMap[x].xyzw  = 0;
+			xmmMap[x].natural = false;
 		}
 		xmmMap[x].isZero = (vfLoadReg == 0);
 		xmmMap[x].count    = counter;

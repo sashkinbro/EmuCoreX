@@ -4055,6 +4055,23 @@ static void mVU_JALR_emit(mP)
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 // Emit production primitives into the oracle-owned buffer. No live microVU
 // allocator, program or guest state is modified by these probes.
+extern "C" void EmuCoreXOracleVULocalFlagRings(u32 index, u32* words, bool seed)
+{
+	microVU& vu = index ? microVU1 : microVU0;
+	for (u32 i = 0; i < 4; ++i)
+	{
+		if (seed)
+		{
+			vu.statFlag[i] = 0x13579bdfu ^ i;
+			vu.macFlag[i] = 0x2468ace0u ^ i;
+			vu.clipFlag[i] = 0x5a5a5a5au ^ i;
+		}
+		words[i] = vu.statFlag[i];
+		words[4 + i] = vu.macFlag[i];
+		words[8 + i] = vu.clipFlag[i];
+	}
+}
+
 extern "C" u32 EmuCoreXOracleEmitVULocalPrimitive(u32 kind, u32 argument, bool alias)
 {
 	const u8* begin = oakGetCurrentCodePointer();
