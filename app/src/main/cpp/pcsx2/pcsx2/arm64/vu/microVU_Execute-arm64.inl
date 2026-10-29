@@ -215,7 +215,7 @@ void mVUdispatcherAB(mV)
 
     recEndOaknutEmit();
 
-	Perf::any.Register(mVU.startFunct, static_cast<u32>(mVU.prog.x86start - mVU.startFunct),
+	Perf::any.Register(mVU.startFunct, static_cast<u32>(oakGetCurrentCodePointer() - mVU.startFunct),
 		mVU.index ? "VU1StartFunc" : "VU0StartFunc");
 }
 
@@ -262,7 +262,7 @@ void mVUdispatcherCD(mV)
     oakAsm->RET();
     recEndOaknutEmit();
 
-	Perf::any.Register(mVU.startFunctXG, static_cast<u32>(mVU.prog.x86start - mVU.startFunctXG),
+	Perf::any.Register(mVU.startFunctXG, static_cast<u32>(oakGetCurrentCodePointer() - mVU.startFunctXG),
 		mVU.index ? "VU1StartFuncXG" : "VU0StartFuncXG");
 }
 
@@ -318,7 +318,7 @@ static void mVUGenerateWaitMTVU(mV)
     oakAsm->RET();
     recEndOaknutEmit();
 
-	Perf::any.Register(mVU.waitMTVU, static_cast<u32>(mVU.prog.x86start - mVU.waitMTVU),
+	Perf::any.Register(mVU.waitMTVU, static_cast<u32>(oakGetCurrentCodePointer() - mVU.waitMTVU),
 		mVU.index ? "VU1WaitMTVU" : "VU0WaitMTVU");
 }
 
@@ -344,7 +344,7 @@ static void mVUGenerateCopyPipelineState(mV)
 	oakAsm->RET();
 	recEndOaknutEmit();
 
-	Perf::any.Register(mVU.copyPLState, static_cast<u32>(mVU.prog.x86start - mVU.copyPLState),
+	Perf::any.Register(mVU.copyPLState, static_cast<u32>(oakGetCurrentCodePointer() - mVU.copyPLState),
 		mVU.index ? "VU1CopyPLState" : "VU0CopyPLState");
 }
 

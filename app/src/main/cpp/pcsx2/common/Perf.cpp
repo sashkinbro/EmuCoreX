@@ -24,6 +24,12 @@
 #endif
 
 //#define ProfileWithPerf
+#if defined(__ANDROID__) && !defined(NDEBUG)
+// Native simpleperf reads an opt-in per-process map from the app data folder.
+// Developer profiling only; ordinary Android sessions do not create a file.
+#include <sys/system_properties.h>
+#define ProfileWithPerf
+#endif
 //#define ProfileWithPerfJitDump
 
 #if defined(ENABLE_VTUNE) && defined(_WIN32)
@@ -54,14 +60,25 @@ namespace Perf
 				return;
 
 			char file[256];
+#ifdef __ANDROID__
+            char directory[PROP_VALUE_MAX] = {};
+            if (__system_property_get("debug.emucorex.perf_map_dir", directory) <= 0 || directory[0] != '/')
+                return;
+            std::snprintf(file, std::size(file), "%s/perf-%d.map", directory, getpid());
+#else
 			snprintf(file, std::size(file), "/tmp/perf-%d.map", getpid());
+#endif
 			s_map_file = std::fopen(file, "wb");
 			s_map_file_opened = true;
 			if (!s_map_file)
 				return;
 		}
 
+#ifdef __ANDROID__
+		std::fprintf(s_map_file, "0x%" PRIx64 " 0x%zx %s\n", static_cast<u64>(reinterpret_cast<uintptr_t>(ptr)), size, symbol);
+#else
 		std::fprintf(s_map_file, "%" PRIx64 " %zx %s\n", static_cast<u64>(reinterpret_cast<uintptr_t>(ptr)), size, symbol);
+#endif
 		std::fflush(s_map_file);
 	}
 #elif defined(__linux__) && defined(ProfileWithPerfJitDump)
