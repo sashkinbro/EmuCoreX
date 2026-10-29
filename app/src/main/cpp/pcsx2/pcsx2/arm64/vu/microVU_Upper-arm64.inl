@@ -66,6 +66,10 @@ static thread_local bool s_vuLocalReadonlyClipEnabled = true;
 static thread_local u64 s_vuLocalReadonlyClipEmits = 0;
 extern "C" void EmuCoreXOracleSetVULocalReadonlyClip(bool enabled) { s_vuLocalReadonlyClipEnabled = enabled; }
 extern "C" u64 EmuCoreXOracleVULocalReadonlyClipEmits() { return s_vuLocalReadonlyClipEmits; }
+static thread_local bool s_vuLocalIdentityEnabled = true;
+static thread_local u64 s_vuLocalIdentityEmits = 0;
+extern "C" void EmuCoreXOracleSetVULocalIdentity(bool enabled) { s_vuLocalIdentityEnabled = enabled; }
+extern "C" u64 EmuCoreXOracleVULocalIdentityEmits() { return s_vuLocalIdentityEmits; }
 #endif
 
 static __fi bool mVUUpperNatural_oaknut(mV)
@@ -89,6 +93,30 @@ public:
 	}
 	~mVUUpperNaturalScope() { alloc.setNaturalLane(previous); }
 };
+
+// Called only after the body's Fs clamp. Numeric clamp under FZ leaves
+// normal numbers and signed zero, so multiplying by canonical VF0.w is exact.
+// Keep the VU1 A-form vuDouble path: its bit clamp leaves denormals unflushed.
+static __fi bool mVUUpperSkipCanonicalLaneMul_oaknut(mV, int Fs, int lane, bool aform)
+{
+	if (!mVUlocalRuleEnabled(16) || _Ft_ != 0 || lane != 3 || clampE ||
+		!CHECK_VU_OVERFLOW(mVU.index) || CHECK_VU_SIGN_OVERFLOW(mVU.index) ||
+		(aform && isVU1) || (_XYZW_SS && !mVUUpperNatural_oaknut(mVU)) ||
+		!mVU.regAlloc->checkVFClamp(Fs))
+		return false;
+
+	// COP2 macros execute under the EE policy, which may differ from VU0's.
+	const FPControlRegister fpcr = isCOP2 ? EmuConfig.Cpu.FPUFPCR :
+		(isVU1 ? EmuConfig.Cpu.VU1FPCR : EmuConfig.Cpu.VU0FPCR);
+	constexpr u64 allowed = FPControlRegister::FZ_BIT | FPControlRegister::RMODE_BITS | (1ULL << 25);
+	if (!fpcr.GetFlushToZero() || (fpcr.bitmask & ~allowed))
+		return false;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (!s_vuLocalIdentityEnabled) return false;
+	++s_vuLocalIdentityEmits;
+#endif
+	return true;
+}
 
 // Within a natural-lane body each private operand is consumed full width.
 static __fi void mVUUpperClampOperandScalar_oaknut(mV, int reg, bool extra)
@@ -3842,20 +3870,23 @@ static void mVU_MULA_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 			mVUUpperClampAccLaneFs_oaknut(mVU, Fs, !mVUUpperNatural_oaknut(mVU));
 		else
 			mVUUpperClampAccLaneFs_oaknut(mVU, Fs, false);
+		const bool identity = mVUUpperSkipCanonicalLaneMul_oaknut(mVU, Fs, lane, true);
 		if (_XYZW_SS)
 		{
-			if (useFtLane)
-				mVUUpperMulSsLane_oaknut(mVU, Fs, FtRaw, lane);
-			else
-				mVUUpperMulSs_oaknut(mVU, Fs, FtL);
+			if (!identity)
+			{
+				if (useFtLane) mVUUpperMulSsLane_oaknut(mVU, Fs, FtRaw, lane);
+				else mVUUpperMulSs_oaknut(mVU, Fs, FtL);
+			}
 			oakAsm->MOV(oakQRegister(ACC).Selem()[0], oakQRegister(Fs).Selem()[0]);
 		}
 		else
 		{
-			if (useFtLane)
-				mVUUpperMulPsLane_oaknut(Fs, FtRaw, lane);
-			else
-				mVUUpperMulPs_oaknut(mVU, Fs, FtL);
+			if (!identity)
+			{
+				if (useFtLane) mVUUpperMulPsLane_oaknut(Fs, FtRaw, lane);
+				else mVUUpperMulPs_oaknut(mVU, Fs, FtL);
+			}
 			if (mVUlocalRuleEnabled(15) && _XYZW_PS)
 				mVU.regAlloc->rebindFullWrite(Fs, 32);
 			else
@@ -4061,10 +4092,11 @@ static void mVU_MUL_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane)
 				mVUUpperClampOperandScalar_oaknut(mVU, FtL, false);
 		}
 		mVUUpperClampOperandScalar_oaknut(mVU, Fs, false);
-		if (useFtLane)
-			mVUUpperMulSsLane_oaknut(mVU, Fs, FtRaw, lane);
-		else
-			mVUUpperMulSs_oaknut(mVU, Fs, FtL);
+		if (!mVUUpperSkipCanonicalLaneMul_oaknut(mVU, Fs, lane, false))
+		{
+			if (useFtLane) mVUUpperMulSsLane_oaknut(mVU, Fs, FtRaw, lane);
+			else mVUUpperMulSs_oaknut(mVU, Fs, FtL);
+		}
 	}
 	else
 	{
@@ -4073,10 +4105,11 @@ static void mVU_MUL_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane)
 				mVUUpperClamp2Vector_oaknut(mVU, FtL, false);
 		}
 		mVUUpperClamp2Vector_oaknut(mVU, Fs, false);
-		if (useFtLane)
-			mVUUpperMulPsLane_oaknut(Fs, FtRaw, lane);
-		else
-			mVUUpperMulPs_oaknut(mVU, Fs, FtL);
+		if (!mVUUpperSkipCanonicalLaneMul_oaknut(mVU, Fs, lane, false))
+		{
+			if (useFtLane) mVUUpperMulPsLane_oaknut(Fs, FtRaw, lane);
+			else mVUUpperMulPs_oaknut(mVU, Fs, FtL);
+		}
 	}
 	recEndOaknutEmit();
 

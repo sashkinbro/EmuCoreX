@@ -220,3 +220,5 @@ void EEVuLocalStatusProbeTests()
 }
 
 #include "jit_oracle_ee_vu_local_clip.inl"
+
+#include "jit_oracle_ee_vu_local_identity.inl"
