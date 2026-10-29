@@ -63,12 +63,7 @@ namespace vuaot
 	{
 		const auto incoming = [&]() { return (((pState.flagInfo >> (2 * flagType + 2)) & 3) - 1) & 3; };
 		if (isEbit)
-		{
-			const int inst = FindFlagInst(xFlag, 0x7fffffff);
-			if (xFlag[inst] < 0)
-				return incoming();
-			return inst;
-		}
+			return FindFlagInst(xFlag, 0x7fffffff);
 		if (pState.needExactMatch & (1 << flagType))
 			return 3;
 		return incoming();
@@ -942,7 +937,11 @@ namespace vuaot
 			found |= (regs_.needExactMatch & 8) >> 3;
 			regs_.needExactMatch &= 7;
 			if (curI() & kEbit)
+			{
+				// The lookahead may end on this pair, before visiting its delay slot.
+				needFlagFinalize_ = true;
 				branch = 1;
+			}
 			if (curI() & kTbit)
 				branch = 6;
 			if ((curI() & kDbit) && doDBitHandling)
