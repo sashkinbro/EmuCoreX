@@ -9992,6 +9992,16 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     psxRegs.pc = IOP_TEST_SCRATCH;
     psxRegs.cycle = 0;
 
+    if (direct_suite && std::strcmp(direct_suite, "ee-vu-local-clip") == 0)
+    {
+        EEVuLocalClipRewriteTests();
+        return;
+    }
+    if (direct_suite && std::strcmp(direct_suite, "ee-vu-status") == 0)
+    {
+        EEVuLocalStatusProbeTests();
+        return;
+    }
     if (direct_suite && std::strcmp(direct_suite, "ee-vu-local") == 0)
     {
         EEVuLocalRewriteMacroTests();
@@ -12336,6 +12346,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         EmuCoreXOracleTestVUQuick(Check);
     else if (std::strcmp(suite, "vu-local") == 0)
         RunVULocalRewriteTests();
+    else if (std::strcmp(suite, "vu-local-clip") == 0)
+        RunVULocalClipRewriteTests();
     else if (std::strcmp(suite, "vu-aot-trace") == 0)
         RunVuAotTraceTests();
     else if (std::strcmp(suite, "spu2-volume") == 0)
@@ -12384,7 +12396,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         EETests(false, false, false, false, false, false, false, false, false,
             false, false, false, false, false, false, 0, false, false, false, true);
     else if (std::strcmp(suite, "ee-direct") == 0 || std::strcmp(suite, "ee-direct-stores") == 0 ||
-        std::strcmp(suite, "ee-vu-local") == 0)
+        std::strcmp(suite, "ee-vu-local") == 0 || std::strcmp(suite, "ee-vu-status") == 0 ||
+        std::strcmp(suite, "ee-vu-local-clip") == 0)
         EETests(false, false, false, false, false, false, false, false, false,
             false, false, false, false, false, false, 0, false, false, false, false, suite);
     else if (std::strcmp(suite, "ee") == 0)

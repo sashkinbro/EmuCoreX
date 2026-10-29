@@ -62,6 +62,10 @@ enum clampModes
 static thread_local u64 s_vuLocalNaturalEmits = 0;
 static thread_local bool s_vuLocalNaturalEnabled = true;
 extern "C" void EmuCoreXOracleSetVULocalNatural(bool enabled) { s_vuLocalNaturalEnabled = enabled; }
+static thread_local bool s_vuLocalReadonlyClipEnabled = true;
+static thread_local u64 s_vuLocalReadonlyClipEmits = 0;
+extern "C" void EmuCoreXOracleSetVULocalReadonlyClip(bool enabled) { s_vuLocalReadonlyClipEnabled = enabled; }
+extern "C" u64 EmuCoreXOracleVULocalReadonlyClipEmits() { return s_vuLocalReadonlyClipEmits; }
 #endif
 
 static __fi bool mVUUpperNatural_oaknut(mV)
@@ -4186,7 +4190,7 @@ static void mVU_ABS_emit(mP)
 }
 
 // CLIP Opcode
-static void mVU_CLIP_direct_emit_oaknut(mP)
+static void mVU_CLIP_reference_emit_oaknut(mP)
 {
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, 0xf);
 	const int Ft = mVU.regAlloc->allocRegId(_Ft_, 0, 0x1);
@@ -4249,6 +4253,41 @@ static void mVU_CLIP_direct_emit_oaknut(mP)
 	mVU.regAlloc->clearNeededXmmId(Ft);
 	mVU.regAlloc->clearNeededXmmId(t1);
 	mVU.regAlloc->clearNeededXmmId(t2);
+}
+
+static void mVU_CLIP_direct_emit_oaknut(mP)
+{
+	bool readonly = mVUlocalRuleEnabled(12);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	readonly &= s_vuLocalReadonlyClipEnabled;
+#endif
+	if (!readonly)
+	{
+		mVU_CLIP_reference_emit_oaknut(mVU, recPass);
+		return;
+	}
+
+	// Keep full raw cached inputs readonly. The shared integer lowering owns
+	// only Q29-Q31/W16-W17 and the scheduled CLIP-history destination.
+	const int Fs = mVU.regAlloc->allocRegId(_Fs_);
+	const int Ft = mVU.regAlloc->allocRegId(_Ft_);
+	mVUallocCFLAGa(mVU, VU_HOST_T1, cFLAG.lastWrite);
+	const Arm64Ir::BoundVfClipPlan plan{static_cast<u8>(_Fs_), static_cast<u8>(_Ft_), mVUinfo.isBdelay != 0};
+	Arm64Ir::LowerOutput out;
+	std::string error;
+	const bool lowered = Arm64Ir::LowerBoundVfClipPlan(plan, Fs, Ft, VU_HOST_T1, &out, &error);
+	if (lowered)
+		mVUallocCFLAGb(mVU, VU_HOST_T1, cFLAG.write);
+	mVU.regAlloc->clearNeededXmmId(Fs);
+	if (Ft != Fs) mVU.regAlloc->clearNeededXmmId(Ft);
+	if (!lowered)
+	{
+		mVU_CLIP_reference_emit_oaknut(mVU, recPass);
+		return;
+	}
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	++s_vuLocalReadonlyClipEmits;
+#endif
 }
 
 static bool mVUTrySharedClip(mV)

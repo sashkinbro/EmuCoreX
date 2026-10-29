@@ -11,6 +11,7 @@ extern "C" u32 EmuCoreXOracleEmitVULocalCarryCompare(bool equality_only);
 #include "jit_oracle_vu_empty_field.inl"
 #include "jit_oracle_vu_local_full_acc.inl"
 #include "jit_oracle_vu_local_op.inl"
+#include "jit_oracle_vu_local_clip.inl"
 
 void RunVULocalRewriteTests()
 {

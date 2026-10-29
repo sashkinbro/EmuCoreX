@@ -63,10 +63,10 @@ void EEVuLocalRewriteMacroTests()
         const EESnapshot jit = RunEEProgramWithIrMode(0, code, initial_gpr.data(), nullptr,
             nullptr, nullptr, false, initial_vf.data());
         const VECTOR jit_acc = VU0.ACC;
-        const std::array<u32, 3> jit_flags{VU0.macflag, VU0.statusflag, VU0.clipflag};
         const EESnapshot interp = RunEEProgram(false, code, false, nullptr, nullptr,
             initial_gpr.data(), nullptr, nullptr, initial_vf.data());
         bool expected_jit = true, expected_interp = true, expected_acc = true;
+        u32 expected_mac = 0;
         for (u32 lane = 0; lane < 4; ++lane)
         {
             const float s = static_cast<float>(lane + 1);
@@ -75,6 +75,8 @@ void EEVuLocalRewriteMacroTests()
                 static_cast<float>((shape - 1) + (alias == 1 ? 1 : 5)));
             const float acc = operation == 0 ? s + a_t : (operation == 1 ? s - a_t : s * a_t);
             const u32 expected = bits(acc + s * t);
+            if (!(expected & 0x7fffffffu)) expected_mac |= 1u << (3 - lane);
+            if (expected & 0x80000000u) expected_mac |= 1u << (7 - lane);
             expected_jit &= jit.vu0_vf[fd * 4 + lane] == expected;
             const u32 jit_gpr = lane < 2 ? static_cast<u32>(jit.gpr[18] >> (lane * 32)) :
                 static_cast<u32>(jit.gpr_upper[18] >> ((lane - 2) * 32));
@@ -86,12 +88,23 @@ void EEVuLocalRewriteMacroTests()
             std::printf("MACRO ACC CASE operation=%u shape=%u prior=%u alias=%u pressure=%u clamp=%u flags=%u\n",
                 operation, shape, static_cast<u32>(prior_acc), alias, static_cast<u32>(pressure), clamp,
                 static_cast<u32>(flag_hack));
-        CompareEE(interp, jit, "EE full ACC macro chain preserves all architectural registers");
+        auto policy_reference = interp;
+        // The speedhack intentionally drops unobserved intermediate sticky
+        // history. Its final flags still follow the independently modeled MADD.
+        if (flag_hack)
+        {
+            policy_reference.vu0_vi[REG_STATUS_FLAG] = ((expected_mac & 0xf) ? 0x41u : 0u) |
+                ((expected_mac & 0xf0) ? 0x82u : 0u);
+            policy_reference.gpr[19] = policy_reference.vu0_vi[REG_STATUS_FLAG]; // CFC2 observer.
+        }
+        CompareEE(policy_reference, jit, "EE full ACC macro chain preserves architectural state and explicit flag policy");
         Check(expected_interp, "EE full ACC macro chain interpreter matches independent finite bits");
         Check(expected_jit, "EE full ACC macro chain retains result across cached consumer and spill");
         Check(expected_acc, "EE full ACC macro chain writes architectural ACC and preserves it after MADD");
-        Check(jit_flags == std::array<u32, 3>{VU0.macflag, VU0.statusflag, VU0.clipflag},
-            "EE full ACC macro chain preserves MAC STATUS and CLIP flags");
+        Check(jit.gpr[19] == policy_reference.vu0_vi[REG_STATUS_FLAG] &&
+            jit.vu0_vi[REG_MAC_FLAG] == expected_mac && jit.vu0_vi[REG_CLIP_FLAG] == 0 &&
+            jit.vu0_vi[REG_STATUS_FLAG] == policy_reference.vu0_vi[REG_STATUS_FLAG],
+            "EE full ACC macro chain matches independent MAC bits and architectural STATUS CLIP policy");
     }
     EmuConfig.Cpu = saved_cpu;
     EmuConfig.Speedhacks.vuFlagHack = saved_flag_hack;
@@ -153,3 +166,57 @@ void EEVuLocalOpDirtyAliasTests()
     }
     EmuConfig = saved;
 }
+
+
+void EEVuLocalStatusProbeTests()
+{
+    const auto saved = EmuConfig;
+    const auto bits = [](float value) { u32 out; std::memcpy(&out, &value, sizeof(out)); return out; };
+    const auto qmtc2 = [](u32 rt, u32 vf) { return (0x12u << 26) | (5u << 21) | (rt << 16) | (vf << 11); };
+    const auto cfc2 = [](u32 rt, u32 vi) { return (0x12u << 26) | (2u << 21) | (rt << 16) | (vi << 11); };
+    const auto upper = [](u32 op, u32 fd = 0) {
+        return (0x12u << 26) | (0x1fu << 21) | (9u << 16) | (7u << 11) | (fd << 6) | op;
+    };
+    std::array<GPR_reg, 32> initial_gpr{};
+    std::array<u32, 128> initial_vf{};
+    initial_vf[3] = bits(1.0f);
+    for (u32 lane = 0; lane < 4; ++lane)
+    {
+        initial_gpr[8].UL[lane] = bits(static_cast<float>(lane + 1));
+        initial_gpr[10].UL[lane] = bits(static_cast<float>(lane + 5));
+    }
+    EmuConfig.Cpu.Recompiler.vu0Overflow = true;
+    EmuConfig.Cpu.Recompiler.vu0ExtraOverflow = false;
+    EmuConfig.Cpu.Recompiler.vu0SignOverflow = false;
+    for (bool hack : {false, true})
+    for (bool observe : {false, true})
+    for (bool broadcast : {false, true})
+    for (bool transfer : {false, true})
+    {
+        EmuConfig.Speedhacks.vuFlagHack = hack;
+        EmuCoreXOracleSetVUIR(0, 0);
+        std::vector<u32> code{qmtc2(8, 7), qmtc2(10, 9), upper(broadcast ? 0x7d : 0x2fc)};
+        if (observe) code.push_back(cfc2(19, 16));
+        code.push_back(upper(0x29, 3));
+        if (transfer) code.push_back((0x12u << 26) | (1u << 21) | (18u << 16) | (3u << 11));
+        code.insert(code.end(), {cfc2(20, 16), cfc2(21, 17)});
+        const auto jit = RunEEProgramWithIrMode(0, code, initial_gpr.data(), nullptr,
+            nullptr, nullptr, false, initial_vf.data());
+        const auto interp = RunEEProgram(false, code, false, nullptr, nullptr,
+            initial_gpr.data(), nullptr, nullptr, initial_vf.data());
+        const u32 final = broadcast ? 0xc1 : 0x80;
+        const u32 policy = hack && !observe ? (final & ~0x80u) : final;
+        std::printf("STATUS PROBE hack=%u observe=%u broadcast=%u transfer=%u first=%llx/%llx final=%llx/%llx mac=%llx/%llx expected=%x\n",
+            static_cast<u32>(hack), static_cast<u32>(observe), static_cast<u32>(broadcast), static_cast<u32>(transfer),
+            static_cast<unsigned long long>(interp.gpr[19]), static_cast<unsigned long long>(jit.gpr[19]),
+            static_cast<unsigned long long>(interp.gpr[20]), static_cast<unsigned long long>(jit.gpr[20]),
+            static_cast<unsigned long long>(interp.gpr[21]), static_cast<unsigned long long>(jit.gpr[21]), policy);
+        Check(interp.gpr[20] == final && (!observe || interp.gpr[19] == 0x82),
+            "STATUS chain interpreter retains prior sign sticky and final zero aggregate");
+        Check(jit.gpr[20] == policy && (!observe || jit.gpr[19] == 0x82),
+            "STATUS chain JIT retains required sticky bits under explicit flag-hack policy");
+    }
+    EmuConfig = saved;
+}
+
+#include "jit_oracle_ee_vu_local_clip.inl"

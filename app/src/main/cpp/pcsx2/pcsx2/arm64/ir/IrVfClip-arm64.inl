@@ -73,7 +73,7 @@ namespace Arm64Ir
 		oakAsm->CMGT(negative.S4(), negative.S4(), threshold.S4());
 		// These immutable host constants are independent of VU state/ring slots.
 		alignas(16) static constexpr u32 weights[4] = {1, 4, 16, 0};
-		oakAsm->MOV(oak::util::X17, reinterpret_cast<uintptr_t>(weights));
+		oakMoveAddressToReg(oak::util::X17, weights);
 		oakAsm->LDR(threshold, oak::util::X17);
 		oakAsm->AND(positive.B16(), positive.B16(), threshold.B16());
 		oakAsm->SHL(threshold.S4(), threshold.S4(), 1);

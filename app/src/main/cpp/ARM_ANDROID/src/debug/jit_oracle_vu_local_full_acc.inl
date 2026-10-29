@@ -57,6 +57,7 @@ void VULocalFullAccCompositionTests()
         const auto actual = RunVU(vu, true, program, 0x80, 0, 512, false, nullptr, input.data(), initial_acc.data());
         const auto reference = RunVU(vu, false, program, 0x80, 0, 512, false, nullptr, input.data(), initial_acc.data());
         bool expected = true;
+        u32 expected_mac = 0;
         for (u32 lane = 0; lane < 4; ++lane)
         {
             const float s = static_cast<float>(lane + 1);
@@ -64,6 +65,9 @@ void VULocalFullAccCompositionTests()
             const float a_t = shape == 0 ? t : (shape >= 5 ? 2.0f :
                 static_cast<float>((shape - 1) + (alias == 1 ? 1 : 5)));
             const float acc = operation == 0 ? s + a_t : (operation == 1 ? s - a_t : s * a_t);
+            const u32 result = bits(acc + s * t);
+            if (!(result & 0x7fffffffu)) expected_mac |= 1u << (3 - lane);
+            if (result & 0x80000000u) expected_mac |= 1u << (7 - lane);
             expected &= actual.regs.ACC.UL[lane] == bits(acc) && reference.regs.ACC.UL[lane] == bits(acc) &&
                 actual.regs.VF[fd].UL[lane] == bits(acc + s * t) && reference.regs.VF[fd].UL[lane] == bits(acc + s * t);
         }
@@ -72,7 +76,15 @@ void VULocalFullAccCompositionTests()
                 vu, operation, shape, static_cast<u32>(prior_acc), alias, static_cast<u32>(pressure), clamp,
                 static_cast<u32>(flag_hack));
         Check(expected, "full ACC micro composition matches independent finite result and ACC bits");
-        Compare(reference, actual, "full ACC micro composition preserves all VF VI ACC PQ flags and memory");
+        auto policy_reference = reference;
+        // With no intermediate flag reader, the enabled speedhack discards
+        // earlier sticky history. Check its final STATUS from the result bits.
+        if (flag_hack)
+            policy_reference.regs.VI[REG_STATUS_FLAG].UL = ((expected_mac & 0xf) ? 0x41u : 0u) |
+                ((expected_mac & 0xf0) ? 0x82u : 0u);
+        Check(actual.regs.VI[REG_MAC_FLAG].UL == expected_mac,
+            "full ACC micro composition matches independent final MAC lane bits");
+        Compare(policy_reference, actual, "full ACC micro composition preserves architectural state and explicit flag policy");
     }
     EmuCoreXOracleSetVUIR(0, -1);
     EmuCoreXOracleSetVUIR(1, -1);
