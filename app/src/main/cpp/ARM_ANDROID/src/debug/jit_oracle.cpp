@@ -193,6 +193,7 @@ void CheckBits(bool pass, u32 actual, u32 expected, const char* name)
 #include "jit_oracle_gs_alpha_selectors.inl"
 #include "jit_oracle_gs_vertices.inl"
 #include "jit_oracle_gs_uploads.inl"
+#include "jit_oracle_gs_restarts.inl"
 
 void GSPreparationDeviceTests()
 {
@@ -12463,6 +12464,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         IOPTests(false, false, true);
     else if (std::strcmp(suite, "iop-avsz") == 0)
         IOPTests(false, false, false, true);
+    else if (std::strcmp(suite, "gs-restarts") == 0)
+        GSRestartTests();
     else if (std::strcmp(suite, "gs-uploads") == 0)
         GSUploadTests();
     else if (std::strcmp(suite, "gs-vertices") == 0)

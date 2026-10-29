@@ -1365,12 +1365,11 @@ VkRenderPass GSDeviceVK::GetRenderPassForRestarting(VkRenderPass pass)
 
 		RenderPassCacheKey modified_key;
 		modified_key.key = it.first;
-		if (modified_key.color_load_op == VK_ATTACHMENT_LOAD_OP_CLEAR)
-			modified_key.color_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
-		if (modified_key.depth_load_op == VK_ATTACHMENT_LOAD_OP_CLEAR)
-			modified_key.depth_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
-		if (modified_key.stencil_load_op == VK_ATTACHMENT_LOAD_OP_CLEAR)
-			modified_key.stencil_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+		// A restart continues the existing pass. DONT_CARE would discard the
+		// contents already drawn, just as repeating CLEAR would overwrite them.
+		modified_key.color_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+		modified_key.depth_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+		modified_key.stencil_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
 
 		if (modified_key.key == it.first)
 			return pass;
@@ -8485,9 +8484,24 @@ void GSDeviceVK::ExecuteCommandBufferAndRestartRenderPass(bool wait_for_completi
 	GSTexture* const current_rt = m_current_render_target;
 	GSTexture* const current_ds = m_current_depth_target;
 	const FeedbackLoopFlag current_feedback_loop = m_current_framebuffer_feedback_loop;
+	// Moving to the next command buffer invalidates texture slots, but this
+	// draw still owns its bound textures. Retain them for descriptor reapply.
+	const auto tfx_textures = m_tfx_textures;
+	const GSTextureVK* const utility_texture = m_utility_texture;
 
 	EndRenderPass();
 	ExecuteCommandBuffer(GetWaitType(wait_for_completion, GSConfig.HWSpinCPUForReadbacks));
+	m_tfx_textures = tfx_textures;
+	m_utility_texture = utility_texture;
+	// These sources can be sampled by the resumed draw without being rebound.
+	// Keep later uploads after that draw rather than in the new init buffer.
+	for (GSTextureVK* texture : m_tfx_textures)
+	{
+		if (texture)
+			texture->SetUseFenceCounter(GetCurrentFenceCounter());
+	}
+	if (m_utility_texture)
+		const_cast<GSTextureVK*>(m_utility_texture)->SetUseFenceCounter(GetCurrentFenceCounter());
 
 	if (render_pass != VK_NULL_HANDLE)
 	{
@@ -10014,4 +10028,5 @@ void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, 
 
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 #include "GSTextureUploadTests.inl"
+#include "GSRenderPassRestartTests.inl"
 #endif
