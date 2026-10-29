@@ -604,6 +604,8 @@ namespace vuaot
 			int IntOperand(ValueId v);           // a W register
 			int LaneWord(ValueId v, int lane);   // lane `lane` of a vector value in a W register
 			int Broadcast(ValueId v);            // scalar broadcast to 4 lanes (temp)
+			int OverflowMask(ValueId c, u8 mask);
+			int VuDoubleInto(int src, bool flush);
 			int ClampInto(int src);              // mVUclamp1 into a temp
 			// Every clamped copy of a value is made once. A clamp is idempotent
 			// and microVU's clamps never write the value itself, so the copy can
@@ -1575,6 +1577,40 @@ namespace vuaot
 			base = UseReg(memBase_);
 		}
 
+		int Lowerer::VuDoubleInto(int src, bool flush)
+		{
+			const int t = env_.clampOverflow ? SignClampInto(src) : TempV();
+			if (!env_.clampOverflow)
+				armAsm->Mov(V(t).V16B(), V(src).V16B());
+			if (flush)
+			{
+				const int e = TempV();
+				armAsm->Shl(V(e).V4S(), V(t).V4S(), 1);
+				armAsm->Ushr(V(e).V4S(), V(e).V4S(), 24);
+				armAsm->Cmeq(V(e).V4S(), V(e).V4S(), 0);
+				armAsm->Ushr(V(e).V4S(), V(e).V4S(), 1);
+				armAsm->Bic(V(t).V16B(), V(t).V16B(), V(e).V16B());
+			}
+			return t;
+		}
+
+		// Local VU_MAC_UPDATE counts every exponent-255 result, including NaNs.
+		int Lowerer::OverflowMask(ValueId c, u8 mask)
+		{
+			const int src = UseReg(c), bits = TempG(), packed = TempG();
+			armAsm->Mov(W(packed), 0);
+			for (int lane = 0; lane < 4; ++lane)
+			{
+				if (!MaskLane(mask, lane)) continue;
+				armAsm->Umov(W(bits), V(src).V4S(), lane);
+				armAsm->And(W(bits), W(bits), kExpMask);
+				armAsm->Cmp(W(bits), kExpMask);
+				armAsm->Cset(W(bits), a64::eq);
+				armAsm->Orr(W(packed), W(packed), a64::Operand(W(bits), a64::LSL, Single(mask) ? 3-lane : lane));
+			}
+			return packed;
+		}
+
 		// microVU's operand clamp table (clampType) for the shipped mode.
 		int Lowerer::ClampType(const UpperInst& u)
 		{
@@ -1798,7 +1834,7 @@ namespace vuaot
 
 		int Lowerer::StatusPackReg(ValueId id, int tmp)
 		{
-			if (const ValueId m = MacOf(id))
+			if (const ValueId m = MacOf(id); m && env_.clampOverflow)
 				return UseReg(m);
 			const Inst& in = I(id);
 			const int p = tmp >= 0 ? tmp : TempG();
@@ -2349,6 +2385,65 @@ namespace vuaot
 				armAsm->Movi(V(d).V4S(), 0);
 				return;
 			}
+			// Local by-element MUL paths deliberately bypass the extra-clamp helpers.
+			// Only a full vector field materializes/clamps Ft (MULA: w broadcast only).
+			if (u.op == UOp::MULbc || u.op == UOp::MULAbc)
+			{
+				int fs = VecOperand(in.args, 0);
+				const int ft = UseReg(in.args[4]);
+				const bool materializeFt = u.mask == 15 && (u.op == UOp::MULbc || u.bc == 3) &&
+					(env_.clampOverflow || env_.clampExtra || env_.clampSign);
+				if (u.op == UOp::MULAbc && env_.clampOverflow) fs = SignClampInto(fs);
+				else if (!env_.clampExtra && env_.clampOverflow) fs = ClampInto(fs);
+				if (!materializeFt)
+				{
+					armAsm->Fmul(V(DefV(id)).V4S(), V(fs).V4S(), S(ft), static_cast<int>(in.lane));
+					return;
+				}
+				int ftCopy = TempV();
+				armAsm->Dup(V(ftCopy).V4S(), V(ft).V4S(), in.lane);
+				if (env_.clampExtra) { fs = ClampE(fs); ftCopy = ClampE(ftCopy); }
+				// MULA.w materializes Ft for the vector multiply helper, but that
+				// helper only clamps inputs in extra mode. MUL has an explicit Ft clamp.
+				else if (env_.clampOverflow && u.op == UOp::MULbc) ftCopy = ClampInto(ftCopy);
+				const int product = TempV();
+				armAsm->Fmul(V(product).V4S(), V(fs).V4S(), V(ftCopy).V4S());
+				const int result = ResultClamp() ? ClampInto(product) : product;
+				armAsm->Mov(V(DefV(id)).V16B(), V(result).V16B());
+				return;
+			}
+			// EmuCoreX's ordinary ADD uses bitwise vuDouble clamps in mode one;
+			// its VU1 MSUB.xyzw sanitizes all three inputs and clamps once after subtraction.
+			const bool localAdd = u.op == UOp::ADD && env_.clampOverflow && !env_.clampExtra;
+			const bool localMsub = u.op == UOp::MSUB && u.mask == 15;
+			const bool localMadd = u.op == UOp::MADDbc && (u.bc == 0 || u.bc == 3);
+			if (localAdd || localMsub || localMadd)
+			{
+				int fs = VuDoubleInto(VecOperand(in.args, 0), env_.softwareFlush);
+				int rawFt;
+				if (localMadd)
+				{
+					const int source = UseReg(in.args[4]); rawFt = TempV();
+					armAsm->Dup(V(rawFt).V4S(), V(source).V4S(), in.lane);
+				}
+				else rawFt = VecOperand(in.args, 4);
+				int ft = VuDoubleInto(rawFt, env_.softwareFlush);
+				if (localAdd)
+					armAsm->Fadd(V(DefV(id)).V4S(), V(fs).V4S(), V(ft).V4S());
+				else
+				{
+					int acc = VuDoubleInto(VecOperand(in.args, 8), env_.softwareFlush);
+					if (env_.clampExtra) { fs = ClampE(fs); ft = ClampE(ft); acc = ClampE(acc); }
+					const int prod = TempV(), result = TempV();
+					armAsm->Fmul(V(prod).V4S(), V(fs).V4S(), V(ft).V4S());
+					if (localMsub) armAsm->Fsub(V(result).V4S(), V(acc).V4S(), V(prod).V4S());
+					else armAsm->Fadd(V(result).V4S(), V(acc).V4S(), V(prod).V4S());
+					const int clamped = ResultClamp() ? ClampInto(result) : result;
+					const int exact = VuDoubleInto(clamped, !env_.clampOverflow);
+					armAsm->Mov(V(DefV(id)).V16B(), V(exact).V16B());
+				}
+				return;
+			}
 			const bool E = env_.clampExtra;
 			const bool arith = u.kind != FmacKind::Max && u.kind != FmacKind::Mini;
 			const bool step = E && arith; // the step clamps
@@ -2456,10 +2551,8 @@ namespace vuaot
 				finish([&](int d) {
 					if (u.kind == FmacKind::Msub)
 						armAsm->Fsub(V(d).V4S(), V(acc).V4S(), V(prod).V4S());
-					else if (u.cls == UClass::FmacB)
-						armAsm->Fadd(V(d).V4S(), V(acc).V4S(), V(prod).V4S());
 					else
-						armAsm->Fadd(V(d).V4S(), V(prod).V4S(), V(acc).V4S());
+						armAsm->Fadd(V(d).V4S(), V(acc).V4S(), V(prod).V4S());
 				});
 				return;
 			}
@@ -4016,6 +4109,12 @@ namespace vuaot
 				case Op::MacFlags:
 				{
 					PackFlags(C(in.args[0]), in.mask, true, -1, id);
+					if (!env_.clampOverflow)
+					{
+						const int overflow = OverflowMask(C(in.args[0]), in.mask);
+						const int dst = UseReg(id);
+						armAsm->Orr(W(dst), W(dst), a64::Operand(W(overflow), a64::LSL, 12));
+					}
 					break;
 				}
 				case Op::StatusUpd:
@@ -4069,6 +4168,21 @@ namespace vuaot
 					}
 					else
 						armAsm->Orr(W(d), W(prev), W(p));
+					if (!env_.clampOverflow)
+					{
+						const auto applyOverflow = [&](const Inst& update, bool current) {
+							const u32 savedV = vLock_, savedG = gLock_;
+							const int bits = OverflowMask(C(update.args[1]), update.mask);
+							a64::Label none;
+							armAsm->Cbz(W(bits), &none);
+							armAsm->Orr(W(d), W(d), current ? 0x820000u : 0x800000u);
+							armAsm->Bind(&none);
+							vLock_ = savedV; gLock_ = savedG;
+						};
+						if (ch != statusChain_.end())
+							for (ValueId v : ch->second) applyOverflow(I(v), false);
+						applyOverflow(in, nonSticky);
+					}
 					break;
 				}
 				case Op::StatusDiv:

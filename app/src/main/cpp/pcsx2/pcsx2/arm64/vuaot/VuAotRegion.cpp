@@ -1765,7 +1765,8 @@ namespace vuaot
 						t_.stickyDivReaders_++;
 				}
 			}
-		acc_ = t_.stickyAcc && !le_.dropSticky && WantsAcc();
+		// The two-vector accumulator tracks Z/S; unclamped arithmetic also owes O.
+		acc_ = t_.stickyAcc && le_.clampOverflow && !le_.dropSticky && WantsAcc();
 		for (int pass = 0; pass < 2; pass++)
 		{
 			le_.stickyAcc = acc_;
