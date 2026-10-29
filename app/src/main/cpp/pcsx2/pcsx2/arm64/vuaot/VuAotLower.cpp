@@ -2973,7 +2973,15 @@ namespace vuaot
 			};
 			if (op != LOp::SQRT)
 				fsR = lane0(in.args[0], l.fsf);
-			const int ftR = lane0(in.args[1], l.ftf);
+            int ftR = lane0(in.args[1], l.ftf);
+            // Local DIV/RSQRT convert exponent-255 inputs to signed VU max
+            // before sign/zero classification and arithmetic. FP min/max on
+            // the quotient cannot reproduce NaN/infinity operand conversion.
+            if (op != LOp::SQRT && (env_.clampOverflow || env_.softwareFlush))
+            {
+                fsR = VuDoubleInto(fsR, env_.softwareFlush);
+                ftR = VuDoubleInto(ftR, env_.softwareFlush);
+            }
 			// the quotient is built in the result's register
 			const int q = DefV(id);
 			const int g9 = TempG(), g10 = TempG(), g11 = TempG(), g12 = TempG();
@@ -3005,21 +3013,17 @@ namespace vuaot
 				}
 			};
 			const auto zeroDivisorQ = [&](bool fromBoth) {
-				// sign(Fs) [xor sign(Ft)] | the ceiling: maxvals, or at the
-				// sign-preserving mode 0x7FFFFFFF (consoleQ)
+				// sign(Fs) [xor sign(Ft)] | the local finite ceiling.
 				armAsm->Umov(W(g9), V(fsR).V4S(), 0);
 				if (fromBoth)
 				{
 					armAsm->Umov(W(g10), V(ftR).V4S(), 0);
 					armAsm->Eor(W(g9), W(g9), W(g10));
 				}
-				if (env_.clampSign)
-					armAsm->Orr(W(g9), W(g9), 0x7fffffff);
-				else
-				{
-					armAsm->And(W(g9), W(g9), 0x80000000);
-					armAsm->Orr(W(g9), W(g9), 0x7f7fffff);
-				}
+                // Local DIV and RSQRT saturate to signed finite max in every
+                // clamp mode, including sign-preserving mode.
+                armAsm->And(W(g9), W(g9), 0x80000000);
+                armAsm->Orr(W(g9), W(g9), 0x7f7fffff);
 				armAsm->Fmov(S(q), W(g9));
 			};
 
