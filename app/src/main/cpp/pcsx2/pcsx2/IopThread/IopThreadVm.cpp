@@ -309,8 +309,14 @@ namespace IopThread
 			StopRunningThread();
 			Console.WriteLn(Color_StrongGreen, "IOP thread: stopped.");
 		}
-		if (s_mode != IopThreadMode::Off && g_thread.Start(MakeParams()))
+		if (s_mode != IopThreadMode::Off)
 		{
+			if (!g_thread.Start(MakeParams()))
+			{
+				SetMode(IopThreadMode::Off);
+				Console.Error("IOP thread: startup failed, effective mode is Off.");
+				return;
+			}
 
 			const char* const names[] = {"Off", "Lockstep", "Threaded"};
 			Console.WriteLn(Color_StrongGreen, "IOP thread: started in %s mode.", names[static_cast<int>(GetMode())]);

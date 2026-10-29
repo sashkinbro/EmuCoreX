@@ -4289,14 +4289,18 @@ void VMManager::SetEmuThreadAffinities()
 {
 	const bool new_pin_enable = (GetState() != VMState::Shutdown && EmuConfig.EnableThreadPinning);
 	static u32 placed_iop = 0;
+	static bool placed_mtvu = false;
 	const u32 current_iop = IopThread::PlacementToken();
-	if (s_thread_affinities_set == new_pin_enable && placed_iop == current_iop)
+	const bool mtvu = EmuConfig.Speedhacks.vuThread;
+	if (s_thread_affinities_set == new_pin_enable && placed_iop == current_iop && placed_mtvu == mtvu)
 		return;
 	placed_iop = current_iop;
+	placed_mtvu = mtvu;
 	if (IopThread::g_thread.IsRunning())
 		IopThread::g_thread.GetThreadHandle().SetAffinity(0);
 
-	s_thread_affinities_set = EmuConfig.EnableThreadPinning;
+	s_thread_affinities_set = new_pin_enable;
+	s_software_renderer_processor_list.clear();
 
 	EnsureCPUInfoInitialized();
 
@@ -4306,7 +4310,6 @@ void VMManager::SetEmuThreadAffinities()
 		return;
 	}
 
-	const bool mtvu = EmuConfig.Speedhacks.vuThread;
 	const bool iop_thread = IopThread::PlacesThread();
 	const size_t occupied_count = (mtvu ? 3 : 2) + (iop_thread ? 1 : 0);
 	if (!new_pin_enable || s_processor_list.size() < occupied_count)
