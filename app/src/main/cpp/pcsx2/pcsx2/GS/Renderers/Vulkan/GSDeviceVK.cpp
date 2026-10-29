@@ -87,6 +87,8 @@ enum : u32
 	// vertices would otherwise make the GS thread wait for the GPU (GSStreamRingGrowth.h). A title
 	// whose frames fit never pays for more.
 	VERTEX_BUFFER_MAX_SIZE = 64 * 1024 * 1024,
+	// Preserve the initial footprint; grow only when in-flight uploads exhaust it.
+	TEXTURE_BUFFER_MAX_SIZE = 128 * 1024 * 1024,
 
 	// How many persistent TFX UBO sets can be alive at once: the current one plus one retiring per
 	// vertex-ring growth, since each growth rebinds the ring by handle.
@@ -4935,7 +4937,8 @@ bool GSDeviceVK::CreateBuffers()
 		return false;
 	}
 
-	if (!m_texture_stream_buffer.Create(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, TEXTURE_BUFFER_SIZE, "texture"))
+	if (!m_texture_stream_buffer.Create(
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT, TEXTURE_BUFFER_SIZE, "texture", TEXTURE_BUFFER_MAX_SIZE))
 	{
 		Host::ReportErrorAsync("GS", "Failed to allocate texture upload buffer");
 		return false;
@@ -8412,7 +8415,10 @@ VkDescriptorSet GSDeviceVK::CreateTFXUBODescriptorSet()
 
 void GSDeviceVK::OnStreamRingReplaced(const VKStreamBuffer& ring)
 {
-	// Only the vertex ring is created with room to grow.
+	// Recorded image copies already name the old buffer, which retires after
+	// this command buffer's fence. Texture uploads have no persistent binding.
+	if (&ring == &m_texture_stream_buffer)
+		return;
 	pxAssert(&ring == &m_vertex_stream_buffer);
 
 	// Draws already recorded keep the old buffer, which retires with this command buffer. Later
@@ -10005,3 +10011,7 @@ void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, 
 
 	Draw(config);
 }
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#include "GSTextureUploadTests.inl"
+#endif

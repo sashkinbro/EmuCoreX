@@ -853,6 +853,7 @@ public:
 	static bool TestTFXPreparationProgress();
 	static bool TestTFXPreparationPlan();
 	bool TestTFXPreparationResources() const;
+	void TestTextureUploadRing(void (*check)(bool, const char*));
 	void SetTFXPreparationFailureStageForTesting(TFXPreparationFailureStage stage)
 	{
 		m_tfx_preparation_failure_stage = stage;

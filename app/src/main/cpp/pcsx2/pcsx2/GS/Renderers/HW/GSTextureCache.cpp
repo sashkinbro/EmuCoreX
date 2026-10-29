@@ -3,6 +3,7 @@
 
 #include "GSTextureCache.h"
 #include "GSTextureReplacements.h"
+#include "GSTargetUpdateUpload.h"
 #include "GSRendererHW.h"
 #include "GS/GSState.h"
 #include "GS/GSGL.h"
@@ -29,6 +30,7 @@
 std::unique_ptr<GSTextureCache> g_texture_cache;
 
 static u8* s_unswizzle_buffer;
+static constexpr size_t UNSWIZZLE_BUFFER_SIZE = 9 * 1024 * 1024;
 
 /// List of candidates for purging when the hash cache gets too large.
 static std::vector<std::pair<GSTextureCache::HashCacheMap::iterator, s32>> s_hash_cache_purge_list;
@@ -162,7 +164,7 @@ GSTextureCache::GSTextureCache()
 	// In theory 4MB is enough but 9MB is safer for overflow (8MB
 	// isn't enough in custom resolution)
 	// Test: onimusha 3 PAL 60Hz
-	s_unswizzle_buffer = (u8*)_aligned_malloc(9 * 1024 * 1024, VECTOR_ALIGNMENT);
+	s_unswizzle_buffer = (u8*)_aligned_malloc(UNSWIZZLE_BUFFER_SIZE, VECTOR_ALIGNMENT);
 	pxAssertRel(s_unswizzle_buffer, "Failed to allocate unswizzle buffer");
 
 	m_surface_offset_cache.reserve(S_SURFACE_OFFSET_CACHE_MAX_SIZE);
@@ -8527,9 +8529,6 @@ void GSTextureCache::Target::Update(bool cannot_scale)
 		return;
 	}
 
-	GSTexture::GSMap m;
-	const bool mapped = t->Map(m);
-
 	GIFRegTEXA TEXA = {};
 	TEXA.AEM = 0;
 	TEXA.TA0 = 0;
@@ -8566,35 +8565,30 @@ void GSTextureCache::Target::Update(bool cannot_scale)
 
 		const GSVector4i read_r = m_dirty.GetDirtyRect(i, m_TEX0, total_rect, true);
 		const GSVector4i t_r(read_r - t_offset);
-		if (mapped)
+		// Decode into ordinary RAM once. Mapped Vulkan upload memory may be
+		// write-combined; reuse these same bytes for the alpha scan and upload.
+		const u32 pitch = VectorAlign(read_r.width() * sizeof(u32));
+		const bool scan_alpha = (m_TEX0.PSM & 0xf) != PSMCT24 && m_dirty[i].rgba.c.a && bpp >= 16;
+		const bool uploaded = GSUploadTargetRect(read_r, t_r, s_unswizzle_buffer, UNSWIZZLE_BUFFER_SIZE,
+			pitch, GSLocalMemory::m_psm[m_TEX0.PSM].bs.y,
+			[&](const GSVector4i& r, u8* data, u32 row_pitch) {
+				g_gs_renderer->m_mem.ReadTexture(off, r, data, row_pitch, TEXA);
+			},
+			[&](const u8* data, u32 width, u32 height, u32 row_pitch) {
+				if (!scan_alpha) return;
+				const auto range = GSGetRGBA8AlphaMinMax(data, width, height, row_pitch);
+				alpha_minmax.first = std::min(alpha_minmax.first, range.first);
+				alpha_minmax.second = std::max(alpha_minmax.second, range.second);
+			},
+			[&](const GSVector4i& r, const u8* data, u32 row_pitch) {
+				return t->Update(r, data, row_pitch);
+			});
+		if (!uploaded)
 		{
-			if ((m_TEX0.PSM & 0xf) != PSMCT24 && m_dirty[i].rgba.c.a && bpp >= 16)
-			{
-				// TODO: Only read once in 32bit and copy to the mapped texture. Bit out of scope of this PR and not a huge impact.
-				const int pitch = VectorAlign(read_r.width() * sizeof(u32));
-				g_gs_renderer->m_mem.ReadTexture(off, read_r, s_unswizzle_buffer, pitch, TEXA);
-
-				std::pair<u8, u8> new_alpha_minmax = GSGetRGBA8AlphaMinMax(s_unswizzle_buffer, read_r.width(), read_r.height(), pitch);
-				alpha_minmax.first = std::min(alpha_minmax.first, new_alpha_minmax.first);
-				alpha_minmax.second = std::max(alpha_minmax.second, new_alpha_minmax.second);
-			}
-
-			g_gs_renderer->m_mem.ReadTexture(
-				off, read_r, m.bits + t_r.y * static_cast<u32>(m.pitch) + (t_r.x * sizeof(u32)), m.pitch, TEXA);
-		}
-		else
-		{
-			const int pitch = VectorAlign(read_r.width() * sizeof(u32));
-			g_gs_renderer->m_mem.ReadTexture(off, read_r, s_unswizzle_buffer, pitch, TEXA);
-
-			if ((m_TEX0.PSM & 0xf) != PSMCT24 && m_dirty[i].rgba.c.a && bpp >= 16)
-			{
-				std::pair<u8, u8> new_alpha_minmax = GSGetRGBA8AlphaMinMax(s_unswizzle_buffer, read_r.width(), read_r.height(), pitch);
-				alpha_minmax.first = std::min(alpha_minmax.first, new_alpha_minmax.first);
-				alpha_minmax.second = std::max(alpha_minmax.second, new_alpha_minmax.second);
-			}
-
-			t->Update(t_r, s_unswizzle_buffer, pitch);
+			// No target draw or alpha state update has been committed yet.
+			// Keep the dirty rectangles so a failed upload can be retried.
+			g_gs_device->Recycle(t);
+			return;
 		}
 
 		GSDevice::MultiStretchRect& drect = drects[ndrects++];
@@ -8616,9 +8610,6 @@ void GSTextureCache::Target::Update(bool cannot_scale)
 			drect.wmask = 0xF;
 		}
 	}
-
-	if (mapped)
-		t->Unmap();
 
 	if (ndrects > 0)
 	{
@@ -9774,3 +9765,7 @@ u64 GSTextureCache::HashCacheKeyHash::operator()(const HashCacheKey& key) const
 		static_cast<u64>(key.region_width) | (static_cast<u64>(key.region_height) << 16));
 	return h;
 }
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#include "GSTargetUpdateUploadTests.inl"
+#endif
