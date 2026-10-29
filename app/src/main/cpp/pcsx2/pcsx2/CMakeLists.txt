@@ -1083,6 +1083,11 @@ set(pcsx2JitHeaders
 	arm64/vu/microVU_Branch-arm64.inl
 	arm64/vu/microVU_Compile-arm64.inl
 	arm64/vu/microVU-arm64.cpp
+	arm64/vuaot/VuAotDecode.cpp
+	arm64/vuaot/VuAotPipe.cpp
+	arm64/vuaot/VuAotGraph.cpp
+	arm64/vuaot/VuAotIR.cpp
+	arm64/vuaot/VuAotMvuTrace.cpp
 	arm64/vu/microVU_Execute-arm64.inl
 	arm64/vu/microVU_Flags-arm64.inl
 	arm64/vu/microVU-arm64.h

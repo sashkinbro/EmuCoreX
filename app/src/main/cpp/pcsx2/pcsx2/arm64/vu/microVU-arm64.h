@@ -22,6 +22,7 @@
 #include "common/emitter/x86emitter.h"
 #include "arm64/vu/microVU_Misc-arm64.h"
 #include "microVU_IR-arm64.h"
+#include "arm64/vuaot/VuAotMvuTrace.h"
 #include "common/Perf.h"
 
 class microBlockManager;

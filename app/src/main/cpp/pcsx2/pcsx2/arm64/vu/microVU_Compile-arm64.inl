@@ -738,6 +738,8 @@ void mVUSaveFlags(microVU& mVU, microFlagCycles& mFC, microFlagCycles& mFCBackup
 	mVUsetFlags(mVU, mFCBackup); // Sets Up Flag instances
 }
 
+#include "arm64/vuaot/microVU_VuAotTrace-arm64.inl"
+
 void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 {
 	microFlagCycles mFC{};
@@ -937,6 +939,14 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 	mVUregs.vi15v = (doConstProp && mVUconstReg[15].isValid) ? 1 : 0;
 	mVUsetFlags(mVU, mFC);           // Sets Up Flag instances
 	mVUoptimizePipeState(mVU);       // Optimize the End Pipeline State for nicer Block Linking
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (vuaot::g_mvuBlockHook)
+	{
+		vuaot::MvuBlockTrace trace;
+		mVUbuildBlockTrace(mVU, startPC, trace);
+		vuaot::g_mvuBlockHook(trace, vuaot::g_mvuBlockHookUser);
+	}
+#endif
 	{
 		JitProfiler::OpcodeRangeScope control_scope;
 		if (JitProfiler::IsActive())

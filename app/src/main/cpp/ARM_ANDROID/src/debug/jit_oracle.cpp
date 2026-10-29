@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 #include "Common.h"
+#include "arm64/vuaot/VuAotPipe.h"
 #include "DebugTools/Breakpoints.h"
 #include "IopMem.h"
 #include "IopHw.h"
@@ -2223,6 +2224,8 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vu_operand_clamp.inl"
 #include "jit_oracle_vu_maxmin_select.inl"
 #include "jit_oracle_vu_scalar_clamp.inl"
+#include "jit_oracle_vu_local_rewrites.inl"
+#include "jit_oracle_vuaot_trace.inl"
 
 void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin_only = false,
     bool maxmin_route_only = false, bool maxmin_broadcast_only = false,
@@ -12322,6 +12325,10 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         BlockCacheTests();
     else if (std::strcmp(suite, "vu-cache") == 0)
         EmuCoreXOracleTestVUQuick(Check);
+    else if (std::strcmp(suite, "vu-local") == 0)
+        RunVULocalRewriteTests();
+    else if (std::strcmp(suite, "vu-aot-trace") == 0)
+        RunVuAotTraceTests();
     else if (std::strcmp(suite, "spu2-volume") == 0)
         EmuCoreXOracleTestVolumeSlide(Check);
     else if (std::strcmp(suite, "vif-mpg") == 0)
