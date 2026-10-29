@@ -321,6 +321,10 @@ public:
 				{
 					if (linkI != fBlockList)
 					{
+						// A later add appends through fBlockEnd. When the promoted
+						// node was the tail, its predecessor is the new tail.
+						if (linkI == fBlockEnd)
+							fBlockEnd = prevI;
 						prevI->next = linkI->next;
 						linkI->next = fBlockList;
 						fBlockList = linkI;

@@ -4055,6 +4055,52 @@ static void mVU_JALR_emit(mP)
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 // Emit production primitives into the oracle-owned buffer. No live microVU
 // allocator, program or guest state is modified by these probes.
+static u32 mVUOracleExactPipelineCompare(u32, void* lhs, void* rhs)
+{
+	return static_cast<u32>(std::memcmp(lhs, rhs, sizeof(microRegInfo)));
+}
+
+extern "C" void EmuCoreXOracleTestVUBlockTail(void (*check)(bool, const char*))
+{
+	auto owner = std::make_unique<microProgManager>();
+	microVU probe(*owner);
+	probe.index = 1;
+	probe.cop2 = 0;
+	probe.compareStateF = reinterpret_cast<u8*>(&mVUOracleExactPipelineCompare);
+	microBlockManager manager;
+	std::array<microBlock, 4> inputs{};
+	std::array<microBlock*, 4> stored{};
+	for (u32 i = 0; i < inputs.size(); ++i)
+	{
+		inputs[i].pState.needExactMatch = 1;
+		inputs[i].pState.VI[1] = static_cast<u8>(i + 1);
+	}
+	for (u32 i = 0; i < 3; ++i) stored[i] = manager.add(probe, &inputs[i]);
+	check(manager.getFullListCount() == 3, "three distinct exact VU pipeline variants are added");
+	check(manager.search(probe, &inputs[2].pState) == stored[2],
+		"search promotes the last exact VU pipeline variant");
+	stored[3] = manager.add(probe, &inputs[3]);
+	u32 reachable = 0;
+	for (auto* node = manager.getFBlockList(); node; node = node->next) ++reachable;
+	check(reachable == 4, "adding a fourth exact VU variant retains the complete promoted list");
+	for (u32 i = 0; i < inputs.size(); ++i)
+		check(manager.search(probe, &inputs[i].pState) == stored[i],
+			"every exact VU variant remains findable after tail promotion and append");
+	// Keep the regression leak-free even when run against the broken version:
+	// its orphaned nodes are no longer owned by manager.reset().
+	static_assert(offsetof(microBlockLink, block) == 0);
+	for (microBlock* block : stored)
+	{
+		bool retained = false;
+		for (auto* node = manager.getFBlockList(); node; node = node->next)
+			retained |= &node->block == block;
+		if (!retained) _aligned_free(block);
+	}
+	manager.reset();
+	check(manager.getFullListCount() == 0 && manager.getFBlockList() == nullptr &&
+		manager.getQuickLookupCount() == 0, "VU block list reset clears retained nodes and quick references");
+}
+
 extern "C" void EmuCoreXOracleVULocalFlagRings(u32 index, u32* words, bool seed)
 {
 	microVU& vu = index ? microVU1 : microVU0;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 // Focused local rewrite tests; include in jit_oracle.cpp after the VU suites.
 extern "C" u32 EmuCoreXOracleEmitVULocalPrimitive(u32 kind, u32 argument, bool alias);
+extern "C" void EmuCoreXOracleTestVUBlockTail(void (*check)(bool, const char*));
 
 
 #include "jit_oracle_vu_local_integration.inl"
@@ -157,6 +158,7 @@ void RunVULocalRewriteTests()
     }
     Check(vf0_bits, "VU MAX/MINI with VF0 on either side preserves all raw ordering edge bits");
     Check(vf0_sizes, "VU MAX/MINI with a nonnegative VF0 operand is one SMAX/SMIN");
+    EmuCoreXOracleTestVUBlockTail(Check);
     VULocalArchitecturalTests();
     VULocalNaturalParityTests();
 }
