@@ -76,7 +76,7 @@ class mVUUpperNaturalScope
 public:
 	explicit mVUUpperNaturalScope(mV, bool allowed = true) : alloc(*mVU.regAlloc)
 	{
-		bool enabled = allowed && isVU1 && !isCOP2 && _XYZW_SS2 && !_X && !clampE;
+		bool enabled = mVUlocalNaturalEnabled() && allowed && isVU1 && !isCOP2 && _XYZW_SS2 && !_X && !clampE;
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 		enabled &= s_vuLocalNaturalEnabled;
 		if (enabled) ++s_vuLocalNaturalEmits;
@@ -463,7 +463,7 @@ static __fi void mVUUpperMaxMinSelect_oaknut(const oak::QReg& dest, const oak::Q
 {
 	// VF0 and its broadcasts contain only +0/+1 raw words. With either
 	// operand nonnegative, the both-negative reversal is impossible.
-	if (one_nonnegative)
+	if (mVUlocalRuleEnabled(3) && one_nonnegative)
 	{
 		if (maximum) oakAsm->SMAX(dest.S4(), dest.S4(), src.S4());
 		else oakAsm->SMIN(dest.S4(), dest.S4(), src.S4());
@@ -823,7 +823,8 @@ static void mVU_ADDA_direct_emit_oaknut(mP)
 	}
 
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
-	const int ACC = _XYZW_PS ? Fs : mVU.regAlloc->allocRegId(32, 32, 0xf, false);
+	const int ACC = mVUlocalRuleEnabled(15) && _XYZW_PS ? Fs :
+		mVU.regAlloc->allocRegId(_XYZW_PS ? -1 : 32, 32, 0xf, false);
 
 	if (_XYZW_SS2)
 	{
@@ -850,7 +851,7 @@ static void mVU_ADDA_direct_emit_oaknut(mP)
 		else
 		{
 			mVUUpperAddPs_oaknut(mVU, Fs, Ft);
-			if (_XYZW_PS)
+			if (mVUlocalRuleEnabled(15) && _XYZW_PS)
 				mVU.regAlloc->rebindFullWrite(Fs, 32);
 			else
 				mVUUpperMergeRegs_oaknut(ACC, Fs, _X_Y_Z_W);
@@ -883,7 +884,8 @@ static void mVU_ADDAi_direct_emit_oaknut(mP)
 	mVUUpperNaturalScope natural_scope(mVU, true);
 	const int Fi = mVU.regAlloc->allocRegId(33, 0, _X_Y_Z_W);
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
-	const int ACC = _XYZW_PS ? Fs : mVU.regAlloc->allocRegId(32, 32, 0xf, false);
+	const int ACC = mVUlocalRuleEnabled(15) && _XYZW_PS ? Fs :
+		mVU.regAlloc->allocRegId(_XYZW_PS ? -1 : 32, 32, 0xf, false);
 
 	if (_XYZW_SS2)
 	{
@@ -907,7 +909,7 @@ static void mVU_ADDAi_direct_emit_oaknut(mP)
 		else
 		{
 			mVUUpperAddPs_oaknut(mVU, Fs, Fi);
-			if (_XYZW_PS)
+			if (mVUlocalRuleEnabled(15) && _XYZW_PS)
 				mVU.regAlloc->rebindFullWrite(Fs, 32);
 			else
 				mVUUpperMergeRegs_oaknut(ACC, Fs, _X_Y_Z_W);
@@ -955,7 +957,8 @@ static void mVU_ADDAq_direct_emit_oaknut(mP)
 	}
 
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
-	const int ACC = _XYZW_PS ? Fs : mVU.regAlloc->allocRegId(32, 32, 0xf, false);
+	const int ACC = mVUlocalRuleEnabled(15) && _XYZW_PS ? Fs :
+		mVU.regAlloc->allocRegId(_XYZW_PS ? -1 : 32, 32, 0xf, false);
 
 	if (_XYZW_SS2)
 	{
@@ -979,7 +982,7 @@ static void mVU_ADDAq_direct_emit_oaknut(mP)
 		else
 		{
 			mVUUpperAddPs_oaknut(mVU, Fs, Fq);
-			if (_XYZW_PS)
+			if (mVUlocalRuleEnabled(15) && _XYZW_PS)
 				mVU.regAlloc->rebindFullWrite(Fs, 32);
 			else
 				mVUUpperMergeRegs_oaknut(ACC, Fs, _X_Y_Z_W);
@@ -1017,7 +1020,8 @@ static void mVU_ADDA_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 	mVU.regAlloc->clearNeededXmmId(FtRaw);
 
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
-	const int ACC = _XYZW_PS ? Fs : mVU.regAlloc->allocRegId(32, 32, 0xf, false);
+	const int ACC = mVUlocalRuleEnabled(15) && _XYZW_PS ? Fs :
+		mVU.regAlloc->allocRegId(_XYZW_PS ? -1 : 32, 32, 0xf, false);
 
 	if (_XYZW_SS2)
 	{
@@ -1041,7 +1045,7 @@ static void mVU_ADDA_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 		else
 		{
 			mVUUpperAddPs_oaknut(mVU, Fs, FtL);
-			if (_XYZW_PS)
+			if (mVUlocalRuleEnabled(15) && _XYZW_PS)
 				mVU.regAlloc->rebindFullWrite(Fs, 32);
 			else
 				mVUUpperMergeRegs_oaknut(ACC, Fs, _X_Y_Z_W);
@@ -3240,7 +3244,8 @@ static void mVU_SUBA_direct_emit_oaknut(mP)
 	}
 
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
-	const int ACC = _XYZW_PS ? Fs : mVU.regAlloc->allocRegId(32, 32, 0xf, false);
+	const int ACC = mVUlocalRuleEnabled(15) && _XYZW_PS ? Fs :
+		mVU.regAlloc->allocRegId(_XYZW_PS ? -1 : 32, 32, 0xf, false);
 
 	if (_XYZW_SS2)
 	{
@@ -3266,7 +3271,7 @@ static void mVU_SUBA_direct_emit_oaknut(mP)
 		else
 		{
 			mVUUpperSubPs_oaknut(mVU, Fs, Ft);
-			if (_XYZW_PS)
+			if (mVUlocalRuleEnabled(15) && _XYZW_PS)
 				mVU.regAlloc->rebindFullWrite(Fs, 32);
 			else
 				mVUUpperMergeRegs_oaknut(ACC, Fs, _X_Y_Z_W);
@@ -3299,7 +3304,8 @@ static void mVU_SUBAi_direct_emit_oaknut(mP)
 	mVUUpperNaturalScope natural_scope(mVU, true);
 	const int Fi = mVU.regAlloc->allocRegId(33, 0, _X_Y_Z_W);
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
-	const int ACC = _XYZW_PS ? Fs : mVU.regAlloc->allocRegId(32, 32, 0xf, false);
+	const int ACC = mVUlocalRuleEnabled(15) && _XYZW_PS ? Fs :
+		mVU.regAlloc->allocRegId(_XYZW_PS ? -1 : 32, 32, 0xf, false);
 
 	if (_XYZW_SS2)
 	{
@@ -3323,7 +3329,7 @@ static void mVU_SUBAi_direct_emit_oaknut(mP)
 		else
 		{
 			mVUUpperSubPs_oaknut(mVU, Fs, Fi);
-			if (_XYZW_PS)
+			if (mVUlocalRuleEnabled(15) && _XYZW_PS)
 				mVU.regAlloc->rebindFullWrite(Fs, 32);
 			else
 				mVUUpperMergeRegs_oaknut(ACC, Fs, _X_Y_Z_W);
@@ -3371,7 +3377,8 @@ static void mVU_SUBAq_direct_emit_oaknut(mP)
 	}
 
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
-	const int ACC = _XYZW_PS ? Fs : mVU.regAlloc->allocRegId(32, 32, 0xf, false);
+	const int ACC = mVUlocalRuleEnabled(15) && _XYZW_PS ? Fs :
+		mVU.regAlloc->allocRegId(_XYZW_PS ? -1 : 32, 32, 0xf, false);
 
 	if (_XYZW_SS2)
 	{
@@ -3395,7 +3402,7 @@ static void mVU_SUBAq_direct_emit_oaknut(mP)
 		else
 		{
 			mVUUpperSubPs_oaknut(mVU, Fs, Fq);
-			if (_XYZW_PS)
+			if (mVUlocalRuleEnabled(15) && _XYZW_PS)
 				mVU.regAlloc->rebindFullWrite(Fs, 32);
 			else
 				mVUUpperMergeRegs_oaknut(ACC, Fs, _X_Y_Z_W);
@@ -3433,7 +3440,8 @@ static void mVU_SUBA_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 	mVU.regAlloc->clearNeededXmmId(FtRaw);
 
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
-	const int ACC = _XYZW_PS ? Fs : mVU.regAlloc->allocRegId(32, 32, 0xf, false);
+	const int ACC = mVUlocalRuleEnabled(15) && _XYZW_PS ? Fs :
+		mVU.regAlloc->allocRegId(_XYZW_PS ? -1 : 32, 32, 0xf, false);
 
 	if (_XYZW_SS2)
 	{
@@ -3457,7 +3465,7 @@ static void mVU_SUBA_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 		else
 		{
 			mVUUpperSubPs_oaknut(mVU, Fs, FtL);
-			if (_XYZW_PS)
+			if (mVUlocalRuleEnabled(15) && _XYZW_PS)
 				mVU.regAlloc->rebindFullWrite(Fs, 32);
 			else
 				mVUUpperMergeRegs_oaknut(ACC, Fs, _X_Y_Z_W);
@@ -3595,7 +3603,8 @@ static void mVU_MULA_direct_emit_oaknut(mP)
 	}
 
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
-	const int ACC = _XYZW_PS ? Fs : mVU.regAlloc->allocRegId(32, 32, 0xf, false);
+	const int ACC = mVUlocalRuleEnabled(15) && _XYZW_PS ? Fs :
+		mVU.regAlloc->allocRegId(_XYZW_PS ? -1 : 32, 32, 0xf, false);
 
 	if (_XYZW_SS2)
 	{
@@ -3621,7 +3630,7 @@ static void mVU_MULA_direct_emit_oaknut(mP)
 		else
 		{
 			mVUUpperMulPs_oaknut(mVU, Fs, Ft);
-			if (_XYZW_PS)
+			if (mVUlocalRuleEnabled(15) && _XYZW_PS)
 				mVU.regAlloc->rebindFullWrite(Fs, 32);
 			else
 				mVUUpperMergeRegs_oaknut(ACC, Fs, _X_Y_Z_W);
@@ -3654,7 +3663,8 @@ static void mVU_MULAi_direct_emit_oaknut(mP)
 	mVUUpperNaturalScope natural_scope(mVU, true);
 	const int Fi = mVU.regAlloc->allocRegId(33, 0, _X_Y_Z_W);
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
-	const int ACC = _XYZW_PS ? Fs : mVU.regAlloc->allocRegId(32, 32, 0xf, false);
+	const int ACC = mVUlocalRuleEnabled(15) && _XYZW_PS ? Fs :
+		mVU.regAlloc->allocRegId(_XYZW_PS ? -1 : 32, 32, 0xf, false);
 
 	if (_XYZW_SS2)
 	{
@@ -3678,7 +3688,7 @@ static void mVU_MULAi_direct_emit_oaknut(mP)
 		else
 		{
 			mVUUpperMulPs_oaknut(mVU, Fs, Fi);
-			if (_XYZW_PS)
+			if (mVUlocalRuleEnabled(15) && _XYZW_PS)
 				mVU.regAlloc->rebindFullWrite(Fs, 32);
 			else
 				mVUUpperMergeRegs_oaknut(ACC, Fs, _X_Y_Z_W);
@@ -3726,7 +3736,8 @@ static void mVU_MULAq_direct_emit_oaknut(mP)
 	}
 
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
-	const int ACC = _XYZW_PS ? Fs : mVU.regAlloc->allocRegId(32, 32, 0xf, false);
+	const int ACC = mVUlocalRuleEnabled(15) && _XYZW_PS ? Fs :
+		mVU.regAlloc->allocRegId(_XYZW_PS ? -1 : 32, 32, 0xf, false);
 
 	if (_XYZW_SS2)
 	{
@@ -3750,7 +3761,7 @@ static void mVU_MULAq_direct_emit_oaknut(mP)
 		else
 		{
 			mVUUpperMulPs_oaknut(mVU, Fs, Fq);
-			if (_XYZW_PS)
+			if (mVUlocalRuleEnabled(15) && _XYZW_PS)
 				mVU.regAlloc->rebindFullWrite(Fs, 32);
 			else
 				mVUUpperMergeRegs_oaknut(ACC, Fs, _X_Y_Z_W);
@@ -3795,7 +3806,8 @@ static void mVU_MULA_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 	}
 
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
-	const int ACC = _XYZW_PS ? Fs : mVU.regAlloc->allocRegId(32, 32, 0xf, false);
+	const int ACC = mVUlocalRuleEnabled(15) && _XYZW_PS ? Fs :
+		mVU.regAlloc->allocRegId(_XYZW_PS ? -1 : 32, 32, 0xf, false);
 
 	if (_XYZW_SS2)
 	{
@@ -3840,7 +3852,7 @@ static void mVU_MULA_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 				mVUUpperMulPsLane_oaknut(Fs, FtRaw, lane);
 			else
 				mVUUpperMulPs_oaknut(mVU, Fs, FtL);
-			if (_XYZW_PS)
+			if (mVUlocalRuleEnabled(15) && _XYZW_PS)
 				mVU.regAlloc->rebindFullWrite(Fs, 32);
 			else
 				mVUUpperMergeRegs_oaknut(ACC, Fs, _X_Y_Z_W);
@@ -4323,8 +4335,34 @@ static __fi void mVUopPermuteFt_oaknut(int dst, int src, bool write_w)
 }
 
 // OPMULA Opcode
+static void mVU_OPMULA_reference_emit_oaknut(mP)
+{
+	const u32 original_code = mVU.code;
+	mVU.code = (mVU.code & ~(0xfu << 21)) | (0xeu << 21);
+
+	const int Ft = mVU.regAlloc->allocRegId(_Ft_, 0, _X_Y_Z_W);
+	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 32, _X_Y_Z_W);
+
+	recBeginOaknutEmit();
+	mVUUpperPshufd_oaknut(Fs, Fs, 0xC9);
+	mVUUpperPshufd_oaknut(Ft, Ft, 0xD2);
+	mVUUpperMulPs_oaknut(mVU, Fs, Ft);
+	recEndOaknutEmit();
+
+	mVU.regAlloc->clearNeededXmmId(Ft);
+	mVUupdateFlags_oaknut(mVU, Fs);
+	mVU.regAlloc->clearNeededXmmId(Fs);
+
+	mVU.code = original_code;
+}
+
 static void mVU_OPMULA_direct_emit_oaknut(mP)
 {
+	if (!mVUlocalRuleEnabled(10))
+	{
+		mVU_OPMULA_reference_emit_oaknut(mVU, recPass);
+		return;
+	}
 	const u32 original_code = mVU.code;
 	mVU.code = (mVU.code & ~(0xfu << 21)) | (0xeu << 21);
 
@@ -4369,8 +4407,37 @@ static void mVU_OPMULA_emit(mP)
 
 
 // OPMSUB Opcode
+static void mVU_OPMSUB_reference_emit_oaknut(mP)
+{
+	const u32 original_code = mVU.code;
+	mVU.code = (mVU.code & ~(0xfu << 21)) | (0xeu << 21);
+
+	const int Ft = mVU.regAlloc->allocRegId(_Ft_, 0, _X_Y_Z_W);
+	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
+	const int ACC = mVU.regAlloc->allocRegId(32, _Fd_, _X_Y_Z_W);
+
+	recBeginOaknutEmit();
+	mVUUpperPshufd_oaknut(Fs, Fs, 0xC9);
+	mVUUpperPshufd_oaknut(Ft, Ft, 0xD2);
+	mVUUpperMulPs_oaknut(mVU, Fs, Ft);
+	mVUUpperSubPs_oaknut(mVU, ACC, Fs);
+	recEndOaknutEmit();
+
+	mVU.regAlloc->clearNeededXmmId(Fs);
+	mVU.regAlloc->clearNeededXmmId(Ft);
+	mVUupdateFlags_oaknut(mVU, ACC);
+	mVU.regAlloc->clearNeededXmmId(ACC);
+
+	mVU.code = original_code;
+}
+
 static void mVU_OPMSUB_direct_emit_oaknut(mP)
 {
+	if (!mVUlocalRuleEnabled(10))
+	{
+		mVU_OPMSUB_reference_emit_oaknut(mVU, recPass);
+		return;
+	}
 	const u32 original_code = mVU.code;
 	mVU.code = (mVU.code & ~(0xfu << 21)) | (0xeu << 21);
 
@@ -4387,12 +4454,15 @@ static void mVU_OPMSUB_direct_emit_oaknut(mP)
 	mVUUpperSubPs_oaknut(mVU, ACC, Fs);
 	recEndOaknutEmit();
 
+	mVUupdateFlags_oaknut(mVU, ACC);
+	// Commit the writer before releasing cached readers. Fd may alias a dirty
+	// full source; releasing that old mapping first would invalidate ACC's
+	// new partial result instead of merging it into the whole cached vector.
+	mVU.regAlloc->clearNeededXmmId(ACC);
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	mVU.regAlloc->clearNeededXmmId(rawFs);
 	if (rawFt != rawFs) mVU.regAlloc->clearNeededXmmId(rawFt);
 	mVU.regAlloc->clearNeededXmmId(Ft);
-	mVUupdateFlags_oaknut(mVU, ACC);
-	mVU.regAlloc->clearNeededXmmId(ACC);
 
 	mVU.code = original_code;
 }

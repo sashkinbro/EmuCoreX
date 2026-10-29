@@ -198,7 +198,7 @@ static __fi void mVUBranchTestFbrst_emit_oaknut(mV, u32 bits)
 	recEndOaknutEmit();
 }
 
-static __fi void mVUBranchCmpBranchZero_emit_oaknut(mV)
+static __fi void mVUBranchCmpBranchZero_emit_oaknut(mV, bool equality_only = false)
 {
 	// A live IBcc condition may still sit in a pool GPR from the op before the
 	// delay slot; comparing it directly drops the LDRSH reload. End-program
@@ -208,8 +208,13 @@ static __fi void mVUBranchCmpBranchZero_emit_oaknut(mV)
 		recBeginOaknutEmit();
 		// The memory path reads mVU.branch with LDRSH; reproduce that sign
 		// extension here (equality against zero is unaffected).
-		oakAsm->SXTH(oakWRegister(mVU.branchCondCarryGpr), oakWRegister(mVU.branchCondCarryGpr));
-		oakAsm->CMP(oakWRegister(mVU.branchCondCarryGpr), 0);
+		if (equality_only && mVUlocalRuleEnabled(7))
+			oakAsm->TST(oakWRegister(mVU.branchCondCarryGpr), 0xffffu);
+		else
+		{
+			oakAsm->SXTH(oakWRegister(mVU.branchCondCarryGpr), oakWRegister(mVU.branchCondCarryGpr));
+			oakAsm->CMP(oakWRegister(mVU.branchCondCarryGpr), 0);
+		}
 		recEndOaknutEmit();
 		mVUclearBranchCondCarry(mVU);
 		return;
@@ -236,6 +241,18 @@ static __fi void mVUBranchCmpBranchZero_emit_oaknut(mV)
 	oakAsm->CMP(OAK_XSCRATCH, 0);
 	recEndOaknutEmit();
 }
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" u32 EmuCoreXOracleEmitVULocalCarryCompare(bool equality_only)
+{
+	microVU probe(microVU1.prog);
+	probe.index = 1;
+	probe.branchCondCarryGpr = 0;
+	const u8* begin = oakGetCurrentCodePointer();
+	mVUBranchCmpBranchZero_emit_oaknut(probe, equality_only);
+	return static_cast<u32>(oakGetCurrentCodePointer() - begin);
+}
+#endif
 
 static __fi u8* mVUBranchCondPatchpoint_emit_oaknut()
 {
@@ -709,10 +726,10 @@ void mVUendProgram(mV, microFlagCycles* mFC, int isEbit)
 }
 
 // Recompiles Code for Proper Flags and Q/P regs on Block Linkings
-void mVUsetupBranch(mV, microFlagCycles& mFC)
+void mVUsetupBranch(mV, microFlagCycles& mFC, bool reorderFlags = true)
 {
 	mVU.regAlloc->flushAll(); // Flush Allocated Regs
-	mVUsetupFlags(mVU, mFC);  // Shuffle Flag Instances
+	if (reorderFlags) mVUsetupFlags(mVU, mFC);  // Shuffle Flag Instances
 
 	// Shuffle P/Q regs since every block starts at instance #0
 	if (mVU.p || mVU.q) {
@@ -867,7 +884,10 @@ void normBranch(mV, microFlagCycles& mFC)
 
 void condBranch(mV, microFlagCycles& mFC, oak::Cond JMPcc)
 {
-	mVUsetupBranch(mVU, mFC);
+	// A terminating conditional branch has no live successor. Reordering
+	// its rings for unexecuted target readers would change the final slot.
+	// The M-bit continuation still needs the normal successor ring layout.
+	mVUsetupBranch(mVU, mFC, !mVUlocalRuleEnabled(22) || !(mVUup.eBit && !mVUup.mBit));
 
 	if (mVUup.tBit)
 	{
@@ -881,7 +901,7 @@ void condBranch(mV, microFlagCycles& mFC, oak::Cond JMPcc)
 			mVUBranchOrVuFlags_emit_oaknut(mVU, VUFLAG_INTCINTERRUPT);
 		}
 		mVUDTendProgram(mVU, &mFC, 2);
-		mVUBranchCmpBranchZero_emit_oaknut(mVU);
+		mVUBranchCmpBranchZero_emit_oaknut(mVU, JMPcc == oak::Cond::EQ || JMPcc == oak::Cond::NE);
 		u8* tJMP = mVUBranchCondPatchpoint_emit_oaknut();
 			incPC(4); // Set PC to First instruction of Non-Taken Side
 			mVUBranchStoreTpcImm_emit_oaknut(mVU, xPC);
@@ -913,7 +933,7 @@ void condBranch(mV, microFlagCycles& mFC, oak::Cond JMPcc)
 			mVUBranchOrVuFlags_emit_oaknut(mVU, VUFLAG_INTCINTERRUPT);
 		}
 		mVUDTendProgram(mVU, &mFC, 2);
-		mVUBranchCmpBranchZero_emit_oaknut(mVU);
+		mVUBranchCmpBranchZero_emit_oaknut(mVU, JMPcc == oak::Cond::EQ || JMPcc == oak::Cond::NE);
 		u8* dJMP = mVUBranchCondPatchpoint_emit_oaknut();
 			incPC(4); // Set PC to First instruction of Non-Taken Side
 			mVUBranchStoreTpcImm_emit_oaknut(mVU, xPC);
@@ -936,7 +956,7 @@ void condBranch(mV, microFlagCycles& mFC, oak::Cond JMPcc)
 		mVUBranchCopyPipelineState_emit_oaknut(mVU, &mVUpBlock->pStateEnd);
 
 		mVUendProgram(mVU, &mFC, 3);
-		mVUBranchCmpBranchZero_emit_oaknut(mVU);
+		mVUBranchCmpBranchZero_emit_oaknut(mVU, JMPcc == oak::Cond::EQ || JMPcc == oak::Cond::NE);
 		u8* dJMP = mVUBranchCondPatchpoint_emit_oaknut();
 		incPC(4); // Set PC to First instruction of Non-Taken Side
 		mVUBranchStoreTpcImm_emit_oaknut(mVU, xPC);
@@ -961,7 +981,7 @@ void condBranch(mV, microFlagCycles& mFC, oak::Cond JMPcc)
 			DevCon.Warning("End on evil branch! - Not implemented! - If game broken report to PCSX2 Team");
 
 		mVUendProgram(mVU, &mFC, 2);
-		mVUBranchCmpBranchZero_emit_oaknut(mVU);
+		mVUBranchCmpBranchZero_emit_oaknut(mVU, JMPcc == oak::Cond::EQ || JMPcc == oak::Cond::NE);
 
 		incPC(3);
 		u8* eJMP = mVUBranchCondPatchpoint_emit_oaknut();
@@ -985,7 +1005,7 @@ void condBranch(mV, microFlagCycles& mFC, oak::Cond JMPcc)
 	}
 	else // Normal Conditional Branch
 	{
-		mVUBranchCmpBranchZero_emit_oaknut(mVU);
+		mVUBranchCmpBranchZero_emit_oaknut(mVU, JMPcc == oak::Cond::EQ || JMPcc == oak::Cond::NE);
 
 		incPC(3);
 		microBlock* bBlock;

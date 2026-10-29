@@ -6,6 +6,64 @@
 #include "microVU-arm64.h"
 #include <array>
 #include <cstring>
+#include <cstdlib>
+#if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#include <android/log.h>
+#include <sys/system_properties.h>
+#include <unistd.h>
+#endif
+
+struct mVULocalRewriteOptions
+{
+	bool enabled;
+	bool natural;
+	u32 rule_mask;
+};
+
+// Development bisect only. Cache once on each actual compiler owner thread,
+// including MTVU, so a game run never mixes gate settings within that thread.
+__fi const mVULocalRewriteOptions& mVUlocalRewriteOptions()
+{
+#if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	static thread_local const mVULocalRewriteOptions options = [] {
+		char value[PROP_VALUE_MAX]{};
+		__system_property_get("debug.emucorex.vu_rewrites", value);
+		const bool enabled = value[0] != '0';
+		value[0] = 0;
+		__system_property_get("debug.emucorex.vu_natural", value);
+		const bool natural = value[0] != '0';
+		value[0] = 0;
+		__system_property_get("debug.emucorex.vu_rewrite_mask", value);
+		u32 rule_mask = 0xffffffffu;
+		if (value[0])
+		{
+			char* end = nullptr;
+			const unsigned long parsed = std::strtoul(value, &end, 0);
+			if (end != value && !*end) rule_mask = static_cast<u32>(parsed);
+		}
+		__android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
+			"VU_LOCAL_GATES tid=%d rewrites=%u natural=%u mask=%08x", gettid(),
+			static_cast<unsigned>(enabled), static_cast<unsigned>(enabled && natural && (rule_mask & (1u << 17))), rule_mask);
+		return mVULocalRewriteOptions{enabled, natural, rule_mask};
+	}();
+	return options;
+#else
+	static constexpr mVULocalRewriteOptions options{true, true, 0xffffffffu};
+	return options;
+#endif
+}
+
+static __fi bool mVUlocalRulesEnabled() { return mVUlocalRewriteOptions().enabled; }
+static __fi bool mVUlocalRuleEnabled(u32 rule)
+{
+	const auto& options = mVUlocalRewriteOptions();
+	return options.enabled && (options.rule_mask & (1u << (rule - 1)));
+}
+static __fi bool mVUlocalNaturalEnabled()
+{
+	const auto& options = mVUlocalRewriteOptions();
+	return mVUlocalRuleEnabled(18) && options.natural;
+}
 
 struct regCycleInfo
 {
@@ -66,7 +124,7 @@ static __fi void mVUIrPshufd_oaknut(int dst, int src, u8 imm)
 	const oak::QReg src_q = oakQRegister(src);
 	// Cached single-lane clones only consume lane zero. EXT selects that
 	// word directly, including an in-place clone, without a shuffle table.
-	if (imm >= 1 && imm <= 3)
+	if (mVUlocalRuleEnabled(1) && imm >= 1 && imm <= 3)
 	{
 		oakAsm->EXT(dst_q.B16(), src_q.B16(), src_q.B16(), imm * 4);
 		return;
@@ -543,7 +601,7 @@ public:
 	}
 	int takeCloneSource(int dst)
 	{
-		if (!cloneCount)
+		if (!mVUlocalRuleEnabled(2) || !cloneCount)
 			return -1;
 		const CloneNote note = clones[cloneCount - 1];
 		if (note.dst != dst || note.end != oakGetCurrentCodePointer() || oakAsm->offset() < 4)
@@ -563,6 +621,7 @@ public:
 	}
 	int takeGPRCloneSource(int dst)
 	{
+		if (!mVUlocalRuleEnabled(4)) return -1;
 		const CloneNote note = gprClone;
 		gprClone = {-1, -1, nullptr};
 		if (note.dst != dst || note.end != oakGetCurrentCodePointer() || oakAsm->offset() < 4)
@@ -701,6 +760,9 @@ public:
 		map.VFreg = vfreg;
 		map.isZero = false;
 		map.count = counter;
+		// Macro mode keeps full writes cached in the EE allocator. Its label
+		// and dirty bit must follow the temporary-to-ACC ownership transfer.
+		updateCOP2AllocState(reg);
 	}
 
 	bool isCachedWhole(int vfreg) const
@@ -1070,6 +1132,8 @@ public:
 		counter++;
 		const bool natural = naturalLane >= 0 && _XYZWss(xyzw);
 		const int shuffleMask = natural ? 0 : xyzw;
+		// An empty write must not masquerade as an unmodified VF/ACC cache.
+		const int writeSlot = xyzw || !mVUlocalRuleEnabled(21) ? vfWriteReg : -1;
 		if (vfLoadReg >= 0) // Search For Cached Regs
 		{
             int i;
@@ -1133,7 +1197,7 @@ public:
 								recEndOaknutEmit();
                             }
 						}
-						xmmMap[z].VFreg = vfWriteReg;
+						xmmMap[z].VFreg = writeSlot;
 						xmmMap[z].xyzw = xyzw;
 						xmmMap[z].natural = natural;
 						xmmMap[z].isZero = (vfLoadReg == 0);
@@ -1169,7 +1233,7 @@ public:
 				mVUIrLoadReg_oaknut(x, static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[index].VF[vfLoadReg])), natural ? 0xf : xyzw);
             }
 
-			xmmMap[x].VFreg = vfWriteReg;
+			xmmMap[x].VFreg = writeSlot;
 			xmmMap[x].xyzw  = xyzw;
 			xmmMap[x].natural = natural;
 		}

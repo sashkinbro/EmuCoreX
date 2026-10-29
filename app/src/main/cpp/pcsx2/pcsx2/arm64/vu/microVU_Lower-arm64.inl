@@ -1253,6 +1253,14 @@ static void mVU_FCGET_emit(mP)
 // Shared with the focused oracle: emit the actual production FCOR reduction.
 static __fi void mVU_FCOR_reduce_oaknut(oak::WReg dst, u32 immediate)
 {
+	if (!mVUlocalRuleEnabled(8))
+	{
+		oakAsm->MOV(OAK_WSCRATCH, immediate);
+		oakAsm->ORR(dst, dst, OAK_WSCRATCH);
+		oakAsm->ADD(dst, dst, 1);
+		oakAsm->LSR(dst, dst, 24);
+		return;
+	}
 	// FCOR succeeds iff every bit the immediate leaves clear is set in CLIP.
 	// Keep the complement in the 24-bit CLIP domain; dirty high bits cannot
 	// contribute to the test, and CSET already produces a normalized VI.
@@ -1269,6 +1277,7 @@ static void mVU_FCOR_direct_emit_oaknut(mP)
 	recBeginOaknutEmit();
 	mVU_FCOR_reduce_oaknut(dst_w, _Imm24_);
 	recEndOaknutEmit();
+	if (!mVUlocalRuleEnabled(8)) mVU_normalizeVIWrite_oaknut(dst);
 	mVU.regAlloc->clearNeeded(dst);
 }
 
@@ -1674,6 +1683,13 @@ static void mVU_IADDIU_load_ibithack_imm15_emit_oaknut(mV, oak::WReg dst)
 
 static __fi void mVU_unsignedVIImmediate_oaknut(oak::WReg dst, oak::WReg src, u32 immediate, bool subtract)
 {
+	if (!mVUlocalRuleEnabled(4))
+	{
+		oakAsm->MOV(OAK_WSCRATCH, immediate);
+		if (subtract) oakAsm->SUB(dst, src, OAK_WSCRATCH);
+		else oakAsm->ADD(dst, src, OAK_WSCRATCH);
+		return;
+	}
 	// A VI immediate is at most 15 bits. Two ADD/SUB immediate pieces cover
 	// every value without consuming a scratch register; encodable values
 	// (including a shifted 12-bit immediate) need only one instruction.
@@ -2007,7 +2023,7 @@ static __fi void mVUinsertCachedLane_oaknut(int dst, int src, u32 dst_lane, u32 
 
 static bool mVUtryInsertCachedLane_oaknut(mV, u32 source_lane)
 {
-	if (!_XYZW_SS || !_Ft_ || !mVU.regAlloc->isCachedWhole(_Ft_))
+	if (!mVUlocalRuleEnabled(19) || !_XYZW_SS || !_Ft_ || !mVU.regAlloc->isCachedWhole(_Ft_))
 		return false;
 	const int source = mVU.regAlloc->allocRegId(_Fs_);
 	const int destination = mVU.regAlloc->allocRegId(_Ft_, _Ft_, 0xf, false);
@@ -2430,7 +2446,7 @@ static bool mVU_makeIndexedQwordMemoryAddress_oaknut(mP, int addr, int vi, s32 i
 	if (!isVU1 || EmuConfig.Gamefixes.IbitHack || vi == 0)
 		return false;
 
-	if (imm == 0)
+	if (mVUlocalRuleEnabled(6) && imm == 0)
 	{
 		const int source = mVU.regAlloc->allocGPRId(vi);
 		mVUaddressFromVI_oaknut(oakWRegister(addr), oakWRegister(source), 0, 10);
@@ -2438,25 +2454,28 @@ static bool mVU_makeIndexedQwordMemoryAddress_oaknut(mP, int addr, int vi, s32 i
 		mVU_prepareMemoryBase_oaknut(mVU);
 		return true;
 	}
-	mVU_moveVIToAddressGPR_oaknut(mVU, addr, vi);
+	const int source = mVUlocalRuleEnabled(6) ? mVU.regAlloc->allocGPRId(vi) : -1;
+	if (source < 0) mVU_moveVIToAddressGPR_oaknut(mVU, addr, vi);
 	const oak::WReg addr_w = oakWRegister(addr);
+	const oak::WReg source_w = source >= 0 ? oakWRegister(source) : addr_w;
 	recBeginOaknutEmit();
 	if (imm > 0 && imm <= 4095)
 	{
-		oakAsm->ADD(addr_w, addr_w, static_cast<u32>(imm));
+		oakAsm->ADD(addr_w, source_w, static_cast<u32>(imm));
 	}
 	else if (imm < 0 && imm >= -4095)
 	{
-		oakAsm->SUB(addr_w, addr_w, static_cast<u32>(-imm));
+		oakAsm->SUB(addr_w, source_w, static_cast<u32>(-imm));
 	}
 	else if (imm != 0)
 	{
 		oakAsm->MOV(OAK_WSCRATCH, static_cast<u32>(imm));
-		oakAsm->ADD(addr_w, addr_w, OAK_WSCRATCH);
+		oakAsm->ADD(addr_w, source_w, OAK_WSCRATCH);
 	}
 	oakAsm->AND(addr_w, addr_w, 0x3ff);
 	mVU_prepareMemoryBase_oaknut(mVU);
 	recEndOaknutEmit();
+	if (source >= 0) mVU.regAlloc->clearNeeded(source);
 	return true;
 }
 
@@ -2465,7 +2484,7 @@ static void mVU_makeRegisterMemoryAddress_oaknut(mP, int addr, int vi, s32 byte_
 	if (mVU_tryConstantMemoryAddress_oaknut(mVU, recPass, vi, 0, byte_offset))
 		return;
 
-	if (isVU1 && vi != 0)
+	if (mVUlocalRuleEnabled(6) && isVU1 && vi != 0)
 	{
 		const int source = mVU.regAlloc->allocGPRId(vi);
 		mVUaddressFromVI_oaknut(oakWRegister(addr), oakWRegister(source), 4, 10);
@@ -3854,11 +3873,42 @@ static __fi void mVU_storeOrCondBranch_oaknut(mV, int condReg, oak::Cond cond)
 	}
 }
 
+static void mVUcondBranchXor_oaknut(mV, int destination)
+{
+	if (mVUlocalRuleEnabled(7))
+	{
+		if (!_Is_ && !mVUlow.memReadIs)
+		{
+			mVU_loadBranchSource_oaknut(mVU, destination, _It_, mVUlow.memReadIt);
+			return;
+		}
+		if (!_It_ && !mVUlow.memReadIt)
+		{
+			mVU_loadBranchSource_oaknut(mVU, destination, _Is_, mVUlow.memReadIs);
+			return;
+		}
+	}
+	if (!mVUlocalRuleEnabled(17))
+	{
+		mVU_loadBranchSource_oaknut(mVU, destination, _Is_, mVUlow.memReadIs);
+		mVU_xorBranchSource_oaknut(mVU, destination, _It_, mVUlow.memReadIt);
+		return;
+	}
+	// Hold It before acquiring Is so allocator pressure cannot recycle a
+	// still-live source. Backup values retain their existing full-W layout.
+	const int right = mVUlow.memReadIt ? VU_HOST_T2 : mVU.regAlloc->allocGPRId(_It_);
+	if (mVUlow.memReadIt) mVU_loadVIBackupToGPR_oaknut(mVU, right);
+	const int left = mVUlow.memReadIs ? destination : mVU.regAlloc->allocGPRId(_Is_);
+	if (mVUlow.memReadIs) mVU_loadVIBackupToGPR_oaknut(mVU, left);
+	oakAsm->EOR(oakWRegister(destination), oakWRegister(left), oakWRegister(right));
+	if (!mVUlow.memReadIs) mVU.regAlloc->clearNeeded(left);
+	if (!mVUlow.memReadIt && right != left) mVU.regAlloc->clearNeeded(right);
+}
+
 static void mVU_IBEQ_direct_emit_oaknut(mP)
 {
 	const int condReg = mVUcondBranchDest_oaknut(mVU);
-	mVU_loadBranchSource_oaknut(mVU, condReg, _Is_, mVUlow.memReadIs);
-	mVU_xorBranchSource_oaknut(mVU, condReg, _It_, mVUlow.memReadIt);
+	mVUcondBranchXor_oaknut(mVU, condReg);
 	mVU_storeOrCondBranch_oaknut(mVU, condReg, oak::Cond::EQ);
 }
 
@@ -3948,8 +3998,7 @@ static void mVU_IBLTZ_emit(mP)
 static void mVU_IBNE_direct_emit_oaknut(mP)
 {
 	const int condReg = mVUcondBranchDest_oaknut(mVU);
-	mVU_loadBranchSource_oaknut(mVU, condReg, _Is_, mVUlow.memReadIs);
-	mVU_xorBranchSource_oaknut(mVU, condReg, _It_, mVUlow.memReadIt);
+	mVUcondBranchXor_oaknut(mVU, condReg);
 	mVU_storeOrCondBranch_oaknut(mVU, condReg, oak::Cond::NE);
 }
 

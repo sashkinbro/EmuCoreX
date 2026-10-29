@@ -87,6 +87,13 @@ __fi void setBitFSEQ(int reg, int bitX)
 
 static __fi void mVUclearNonStickyStatus_oaknut(oak::WReg dst, oak::WReg src)
 {
+	if (!mVUlocalRuleEnabled(5))
+	{
+		oakAsm->MOV(dst, src);
+		oakAsm->MOV(OAK_WSCRATCH, 0xfffc00ffu);
+		oakAsm->AND(dst, dst, OAK_WSCRATCH);
+		return;
+	}
 	oakAsm->AND(dst, src, 0xfffc00ffu);
 }
 

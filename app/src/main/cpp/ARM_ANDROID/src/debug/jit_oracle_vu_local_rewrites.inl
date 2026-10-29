@@ -2,10 +2,15 @@
 // Focused local rewrite tests; include in jit_oracle.cpp after the VU suites.
 extern "C" u32 EmuCoreXOracleEmitVULocalPrimitive(u32 kind, u32 argument, bool alias);
 extern "C" void EmuCoreXOracleTestVUBlockTail(void (*check)(bool, const char*));
+extern "C" u32 EmuCoreXOracleEmitVULocalCarryCompare(bool equality_only);
 
 
 #include "jit_oracle_vu_local_integration.inl"
 #include "jit_oracle_vu_local_natural.inl"
+#include "jit_oracle_vu_ebit_target.inl"
+#include "jit_oracle_vu_empty_field.inl"
+#include "jit_oracle_vu_local_full_acc.inl"
+#include "jit_oracle_vu_local_op.inl"
 
 void RunVULocalRewriteTests()
 {
@@ -25,6 +30,23 @@ void RunVULocalRewriteTests()
     constexpr std::array<u32, 10> words = {0, 1, 0x7fff, 0x8000, 0xffff,
         0x10000, 0xffff0000, 0xdeadbeef, 0x80000000, 0xffffffff};
     constexpr std::array<u32, 8> immediates = {0, 1, 0x7ff, 0xfff, 0x1000, 0x1234, 0x7000, 0x7fff};
+    bool branch_bits = true, branch_sizes = true;
+    for (bool equality : {false, true})
+    {
+        oakSetAsmPtr(SysMemory::GetEERec() + 0x2000000, 0x10000);
+        u8* entry = oakStartBlock();
+        const u32 bytes = EmuCoreXOracleEmitVULocalCarryCompare(equality);
+        oakAsm->CSET(oak::util::W0, equality ? oak::Cond::EQ : oak::Cond::LT);
+        oakAsm->RET();
+        oakEndBlock();
+        branch_sizes &= bytes == (equality ? 4u : 8u);
+        for (u32 word : words)
+            branch_bits &= reinterpret_cast<u32 (*)(u32)>(entry)(word) ==
+                (equality ? ((word & 0xffffu) == 0) : (static_cast<s16>(word) < 0));
+    }
+    Check(branch_bits, "carried VI branch compares ignore dirty high halfwords and preserve signed tests");
+    Check(branch_sizes, "carried equality branches use one TST while signed branches retain SXTH/CMP");
+
     bool immediate_bits = true, immediate_sizes = true;
     for (u32 kind : {1u, 2u})
     for (u32 imm : immediates)
@@ -160,5 +182,10 @@ void RunVULocalRewriteTests()
     Check(vf0_sizes, "VU MAX/MINI with a nonnegative VF0 operand is one SMAX/SMIN");
     EmuCoreXOracleTestVUBlockTail(Check);
     VULocalArchitecturalTests();
+    VULocalFullAccCompositionTests();
+    VULocalDualIssueCompositionTests();
+    VULocalOpDirtyAliasTests();
     VULocalNaturalParityTests();
+    VULocalEbitTargetTests();
+    VULocalEmptyFieldTests();
 }
