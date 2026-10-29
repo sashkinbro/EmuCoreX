@@ -368,7 +368,7 @@ void Pcsx2Config::SpeedhackOptions::Set(SpeedHack id, int value)
 
 bool Pcsx2Config::SpeedhackOptions::operator==(const SpeedhackOptions& right) const
 {
-	return OpEqu(bitset) && OpEqu(EECycleRate) && OpEqu(EECycleSkip);
+	return OpEqu(bitset) && OpEqu(EECycleRate) && OpEqu(EECycleSkip) && OpEqu(iopThreadLag);
 }
 
 bool Pcsx2Config::SpeedhackOptions::operator!=(const SpeedhackOptions& right) const
@@ -407,6 +407,9 @@ void Pcsx2Config::SpeedhackOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapBitBool(WaitLoop);
 	SettingsWrapBitBool(vuFlagHack);
 	SettingsWrapBitBool(vuThread);
+	SettingsWrapBitBool(iopThread);
+	SettingsWrapBitBool(iopThreadLockstep);
+	SettingsWrapEntry(iopThreadLag);
 	SettingsWrapBitBool(vu1Instant);
 
 	EECycleRate = std::clamp(EECycleRate, MIN_EE_CYCLE_RATE, MAX_EE_CYCLE_RATE);

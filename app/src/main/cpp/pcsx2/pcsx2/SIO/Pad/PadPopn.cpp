@@ -491,8 +491,8 @@ bool PadPopn::Freeze(StateWrapper& sw)
 		return false;
 
 	// Private PadPopn members
-	sw.Do(&analogLight);
-	sw.Do(&analogLocked);
+	SharedWord::Freeze(sw, analogLight);
+	SharedWord::Freeze(sw, analogLocked);
 	sw.Do(&analogPressed);
 	sw.Do(&commandStage);
 	sw.Do(&responseBytes);
@@ -516,7 +516,7 @@ u8 PadPopn::SendCommandByte(u8 commandByte)
 				Console.Warning("%s(%02X) Config-only command was sent to a pad outside of config mode!", __FUNCTION__, commandByte);
 			}
 
-			ret = this->isInConfig ? static_cast<u8>(Pad::Mode::CONFIG) : static_cast<u8>(this->currentMode);
+			ret = this->isInConfig ? static_cast<u8>(Pad::Mode::CONFIG) : static_cast<u8>(this->currentMode.Load());
 			break;
 		case 2:
 			ret = 0x5a;

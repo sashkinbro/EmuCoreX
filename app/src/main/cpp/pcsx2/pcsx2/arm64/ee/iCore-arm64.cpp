@@ -13,15 +13,15 @@
 using namespace x86Emitter;
 #endif
 
-u16 g_x86AllocCounter = 0;
+thread_local u16 g_x86AllocCounter = 0;
 u16 g_xmmAllocCounter = 0;
 
-EEINST* g_pCurInstInfo = NULL;
+thread_local EEINST* g_pCurInstInfo = NULL;
 
 _xmmregs xmmregs[iREGCNT_XMM], s_saveXMMregs[iREGCNT_XMM];
 
 // ARM64 host GPR caching
-_x86regs x86regs[iREGCNT_GPR], s_saveX86regs[iREGCNT_GPR];
+thread_local _x86regs x86regs[iREGCNT_GPR], s_saveX86regs[iREGCNT_GPR];
 
 static void eeSharedLoadFpu32ToXmm_emit_oaknut(int xmmreg, int fpreg)
 {

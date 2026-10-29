@@ -28,6 +28,8 @@
 #include "ImGui/ImGuiOverlays.h"
 #include "Input/InputManager.h"
 #include "IopBios.h"
+#include "IopThread/IopPlacement.h"
+#include "IopThread/IopThreadVm.h"
 #include "MTGS.h"
 #include "MTVU.h"
 #include "PINE.h"
@@ -329,6 +331,7 @@ void VMManager::SetState(VMState state)
 	if (state != VMState::Stopping && (state == VMState::Paused || old_state == VMState::Paused))
 	{
 		const bool paused = (state == VMState::Paused);
+		if (paused) IopThread::OnVmPaused(true);
 		if (paused)
 		{
 			// Stop consuming audio before the CPU waits for VU/GS to drain. Otherwise
@@ -346,6 +349,7 @@ void VMManager::SetState(VMState state)
 			SPU2::SetOutputPaused(false);
 		}
 
+		if (!paused) IopThread::OnVmPaused(false);
 		Achievements::OnVMPaused(paused);
 
 		UpdateInhibitScreensaver(!paused && EmuConfig.InhibitScreensaver);
@@ -392,6 +396,8 @@ std::string VMManager::GetDiscSerial()
 	std::unique_lock lock(s_info_mutex);
 	return s_disc_serial;
 }
+
+bool VMManager::IsArcadeActive() { return !s_acgame.empty(); }
 
 bool VMManager::IsArcadeSystem246()
 {
@@ -879,6 +885,7 @@ void VMManager::ApplyGameFixes()
 
 void VMManager::ApplySettings()
 {
+	IopThread::VmHold iop_hold;
 	Console.WriteLn("Applying settings...");
 
 	// If we're running, ensure the threads are synced.
@@ -903,6 +910,8 @@ void VMManager::ApplyCoreSettings()
 	// Lightweight version of above, called when ELF changes. This should not get called without an active VM.
 	pxAssertRel(HasValidOrInitializingVM(), "Reloading core settings requires a valid VM.");
 	Console.WriteLn("Applying core settings...");
+
+	IopThread::VmHold iop_hold;
 
 	// If we're running, ensure the threads are synced.
 	if (GetState() == VMState::Running)
@@ -1839,6 +1848,7 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 
 		UpdateGameSettingsLayer();
 		s_state.store(VMState::Shutdown, std::memory_order_release);
+		IopThread::StopThread();
 		Host::OnVMDestroyed();
 		ApplySettings();
 	};
@@ -1990,6 +2000,7 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 		EmuConfig.Cpu.ExtraMemory = true;
 
 	s_cpu_implementation_changed = false;
+	IopThread::ChooseMode();
 	UpdateCPUImplementations();
 	mmap_ResetBlockTracking();
 	memSetExtraMemMode(EmuConfig.Cpu.ExtraMemory);
@@ -2097,10 +2108,19 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 	if (EmuConfig.CdvdPrecache)
 		PrecacheCDVDFile();
 
+	// The devices are open and the CPU state is reset: the IOP thread, if the mode has one, takes its
+	// clocks from it.
+	IopThread::SyncThread();
+
 	hwReset();
 
 	Console.WriteLn("VM subsystems initialized in %.2f ms", init_timer.GetTimeMilliseconds());
 	s_state.store(VMState::Paused, std::memory_order_release);
+	// A paused VM holds the IOP for as long as it stays paused (SetState does the same when it enters Paused). This
+	// store bypasses SetState, and the first resume goes through SetState: it calls SPU2::SetOutputPaused(false),
+	// which touches the audio stream the IOP thread started above writes. Found at step 10 by that assert, in the
+	// first BIOS boot of armsx2-sdl in Lockstep (IOP thread design 7.1, row C25).
+	IopThread::OnVmPaused(true);
 	Host::OnVMStarted();
 	FullscreenUI::OnVMStarted();
 	UpdateInhibitScreensaver(EmuConfig.InhibitScreensaver);
@@ -2128,6 +2148,9 @@ void VMManager::Shutdown(bool save_resume_state)
 	s_state.store(VMState::Stopping, std::memory_order_release);
 
 	SetTimerResolutionIncreased(false);
+
+	// Everything below touches the devices the IOP owns; the thread is gone before any of them close.
+	IopThread::VmHold iop_hold;
 
 	// sync everything
 	if (THREAD_VU1)
@@ -2172,6 +2195,7 @@ void VMManager::Shutdown(bool save_resume_state)
 
 	FPControlRegister::SetCurrent(FPControlRegister::GetDefault());
 
+	IopThread::StopThread();
 	Patch::UnloadPatches();
 	R3000A::ioman::reset();
 	vtlb_Shutdown();
@@ -2260,6 +2284,8 @@ void VMManager::Reset()
 	if (!GSDumpReplayer::IsReplayingDump() && Achievements::ResetHardcoreMode(false))
 		ApplySettings();
 
+	IopThread::VmHold iop_hold;
+
 	vu1Thread.WaitVU();
 	vu1Thread.Reset();
 	MTGS::WaitGS();
@@ -2273,10 +2299,14 @@ void VMManager::Reset()
 
 	mmap_ResetBlockTracking();
 	memSetExtraMemMode(EmuConfig.Cpu.ExtraMemory);
+	IopThread::ChooseModeForReset();
 	Internal::ClearCPUExecutionCaches();
 	memBindConditionalHandlers();
 	SysMemory::Reset();
 	cpuReset();
+	IopThread::SyncThread();
+	IopThread::ResyncClocks();
+	SetEmuThreadAffinities();
 	hwReset();
 
 	if (g_InputRecording.isActive())
@@ -2401,6 +2431,9 @@ void VMManager::DoSaveState(const char* filename, s32 slot_for_message, bool zip
 		error_callback(TRANSLATE_STR("VMManager", "Cannot save state while replaying a GS dump."));
 		return;
 	}
+
+	// The state reads the IOP's registers, RAM and devices.
+	IopThread::VmHold iop_hold;
 
 	Error error;
 	std::unique_ptr<ArchiveEntryList> elist = SaveState_DownloadState(&error);
@@ -2731,7 +2764,13 @@ void VMManager::UpdateTargetSpeed()
 		s_target_speed = target_speed;
 
 		MTGS::UpdateVSyncMode();
-		SPU2::OnTargetSpeedChanged();
+		{
+			// Empties the audio buffer and changes its rate and volume from the producer's side, which is the
+			// IOP thread's (IOP thread design 8.10). Reached from the event test (a frame rate change), so a
+			// hold that never sleeps.
+			IopThread::VmHold iop_hold(IopThread::HoldKind::Emulation);
+			SPU2::OnTargetSpeedChanged();
+		}
 		ResetFrameLimiter();
 	}
 }
@@ -2838,6 +2877,10 @@ void VMManager::FrameAdvance(u32 num_frames /*= 1*/)
 
 bool VMManager::ChangeDisc(CDVD_SourceType source, std::string path)
 {
+	// Reopens the disc backend and writes the CDVD tray state, which the IOP's CDVD code reads
+	// (IOP thread design 8.3).
+	IopThread::VmHold iop_hold;
+
 	const CDVD_SourceType old_type = CDVDsys_GetSourceType();
 	const std::string old_path(CDVDsys_GetFile(old_type));
 
@@ -3244,6 +3287,9 @@ void VMManager::UpdateCPUImplementations()
 
 void VMManager::Internal::ClearCPUExecutionCaches()
 {
+	// Resets the IOP's code cache with the rest, so the IOP must be held or not running.
+	IopThread::AssertHeldOrStopped();
+
 	Cpu->Reset();
 	psxCpu->Reset();
 
@@ -3269,6 +3315,7 @@ void VMManager::Execute()
 	if (std::exchange(s_cpu_implementation_changed, false))
 	{
 		// We need to switch the cpus out, and reset the new ones if so.
+		IopThread::VmHold iop_hold;
 		UpdateCPUImplementations();
 		Internal::ClearCPUExecutionCaches();
 		vtlb_ResetFastmem();
@@ -3362,6 +3409,12 @@ const std::string& VMManager::Internal::GetELFOverride()
 	return s_elf_override;
 }
 
+VMState VMManager::Internal::GetStateForEventTest()
+{
+	// Relaxed: the caller adds the acquire as a fence where it relies on the value (_cpuEventTest_Shared).
+	return s_state.load(std::memory_order_relaxed);
+}
+
 bool VMManager::Internal::IsExecutionInterrupted()
 {
 	return s_state.load(std::memory_order_relaxed) != VMState::Running || s_cpu_implementation_changed;
@@ -3388,6 +3441,11 @@ void VMManager::Internal::EntryPointCompilingOnCPUThread()
 {
 	if (s_elf_executed)
 		return;
+
+	// Runs inside the EE JIT's compile of the entry point block, with the IOP thread alive. It applies the
+	// game's settings, writes the boot patches (IOP patch lines write IOP RAM) and resets the recompilers,
+	// the IOP's included, so the IOP is held for all of it (IOP thread design section 7, row C19).
+	IopThread::VmHold iop_hold;
 
 	const bool reset_speed_limiter = (EmuConfig.EnableFastBootFastForward && IsFastBootInProgress());
 
@@ -3471,6 +3529,8 @@ void VMManager::CheckForCPUConfigChanges(const Pcsx2Config& old_config)
 	}
 
 	Console.WriteLn("Updating CPU configuration...");
+	IopThread::OnCpuConfigChanged();
+	SetEmuThreadAffinities();
 	g_cpuRegistersPack.Cpu = EmuConfig.Cpu;
 	FPControlRegister::SetCurrent(EmuConfig.Cpu.FPUFPCR);
 	Internal::ClearCPUExecutionCaches();
@@ -4228,8 +4288,13 @@ void VMManager::EnsureCPUInfoInitialized()
 void VMManager::SetEmuThreadAffinities()
 {
 	const bool new_pin_enable = (GetState() != VMState::Shutdown && EmuConfig.EnableThreadPinning);
-	if (s_thread_affinities_set == new_pin_enable)
+	static u32 placed_iop = 0;
+	const u32 current_iop = IopThread::PlacementToken();
+	if (s_thread_affinities_set == new_pin_enable && placed_iop == current_iop)
 		return;
+	placed_iop = current_iop;
+	if (IopThread::g_thread.IsRunning())
+		IopThread::g_thread.GetThreadHandle().SetAffinity(0);
 
 	s_thread_affinities_set = EmuConfig.EnableThreadPinning;
 
@@ -4242,7 +4307,9 @@ void VMManager::SetEmuThreadAffinities()
 	}
 
 	const bool mtvu = EmuConfig.Speedhacks.vuThread;
-	if (!new_pin_enable || s_processor_list.size() < (mtvu ? 3 : 2))
+	const bool iop_thread = IopThread::PlacesThread();
+	const size_t occupied_count = (mtvu ? 3 : 2) + (iop_thread ? 1 : 0);
+	if (!new_pin_enable || s_processor_list.size() < occupied_count)
 	{
 		if (new_pin_enable)
 			ERROR_LOG("Insufficient processors for thread pinning.");
@@ -4279,12 +4346,20 @@ void VMManager::SetEmuThreadAffinities()
 	INFO_LOG("  GS thread is on processor {} (0x{:x})", gs_index, gs_affinity);
 	MTGS::GetThreadHandle().SetAffinity(gs_affinity);
 
+	if (iop_thread)
+	{
+		const u64 iop_mask = u64{1} << s_processor_list[mtvu ? 3 : 2];
+		if (iop_mask & IopThread::PerformanceCoreMask())
+			IopThread::g_thread.GetThreadHandle().SetAffinity(iop_mask);
+		INFO_LOG("IOP thread processor mask 0x{:x}", iop_mask);
+	}
+
 	// Try to find some threads for the software renderer.
 	// They should be in the same cluster as the main GS thread. If they're not, for example,
 	// we had 4 P cores and 6 E cores, let the OS schedule them instead.
-	s_software_renderer_processor_list.reserve(s_processor_list.size() - (mtvu ? 3 : 2));
+	s_software_renderer_processor_list.reserve(s_processor_list.size() - occupied_count);
 	const u32 gs_cluster_id = cpuinfo_get_processor(gs_index)->cluster->cluster_id;
-	for (size_t i = mtvu ? 3 : 2; i < s_processor_list.size(); i++)
+	for (size_t i = occupied_count; i < s_processor_list.size(); i++)
 	{
 		const u32 proc_index = s_processor_list[i];
 		const u32 proc_cluster_id = cpuinfo_get_processor(proc_index)->cluster->cluster_id;

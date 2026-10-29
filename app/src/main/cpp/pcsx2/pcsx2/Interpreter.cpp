@@ -25,6 +25,8 @@ static bool intExitExecution = false;
 static fastjmp_buf intJmpBuf;
 static u32 intLastBranchTo;
 
+
+
 void intEventTest();
 
 void intUpdateCPUCycles()
@@ -560,6 +562,8 @@ static void intReset()
 extern "C" int EmuCoreXOracleSkipEvents();
 #endif
 
+CpuEventTestFn g_intEventTestShared = &_cpuEventTest_Shared<IopThreadMode::Off>;
+
 void intEventTest()
 {
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
@@ -567,7 +571,7 @@ void intEventTest()
 		return;
 #endif
 	// Perform counters, ints, and IOP updates:
-	_cpuEventTest_Shared();
+	g_intEventTestShared();
 
 	if (intExitExecution)
 	{

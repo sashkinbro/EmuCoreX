@@ -1,6 +1,10 @@
 // SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "IopThread/IopBridge.h"
+#include "IopThread/OwnerAsserts.h"
+#include "IopThread/EeBridge.h"
+#include "IopThread/IopThreadVm.h"
 #include "Common.h"
 
 #include "common/Path.h"
@@ -48,7 +52,7 @@ cachedTlbs_t cachedTlbs;
 
 R5900cpu *Cpu = NULL;
 
-static constexpr uint eeWaitCycles = 4096;
+static constexpr uint eeWaitCycles = IopThread::kEeWaitCycles;
 
 bool eeEventTestIsActive = false;
 EE_intProcessStatus eeRunInterruptScan = INT_NOT_RUNNING;
@@ -65,6 +69,7 @@ uptr g_argPtrs[kMaxArgs];
 
 void cpuReset()
 {
+	IopBridge::EmuHold reset_hold(IopThread::HoldKind::Lifecycle);
     //// cpuRegistersPack -> VIFregisters
     g_cpuRegistersPack.vifRegs[0] = vif0Regs;
     g_cpuRegistersPack.vifRegs[1] = vif1Regs;
@@ -85,7 +90,12 @@ void cpuReset()
 	EEsCycle = 0;
 	EEoCycle = cpuRegs.cycle;
 
-	psxReset();
+	// C18: the reset writes the IOP's registers and devices. A VM reset holds the IOP around this
+	// already; boot calls it before the IOP thread exists. The hold is for whoever calls it next.
+	{
+		IopBridge::EmuHold hold(IopThread::HoldKind::Lifecycle);
+		psxReset();
+	}
 	pgifInit();
 
 	extern void Deci2Reset();		// lazy, no good header for it yet.
@@ -395,24 +405,8 @@ extern "C" __attribute__((noinline)) void EmuCoreXOracleSyncEventVUs()
 
 // Shared portion of the branch test, called from both the Interpreter
 // and the recompiler.  (moved here to help alleviate redundant code)
-__fi void _cpuEventTest_Shared()
+void iopRunSliceOnIopThread()
 {
-	eeEventTestIsActive = true;
-	cpuRegs.nextEventCycle = cpuRegs.cycle + eeWaitCycles;
-	cpuRegs.lastEventCycle = cpuRegs.cycle;
-	// ---- INTC / DMAC (CPU-level Exceptions) -----------------
-	// Done first because exceptions raised during event tests need to be postponed a few
-	// cycles (fixes Grandia II [PAL], which does a spin loop on a vsync and expects to
-	// be able to read the value before the exception handler clears it).
-
-	uint mask = intcInterrupt() | dmacInterrupt();
-	if (cpuIntsEnabled(mask))
-		cpuException(mask, cpuRegs.branch);
-
-	// ---- IOP -------------
-	EEsCycle += cpuRegs.cycle - EEoCycle;
-	EEoCycle = cpuRegs.cycle;
-
 	if (EEsCycle > 0)
 		iopEventAction = true;
 
@@ -424,9 +418,50 @@ __fi void _cpuEventTest_Shared()
 
 	iopEventTest();
 
+}
+
+template <IopThreadMode M>
+void _cpuEventTest_Shared()
+{
+	eeEventTestIsActive = true;
+	cpuRegs.nextEventCycle = cpuRegs.cycle + eeWaitCycles;
+	cpuRegs.lastEventCycle = cpuRegs.cycle;
+	if constexpr (M == IopThreadMode::Threaded)
+		IopThread::EeEventTestBegin(IopThread::EeCycle());
+	// ---- INTC / DMAC (CPU-level Exceptions) -----------------
+	// Done first because exceptions raised during event tests need to be postponed a few
+	// cycles (fixes Grandia II [PAL], which does a spin loop on a vsync and expects to
+	// be able to read the value before the exception handler clears it).
+
+	uint mask = intcInterrupt() | dmacInterrupt();
+	if (cpuIntsEnabled(mask))
+		cpuException(mask, cpuRegs.branch);
+
+	// ---- IOP -------------
+	if constexpr (M == IopThreadMode::Threaded)
+	{
+		if (!IopThread::EeLagWait(IopThread::EeCycle()))
+		{
+			EEsCycle += cpuRegs.cycle - EEoCycle;
+			EEoCycle = cpuRegs.cycle;
+			iopRunSliceOnIopThread();
+		}
+	}
+	else
+	{
+		EEsCycle += cpuRegs.cycle - EEoCycle;
+		EEoCycle = cpuRegs.cycle;
+		if constexpr (M == IopThreadMode::Lockstep)
+		{
+			if (IopThread::LockstepActive()) IopThread::RunLockstepSlice();
+			else iopRunSliceOnIopThread();
+		}
+		else iopRunSliceOnIopThread();
+	}
+
 	if (cpuTestCycle(nextStartCounter, nextDeltaCounter))
 	{
-		rcntUpdate();
+		rcntUpdate<M>();
 		_cpuTestPERF();
 	}
 	_cpuTestTIMR();
@@ -446,6 +481,8 @@ __fi void _cpuEventTest_Shared()
 	// ---- VU Sync -------------
 	cpuSyncEventVUs();
 
+	if constexpr (M != IopThreadMode::Threaded)
+	{
     // ---- Schedule Next Event Test --------------
 #if defined(ANDROID)
     const s32 nextIopEventDeta = (psxRegs.iopNextEventCycle - psxRegs.cycle) << 3;
@@ -469,10 +506,30 @@ __fi void _cpuEventTest_Shared()
         cpuSetNextEventDelta(nextIopEventDeta - EEsCycle);
     }
 
+	}
+
 	// Apply vsync and other counter nextCycles
 	cpuSetNextEvent(nextStartCounter, nextDeltaCounter);
 
 	eeEventTestIsActive = false;
+}
+
+template void _cpuEventTest_Shared<IopThreadMode::Off>();
+template void _cpuEventTest_Shared<IopThreadMode::Lockstep>();
+template void _cpuEventTest_Shared<IopThreadMode::Threaded>();
+
+CpuEventTestFn cpuEventTestFor(IopThreadMode mode)
+{
+	switch (mode)
+	{
+		case IopThreadMode::Lockstep:
+			return &_cpuEventTest_Shared<IopThreadMode::Lockstep>;
+		case IopThreadMode::Threaded:
+			return &_cpuEventTest_Shared<IopThreadMode::Threaded>;
+		case IopThreadMode::Off:
+		default:
+			return &_cpuEventTest_Shared<IopThreadMode::Off>;
+	}
 }
 
 __ri void cpuTestINTCInts()
@@ -486,11 +543,8 @@ __ri void cpuTestINTCInts()
 		return;
 
 	cpuSetNextEventDelta(4);
-	if (eeEventTestIsActive && (psxRegs.iopCycleEE > 0))
-	{
-		psxRegs.iopBreak += psxRegs.iopCycleEE; // record the number of cycles the IOP didn't run.
-		psxRegs.iopCycleEE = 0;
-	}
+	if (IopThread::GetMode() != IopThreadMode::Threaded && eeEventTestIsActive && (psxRegs.iopCycleEE > 0))
+		EeBridge::BreakIopSlice();
 }
 
 __fi void cpuTestDMACInts()
@@ -505,11 +559,8 @@ __fi void cpuTestDMACInts()
 		return;
 
 	cpuSetNextEventDelta(4);
-	if (eeEventTestIsActive && (psxRegs.iopCycleEE > 0))
-	{
-		psxRegs.iopBreak += psxRegs.iopCycleEE; // record the number of cycles the IOP didn't run.
-		psxRegs.iopCycleEE = 0;
-	}
+	if (IopThread::GetMode() != IopThreadMode::Threaded && eeEventTestIsActive && (psxRegs.iopCycleEE > 0))
+		EeBridge::BreakIopSlice();
 }
 
 __fi void cpuTestTIMRInts()
@@ -538,6 +589,7 @@ __fi void CPU_SET_DMASTALL(EE_EventType n, bool set)
 
 __fi void CPU_INT( EE_EventType n, s32 ecycle)
 {
+	EE_SIDE_ASSERT();
 	// If it's retunning too quick, just rerun the DMA, there's no point in running the EE for < 4 cycles.
 	// This causes a huge uplift in performance for ONI FMV's.
 	if (ecycle < 4 && !(cpuRegs.dmastall & (1 << n)) && eeRunInterruptScan != INT_NOT_RUNNING)
@@ -561,13 +613,12 @@ __fi void CPU_INT( EE_EventType n, s32 ecycle)
 
 	// Interrupt is happening soon: make sure both EE and IOP are aware.
 
-	if (ecycle <= 28 && psxRegs.iopCycleEE > 0)
+	if (IopThread::GetMode() != IopThreadMode::Threaded && ecycle <= 28 && psxRegs.iopCycleEE > 0)
 	{
 		// If running in the IOP, force it to break immediately into the EE.
 		// the EE's branch test is due to run.
 
-		psxRegs.iopBreak += psxRegs.iopCycleEE; // record the number of cycles the IOP didn't run.
-		psxRegs.iopCycleEE = 0;
+		EeBridge::BreakIopSlice();
 	}
 
 	cpuSetNextEventDelta(cpuRegs.eCycle[n]);

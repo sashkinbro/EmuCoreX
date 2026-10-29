@@ -7,6 +7,9 @@
 #include "Common.h"
 #include "Sif.h"
 #include "IopHw.h"
+#include "IopThread/IopBridge.h"
+#include "IopThread/OwnerAsserts.h"
+#include "IopThread/SharedWord.h"
 
 _sif sif1;
 
@@ -253,8 +256,8 @@ static __fi void HandleIOPTransfer()
 
 static __fi void Sif1End()
 {
-	psHu32(SBUS_F240) &= ~0x40;
-	psHu32(SBUS_F240) &= ~0x4000;
+	// Both bits in one step: the other side changes this register too.
+	SharedWord::FetchAnd(psHu32(SBUS_F240), ~(0x40u | 0x4000u));
 
 	DMA_LOG("SIF1 DMA End");
 }
@@ -262,6 +265,8 @@ static __fi void Sif1End()
 // Transfer EE to IOP, putting data in the fifo as an intermediate step.
 __fi void SIF1Dma()
 {
+	IOP_SIDE_ASSERT();
+	EE_SIDE_ASSERT();
 	int BusyCheck = 0;
 
 	if (sif1_dma_stall)
@@ -325,7 +330,7 @@ __fi void dmaSIF1()
 		SIF_LOG("warning, sif1.fifoReadPos != sif1.fifoWritePos");
 	}
 
-	psHu32(SBUS_F240) |= 0x4000;
+	SharedWord::FetchOr(psHu32(SBUS_F240), 0x4000u);
 	sif1.ee.busy = true;
 
 	CPU_SET_DMASTALL(DMAC_SIF1, false);
@@ -349,6 +354,6 @@ __fi void dmaSIF1()
 		}
 	}
 
-	SIF1Dma();
+	IopBridge::Sif1Pump();
 
 }

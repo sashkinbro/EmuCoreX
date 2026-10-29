@@ -4,6 +4,7 @@
 #pragma once
 
 #include "MemoryTypes.h"
+#include "IopThread/IopThreadMode.h"
 
 struct EECNT_MODE
 {
@@ -121,10 +122,13 @@ extern s32 nextDeltaCounter;		// delta until the next counter event (must be sig
 extern u32 nextStartCounter;
 extern uint g_FrameCount;
 
+template <IopThreadMode M>
 extern void rcntUpdate_hScanline();
+template <IopThreadMode M>
 extern void rcntUpdate_vSync();
 extern bool rcntCanCount(int i);
 extern void rcntSyncCounter(int i);
+template <IopThreadMode M>
 extern void rcntUpdate();
 
 extern void rcntInit();

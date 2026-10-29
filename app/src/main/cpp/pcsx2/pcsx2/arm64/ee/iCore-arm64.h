@@ -91,7 +91,7 @@ struct _x86regs
 	u32 extra; // extra info assoc with the reg
 };
 
-extern _x86regs x86regs[iREGCNT_GPR], s_saveX86regs[iREGCNT_GPR];
+extern thread_local _x86regs x86regs[iREGCNT_GPR], s_saveX86regs[iREGCNT_GPR];
 
 bool _isAllocatableX86reg(int x86reg);
 void _initX86regs();
@@ -224,7 +224,7 @@ struct EEINST
 	u8 readType[4], readReg[4];
 };
 
-extern EEINST* g_pCurInstInfo; // info for the cur instruction
+extern thread_local EEINST* g_pCurInstInfo; // info for the cur instruction
 extern void _recClearInst(EEINST* pinst);
 
 // returns the number of insts + 1 until written (0 if not written)
@@ -301,7 +301,7 @@ extern _xmmregs xmmregs[iREGCNT_XMM], s_saveXMMregs[iREGCNT_XMM];
 extern thread_local u8* j8Ptr[32];   // depreciated item.  use local u8* vars instead.
 extern thread_local u32* j32Ptr[32]; // depreciated item.  use local u32* vars instead.
 
-extern u16 g_x86AllocCounter;
+extern thread_local u16 g_x86AllocCounter;
 extern u16 g_xmmAllocCounter;
 
 // allocates only if later insts use this register

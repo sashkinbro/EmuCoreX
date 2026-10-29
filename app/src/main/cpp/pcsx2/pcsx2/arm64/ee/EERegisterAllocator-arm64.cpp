@@ -20,7 +20,7 @@ using namespace x86Emitter;
 extern u32 g_psxConstRegs[32];
 
 // ARM64 host GPR caching
-static uint g_x86checknext;
+static thread_local uint g_x86checknext;
 
 // use ARM64 host register allocation
 

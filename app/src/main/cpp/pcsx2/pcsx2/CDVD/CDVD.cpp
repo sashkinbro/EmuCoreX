@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "IopThread/OwnerAsserts.h"
 #include "CDVD/CDVD.h"
 #include "CDVD/Ps1CD.h"
 #include "CDVD/CDVD_internal.h"
@@ -1065,6 +1066,8 @@ bool SaveStateBase::cdvdFreeze()
 
 void cdvdNewDiskCB()
 {
+	IOP_SIDE_ASSERT();
+
 	DoCDVDresetDiskTypeCache();
 	cdvdDetectDisk();
 
@@ -1642,6 +1645,8 @@ void cdvdUpdateTrayState()
 
 void cdvdVsync()
 {
+	IOP_SIDE_ASSERT();
+
 	// We're counting in frames, but one second isn't exactly 50 or 60 frames in most cases, so we'll keep the fractions.
 	cdvd.RTCcount++;
 	const double verticalFrequency = GetVerticalFrequency();

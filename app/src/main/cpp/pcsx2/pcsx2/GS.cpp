@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "IopThread/SharedWord.h"
 #include "Counters.h"
 #include "Common.h"
 #include "Config.h"
@@ -27,7 +28,7 @@ static __fi void gsSyncMTVUReadback()
 
 void gsSetVideoMode(GS_VideoMode mode)
 {
-	gsVideoMode = mode;
+	SharedWord::StoreRelaxed(gsVideoMode, mode);
 	UpdateVSyncRate(false);
 }
 
@@ -35,7 +36,7 @@ void gsSetVideoMode(GS_VideoMode mode)
 void gsReset()
 {
 	MTGS::ResetGS(true);
-	gsVideoMode = GS_VideoMode::Uninitialized;
+	SharedWord::StoreRelaxed(gsVideoMode, GS_VideoMode::Uninitialized);
 	std::memset(g_RealGSMem, 0, sizeof(g_RealGSMem));
 	UpdateVSyncRate(true);
 }

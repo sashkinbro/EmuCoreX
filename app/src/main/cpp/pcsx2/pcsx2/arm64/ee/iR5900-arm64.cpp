@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Common.h"
+#include "IopThread/IopThreadVm.h"
 #include "CDVD/CDVD.h"
 #include "DebugTools/Breakpoints.h"
 #include "Elfheader.h"
@@ -329,7 +330,7 @@ static void recEventTest()
 	}
 #endif
 
-	_cpuEventTest_Shared();
+	cpuEventTestFor(IopThread::GetMode())();
 
 	if (eeRecExitRequested)
 	{

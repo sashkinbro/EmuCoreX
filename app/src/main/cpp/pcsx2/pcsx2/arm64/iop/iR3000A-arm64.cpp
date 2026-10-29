@@ -17,6 +17,7 @@
 #include "IopHw.h"
 #include "Common.h"
 #include "VMManager.h"
+#include "IopThread/EeBridge.h"
 
 #include <time.h>
 
@@ -1554,10 +1555,7 @@ static bool psxDynarecCheckBreakpoint()
 		return false;
 
 	CBreakPoints::SetBreakpointTriggered(true, BREAKPOINT_IOP);
-	VMManager::SetPaused(true);
-
-	// Exit the EE too.
-	Cpu->ExitExecution();
+	EeBridge::RequestPause();
 	return true;
 }
 
@@ -1578,10 +1576,7 @@ static bool psxDynarecMemcheck(size_t i)
 	}
 
 	CBreakPoints::SetBreakpointTriggered(true, BREAKPOINT_IOP);
-	VMManager::SetPaused(true);
-
-	// Exit the EE too.
-	Cpu->ExitExecution();
+	EeBridge::RequestPause();
 	return true;
 }
 

@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "IopThread/EeBridge.h"
+#include "IopThread/OwnerAsserts.h"
 #include "R3000A.h"
 #include "Common.h"
 #include "SPU2/spu2.h"
@@ -58,6 +60,8 @@ static void psxDmaGeneric(u32 madr, u32 bcr, u32 chcr, u32 spuCore)
 
 void psxDma4(u32 madr, u32 bcr, u32 chcr) // SPU2's Core 0
 {
+	IOP_SIDE_ASSERT();
+
 	psxDmaGeneric(madr, bcr, chcr, 0);
 }
 
@@ -87,6 +91,8 @@ void spu2DMA4Irq()
 
 void psxDma7(u32 madr, u32 bcr, u32 chcr) // SPU2's Core 1
 {
+	IOP_SIDE_ASSERT();
+
 	psxDmaGeneric(madr, bcr, chcr, 1);
 }
 
@@ -116,6 +122,8 @@ void spu2DMA7Irq()
 #ifndef DISABLE_PSX_GPU_DMAS
 void psxDma2(u32 madr, u32 bcr, u32 chcr) // GPU
 {
+	IOP_SIDE_ASSERT();
+
 	//DevCon.Warning("SIF2 IOP CHCR = %x MADR = %x BCR = %x first 16bits %x", chcr, madr, bcr, iopMemRead16(madr));
 	sif2.iop.busy = true;
 	sif2.iop.end = false;
@@ -127,6 +135,8 @@ void psxDma2(u32 madr, u32 bcr, u32 chcr) // GPU
 
 void psxDma6(u32 madr, u32 bcr, u32 chcr)
 {
+	IOP_SIDE_ASSERT();
+
 	u32* mem = (u32*)iopPhysMem(madr);
 
 	PSXDMA_LOG("*** DMA 6 - OT *** %lx addr = %lx size = %lx", chcr, madr, bcr);
@@ -184,12 +194,14 @@ void psxDMA8Interrupt()
 
 void psxDma9(u32 madr, u32 bcr, u32 chcr)
 {
+	IOP_SIDE_ASSERT();
+
 	SIF_LOG("IOP: dmaSIF0 chcr = %lx, madr = %lx, bcr = %lx, tadr = %lx", chcr, madr, bcr, HW_DMA9_TADR);
 
 	sif0.iop.busy = true;
 	sif0.iop.end = false;
 
-	SIF0Dma();
+	EeBridge::Sif0Pump();
 
 	// Clear dma9 busy now so each queued sceSifSetDma re-kicks & reads the reused bounce fresh (else movie corrupts).
 	if (!ACJV::GetGameId().empty() && !sif0.iop.busy)
@@ -198,16 +210,20 @@ void psxDma9(u32 madr, u32 bcr, u32 chcr)
 
 void psxDma10(u32 madr, u32 bcr, u32 chcr)
 {
+	IOP_SIDE_ASSERT();
+
 	SIF_LOG("IOP: dmaSIF1 chcr = %lx, madr = %lx, bcr = %lx", chcr, madr, bcr);
 
 	sif1.iop.busy = true;
 	sif1.iop.end = false;
 
-	SIF1Dma();
+	EeBridge::Sif1Pump();
 }
 
 void psxDma11(u32 madr, u32 bcr, u32 chcr)
 {
+	IOP_SIDE_ASSERT();
+
 	unsigned int i, j;
 	int size = (bcr >> 16) * (bcr & 0xffff);
 	PSXDMA_LOG("*** DMA 11 - SIO2 in *** %lx addr = %lx size = %lx", chcr, madr, bcr);
@@ -245,6 +261,8 @@ void psxDMA11Interrupt()
 
 void psxDma12(u32 madr, u32 bcr, u32 chcr)
 {
+	IOP_SIDE_ASSERT();
+
 	int size = ((bcr >> 16) * (bcr & 0xFFFF)) * 4;
 	PSXDMA_LOG("*** DMA 12 - SIO2 out *** %lx addr = %lx size = %lx", chcr, madr, size);
 

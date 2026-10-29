@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "IopThread/EeBridge.h"
+#include "IopThread/OwnerAsserts.h"
+#include "IopThread/OwnerAsserts.h"
 #include "R3000A.h"
 #include "Common.h"
 
@@ -128,6 +131,8 @@ __fi int psxRemainingCycles(IopEventId n)
 
 __fi void PSX_INT( IopEventId n, s32 ecycle )
 {
+	IOP_SIDE_ASSERT();
+
 	// 19 is CDVD read int, it's supposed to be high.
 	//if (ecycle > 8192 && n != 19)
 	//	DevCon.Warning( "IOP cycles high: %d, n %d", ecycle, n );
@@ -150,7 +155,7 @@ __fi void PSX_INT( IopEventId n, s32 ecycle )
 	{
 		// The EE called this int, so inform it to branch as needed:
 		
-		cpuSetNextEventDelta(iopDelta - psxRegs.iopCycleEE);
+		EeBridge::ScheduleEeEvent(iopDelta - psxRegs.iopCycleEE);
 	}
 }
 
@@ -219,6 +224,7 @@ extern "C" int EmuCoreXOracleSkipEvents();
 
 __ri void iopEventTest()
 {
+	IOP_SIDE_ASSERT();
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	if (EmuCoreXOracleSkipEvents())
 		return;
@@ -261,20 +267,7 @@ void iopTestIntc()
 	if( psxHu32(0x1078) == 0 ) return;
 	if( (psxHu32(0x1070) & psxHu32(0x1074)) == 0 ) return;
 
-	if( !eeEventTestIsActive )
-	{
-		// An iop exception has occurred while the EE is running code.
-		// Inform the EE to branch so the IOP can handle it promptly:
-
-		cpuSetNextEventDelta( 16 );
-		iopEventAction = true;
-		//Console.Error( "** IOP Needs an EE EventText, kthx **  %d", iopCycleEE );
-
-		// Note: No need to set the iop's branch delta here, since the EE
-		// will run an IOP branch test regardless.
-	}
-	else if ( !iopEventTestIsActive )
-		psxSetNextBranchDelta( 2 );
+	EeBridge::IopInterruptPending();
 }
 
 inline bool psxIsBranchOrJump(u32 addr)

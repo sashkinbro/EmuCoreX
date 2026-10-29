@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "IopThread/IopThreadVm.h"
 #include "Common.h"
 #include "Gif_Unit.h"
 #include "Hardware.h"
@@ -8,6 +9,8 @@
 #include "USB/USB.h"
 
 #include "common/WrappedMemCopy.h"
+#include "IopThread/IopBridge.h"
+#include "IopThread/SharedWord.h"
 
 #include "fmt/format.h"
 
@@ -23,6 +26,7 @@ std::deque<u8> ee_sio_tx_fifo;
 
 void hwReset()
 {
+	IopBridge::EmuHold reset_hold(IopThread::HoldKind::Lifecycle);
 	std::memset(eeHw, 0, sizeof(eeHw));
 
 	{
@@ -32,7 +36,7 @@ void hwReset()
 		std::swap(ee_sio_tx_fifo, empty_tx);
 	}
 
-	psHu32(SBUS_F260) = 0x1D000060;
+	SharedWord::StoreRelease(psHu32(SBUS_F260), 0x1D000060);
 
 	// i guess this is kinda a version, it's used by some bioses
 	psHu32(DMAC_ENABLEW) = 0x1201;
@@ -42,7 +46,11 @@ void hwReset()
 
 	// Sets SPU2 sample rate to PS2 standard (48KHz) whenever emulator is reset.
 	// For PSX mode sample rate setting, see HwWrite.cpp
-	SPU2::Reset(false);
+	// C18: SPU2 belongs to the IOP, so the IOP is held while it is reset.
+	{
+		IopBridge::EmuHold hold(IopThread::HoldKind::Lifecycle);
+		SPU2::Reset(false);
+	}
 
 	sifReset();
 	gsReset();
@@ -51,7 +59,10 @@ void hwReset()
 	vif0Reset();
 	vif1Reset();
 	gif_fifo.init();
-	USBreset();
+	{
+		IopBridge::EmuHold hold(IopThread::HoldKind::Lifecycle);
+		USBreset();
+	}
 }
 
 __fi uint intcInterrupt()

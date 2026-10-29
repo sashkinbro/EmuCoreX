@@ -101,6 +101,11 @@ set(pcsx2Sources
 	R3000A.cpp
 	R3000AInterpreter.cpp
 	R3000AOpcodeTables.cpp
+	IopThread/IopChannels.cpp
+	IopThread/IopPlacement.cpp
+	IopThread/IopThread.cpp
+	IopThread/IopThreadMode.cpp
+	IopThread/IopThreadVm.cpp
 	R5900.cpp
 	R5900OpcodeImpl.cpp
 	R5900OpcodeTables.cpp

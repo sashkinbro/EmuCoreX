@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "IopThread/SharedWord.h"
 #include "SIO/Pad/PadBase.h"
 
 class PadNegcon final : public PadBase
@@ -38,13 +39,13 @@ public:
 private:
 	struct Analogs
 	{
-		u8 i = 0x00;
-		u8 ii = 0x00;
-		u8 l = 0x00;
-		u8 twist = 0x80;
+		SharedWord::Relaxed<u8> i{0x00};
+		SharedWord::Relaxed<u8> ii{0x00};
+		SharedWord::Relaxed<u8> l{0x00};
+		SharedWord::Relaxed<u8> twist{0x80};
 	};
 
-	u32 buttons = 0xffffffffu;
+	SharedWord::Relaxed<u32> buttons{0xffffffffu};
 	Analogs analogs;
 
 	bool commandStage = false;

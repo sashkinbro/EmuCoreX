@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "IopThread/OwnerAsserts.h"
 #include "common/Assertions.h"
 #include "common/Path.h"
 #include "common/StringUtil.h"
@@ -1197,6 +1198,9 @@ void DEV9async(u32 cycles)
 
 void DEV9CheckChanges(const Pcsx2Config& old_config)
 {
+	// Reopens the network adapter and the disk the IOP's DEV9 code is using: the CPU thread holds the IOP
+	// (IOP thread design 8.5).
+	IOP_SIDE_ASSERT();
 	if (!isRunning)
 		return;
 

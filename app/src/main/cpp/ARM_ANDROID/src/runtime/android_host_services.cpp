@@ -1,3 +1,4 @@
+#include "IopThread/OwnerAsserts.h"
 // SPDX-License-Identifier: GPL-3.0+
 #include "common/AndroidLogging.h"
 
@@ -667,6 +668,7 @@ void Host::OnSaveStateSaved(const std::string_view filename)
 
 void Host::RunOnCPUThread(std::function<void()> function, bool block)
 {
+	BLOCKING_HOST_CALL_ASSERT(block);
 	if (!function)
 		return;
 

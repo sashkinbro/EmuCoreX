@@ -30,7 +30,7 @@ bool PadBase::Freeze(StateWrapper& sw)
 	// Protected PadBase members
 	sw.Do(&unifiedSlot);
 	sw.Do(&isInConfig);
-	sw.Do(&currentMode);
+	SharedWord::Freeze(sw, currentMode);
 	sw.Do(&currentCommand);
 	sw.Do(&commandBytesReceived);
 	return !sw.HasError();

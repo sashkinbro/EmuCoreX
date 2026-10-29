@@ -1,4 +1,5 @@
 #include "JitProfiler.h"
+#include "IopThread/IopThreadVm.h"
 
 #include "Common.h"
 #include "Config.h"
@@ -2275,6 +2276,7 @@ void Start()
 	s_collecting_runtime.store(false, std::memory_order_release);
 
 	Host::RunOnCPUThread([]() {
+		IopThread::VmHold iop_hold;
 		if (THREAD_VU1)
 			vu1Thread.WaitVU();
 #if defined(__ANDROID__) && defined(__aarch64__)
@@ -2304,6 +2306,7 @@ void Stop()
 	StopPcSampler();
 
 	Host::RunOnCPUThread([]() {
+		IopThread::VmHold iop_hold;
 		if (THREAD_VU1)
 			vu1Thread.WaitVU();
 		WriteReport();

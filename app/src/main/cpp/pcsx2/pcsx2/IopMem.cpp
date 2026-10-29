@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "IopThread/SharedWord.h"
+#include "IopThread/OwnerAsserts.h"
 #include "common/AlignedMalloc.h"
 #include "R3000A.h"
 #include "Common.h"
@@ -106,6 +108,30 @@ void iopMemReset()
 	std::memset(iopMem, 0, sizeof(*iopMem));
 }
 
+static __fi void IopSbusWriteControl(u32 value)
+{
+	const u32 temp = value & 0xF0;
+	const bool reset = (value & 0x20) || (value & 0x80);
+	SharedWord::Update(psHu32(SBUS_F240), [temp, reset](u32 reg) {
+		if (reset)
+		{
+			reg &= ~0xF000;
+			reg |= 0x2000;
+		}
+		if (reg & temp)
+			reg &= ~temp;
+		else
+			reg |= temp;
+		return reg;
+	});
+}
+
+static __fi void IopSbusWriteLow16(u32& reg, u16 value)
+{
+	SharedWord::Update(reg, [value](u32 old) { return (old & 0xFFFF0000u) | value; });
+}
+
+
 u8 iopMemRead8(u32 mem)
 {
 	mem &= 0x1fffffff;
@@ -204,13 +230,13 @@ u16 iopMemRead16(u32 mem)
 				switch(mem & 0xF0)
 				{
 				case 0x00:
-					ret= psHu16(SBUS_F200);
+					ret = static_cast<u16>(SharedWord::LoadAcquire(psHu32(SBUS_F200)));
 					break;
 				case 0x10:
-					ret= psHu16(SBUS_F210);
+					ret = static_cast<u16>(SharedWord::LoadAcquire(psHu32(SBUS_F210)));
 					break;
 				case 0x40:
-					ret= psHu16(SBUS_F240) | 0x0002;
+					ret = static_cast<u16>(SharedWord::LoadAcquire(psHu32(SBUS_F240))) | 0x0002;
 					break;
 				case 0x60:
 					ret = 0;
@@ -264,19 +290,19 @@ u32 iopMemRead32(u32 mem)
 				switch(mem & 0x8F0)
 				{
 				case 0x00:
-					ret= psHu32(SBUS_F200);
+					ret = SharedWord::LoadAcquire(psHu32(SBUS_F200));
 					break;
 				case 0x10:
-					ret= psHu32(SBUS_F210);
+					ret = SharedWord::LoadAcquire(psHu32(SBUS_F210));
 					break;
 				case 0x20:
-					ret= psHu32(SBUS_F220);
+					ret = SharedWord::LoadAcquire(psHu32(SBUS_F220));
 					break;
 				case 0x30:	// EE Side
-					ret= psHu32(SBUS_F230);
+					ret = SharedWord::LoadAcquire(psHu32(SBUS_F230));
 					break;
 				case 0x40:
-					ret= psHu32(SBUS_F240) | 0xF0000002;
+					ret = SharedWord::LoadAcquire(psHu32(SBUS_F240)) | 0xF0000002;
 					break;
 				case 0x60:
 					ret = 0;
@@ -421,27 +447,14 @@ void iopMemWrite16(u32 mem, u16 value)
 				{
 					case 0x10:
 						// write to ps2 mem
-						psHu16(SBUS_F210) = value;
+						IopSbusWriteLow16(psHu32(SBUS_F210), value);
 						return;
 					case 0x40:
-					{
-						u32 temp = value & 0xF0;
 						// write to ps2 mem
-						if(value & 0x20 || value & 0x80)
-						{
-							psHu16(SBUS_F240) &= ~0xF000;
-							psHu16(SBUS_F240) |= 0x2000;
-						}
-
-
-						if(psHu16(SBUS_F240) & temp)
-							psHu16(SBUS_F240) &= ~temp;
-						else
-							psHu16(SBUS_F240) |= temp;
+						IopSbusWriteControl(value);
 						return;
-					}
 					case 0x60:
-						psHu32(SBUS_F260) = 0;
+						SharedWord::StoreRelease(psHu32(SBUS_F260), 0);
 						return;
 				}
 #if PSX_EXTRALOGS
@@ -499,36 +512,23 @@ void iopMemWrite32(u32 mem, u32 value)
 						return;		// this is the IOP, so read-only (do nothing)
 
 					case 0x10:		// IOP write path (EE/IOP readable)
-						psHu32(SBUS_F210) = value;
+						SharedWord::StoreRelease(psHu32(SBUS_F210), value);
 						return;
 
 					case 0x20:		// Bits cleared when written from IOP.
-						psHu32(SBUS_F220) &= ~value;
+						SharedWord::FetchAnd(psHu32(SBUS_F220), ~value);
 						return;
 
 					case 0x30:		// bits set when written from IOP
-						psHu32(SBUS_F230) |= value;
+						SharedWord::FetchOr(psHu32(SBUS_F230), value);
 						return;
 
 					case 0x40:		// Control Register
-					{
-						u32 temp = value & 0xF0;
-						if (value & 0x20 || value & 0x80)
-						{
-							psHu32(SBUS_F240) &= ~0xF000;
-							psHu32(SBUS_F240) |= 0x2000;
-						}
-
-
-						if (psHu32(SBUS_F240) & temp)
-							psHu32(SBUS_F240) &= ~temp;
-						else
-							psHu32(SBUS_F240) |= temp;
+						IopSbusWriteControl(value);
 						return;
-					}
 
 					case 0x60:
-						psHu32(SBUS_F260) = 0;
+						SharedWord::StoreRelease(psHu32(SBUS_F260), 0);
 						return;
 
 				}
@@ -666,18 +666,21 @@ bool IOPMemoryInterface::ReadBytes(u32 address, void* dest, u32 size)
 
 bool IOPMemoryInterface::Write8(u32 address, u8 value)
 {
+	IOP_SIDE_ASSERT();
 	iopMemWrite8(address, value);
 	return true;
 }
 
 bool IOPMemoryInterface::Write16(u32 address, u16 value)
 {
+	IOP_SIDE_ASSERT();
 	iopMemWrite16(address, value);
 	return true;
 }
 
 bool IOPMemoryInterface::Write32(u32 address, u32 value)
 {
+	IOP_SIDE_ASSERT();
 	iopMemWrite32(address, value);
 	return true;
 }
@@ -694,6 +697,7 @@ bool IOPMemoryInterface::Write128(u32 address, u128 value)
 
 bool IOPMemoryInterface::WriteBytes(u32 address, const void* src, u32 size)
 {
+	IOP_SIDE_ASSERT();
 	return iopMemSafeWriteBytes(address, src, size);
 }
 

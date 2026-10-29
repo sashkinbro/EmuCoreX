@@ -8,6 +8,8 @@
 
 #include "Common.h"
 #include "Input/InputManager.h"
+#include "IopThread/EeBridge.h"
+#include "IopThread/IopThreadVm.h"
 #include "Host.h"
 
 #include "IconsPromptFont.h"
@@ -243,7 +245,7 @@ u8 PadDualshock2::Poll(u8 commandByte)
 			}
 
 			// Order is reversed here - SetPadVibrationIntensity takes large motor first, then small. PS2 orders small motor first, large motor second.
-			InputManager::SetPadVibrationIntensity(this->unifiedSlot,
+			EeBridge::SetPadVibration(this->unifiedSlot,
 				std::min(static_cast<float>(largeMotor) * GetVibrationScale(1) * (1.0f / 255.0f), 1.0f),
 				// Small motor on the PS2 is either on full power or zero power, it has no variable speed. If the game supplies any value here at all,
 				// the pad in turn supplies full power to the motor, or no power at all if zero.
@@ -553,6 +555,27 @@ const Pad::ControllerInfo& PadDualshock2::GetInfo() const
 	return ControllerInfo;
 }
 
+void PadDualshock2::ToggleAnalogLight()
+{
+	this->analogLight = !this->analogLight;
+
+	if (this->analogLight)
+	{
+		this->currentMode = Pad::Mode::ANALOG;
+	}
+	else
+	{
+		this->currentMode = Pad::Mode::DIGITAL;
+	}
+
+	const auto [port, slot] = sioConvertPadToPortAndSlot(unifiedSlot);
+
+	Host::AddKeyedOSDMessage(fmt::format("PadAnalogButtonChange{}{}", port, slot),
+		this->analogLight ? fmt::format(TRANSLATE_FS("Pad", "Analog light is now on for port {0} / slot {1}"), port + 1, slot + 1) :
+							fmt::format(TRANSLATE_FS("Pad", "Analog light is now off for port {0} / slot {1}"), port + 1, slot + 1),
+		Host::OSD_INFO_DURATION);
+}
+
 void PadDualshock2::Set(u32 index, float value)
 {
 	if (index >= Inputs::LENGTH)
@@ -624,11 +647,13 @@ void PadDualshock2::Set(u32 index, float value)
 					// In deadzone. Set to 127 (center).
 					if (index <= Inputs::PAD_L_LEFT)
 					{
-						this->analogs.lx = this->analogs.ly = 127;
+						this->analogs.ly = 127;
+						this->analogs.lx = 127;
 					}
 					else
 					{
-						this->analogs.rx = this->analogs.ry = 127;
+						this->analogs.ry = 127;
+						this->analogs.rx = 127;
 					}	
 				}
 			}
@@ -685,23 +710,24 @@ void PadDualshock2::Set(u32 index, float value)
 
 			if (!this->analogLocked)
 			{
-				this->analogLight = !this->analogLight;
-
-				if (this->analogLight)
+				if (IopThread::GetMode() == IopThreadMode::Threaded) [[unlikely]]
 				{
-					this->currentMode = Pad::Mode::ANALOG;
+					// analogLight and currentMode are written by the IOP's mode-switch command as well, which now
+					// runs on the IOP thread. The pad is found again by its slot when the command runs, because
+					// a settings change can replace it (under a hold) before the IOP gets to the command.
+					const u8 slot = this->unifiedSlot;
+					const auto toggle = [slot] {
+						PadBase* const pad = Pad::GetPad(slot);
+						if (pad && pad->GetType() == Pad::ControllerType::DualShock2)
+							static_cast<PadDualshock2*>(pad)->ToggleAnalogLight();
+					};
+					if (!IopThread::TryPostToIop(toggle))
+						ToggleAnalogLight(); // no IOP thread any more: nothing else writes the fields
 				}
 				else
 				{
-					this->currentMode = Pad::Mode::DIGITAL;
+					ToggleAnalogLight();
 				}
-
-				const auto [port, slot] = sioConvertPadToPortAndSlot(unifiedSlot);
-				
-				Host::AddKeyedOSDMessage(fmt::format("PadAnalogButtonChange{}{}", port, slot),
-					this->analogLight ? fmt::format(TRANSLATE_FS("Pad", "Analog light is now on for port {0} / slot {1}"), port + 1, slot + 1) :
-										fmt::format(TRANSLATE_FS("Pad", "Analog light is now off for port {0} / slot {1}"), port + 1, slot + 1),
-					Host::OSD_INFO_DURATION);
 			}
 		}
 		else
@@ -869,8 +895,8 @@ bool PadDualshock2::Freeze(StateWrapper& sw)
 		return false;
 
 	// Private PadDualshock2 members
-	sw.Do(&analogLight);
-	sw.Do(&analogLocked);
+	SharedWord::Freeze(sw, analogLight);
+	SharedWord::Freeze(sw, analogLocked);
 	sw.Do(&analogPressed);
 	sw.Do(&commandStage);
 	sw.Do(&responseBytes);
@@ -897,7 +923,7 @@ u8 PadDualshock2::SendCommandByte(u8 commandByte)
 				Console.Warning("%s(%02X) Config-only command was sent to a pad outside of config mode!", __FUNCTION__, commandByte);
 			}
 
-			ret = this->isInConfig ? static_cast<u8>(Pad::Mode::CONFIG) : static_cast<u8>(this->currentMode);
+			ret = this->isInConfig ? static_cast<u8>(Pad::Mode::CONFIG) : static_cast<u8>(this->currentMode.Load());
 			break;
 		case 2:
 			ret = 0x5a;

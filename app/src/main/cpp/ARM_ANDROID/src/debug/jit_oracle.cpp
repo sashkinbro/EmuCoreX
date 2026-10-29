@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 #include "Common.h"
 #include "arm64/vuaot/VuAotPipe.h"
+#include "IopThread/IopThread.h"
 #include "DebugTools/Breakpoints.h"
 #include "IopMem.h"
 #include "IopHw.h"
@@ -11858,6 +11859,7 @@ void IOPSharedStateTests()
 #include "jit_oracle_iop_avsz.inl"
 #include "jit_oracle_iop_avsz_fusion.inl"
 #include "jit_oracle_iop_address.inl"
+#include "jit_oracle_iop_thread.inl"
 
 void IOPTests(bool cop2_only = false, bool cop2_memory_only = false, bool nclip_only = false,
     bool avsz_only = false, bool direct_only = false)
@@ -12421,6 +12423,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         EETests(false, false, false, false, false, true);
     else if (std::strcmp(suite, "iop-direct") == 0)
         IOPTests(false, false, false, false, true);
+    else if (std::strcmp(suite, "iop-thread") == 0)
+        IopThreadNativeTests();
     else if (std::strcmp(suite, "iop") == 0)
         IOPTests();
     else if (std::strcmp(suite, "iop-cop2") == 0)

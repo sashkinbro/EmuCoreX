@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "IopThread/OwnerAsserts.h"
 #include "SPU2/spu2.h"
 #include "SPU2/defs.h"
 #include "SPU2/Debug.h"
@@ -55,6 +56,7 @@ u32 SPU2::GetConsoleSampleRate()
 
 void SPU2readDMA4Mem(u16* pMem, u32 size) // size now in 16bit units
 {
+	IOP_SIDE_ASSERT();
 	TimeUpdate(psxRegs.cycle);
 
 	SPU2::FileLog("[%10d] SPU2 readDMA4Mem size %x\n", Cycles, size << 1);
@@ -63,6 +65,7 @@ void SPU2readDMA4Mem(u16* pMem, u32 size) // size now in 16bit units
 
 void SPU2writeDMA4Mem(u16* pMem, u32 size) // size now in 16bit units
 {
+	IOP_SIDE_ASSERT();
 	TimeUpdate(psxRegs.cycle);
 
 	SPU2::FileLog("[%10d] SPU2 writeDMA4Mem size %x at address %x\n", Cycles, size << 1, Cores[0].TSA);
@@ -90,6 +93,7 @@ void SPU2interruptDMA7()
 
 void SPU2readDMA7Mem(u16* pMem, u32 size)
 {
+	IOP_SIDE_ASSERT();
 	TimeUpdate(psxRegs.cycle);
 
 	SPU2::FileLog("[%10d] SPU2 readDMA7Mem size %x\n", Cycles, size << 1);
@@ -98,6 +102,7 @@ void SPU2readDMA7Mem(u16* pMem, u32 size)
 
 void SPU2writeDMA7Mem(u16* pMem, u32 size)
 {
+	IOP_SIDE_ASSERT();
 	TimeUpdate(psxRegs.cycle);
 
 	SPU2::FileLog("[%10d] SPU2 writeDMA7Mem size %x at address %x\n", Cycles, size << 1, Cores[1].TSA);
@@ -107,6 +112,8 @@ void SPU2writeDMA7Mem(u16* pMem, u32 size)
 
 void SPU2::CreateOutputStream()
 {
+	// The stream the IOP thread writes is replaced: the CPU thread holds the IOP (IOP thread design 8.10).
+	IOP_SIDE_ASSERT();
 	// Initialize volume and mute settings on new session.
 	if (!s_output_stream)
 	{
@@ -191,6 +198,9 @@ AudioBackend SPU2::GetOutputBackend()
 
 void SPU2::SetOutputVolume(u32 volume)
 {
+	// The Android JNI setters call this from their own thread with no hold; the design leaves that race (8.10),
+	// and this assert reports it in a Devel build running Lockstep.
+	IOP_SIDE_ASSERT();
 	if (VMManager::GetTargetSpeed() == 1.0f)
 		s_standard_volume = volume;
 	else
@@ -208,6 +218,8 @@ float SPU2::GetNominalRate()
 
 bool SPU2::SetOutputMuted(const bool muted)
 {
+	// See SetOutputVolume.
+	IOP_SIDE_ASSERT();
 	// User setting takes precedence. Unmute not guaranteed by design.
 	if (!s_output_stream || (!muted && EmuConfig.SPU2.OutputMuted))
 		return false;
@@ -294,6 +306,7 @@ void SPU2::Reset(bool psxmode)
 
 void SPU2::OnTargetSpeedChanged()
 {
+	IOP_SIDE_ASSERT();
 	if (!s_output_stream)
 		return;
 
@@ -369,6 +382,7 @@ bool SPU2::IsRunningPSXMode()
 
 void SPU2::CheckForConfigChanges(const Pcsx2Config& old_config)
 {
+	IOP_SIDE_ASSERT();
 	const Pcsx2Config::SPU2Options& opts = EmuConfig.SPU2;
 	const Pcsx2Config::SPU2Options& old_opts = old_config.SPU2;
 
@@ -419,11 +433,14 @@ void SPU2::CheckForConfigChanges(const Pcsx2Config& old_config)
 
 void SPU2async()
 {
+	IOP_SIDE_ASSERT();
 	TimeUpdate(psxRegs.cycle);
 }
 
 u16 SPU2read(u32 rmem)
 {
+	IOP_SIDE_ASSERT();
+
 	u16 ret = 0xDEAD;
 	u32 core = 0;
 	const u32 mem = rmem & 0xFFFF;
@@ -476,6 +493,8 @@ u16 SPU2read(u32 rmem)
 
 void SPU2write(u32 rmem, u16 value)
 {
+	IOP_SIDE_ASSERT();
+
 	// Note: Reverb/Effects are very sensitive to having precise update timings.
 	// If the SPU2 isn't in in sync with the IOP, samples can end up playing at rather
 	// incorrect pitches and loop lengths.

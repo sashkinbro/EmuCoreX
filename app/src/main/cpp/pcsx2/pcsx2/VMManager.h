@@ -93,6 +93,7 @@ namespace VMManager
 
 	/// Returns true while a Namco System 246/256 title is active.
 	bool IsArcadeSystem246();
+	bool IsArcadeActive();
 
 	/// Returns the expected first executable on the active arcade security dongle.
 	const std::string& GetArcadeBootProgram();
@@ -336,7 +337,8 @@ namespace VMManager
 		const std::vector<u32>& GetSoftwareRendererProcessorList();
 
 		const std::string& GetELFOverride();
-		bool IsExecutionInterrupted();
+		VMState GetStateForEventTest();
+	bool IsExecutionInterrupted();
 		void ELFLoadingOnCPUThread(std::string elf_path);
 		void EntryPointCompilingOnCPUThread();
 		void VSyncOnCPUThread();

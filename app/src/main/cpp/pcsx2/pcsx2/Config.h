@@ -1209,11 +1209,15 @@ struct Pcsx2Config
 			WaitLoop : 1, // enables constant loop detection and fast-forwarding
 			vuFlagHack : 1, // microVU specific flag hack
 			vuThread : 1, // Enable Threaded VU1
+			iopThread : 1,
+			iopThreadLockstep : 1,
 			vu1Instant : 1; // Enable Instant VU1 (Without MTVU only)
 		BITFIELD_END
 
 		s8 EECycleRate; // EE cycle rate selector (1.0, 1.5, 2.0)
 		u8 EECycleSkip; // EE Cycle skip factor (0, 1, 2, or 3)
+
+		s32 iopThreadLag = 24576;
 
 		SpeedhackOptions();
 		void LoadSave(SettingsWrapper& conf);

@@ -334,6 +334,12 @@ void ApplyOldCoreJitSettings(SettingsInterface& si, const VmLaunchConfig& config
 		GetBoolSetting(config.settings, "EmuCore/CPU/Recompiler", "vu1ExtraOverflow", false));
 	si.SetBoolValue("EmuCore/CPU/Recompiler", "vu1SignOverflow",
 		GetBoolSetting(config.settings, "EmuCore/CPU/Recompiler", "vu1SignOverflow", false));
+	si.SetBoolValue("EmuCore/Speedhacks", "iopThread",
+		GetBoolSetting(config.settings, "EmuCore/Speedhacks", "iopThread", false));
+	si.SetBoolValue("EmuCore/Speedhacks", "iopThreadLockstep",
+		GetBoolSetting(config.settings, "EmuCore/Speedhacks", "iopThreadLockstep", false));
+	si.SetIntValue("EmuCore/Speedhacks", "iopThreadLag",
+		GetIntSetting(config.settings, "EmuCore/Speedhacks", "iopThreadLag", 24576));
 	const bool wait_loop_speedhack = GetBoolSetting(config.settings, "EmuCore/Speedhacks", "WaitLoop", true);
 	const bool intc_stat_speedhack = GetBoolSetting(config.settings, "EmuCore/Speedhacks", "IntcStat", true);
 	const bool vu_flag_hack = GetBoolSetting(config.settings, "EmuCore/Speedhacks", "vuFlagHack", true);

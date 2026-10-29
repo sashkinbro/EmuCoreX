@@ -7,6 +7,9 @@
 #include "Common.h"
 #include "Sif.h"
 #include "IopHw.h"
+#include "IopThread/IopBridge.h"
+#include "IopThread/OwnerAsserts.h"
+#include "IopThread/SharedWord.h"
 
 _sif sif0;
 
@@ -283,8 +286,8 @@ static __fi void HandleIOPTransfer()
 
 static __fi void Sif0End()
 {
-	psHu32(SBUS_F240) &= ~0x20;
-	psHu32(SBUS_F240) &= ~0x2000;
+	// Both bits in one step: the other side changes this register too.
+	SharedWord::FetchAnd(psHu32(SBUS_F240), ~(0x20u | 0x2000u));
 
 	DMA_LOG("SIF0 DMA End");
 }
@@ -292,6 +295,8 @@ static __fi void Sif0End()
 // Transfer IOP to EE, putting data in the fifo as an intermediate step.
 __fi void SIF0Dma()
 {
+	IOP_SIDE_ASSERT();
+	EE_SIDE_ASSERT();
 	int BusyCheck = 0;
 	Sif0Init();
 
@@ -350,7 +355,7 @@ __fi void dmaSIF0()
 	}
 
 	//if(sif0ch.chcr.MOD == CHAIN_MODE && sif0ch.qwc > 0) DevCon.Warning(L"SIF0 QWC on Chain CHCR " + sif0ch.chcr.desc());
-	psHu32(SBUS_F240) |= 0x2000;
+	SharedWord::FetchOr(psHu32(SBUS_F240), 0x2000u);
 	sif0.ee.busy = true;
 
 	// Okay, this here is needed currently (r3644).
@@ -365,6 +370,6 @@ __fi void dmaSIF0()
 	// Legend of Legaia doesn't throw a warning either :)
 	sif0.ee.end = false;
 	CPU_SET_DMASTALL(DMAC_SIF0, false);
-	SIF0Dma();
+	IopBridge::Sif0Pump();
 
 }
