@@ -3249,6 +3249,24 @@ private fun SettingsContent(
                         )
                         ToggleItem(
                             icon = Icons.Rounded.Speed,
+                            title = stringResource(R.string.settings_iop_thread),
+                            subtitle = stringResource(R.string.settings_iop_thread_desc),
+                            checked = uiState.enableIopThread,
+                            onCheckedChange = viewModel::setEnableIopThread,
+                            helpText = stringResource(R.string.settings_help_iop_thread),
+                            onResetToDefault = { viewModel.setEnableIopThread(defaults.enableIopThread) }
+                        )
+                        ToggleItem(
+                            icon = Icons.Rounded.Speed,
+                            title = stringResource(R.string.settings_vu_aot),
+                            subtitle = stringResource(R.string.settings_vu_aot_desc),
+                            checked = uiState.enableVUAot,
+                            onCheckedChange = viewModel::setEnableVUAot,
+                            helpText = stringResource(R.string.settings_help_vu_aot),
+                            onResetToDefault = { viewModel.setEnableVUAot(defaults.enableVUAot) }
+                        )
+                        ToggleItem(
+                            icon = Icons.Rounded.Speed,
                             title = stringResource(R.string.settings_thread_pinning),
                             subtitle = stringResource(R.string.settings_thread_pinning_desc),
                             checked = uiState.enableThreadPinning,
@@ -5844,6 +5862,8 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Emulation, R.string.settings_ee_cycle_rate),
         entry(SettingsTab.Emulation, R.string.settings_ee_cycle_skip),
         entry(SettingsTab.Emulation, R.string.settings_mtvu),
+        entry(SettingsTab.Emulation, R.string.settings_iop_thread),
+        entry(SettingsTab.Emulation, R.string.settings_vu_aot),
         entry(SettingsTab.Emulation, R.string.settings_fast_cdvd),
         entry(SettingsTab.Emulation, R.string.settings_frame_skip),
         entry(SettingsTab.Fixes, R.string.settings_cpu_sprite_render_size),

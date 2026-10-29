@@ -409,6 +409,8 @@ object EmulatorBridge {
         vuFlagHack: Boolean = true,
         instantVu1: Boolean = true,
         mtvu: Boolean = true,
+        enableIopThread: Boolean = false,
+        enableVUAot: Boolean = false,
         enableThreadPinning: Boolean = AppPreferences.DEFAULT_THREAD_PINNING,
         enableFastBoot: Boolean = true,
         fastCdvd: Boolean = false,
@@ -690,6 +692,8 @@ object EmulatorBridge {
                 add(settingOp("EmuCore/Speedhacks", "IntcStat", "bool", intcStatSpeedhack.toString()))
                 add(settingOp("EmuCore/Speedhacks", "vuFlagHack", "bool", vuFlagHack.toString()))
                 add(settingOp("EmuCore/Speedhacks", "vuThread", "bool", directMtvu.toString()))
+                add(settingOp("EmuCore/Speedhacks", "iopThread", "bool", enableIopThread.toString()))
+                add(settingOp("EmuCore/CPU/Recompiler", "EnableVUAot", "bool", enableVUAot.toString()))
                 add(settingOp("EmuCore/Speedhacks", "vu1Instant", "bool", instantVu1.toString()))
                 add(settingOp("EmuCore", "EnableThreadPinning", "bool", enableThreadPinning.toString()))
                 add(settingOp("EmuCore", "EnableFastBoot", "bool", enableFastBoot.toString()))

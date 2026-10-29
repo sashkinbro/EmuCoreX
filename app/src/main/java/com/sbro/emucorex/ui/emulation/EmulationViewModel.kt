@@ -234,6 +234,8 @@ data class EmulationUiState(
     val performancePreset: Int = PerformancePresets.CUSTOM,
     val enableInstantVu1: Boolean = true,
     val enableMtvu: Boolean = true,
+    val enableIopThread: Boolean = false,
+    val enableVUAot: Boolean = false,
     val enableThreadPinning: Boolean = AppPreferences.DEFAULT_THREAD_PINNING,
     val enableFastCdvd: Boolean = false,
     val enableFastBoot: Boolean = true,
@@ -361,6 +363,8 @@ internal data class EmulationLaunchConfig(
     val vuFlagHack: Boolean,
     val instantVu1: Boolean,
     val mtvu: Boolean,
+    val enableIopThread: Boolean = false,
+    val enableVUAot: Boolean = false,
     val enableThreadPinning: Boolean,
     val fastCdvd: Boolean,
     val enableFastBoot: Boolean,
@@ -467,6 +471,8 @@ internal data class LiveRuntimeSnapshot(
     val performancePreset: Int,
     val enableInstantVu1: Boolean,
     val enableMtvu: Boolean,
+    val enableIopThread: Boolean = false,
+    val enableVUAot: Boolean = false,
     val enableThreadPinning: Boolean,
     val enableFastCdvd: Boolean,
     val enableFastBoot: Boolean,
@@ -1120,6 +1126,16 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             preferences.enableMtvu.collect { value ->
                 applyGlobalRuntimePreferenceUpdate { it.copy(enableMtvu = value) }
+            }
+        }
+        viewModelScope.launch {
+            preferences.enableIopThread.collect { value ->
+                applyGlobalRuntimePreferenceUpdate { it.copy(enableIopThread = value) }
+            }
+        }
+        viewModelScope.launch {
+            preferences.enableVUAot.collect { value ->
+                applyGlobalRuntimePreferenceUpdate { it.copy(enableVUAot = value) }
             }
         }
         viewModelScope.launch {
@@ -2033,6 +2049,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         enableVu1RecompilerOverride: Boolean? = null,
         enableFastmemOverride: Boolean? = null,
         enableMtvuOverride: Boolean? = null,
+        enableIopThreadOverride: Boolean? = null,
+        enableVUAotOverride: Boolean? = null,
         rendererOverride: Int? = null,
         gsDumpFrames: Int? = null,
         gsDumpDelayMs: Int? = null,
@@ -2078,6 +2096,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             enableVu1RecompilerOverride = enableVu1RecompilerOverride,
             enableFastmemOverride = enableFastmemOverride,
             enableMtvuOverride = enableMtvuOverride,
+            enableIopThreadOverride = enableIopThreadOverride,
+            enableVUAotOverride = enableVUAotOverride,
             rendererOverride = rendererOverride,
             gsDumpFrames = gsDumpFrames,
             gsDumpDelayMs = gsDumpDelayMs,
@@ -2197,6 +2217,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 val enableVu1Recompiler = enableVu1RecompilerOverride ?: config.enableVu1Recompiler
                 val enableFastmem = enableFastmemOverride ?: config.enableFastmem
                 val enableMtvu = enableMtvuOverride ?: config.mtvu
+                val enableIopThread = enableIopThreadOverride ?: config.enableIopThread
+                val enableVUAot = enableVUAotOverride ?: config.enableVUAot
 
                 if (!autotestMode) {
                     val resolvedBiosPath = DocumentPathResolver.prepareBiosDirectory(getApplication(), config.biosPath)
@@ -2230,6 +2252,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     enableVu1Recompiler = enableVu1Recompiler,
                     enableFastmem = enableFastmem,
                     enableMtvu = enableMtvu,
+                    enableIopThread = enableIopThread,
+                    enableVUAot = enableVUAot,
                     autotestMode = autotestMode || bootSmokeProbe,
                     vu0FamilyMaskOverride = vu0FamilyMaskOverride,
                     vu1FamilyMaskOverride = vu1FamilyMaskOverride
@@ -3271,6 +3295,30 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 preferences.setEnableMtvu(effectiveEnabled)
             }
             EmulatorBridge.setSetting("EmuCore/Speedhacks", "vuThread", "bool", effectiveEnabled.toString())
+            updateCrashContext()
+        }
+    }
+
+    fun setIopThread(enabled: Boolean) {
+        viewModelScope.launch {
+            val newState = markPerformancePresetCustom(_uiState.value).copy(enableIopThread = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setEnableIopThread(enabled)
+            }
+            EmulatorBridge.setSetting("EmuCore/Speedhacks", "iopThread", "bool", enabled.toString())
+            updateCrashContext()
+        }
+    }
+
+    fun setVUAot(enabled: Boolean) {
+        viewModelScope.launch {
+            val newState = markPerformancePresetCustom(_uiState.value).copy(enableVUAot = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setEnableVUAot(enabled)
+            }
+            EmulatorBridge.setSetting("EmuCore/CPU/Recompiler", "EnableVUAot", "bool", enabled.toString())
             updateCrashContext()
         }
     }
@@ -4584,6 +4632,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         enableVu1Recompiler: Boolean = config.enableVu1Recompiler,
         enableFastmem: Boolean = config.enableFastmem,
         enableMtvu: Boolean = config.mtvu,
+        enableIopThread: Boolean = config.enableIopThread,
+        enableVUAot: Boolean = config.enableVUAot,
         autotestMode: Boolean = false,
         vu0FamilyMaskOverride: Int? = null,
         vu1FamilyMaskOverride: Int? = null
@@ -4631,6 +4681,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             vuFlagHack = config.vuFlagHack,
             instantVu1 = config.instantVu1,
             mtvu = enableMtvu,
+            enableIopThread = enableIopThread,
+            enableVUAot = enableVUAot,
             enableThreadPinning = config.enableThreadPinning,
             enableFastBoot = config.enableFastBoot,
             fastCdvd = config.fastCdvd,
@@ -4796,6 +4848,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             vuFlagHack = settings.enableVuFlagHack,
             instantVu1 = settings.enableInstantVu1,
             mtvu = settings.enableMtvu,
+            enableIopThread = settings.enableIopThread,
+            enableVUAot = settings.enableVUAot,
             enableThreadPinning = settings.enableThreadPinning,
             fastCdvd = settings.enableFastCdvd,
             enableFastBoot = settings.enableFastBoot,
@@ -4931,6 +4985,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             performancePreset = settings.performancePreset,
             enableInstantVu1 = settings.enableInstantVu1,
             enableMtvu = settings.enableMtvu,
+            enableIopThread = settings.enableIopThread,
+            enableVUAot = settings.enableVUAot,
             enableThreadPinning = settings.enableThreadPinning,
             enableFastCdvd = settings.enableFastCdvd,
             enableFastBoot = settings.enableFastBoot,
@@ -5571,6 +5627,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         NativeApp.setCrashContextInt("emu_crop_right", state.displayCrop.right)
         NativeApp.setCrashContextInt("emu_crop_bottom", state.displayCrop.bottom)
         NativeApp.setCrashContextBool("emu_mtvu", state.enableMtvu)
+        NativeApp.setCrashContextBool("emu_enableIopThread", state.enableIopThread)
+        NativeApp.setCrashContextBool("emu_enableVUAot", state.enableVUAot)
         NativeApp.setCrashContextBool("emu_thread_pinning", state.enableThreadPinning)
         NativeApp.setCrashContextBool("emu_fast_cdvd", state.enableFastCdvd)
         NativeApp.setCrashContextBool("emu_enable_cheats", state.enableCheats)

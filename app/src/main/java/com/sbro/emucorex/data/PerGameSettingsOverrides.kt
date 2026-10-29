@@ -62,6 +62,8 @@ internal fun PerGameSettings.withOnlyOverridesComparedWith(
         if (enableFastBoot != defaults.enableFastBoot) add("enableFastBoot")
         if (enableInstantVu1 != defaults.enableInstantVu1) add("enableInstantVu1")
         if (enableMtvu != defaults.enableMtvu) add("enableMtvu")
+        if (enableIopThread != defaults.enableIopThread) add("enableIopThread")
+        if (enableVUAot != defaults.enableVUAot) add("enableVUAot")
         if (enableThreadPinning != defaults.enableThreadPinning) add("enableThreadPinning")
         if (enableFastCdvd != defaults.enableFastCdvd) add("enableFastCdvd")
         if (enableCheats != defaults.enableCheats) add("enableCheats")

@@ -704,6 +704,8 @@ fun EmulationScreen(
     enableVu1RecompilerOverride: Boolean? = null,
     enableFastmemOverride: Boolean? = null,
     enableMtvuOverride: Boolean? = null,
+    enableIopThreadOverride: Boolean? = null,
+    enableVUAotOverride: Boolean? = null,
     rendererOverride: Int? = null,
     gsDumpFrames: Int? = null,
     gsDumpDelayMs: Int? = null,
@@ -1210,6 +1212,8 @@ fun EmulationScreen(
         enableVu1RecompilerOverride,
         enableFastmemOverride,
         enableMtvuOverride,
+        enableIopThreadOverride,
+        enableVUAotOverride,
         rendererOverride,
         gsDumpFrames,
         gsDumpDelayMs,
@@ -1230,6 +1234,8 @@ fun EmulationScreen(
             enableVu1RecompilerOverride = enableVu1RecompilerOverride,
             enableFastmemOverride = enableFastmemOverride,
             enableMtvuOverride = enableMtvuOverride,
+            enableIopThreadOverride = enableIopThreadOverride,
+            enableVUAotOverride = enableVUAotOverride,
             rendererOverride = rendererOverride,
             gsDumpFrames = gsDumpFrames,
             gsDumpDelayMs = gsDumpDelayMs,
@@ -2153,6 +2159,8 @@ fun EmulationScreen(
                     onSetDisplayCrop = { viewModel.setDisplayCrop(it) },
                     onSetLocalMultiplayerMode = viewModel::setLocalMultiplayerMode,
                     onSetMtvu = { viewModel.setMtvu(it) },
+                    onSetIopThread = { viewModel.setIopThread(it) },
+                    onSetVUAot = { viewModel.setVUAot(it) },
                     onSetThreadPinning = { viewModel.setThreadPinning(it) },
                     onSetFastCdvd = { viewModel.setFastCdvd(it) },
                     onSetEnableCheats = { viewModel.setEnableCheats(it) },
@@ -3890,6 +3898,8 @@ private fun EmulationSidebarMenu(
     onSetDisplayCrop: (DisplayCrop) -> Unit,
     onSetLocalMultiplayerMode: (Int) -> Unit,
     onSetMtvu: (Boolean) -> Unit,
+    onSetIopThread: (Boolean) -> Unit,
+    onSetVUAot: (Boolean) -> Unit,
     onSetThreadPinning: (Boolean) -> Unit,
     onSetFastCdvd: (Boolean) -> Unit,
     onSetEnableCheats: (Boolean) -> Unit,
@@ -4977,6 +4987,20 @@ private fun EmulationSidebarMenu(
                             onCheckedChange = onSetMtvu,
                             helpText = stringResource(R.string.settings_help_mtvu),
                             onResetToDefault = { onSetMtvu(globalDefaults.enableMtvu) }
+                        )
+                        SettingsToggle(
+                            title = stringResource(R.string.settings_iop_thread),
+                            checked = uiState.enableIopThread,
+                            onCheckedChange = onSetIopThread,
+                            helpText = stringResource(R.string.settings_help_iop_thread),
+                            onResetToDefault = { onSetIopThread(globalDefaults.enableIopThread) }
+                        )
+                        SettingsToggle(
+                            title = stringResource(R.string.settings_vu_aot),
+                            checked = uiState.enableVUAot,
+                            onCheckedChange = onSetVUAot,
+                            helpText = stringResource(R.string.settings_help_vu_aot),
+                            onResetToDefault = { onSetVUAot(globalDefaults.enableVUAot) }
                         )
 
                         SettingsToggle(

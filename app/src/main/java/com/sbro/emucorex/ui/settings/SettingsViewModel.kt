@@ -88,6 +88,12 @@ internal fun settingsGsOverrideFlags(hwDownloadMode: Boolean, blendingAccuracy: 
     (if (hwDownloadMode) GS_SETTING_OVERRIDE_HW_DOWNLOAD_MODE else 0) or
         (if (blendingAccuracy) GS_SETTING_OVERRIDE_BLENDING_ACCURACY else 0)
 
+data class WorkerOptimizationUiState(
+    val enableMtvu: Boolean = true,
+    val enableIopThread: Boolean = false,
+    val enableVUAot: Boolean = false
+)
+
 data class SettingsUiState(
     val isLoaded: Boolean = false,
     val showMediatekCompatibilityNotice: Boolean = false,
@@ -208,7 +214,7 @@ data class SettingsUiState(
     val enableIntcStatSpeedhack: Boolean = true,
     val enableVuFlagHack: Boolean = true,
     val enableInstantVu1: Boolean = true,
-    val enableMtvu: Boolean = true,
+    val workerOptimizations: WorkerOptimizationUiState = WorkerOptimizationUiState(),
     val enableThreadPinning: Boolean = AppPreferences.DEFAULT_THREAD_PINNING,
     val enableFastBoot: Boolean = true,
     val enableFastCdvd: Boolean = false,
@@ -338,6 +344,10 @@ data class SettingsUiState(
     val ntscFramerate: Float = AppPreferences.DEFAULT_NTSC_FRAMERATE,
     val palFramerate: Float = AppPreferences.DEFAULT_PAL_FRAMERATE
 ) {
+    val enableMtvu: Boolean get() = workerOptimizations.enableMtvu
+    val enableIopThread: Boolean get() = workerOptimizations.enableIopThread
+    val enableVUAot: Boolean get() = workerOptimizations.enableVUAot
+
     val hwDownloadModeUserOverride: Boolean
         get() = (gsSettingOverrideFlags and GS_SETTING_OVERRIDE_HW_DOWNLOAD_MODE) != 0
     val blendingAccuracyUserOverride: Boolean
@@ -533,7 +543,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             enableIntcStatSpeedhack = snapshot.enableIntcStatSpeedhack,
             enableVuFlagHack = snapshot.enableVuFlagHack,
             enableInstantVu1 = snapshot.enableInstantVu1,
-            enableMtvu = snapshot.enableMtvu,
+            workerOptimizations = WorkerOptimizationUiState(
+                enableMtvu = snapshot.enableMtvu,
+                enableIopThread = snapshot.enableIopThread,
+                enableVUAot = snapshot.enableVUAot
+            ),
             enableThreadPinning = snapshot.enableThreadPinning,
             enableFastBoot = snapshot.enableFastBoot,
             enableFastCdvd = snapshot.enableFastCdvd,
@@ -1724,6 +1738,22 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun setEnableIopThread(enabled: Boolean) {
+        viewModelScope.launch {
+            markPerformancePresetCustom()
+            preferences.setEnableIopThread(enabled)
+            EmulatorBridge.setSetting("EmuCore/Speedhacks", "iopThread", "bool", enabled.toString())
+        }
+    }
+
+    fun setEnableVUAot(enabled: Boolean) {
+        viewModelScope.launch {
+            markPerformancePresetCustom()
+            preferences.setEnableVUAot(enabled)
+            EmulatorBridge.setSetting("EmuCore/CPU/Recompiler", "EnableVUAot", "bool", enabled.toString())
+        }
+    }
+
     fun setEnableThreadPinning(enabled: Boolean) {
         viewModelScope.launch {
             markPerformancePresetCustom()
@@ -2441,6 +2471,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 vuFlagHack = _uiState.value.enableVuFlagHack,
                 instantVu1 = _uiState.value.enableInstantVu1,
                 mtvu = _uiState.value.enableMtvu,
+                enableIopThread = _uiState.value.enableIopThread,
+                enableVUAot = _uiState.value.enableVUAot,
                 enableThreadPinning = _uiState.value.enableThreadPinning,
                 enableFastBoot = _uiState.value.enableFastBoot,
                 hwDownloadMode = _uiState.value.hwDownloadMode,

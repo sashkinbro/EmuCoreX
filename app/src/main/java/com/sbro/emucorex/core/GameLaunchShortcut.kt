@@ -24,6 +24,8 @@ object GameLaunchShortcut {
     const val EXTRA_ENABLE_VU1_RECOMPILER = "com.sbro.emucorex.extra.ENABLE_VU1_RECOMPILER"
     const val EXTRA_ENABLE_FASTMEM = "com.sbro.emucorex.extra.ENABLE_FASTMEM"
     const val EXTRA_ENABLE_MTVU = "com.sbro.emucorex.extra.ENABLE_MTVU"
+    const val EXTRA_ENABLE_VU_AOT = "com.sbro.emucorex.extra.ENABLE_VU_AOT"
+    const val EXTRA_ENABLE_IOP_THREAD = "com.sbro.emucorex.extra.ENABLE_IOP_THREAD"
     const val EXTRA_RENDERER = "com.sbro.emucorex.extra.RENDERER"
     const val EXTRA_GS_DUMP_FRAMES = "com.sbro.emucorex.extra.GS_DUMP_FRAMES"
     const val EXTRA_GS_DUMP_DELAY_MS = "com.sbro.emucorex.extra.GS_DUMP_DELAY_MS"
@@ -45,6 +47,8 @@ object GameLaunchShortcut {
         val enableVu1Recompiler: Boolean? = null,
         val enableFastmem: Boolean? = null,
         val enableMtvu: Boolean? = null,
+        val enableIopThread: Boolean? = null,
+        val enableVUAot: Boolean? = null,
         val renderer: Int? = null,
         val gsDumpFrames: Int? = null,
         val gsDumpDelayMs: Int? = null,
@@ -121,6 +125,10 @@ object GameLaunchShortcut {
                 ?: optionalBooleanQuery(data, "enableFastmem"),
             enableMtvu = optionalBooleanExtra(intent, EXTRA_ENABLE_MTVU)
                 ?: optionalBooleanQuery(data, "enableMtvu"),
+            enableIopThread = optionalBooleanExtra(intent, EXTRA_ENABLE_IOP_THREAD)
+                ?: optionalBooleanQuery(data, "enableIopThread"),
+            enableVUAot = optionalBooleanExtra(intent, EXTRA_ENABLE_VU_AOT)
+                ?: optionalBooleanQuery(data, "enableVUAot"),
             renderer = optionalIntExtra(intent, EXTRA_RENDERER)
                 ?: optionalIntQuery(data, "renderer"),
             gsDumpFrames = if (BuildConfig.DEBUG) (optionalIntExtra(intent, EXTRA_GS_DUMP_FRAMES)
@@ -147,6 +155,8 @@ object GameLaunchShortcut {
         intent.removeExtra(EXTRA_ENABLE_VU1_RECOMPILER)
         intent.removeExtra(EXTRA_ENABLE_FASTMEM)
         intent.removeExtra(EXTRA_ENABLE_MTVU)
+        intent.removeExtra(EXTRA_ENABLE_VU_AOT)
+        intent.removeExtra(EXTRA_ENABLE_IOP_THREAD)
         intent.removeExtra(EXTRA_RENDERER)
         intent.removeExtra(EXTRA_GS_DUMP_FRAMES)
         intent.removeExtra(EXTRA_GS_DUMP_DELAY_MS)

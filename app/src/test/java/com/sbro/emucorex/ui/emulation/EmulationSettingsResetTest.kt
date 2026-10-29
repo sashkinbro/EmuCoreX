@@ -11,6 +11,22 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EmulationSettingsResetTest {
+    @Test fun workerOptimizationOverridesRespectExplicitOffAndInheritance() {
+        val global = globalRuntimeSnapshot().copy(enableIopThread = true, enableVUAot = true)
+        val profile = com.sbro.emucorex.data.PerGameSettings(
+            gameKey = "game", gameTitle = "Game", enableIopThread = false, enableVUAot = false,
+            providedKeys = setOf("enableIopThread", "enableVUAot"))
+        val selected = global.applyProfile(profile)
+        assertFalse(selected.enableIopThread)
+        assertFalse(selected.enableVUAot)
+        val inherited = global.applyProfile(profile.copy(providedKeys = emptySet()))
+        assertTrue(inherited.enableIopThread)
+        assertTrue(inherited.enableVUAot)
+        val live = EmulationUiState().withLiveRuntimeSnapshot(inherited)
+        assertTrue(live.enableIopThread)
+        assertTrue(live.enableVUAot)
+    }
+
     @Test fun resetRestoresEveryRuntimeSettingFromGlobalSnapshot() {
         val snapshot = globalRuntimeSnapshot()
         val state = EmulationUiState(
@@ -122,6 +138,8 @@ class EmulationSettingsResetTest {
         performancePreset = 99,
         enableInstantVu1 = false,
         enableMtvu = false,
+        enableIopThread = true,
+        enableVUAot = true,
         enableThreadPinning = true,
         enableFastCdvd = true,
         enableFastBoot = false,

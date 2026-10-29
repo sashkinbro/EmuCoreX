@@ -673,6 +673,8 @@ struct Pcsx2Config
 			EnableFastmem : 1;
 		bool
 			PauseOnTLBMiss : 1;
+		bool
+			EnableVUAot : 1;
 		BITFIELD_END
 
 		RecompilerOptions();

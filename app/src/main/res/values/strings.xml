@@ -3017,4 +3017,10 @@
     <string name="settings_shader_presets_remove_body">Selected presets: %1$d. Remove them from the list?</string>
     <string name="settings_shader_presets_remove_failed">Could not remove the selected presets.</string>
     <string name="onboarding_supported_consoles">Supported consoles</string>
+    <string name="settings_iop_thread">IOP Thread</string>
+    <string name="settings_iop_thread_desc">Run the I/O processor on a separate CPU core</string>
+    <string name="settings_help_iop_thread">May improve speed on devices with enough performance cores. Unsupported devices and modes use normal execution automatically.</string>
+    <string name="settings_vu_aot">VU1 AOT Compiler</string>
+    <string name="settings_vu_aot_desc">Optimize frequently used VU1 code</string>
+    <string name="settings_help_vu_aot">May improve speed with the VU1 recompiler enabled. Unsupported code uses the normal compiler automatically.</string>
 </resources>

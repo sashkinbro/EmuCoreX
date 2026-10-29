@@ -1468,6 +1468,20 @@ private fun GameSettingsTabContent(
                         onResetToDefault = { onDraftChange(draft.copy(enableMtvu = defaultProfile.enableMtvu)) }
                     )
                     ToggleRow(
+                        title = stringResource(R.string.settings_iop_thread),
+                        checked = draft.enableIopThread,
+                        onCheckedChange = { onDraftChange(draft.copy(enableIopThread = it)) },
+                        helpText = stringResource(R.string.settings_help_iop_thread),
+                        onResetToDefault = { onDraftChange(draft.copy(enableIopThread = defaultProfile.enableIopThread)) }
+                    )
+                    ToggleRow(
+                        title = stringResource(R.string.settings_vu_aot),
+                        checked = draft.enableVUAot,
+                        onCheckedChange = { onDraftChange(draft.copy(enableVUAot = it)) },
+                        helpText = stringResource(R.string.settings_help_vu_aot),
+                        onResetToDefault = { onDraftChange(draft.copy(enableVUAot = defaultProfile.enableVUAot)) }
+                    )
+                    ToggleRow(
                         title = stringResource(R.string.settings_fast_cdvd),
                         checked = draft.enableFastCdvd,
                         onCheckedChange = { onDraftChange(draft.copy(enableFastCdvd = it)) },
@@ -2677,6 +2691,20 @@ private fun GameSettingsEditorDialog(
                                 onCheckedChange = { draft = draft.copy(enableMtvu = it) },
                                 helpText = stringResource(R.string.settings_help_mtvu),
                                 onResetToDefault = { draft = draft.copy(enableMtvu = defaultProfile.enableMtvu) }
+                            )
+                            ToggleRow(
+                                title = stringResource(R.string.settings_iop_thread),
+                                checked = draft.enableIopThread,
+                                onCheckedChange = { draft = draft.copy(enableIopThread = it) },
+                                helpText = stringResource(R.string.settings_help_iop_thread),
+                                onResetToDefault = { draft = draft.copy(enableIopThread = defaultProfile.enableIopThread) }
+                            )
+                            ToggleRow(
+                                title = stringResource(R.string.settings_vu_aot),
+                                checked = draft.enableVUAot,
+                                onCheckedChange = { draft = draft.copy(enableVUAot = it) },
+                                helpText = stringResource(R.string.settings_help_vu_aot),
+                                onResetToDefault = { draft = draft.copy(enableVUAot = defaultProfile.enableVUAot) }
                             )
                             ToggleRow(
                                 title = stringResource(R.string.settings_fast_cdvd),
@@ -4936,6 +4964,8 @@ private fun SettingsSnapshot.toPerGameSettings(game: GameItem): PerGameSettings 
         enableFastBoot = enableFastBoot,
         enableInstantVu1 = enableInstantVu1,
         enableMtvu = enableMtvu,
+        enableIopThread = enableIopThread,
+        enableVUAot = enableVUAot,
         enableFastCdvd = enableFastCdvd,
         enableCheats = enableCheats,
         enableGameFixes = enableGameFixes,
@@ -5169,6 +5199,8 @@ private fun PerGameSettings.resolveAgainst(defaultProfile: PerGameSettings): Per
         enableFastBoot = pick("enableFastBoot", enableFastBoot, defaultProfile.enableFastBoot),
         enableInstantVu1 = pick("enableInstantVu1", enableInstantVu1, defaultProfile.enableInstantVu1),
         enableMtvu = pick("enableMtvu", enableMtvu, defaultProfile.enableMtvu),
+        enableIopThread = pick("enableIopThread", enableIopThread, defaultProfile.enableIopThread),
+        enableVUAot = pick("enableVUAot", enableVUAot, defaultProfile.enableVUAot),
         enableFastCdvd = pick("enableFastCdvd", enableFastCdvd, defaultProfile.enableFastCdvd),
         enableCheats = pick("enableCheats", enableCheats, defaultProfile.enableCheats),
         enableGameFixes = pick("enableGameFixes", enableGameFixes, defaultProfile.enableGameFixes),

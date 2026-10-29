@@ -70,6 +70,8 @@ data class PerGameSettings(
     val enableFastBoot: Boolean = true,
     val enableInstantVu1: Boolean = true,
     val enableMtvu: Boolean = true,
+    val enableIopThread: Boolean = false,
+    val enableVUAot: Boolean = false,
     val enableThreadPinning: Boolean = AppPreferences.DEFAULT_THREAD_PINNING,
     val enableFastCdvd: Boolean = false,
     val enableCheats: Boolean = false,
@@ -432,6 +434,8 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         enableFastBoot = optBoolean("enableFastBoot", true),
         enableInstantVu1 = optBoolean("enableInstantVu1", true),
         enableMtvu = optBoolean("enableMtvu", true),
+        enableIopThread = optBoolean("enableIopThread", false),
+        enableVUAot = optBoolean("enableVUAot", false),
         enableThreadPinning = optBoolean("enableThreadPinning", AppPreferences.DEFAULT_THREAD_PINNING),
         enableFastCdvd = optBoolean("enableFastCdvd", false),
         enableCheats = optBoolean("enableCheats", false),
@@ -662,6 +666,8 @@ private fun PerGameSettings.toJson(): JSONObject {
         if (shouldWrite("enableFastBoot")) put("enableFastBoot", enableFastBoot)
         if (shouldWrite("enableInstantVu1")) put("enableInstantVu1", enableInstantVu1)
         if (shouldWrite("enableMtvu")) put("enableMtvu", enableMtvu)
+        if (shouldWrite("enableIopThread")) put("enableIopThread", enableIopThread)
+        if (shouldWrite("enableVUAot")) put("enableVUAot", enableVUAot)
         if (shouldWrite("enableThreadPinning")) put("enableThreadPinning", enableThreadPinning)
         if (shouldWrite("enableFastCdvd")) put("enableFastCdvd", enableFastCdvd)
         if (shouldWrite("enableCheats")) put("enableCheats", enableCheats)

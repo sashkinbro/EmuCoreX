@@ -159,6 +159,8 @@ data class SettingsSnapshot(
     val enableVuFlagHack: Boolean = true,
     val enableInstantVu1: Boolean = true,
     val enableMtvu: Boolean = true,
+    val enableIopThread: Boolean = false,
+    val enableVUAot: Boolean = false,
     val enableThreadPinning: Boolean = AppPreferences.DEFAULT_THREAD_PINNING,
     val enableFastCdvd: Boolean = false,
     val enableCheats: Boolean = false,
@@ -385,7 +387,7 @@ class AppPreferences(private val context: Context) {
             "eeFpuRoundMode", "vu0RoundMode", "vu1RoundMode", "eeFpuClampingMode",
             "vu0ClampingMode", "vu1ClampingMode", "enableGameFixes", "autoGsHardwareFixes", "enableEeTimingHack",
             "enableWaitLoopSpeedhack", "enableIntcStatSpeedhack", "enableVuFlagHack",
-            "enableInstantVu1", "enableMtvu", "enableThreadPinning", "enableFastCdvd",
+            "enableInstantVu1", "enableMtvu", "enableIopThread", "enableVUAot", "enableThreadPinning", "enableFastCdvd",
             "hwDownloadMode", "frameSkip", "skipDuplicateFrames", "lowLatencyMode", "textureFiltering",
             "trilinearFiltering", "blendingAccuracy", "texturePreloading",
             "textureReplacementsEnabled", "textureReplacementsAsync", "textureReplacementsPrecache",
@@ -753,6 +755,8 @@ class AppPreferences(private val context: Context) {
         private val ENABLE_VU_FLAG_HACK = booleanPreferencesKey("enable_vu_flag_hack")
         private val ENABLE_INSTANT_VU1 = booleanPreferencesKey("enable_instant_vu1")
         private val ENABLE_MTVU = booleanPreferencesKey("enable_mtvu")
+        private val ENABLE_IOP_THREAD = booleanPreferencesKey("enable_iop_thread")
+        private val ENABLE_VU_AOT = booleanPreferencesKey("enable_vu_aot")
         private val ENABLE_THREAD_PINNING = booleanPreferencesKey("enable_thread_pinning")
         private val ENABLE_FAST_CDVD = booleanPreferencesKey("enable_fast_cdvd")
         private val ENABLE_CHEATS = booleanPreferencesKey("enable_cheats")
@@ -1988,6 +1992,8 @@ class AppPreferences(private val context: Context) {
                 enableVuFlagHack = prefs[ENABLE_VU_FLAG_HACK] ?: true,
                 enableInstantVu1 = prefs[ENABLE_INSTANT_VU1] ?: true,
                 enableMtvu = prefs[ENABLE_MTVU] ?: true,
+                enableIopThread = prefs[ENABLE_IOP_THREAD] ?: false,
+                enableVUAot = prefs[ENABLE_VU_AOT] ?: false,
                 enableThreadPinning = prefs[ENABLE_THREAD_PINNING] ?: DEFAULT_THREAD_PINNING,
                 enableFastCdvd = prefs[ENABLE_FAST_CDVD] ?: false,
                 enableCheats = prefs[ENABLE_CHEATS] ?: false,
@@ -3277,6 +3283,24 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setEnableThreadPinning(enabled: Boolean) {
         context.dataStore.edit { it[ENABLE_THREAD_PINNING] = enabled }
+    }
+
+    // IopThread opt-in
+    val enableIopThread: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[ENABLE_IOP_THREAD] ?: false
+    }
+
+    suspend fun setEnableIopThread(enabled: Boolean) {
+        context.dataStore.edit { it[ENABLE_IOP_THREAD] = enabled }
+    }
+
+    // VUAot opt-in
+    val enableVUAot: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[ENABLE_VU_AOT] ?: false
+    }
+
+    suspend fun setEnableVUAot(enabled: Boolean) {
+        context.dataStore.edit { it[ENABLE_VU_AOT] = enabled }
     }
 
     // Fast CDVD
@@ -4798,6 +4822,8 @@ class AppPreferences(private val context: Context) {
             put("enableVuFlagHack", prefs[ENABLE_VU_FLAG_HACK] ?: true)
             put("enableInstantVu1", prefs[ENABLE_INSTANT_VU1] ?: true)
             put("enableMtvu", prefs[ENABLE_MTVU] ?: true)
+            put("enableIopThread", prefs[ENABLE_IOP_THREAD] ?: false)
+            put("enableVUAot", prefs[ENABLE_VU_AOT] ?: false)
             put("enableThreadPinning", prefs[ENABLE_THREAD_PINNING] ?: DEFAULT_THREAD_PINNING)
             put("enableFastCdvd", prefs[ENABLE_FAST_CDVD] ?: false)
             put("hwDownloadMode", GsHackDefaults.coerceHardwareDownloadMode(
@@ -5319,6 +5345,8 @@ class AppPreferences(private val context: Context) {
             prefs[ENABLE_VU_FLAG_HACK] = json.optBoolean("enableVuFlagHack", true)
             prefs[ENABLE_INSTANT_VU1] = json.optBoolean("enableInstantVu1", true)
             prefs[ENABLE_MTVU] = json.optBoolean("enableMtvu", true)
+            prefs[ENABLE_IOP_THREAD] = json.optBoolean("enableIopThread", false)
+            prefs[ENABLE_VU_AOT] = json.optBoolean("enableVUAot", false)
             prefs[ENABLE_THREAD_PINNING] = json.optBoolean("enableThreadPinning", DEFAULT_THREAD_PINNING)
             prefs[ENABLE_FAST_CDVD] = json.optBoolean("enableFastCdvd", false)
             prefs[HW_DOWNLOAD_MODE] = GsHackDefaults.coerceHardwareDownloadMode(

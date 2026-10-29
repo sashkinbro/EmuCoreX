@@ -13,6 +13,25 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE, sdk = [35])
 class GameLaunchShortcutTest {
+    @Test fun workerOverridesPreserveExplicitOffAndAreConsumed() {
+        val intent = Intent(GameLaunchShortcut.ACTION_LAUNCH_GAME).apply {
+            putExtra(GameLaunchShortcut.EXTRA_GAME_PATH, "/games/test.iso")
+            putExtra(GameLaunchShortcut.EXTRA_ENABLE_IOP_THREAD, false)
+            putExtra(GameLaunchShortcut.EXTRA_ENABLE_VU_AOT, true)
+        }
+        val request = GameLaunchShortcut.parseLaunchRequest(intent)!!
+        assertEquals(false, request.enableIopThread)
+        assertEquals(true, request.enableVUAot)
+        GameLaunchShortcut.clearLaunchRequest(intent)
+        assertEquals(false, intent.hasExtra(GameLaunchShortcut.EXTRA_ENABLE_IOP_THREAD))
+        assertEquals(false, intent.hasExtra(GameLaunchShortcut.EXTRA_ENABLE_VU_AOT))
+        assertNull(GameLaunchShortcut.parseLaunchRequest(intent))
+        val query = Intent(Intent.ACTION_VIEW,
+            Uri.parse("emucorex://launch?gamePath=%2Fgames%2Ftest.iso&enableIopThread=true&enableVUAot=false"))
+        assertEquals(true, GameLaunchShortcut.parseLaunchRequest(query)?.enableIopThread)
+        assertEquals(false, GameLaunchShortcut.parseLaunchRequest(query)?.enableVUAot)
+    }
+
     @Test
     fun consumedGameIntentsCannotBeLaunchedAgain() {
         val paths = listOf(

@@ -138,6 +138,8 @@ import kotlin.time.Duration.Companion.milliseconds
             displayCrop = pick("displayCrop", displayCrop) { displayCrop },
             instantVu1 = pick("enableInstantVu1", instantVu1) { enableInstantVu1 },
             mtvu = pick("enableMtvu", mtvu) { enableMtvu },
+            enableIopThread = pick("enableIopThread", enableIopThread) { enableIopThread },
+            enableVUAot = pick("enableVUAot", enableVUAot) { enableVUAot },
             enableThreadPinning = pick("enableThreadPinning", enableThreadPinning) { enableThreadPinning },
             fastCdvd = pick("enableFastCdvd", fastCdvd) { enableFastCdvd },
             enableFastBoot = pick("enableFastBoot", enableFastBoot) { enableFastBoot },
@@ -320,6 +322,8 @@ import kotlin.time.Duration.Companion.milliseconds
             displayCrop = pick("displayCrop", displayCrop) { displayCrop },
             enableInstantVu1 = pick("enableInstantVu1", enableInstantVu1) { enableInstantVu1 },
             enableMtvu = pick("enableMtvu", enableMtvu) { enableMtvu },
+            enableIopThread = pick("enableIopThread", enableIopThread) { enableIopThread },
+            enableVUAot = pick("enableVUAot", enableVUAot) { enableVUAot },
             enableThreadPinning = pick("enableThreadPinning", enableThreadPinning) { enableThreadPinning },
             enableFastCdvd = pick("enableFastCdvd", enableFastCdvd) { enableFastCdvd },
             enableFastBoot = pick("enableFastBoot", enableFastBoot) { enableFastBoot },
@@ -404,6 +408,8 @@ import kotlin.time.Duration.Companion.milliseconds
         performancePreset = snapshot.performancePreset,
         enableInstantVu1 = snapshot.enableInstantVu1,
         enableMtvu = snapshot.enableMtvu,
+        enableIopThread = snapshot.enableIopThread,
+        enableVUAot = snapshot.enableVUAot,
         enableThreadPinning = snapshot.enableThreadPinning,
         enableFastCdvd = snapshot.enableFastCdvd,
         enableFastBoot = snapshot.enableFastBoot,
@@ -532,6 +538,8 @@ import kotlin.time.Duration.Companion.milliseconds
             fpsOverlayMode = fpsOverlayMode,
             enableInstantVu1 = enableInstantVu1,
             enableMtvu = enableMtvu,
+            enableIopThread = enableIopThread,
+            enableVUAot = enableVUAot,
             enableThreadPinning = enableThreadPinning,
             enableFastCdvd = enableFastCdvd,
             enableFastBoot = enableFastBoot,
@@ -660,6 +668,8 @@ import kotlin.time.Duration.Companion.milliseconds
             if (fpsOverlayMode != settings.fpsOverlayMode) add("fpsOverlayMode")
             if (enableInstantVu1 != settings.enableInstantVu1) add("enableInstantVu1")
             if (enableMtvu != settings.enableMtvu) add("enableMtvu")
+            if (enableIopThread != settings.enableIopThread) add("enableIopThread")
+            if (enableVUAot != settings.enableVUAot) add("enableVUAot")
             if (enableThreadPinning != settings.enableThreadPinning) add("enableThreadPinning")
             if (enableFastCdvd != settings.enableFastCdvd) add("enableFastCdvd")
             if (enableFastBoot != settings.enableFastBoot) add("enableFastBoot")

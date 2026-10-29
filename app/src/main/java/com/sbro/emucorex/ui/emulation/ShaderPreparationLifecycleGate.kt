@@ -90,6 +90,8 @@ internal data class ShaderPreparationLaunchRequest(
     val enableVu1RecompilerOverride: Boolean?,
     val enableFastmemOverride: Boolean?,
     val enableMtvuOverride: Boolean?,
+    val enableIopThreadOverride: Boolean? = null,
+    val enableVUAotOverride: Boolean? = null,
     val rendererOverride: Int?,
     val gsDumpFrames: Int?,
     val gsDumpDelayMs: Int?,
