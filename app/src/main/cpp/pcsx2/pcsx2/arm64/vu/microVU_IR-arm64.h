@@ -5,6 +5,7 @@
 #include "arm64/OaknutHelpers-arm64.h"
 #include "microVU-arm64.h"
 #include <array>
+#include <cstring>
 
 struct regCycleInfo
 {
@@ -63,6 +64,13 @@ static __fi void mVUIrPshufd_oaknut(int dst, int src, u8 imm)
 {
 	const oak::QReg dst_q = oakQRegister(dst);
 	const oak::QReg src_q = oakQRegister(src);
+	// Cached single-lane clones only consume lane zero. EXT selects that
+	// word directly, including an in-place clone, without a shuffle table.
+	if (imm >= 1 && imm <= 3)
+	{
+		oakAsm->EXT(dst_q.B16(), src_q.B16(), src_q.B16(), imm * 4);
+		return;
+	}
 	oakLoad128(OAK_QSCRATCH3, mVUIrOakCpuMem(static_cast<s64>(offsetof(cpuRegistersPack, shuffle.data[imm][0]))));
 	oakAsm->MOV(OAK_QSCRATCH2.B16(), src_q.B16());
 	oakAsm->TBL(dst_q.B16(), oak::List(OAK_QSCRATCH2.B16()), OAK_QSCRATCH3.B16());
@@ -506,7 +514,58 @@ protected:
 
 	void writeVIBackup(int reg);
 
+	// Clone-note state is compiler-local, never part of VU pipeline state.
+	// BEGIN_LOCAL_CLONE_STATE
+	struct CloneNote { int dst; int src; const u8* end; };
+	std::array<CloneNote, 4> clones{};
+	unsigned cloneCount = 0;
+	CloneNote gprClone{-1, -1, nullptr};
+	// END_LOCAL_CLONE_STATE
+
 public:
+	// Local copy-fold hooks. Consumers must completely overwrite dst.
+	void noteClone(int dst, int src)
+	{
+		const u8* end = oakGetCurrentCodePointer();
+		if (cloneCount == clones.size() || (cloneCount && clones[cloneCount - 1].end != end - 4))
+			cloneCount = 0;
+		clones[cloneCount++] = {dst, src, end};
+	}
+	int takeCloneSource(int dst)
+	{
+		if (!cloneCount)
+			return -1;
+		const CloneNote note = clones[cloneCount - 1];
+		if (note.dst != dst || note.end != oakGetCurrentCodePointer() || oakAsm->offset() < 4)
+			return -1;
+		const u32 expected = 0x4ea01c00u | (note.src << 16) | (note.src << 5) | note.dst;
+		u32 actual;
+		std::memcpy(&actual, note.end - 4, sizeof(actual));
+		if (actual != expected)
+			return -1;
+		oakAsm->set_offset(oakAsm->offset() - 4);
+		--cloneCount;
+		return note.src;
+	}
+	void noteGPRClone(int dst, int src)
+	{
+		gprClone = {dst, src, oakGetCurrentCodePointer()};
+	}
+	int takeGPRCloneSource(int dst)
+	{
+		const CloneNote note = gprClone;
+		gprClone = {-1, -1, nullptr};
+		if (note.dst != dst || note.end != oakGetCurrentCodePointer() || oakAsm->offset() < 4)
+			return -1;
+		const u32 expected = 0x2a0003e0u | (note.src << 16) | note.dst;
+		u32 actual;
+		std::memcpy(&actual, note.end - 4, sizeof(actual));
+		if (actual != expected)
+			return -1;
+		oakAsm->set_offset(oakAsm->offset() - 4);
+		return note.src;
+	}
+
 	microRegAlloc(int _index)
 	{
 		index = _index;
@@ -537,6 +596,8 @@ public:
 	// Fully resets the regalloc by clearing all cached data
 	void reset(bool cop2mode)
 	{
+		cloneCount = 0;
+		gprClone = {-1, -1, nullptr};
 		// we run this at the of cop2, so don't free fprs
 		regAllocCOP2 = false;
 
@@ -619,6 +680,14 @@ public:
 				return true;
 		}
 
+		return false;
+	}
+
+	bool isCachedWhole(int vfreg) const
+	{
+		for (const auto& map : xmmMap)
+			if (map.VFreg == vfreg && (map.xyzw == 0 || map.xyzw == 0xf))
+				return true;
 		return false;
 	}
 
@@ -1014,6 +1083,7 @@ public:
                             else if (z != i) {
 								recBeginOaknutEmit();
 								oakAsm->MOV(oakQRegister(z).B16(), oakQRegister(i).B16());
+								noteClone(z, i);
 								recEndOaknutEmit();
                             }
 
@@ -1263,6 +1333,7 @@ public:
 							}
 							else {
 								oakAsm->MOV(gprX, oakWRegister(i));
+								noteGPRClone(x, i);
 							}
 							recEndOaknutEmit();
 							gprMap[x].isZeroExtended = zext_if_dirty;

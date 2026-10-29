@@ -1250,18 +1250,25 @@ static void mVU_FCGET_emit(mP)
 	pass4 { mVUregs.needExactMatch |= 4; }
 }
 
+// Shared with the focused oracle: emit the actual production FCOR reduction.
+static __fi void mVU_FCOR_reduce_oaknut(oak::WReg dst, u32 immediate)
+{
+	// FCOR succeeds iff every bit the immediate leaves clear is set in CLIP.
+	// Keep the complement in the 24-bit CLIP domain; dirty high bits cannot
+	// contribute to the test, and CSET already produces a normalized VI.
+	oakAsm->MOV(OAK_WSCRATCH, (~immediate) & 0xffffffu);
+	oakAsm->BICS(oak::util::WZR, OAK_WSCRATCH, dst);
+	oakAsm->CSET(dst, oak::Cond::EQ);
+}
+
 static void mVU_FCOR_direct_emit_oaknut(mP)
 {
 	const int dst = mVU.regAlloc->allocGPRId(-1, 1, mVUlow.backupVI);
 	mVUallocCFLAGa(mVU, dst, cFLAG.read);
 	const oak::WReg dst_w = oakWRegister(dst);
 	recBeginOaknutEmit();
-	oakAsm->MOV(OAK_WSCRATCH, _Imm24_);
-	oakAsm->ORR(dst_w, dst_w, OAK_WSCRATCH);
-	oakAsm->ADD(dst_w, dst_w, 1);
-	oakAsm->LSR(dst_w, dst_w, 24);
+	mVU_FCOR_reduce_oaknut(dst_w, _Imm24_);
 	recEndOaknutEmit();
-	mVU_normalizeVIWrite_oaknut(dst);
 	mVU.regAlloc->clearNeeded(dst);
 }
 
@@ -1547,6 +1554,12 @@ static bool mVUTrySharedVI(mV, ir::Op op, bool immediate = false, u32 constant =
 	return true;
 }
 
+static __fi int mVUviSource_oaknut(mV, int dst)
+{
+	const int source = mVU.regAlloc->takeGPRCloneSource(dst);
+	return source >= 0 ? source : dst;
+}
+
 static void mVU_IADD_direct_emit_oaknut(mP)
 {
 	if (_Is_ == 0 || _It_ == 0)
@@ -1564,7 +1577,7 @@ static void mVU_IADD_direct_emit_oaknut(mP)
 		const int regT = mVU.regAlloc->allocGPRId(_It_, -1);
 		const int regS = mVU.regAlloc->allocGPRId(_Is_, _Id_, mVUlow.backupVI);
 		recBeginOaknutEmit();
-		oakAsm->ADD(oakWRegister(regS), oakWRegister(regS), oakWRegister(regT));
+		oakAsm->ADD(oakWRegister(regS), oakWRegister(mVUviSource_oaknut(mVU, regS)), oakWRegister(regT));
 		recEndOaknutEmit();
 		mVU_normalizeVIWrite_oaknut(regS);
 		mVU.regAlloc->clearNeeded(regS);
@@ -1621,9 +1634,9 @@ static void mVU_IADDI_direct_emit_oaknut(mP)
 		if (!EmuConfig.Gamefixes.IbitHack)
 		{
 			if (_Imm5_ > 0)
-				oakAsm->ADD(regSW, regSW, static_cast<u32>(_Imm5_));
+				oakAsm->ADD(regSW, oakWRegister(mVUviSource_oaknut(mVU, regS)), static_cast<u32>(_Imm5_));
 			else if (_Imm5_ < 0)
-				oakAsm->SUB(regSW, regSW, static_cast<u32>(-_Imm5_));
+				oakAsm->SUB(regSW, oakWRegister(mVUviSource_oaknut(mVU, regS)), static_cast<u32>(-_Imm5_));
 		}
 		else
 		{
@@ -1659,6 +1672,33 @@ static void mVU_IADDIU_load_ibithack_imm15_emit_oaknut(mV, oak::WReg dst)
 	oakAsm->ORR(dst, dst, OAK_WSCRATCH2);
 }
 
+static __fi void mVU_unsignedVIImmediate_oaknut(oak::WReg dst, oak::WReg src, u32 immediate, bool subtract)
+{
+	// A VI immediate is at most 15 bits. Two ADD/SUB immediate pieces cover
+	// every value without consuming a scratch register; encodable values
+	// (including a shifted 12-bit immediate) need only one instruction.
+	const u32 low = immediate & 0xfffu;
+	const u32 high = immediate & ~0xfffu;
+	if (immediate <= 0xfffu || low == 0)
+	{
+		if (subtract) oakAsm->SUB(dst, src, immediate);
+		else oakAsm->ADD(dst, src, immediate);
+	}
+	else
+	{
+		if (subtract)
+		{
+			oakAsm->SUB(dst, src, low);
+			oakAsm->SUB(dst, dst, high);
+		}
+		else
+		{
+			oakAsm->ADD(dst, src, low);
+			oakAsm->ADD(dst, dst, high);
+		}
+	}
+}
+
 static void mVU_IADDIU_direct_emit_oaknut(mP)
 {
 	if (_Is_ == 0)
@@ -1689,8 +1729,7 @@ static void mVU_IADDIU_direct_emit_oaknut(mP)
 		{
 			if (_Imm15_ != 0)
 			{
-				oakAsm->MOV(OAK_WSCRATCH, static_cast<u32>(_Imm15_));
-				oakAsm->ADD(regSW, regSW, OAK_WSCRATCH);
+				mVU_unsignedVIImmediate_oaknut(regSW, oakWRegister(mVUviSource_oaknut(mVU, regS)), _Imm15_, false);
 			}
 		}
 		else
@@ -1721,7 +1760,7 @@ static void mVU_IAND_direct_emit_oaknut(mP)
 	if (_It_ != _Is_)
 	{
 		recBeginOaknutEmit();
-		oakAsm->AND(oakWRegister(regS), oakWRegister(regS), oakWRegister(regT));
+		oakAsm->AND(oakWRegister(regS), oakWRegister(mVUviSource_oaknut(mVU, regS)), oakWRegister(regT));
 		recEndOaknutEmit();
 	}
 	mVU_normalizeVIWrite_oaknut(regS);
@@ -1746,7 +1785,7 @@ static void mVU_IOR_direct_emit_oaknut(mP)
 	if (_It_ != _Is_)
 	{
 		recBeginOaknutEmit();
-		oakAsm->ORR(oakWRegister(regS), oakWRegister(regS), oakWRegister(regT));
+		oakAsm->ORR(oakWRegister(regS), oakWRegister(mVUviSource_oaknut(mVU, regS)), oakWRegister(regT));
 		recEndOaknutEmit();
 	}
 	mVU_normalizeVIWrite_oaknut(regS);
@@ -1771,7 +1810,7 @@ static void mVU_ISUB_direct_emit_oaknut(mP)
 		const int regT = mVU.regAlloc->allocGPRId(_It_, -1);
 		const int regS = mVU.regAlloc->allocGPRId(_Is_, _Id_, mVUlow.backupVI);
 		recBeginOaknutEmit();
-		oakAsm->SUB(oakWRegister(regS), oakWRegister(regS), oakWRegister(regT));
+		oakAsm->SUB(oakWRegister(regS), oakWRegister(mVUviSource_oaknut(mVU, regS)), oakWRegister(regT));
 		recEndOaknutEmit();
 		mVU_normalizeVIWrite_oaknut(regS);
 		mVU.regAlloc->clearNeeded(regS);
@@ -1819,8 +1858,7 @@ static void mVU_ISUBIU_direct_emit_oaknut(mP)
 	{
 		if (_Imm15_ != 0)
 		{
-			oakAsm->MOV(OAK_WSCRATCH, static_cast<u32>(_Imm15_));
-			oakAsm->SUB(regSW, regSW, OAK_WSCRATCH);
+			mVU_unsignedVIImmediate_oaknut(regSW, oakWRegister(mVUviSource_oaknut(mVU, regS)), _Imm15_, true);
 		}
 	}
 	else
@@ -1962,8 +2000,28 @@ static void mVU_MFP_emit(mP)
 	pass3 { mVUlog("MFP.%s vf%02d, P", _XYZW_String, _Ft_); }
 }
 
+static __fi void mVUinsertCachedLane_oaknut(int dst, int src, u32 dst_lane, u32 src_lane)
+{
+	oakAsm->MOV(oakQRegister(dst).Selem()[dst_lane], oakQRegister(src).Selem()[src_lane]);
+}
+
+static bool mVUtryInsertCachedLane_oaknut(mV, u32 source_lane)
+{
+	if (!_XYZW_SS || !_Ft_ || !mVU.regAlloc->isCachedWhole(_Ft_))
+		return false;
+	const int source = mVU.regAlloc->allocRegId(_Fs_);
+	const int destination = mVU.regAlloc->allocRegId(_Ft_, _Ft_, 0xf, false);
+	const u32 destination_lane = _X ? 0 : _Y ? 1 : _Z ? 2 : 3;
+	mVUinsertCachedLane_oaknut(destination, source, destination_lane, source_lane);
+	mVU.regAlloc->clearNeededXmmId(destination);
+	if (source != destination) mVU.regAlloc->clearNeededXmmId(source);
+	return true;
+}
+
 static void mVU_MOVE_direct_emit_oaknut(mP)
 {
+	if (mVUtryInsertCachedLane_oaknut(mVU, _X ? 0 : _Y ? 1 : _Z ? 2 : 3))
+		return;
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Ft_, _X_Y_Z_W);
 	mVU.regAlloc->clearNeededXmmId(Fs);
 }
@@ -2032,6 +2090,9 @@ static bool mVUTrySharedMTIR(mV)
 
 static void mVU_MR32_direct_emit_oaknut(mP)
 {
+	const u32 lane = _X ? 0 : _Y ? 1 : _Z ? 2 : 3;
+	if (mVUtryInsertCachedLane_oaknut(mVU, (lane + 1) & 3))
+		return;
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_);
 	const int Ft = mVU.regAlloc->allocRegId(-1, _Ft_, _X_Y_Z_W);
 	const oak::QReg src = oakQRegister(Fs);
@@ -2169,6 +2230,12 @@ static void mVU_moveVIToAddressGPR_oaknut(mV, int dst, int vi)
 	}
 	mVU.regAlloc->clearNeeded(src);
 }
+
+static __fi void mVUaddressFromVI_oaknut(oak::WReg dst, oak::WReg src, u32 shift, u32 width)
+{
+	oakAsm->UBFIZ(dst, src, shift, width);
+}
+
 
 static void mVUaddrFix_oaknut(mV, int gprReg)
 {
@@ -2363,6 +2430,14 @@ static bool mVU_makeIndexedQwordMemoryAddress_oaknut(mP, int addr, int vi, s32 i
 	if (!isVU1 || EmuConfig.Gamefixes.IbitHack || vi == 0)
 		return false;
 
+	if (imm == 0)
+	{
+		const int source = mVU.regAlloc->allocGPRId(vi);
+		mVUaddressFromVI_oaknut(oakWRegister(addr), oakWRegister(source), 0, 10);
+		mVU.regAlloc->clearNeeded(source);
+		mVU_prepareMemoryBase_oaknut(mVU);
+		return true;
+	}
 	mVU_moveVIToAddressGPR_oaknut(mVU, addr, vi);
 	const oak::WReg addr_w = oakWRegister(addr);
 	recBeginOaknutEmit();
@@ -2390,8 +2465,17 @@ static void mVU_makeRegisterMemoryAddress_oaknut(mP, int addr, int vi, s32 byte_
 	if (mVU_tryConstantMemoryAddress_oaknut(mVU, recPass, vi, 0, byte_offset))
 		return;
 
-	mVU_moveVIToAddressGPR_oaknut(mVU, addr, vi);
-	mVUaddrFix_oaknut(mVU, addr);
+	if (isVU1 && vi != 0)
+	{
+		const int source = mVU.regAlloc->allocGPRId(vi);
+		mVUaddressFromVI_oaknut(oakWRegister(addr), oakWRegister(source), 4, 10);
+		mVU.regAlloc->clearNeeded(source);
+	}
+	else
+	{
+		mVU_moveVIToAddressGPR_oaknut(mVU, addr, vi);
+		mVUaddrFix_oaknut(mVU, addr);
+	}
 	recBeginOaknutEmit();
 	mVU_prepareMemoryBase_oaknut(mVU);
 	const oak::XReg base = mVU_memoryBaseRegister_oaknut(mVU);
@@ -3967,3 +4051,45 @@ static void mVU_JALR_emit(mP)
 	}
 	pass3 { mVUlog("JALR vi%02d, [vi%02d]", _Ft_, _Fs_); }
 }
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+// Emit production primitives into the oracle-owned buffer. No live microVU
+// allocator, program or guest state is modified by these probes.
+extern "C" u32 EmuCoreXOracleEmitVULocalPrimitive(u32 kind, u32 argument, bool alias)
+{
+	const u8* begin = oakGetCurrentCodePointer();
+	if (kind == 0)
+		mVUIrPshufd_oaknut(0, alias ? 0 : 1, static_cast<u8>(argument));
+	else if (kind == 1)
+		mVU_unsignedVIImmediate_oaknut(oak::util::W0, alias ? oak::util::W0 : oak::util::W1, argument, false);
+	else if (kind == 2)
+		mVU_unsignedVIImmediate_oaknut(oak::util::W0, alias ? oak::util::W0 : oak::util::W1, argument, true);
+	else if (kind == 3)
+		mVU_FCOR_reduce_oaknut(oak::util::W0, argument);
+	else if (kind == 7)
+		mVUclearNonStickyStatus_oaknut(oak::util::W0, alias ? oak::util::W0 : oak::util::W1);
+	else if (kind == 8)
+		mVUaddressFromVI_oaknut(oak::util::W0, alias ? oak::util::W0 : oak::util::W1, argument ? 4 : 0, 10);
+	else if (kind == 9)
+		mVUinsertCachedLane_oaknut(0, alias ? 0 : 1, argument >> 2, argument & 3);
+	else if (kind == 10)
+		mVUopPermuteFs_oaknut(0, 1, argument != 0);
+	else if (kind == 11)
+		mVUopPermuteFt_oaknut(0, 1, argument != 0);
+	else if (kind == 5 || kind == 6)
+		mVUUpperMaxMinSelect_oaknut(oak::QReg(0), oak::QReg(1), OAK_QSCRATCH, OAK_QSCRATCH2, kind == 5, true);
+	else if (kind == 4)
+	{
+		microVU probe{microVU1.prog};
+		probe.index = 1;
+		probe.cop2 = 0;
+		probe.regAlloc = std::make_unique<microRegAlloc>(1);
+		const int original = probe.regAlloc->allocRegId(1);
+		const u8* clone_begin = oakGetCurrentCodePointer();
+		const int destination = probe.regAlloc->allocRegId(1, 2, 0xf);
+		mVUUpperAddPs_oaknut(probe, destination, original);
+		return static_cast<u32>(oakGetCurrentCodePointer() - clone_begin);
+	}
+	return static_cast<u32>(oakGetCurrentCodePointer() - begin);
+}
+#endif

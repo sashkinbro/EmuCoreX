@@ -85,6 +85,11 @@ __fi void setBitFSEQ(int reg, int bitX)
 	recEndOaknutEmit();
 }
 
+static __fi void mVUclearNonStickyStatus_oaknut(oak::WReg dst, oak::WReg src)
+{
+	oakAsm->AND(dst, src, 0xfffc00ffu);
+}
+
 __fi void mVUallocSFLAGa(int reg, int fInstance)
 {
 	recBeginOaknutEmit();
