@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 EmuCoreX Team
 // SPDX-License-Identifier: GPL-3.0+
 // Include after jit_oracle_gs_vertices.inl; both paths consume identical GIF streams.
+#include "GS/GSUtil.h"
 extern "C" void EmuCoreXOracleSetGSPackedBatch(bool enabled, bool observe = true);
 extern "C" void EmuCoreXOracleGSPackedBatchStats(u64* values);
 
@@ -13,6 +14,7 @@ struct GSPackedBatchOracle final : GSState
     std::vector<u8> draws;
     u32 drawCount = 0;
     u32 vertexFlushes = 0;
+    bool captureTrace = false;
     bool IsCoverageAlphaSupported() override { return true; }
 
     GSPackedBatchOracle()
@@ -58,8 +60,94 @@ struct GSPackedBatchOracle final : GSState
         Append(draws, m_state_flush_reason);
         Append(draws, snapshot.size());
         draws.insert(draws.end(), snapshot.begin(), snapshot.end());
+        if (captureTrace)
+        {
+            const auto trace = TraceSnapshot();
+            draws.insert(draws.end(), trace.begin(), trace.end());
+        }
         ++drawCount;
         vertexFlushes += m_state_flush_reason == GSFlushReason::VERTEXCOUNT;
+    }
+
+    std::vector<u8> TraceSnapshot() const
+    {
+        std::vector<u8> out;
+        Append(out, m_vt.m_min); Append(out, m_vt.m_max); Append(out, m_vt.m_eq.value);
+        Append(out, m_vt.nan.value); Append(out, m_vt.m_filter); Append(out, m_vt.m_lod);
+        Append(out, m_vt.m_alpha.min); Append(out, m_vt.m_alpha.max); Append(out, m_vt.m_alpha.valid);
+        Append(out, m_vt.m_accurate_stq); Append(out, m_vt.m_primclass);
+        return out;
+    }
+
+    void SetTraceFlags(bool tme, bool fst, bool iip, bool decal, u32 size = 5)
+    {
+        m_env.PRIM.TME = tme; m_env.PRIM.FST = fst; m_env.PRIM.IIP = iip;
+        for (auto& ctx : m_env.CTXT)
+        {
+            ctx.TEX0.TW = size; ctx.TEX0.TH = size + 1;
+            ctx.TEX0.TFX = decal ? TFX_DECAL : TFX_MODULATE; ctx.TEX0.TCC = decal;
+            ctx.TEX1.U64 = 0; ctx.TEX1.MXL = 2; ctx.TEX1.MMIN = 3; ctx.TEX1.MMAG = 1;
+            ctx.TEST.ZTE = 1; ctx.TEST.ZTST = ZTST_GEQUAL;
+        }
+        m_prev_env = m_env;
+        m_vt.m_min = {}; m_vt.m_max = {}; m_vt.m_eq.value = 0;
+        m_vt.nan.value = 9; m_vt.m_filter = {}; m_vt.m_lod = {};
+        m_vt.m_alpha = {7, 249, true}; m_vt.m_accurate_stq = false;
+        UpdateContext(); UpdateVertexKick();
+    }
+
+    std::vector<u8> TraceNow()
+    {
+        m_vt.Update(m_vertex.buff, m_index.buff, m_vertex.tail, m_index.tail,
+            GSUtil::GetPrimClass(PRIM->PRIM));
+        return TraceSnapshot();
+    }
+
+    void PoisonTraceCoverage(u32 kind)
+    {
+#if defined(ARCH_ARM64)
+        if (kind == 0) m_fused_trace.indices -= 3;
+        if (kind == 1) m_fused_trace.vertexEnd = m_vertex.tail + 1;
+        if (kind == 2) m_fused_trace.watermark = m_fused_trace.vertexEnd + 1;
+        if (kind == 3) m_fused_trace.key ^= 1;
+        if (kind == 4) m_fused_trace.Invalidate();
+#endif
+    }
+
+    std::vector<u8> TraceForeign(bool foreignVertex)
+    {
+        const std::vector<GSVertex> vertices(m_vertex.buff, m_vertex.buff + m_vertex.tail);
+        const std::vector<u16> indices(m_index.buff, m_index.buff + m_index.tail);
+        m_vt.Update(foreignVertex ? vertices.data() : m_vertex.buff,
+            foreignVertex ? m_index.buff : indices.data(), m_vertex.tail, m_index.tail,
+            GSUtil::GetPrimClass(PRIM->PRIM));
+        return TraceSnapshot();
+    }
+
+    void SetKnownTraceCarry() { m_v.FOG = 31; }
+
+    bool KnownTraceMatches() const
+    {
+        const GSVector4 lo(6.25f, 6.25f, 305419904.0f, 31.0f), hi(25.0f, 25.0f, 305419904.0f, 31.0f);
+        const GSVector4 texture(16.0f, 64.0f, 2.0f, 2.0f);
+        const GSVector4i color(17, 34, 51, 68);
+        return std::memcmp(&m_vt.m_min.p, &lo, sizeof(lo)) == 0 &&
+            std::memcmp(&m_vt.m_max.p, &hi, sizeof(hi)) == 0 &&
+            std::memcmp(&m_vt.m_min.t, &texture, sizeof(texture)) == 0 &&
+            std::memcmp(&m_vt.m_max.t, &texture, sizeof(texture)) == 0 &&
+            std::memcmp(&m_vt.m_min.c, &color, sizeof(color)) == 0 &&
+            std::memcmp(&m_vt.m_max.c, &color, sizeof(color)) == 0 &&
+            m_vt.nan.value == 0 && m_vt.m_eq.rgba == 0xffff && m_vt.m_eq.z && m_vt.m_eq.f;
+    }
+
+    void RewindForTrace(u32 prim)
+    {
+        std::vector<GIFPackedReg> packet(2);
+        packet[0].U64[0] = 1 | (1ull << 15) | (1ull << 60);
+        packet[0].U64[1] = GIF_REG_A_D;
+        packet[1].A_D.ADDR = GIF_A_D_REG_PRIM;
+        packet[1].r.PRIM = m_env.PRIM; packet[1].r.PRIM.PRIM = prim;
+        Submit(packet, 0);
     }
 
     void Prepare(u32 prim, bool native, bool offset, bool aa1, bool smallBuffer, bool invalidScissor = false)

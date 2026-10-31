@@ -109,7 +109,7 @@ namespace GSStripKickKernel
     template<bool writeRing=true,bool observe=false,class Cursor>
     __forceinline_odr GSVector4i Emit(Cursor& cursor,GSVector4i* RESTRICT ring,
         const Entry* RESTRICT seed,const u64* RESTRICT sideXY,const u64* RESTRICT sideMeta,
-        u32 count,u32& accState,u32& scalarCulls)
+        u32 count,u32& accState,u32& scalarCulls,GSFusedVertexTrace::State& trace,u32 traceKey)
     {
         GSVertex* RESTRICT vertices=cursor.vb;
         u32 head=cursor.head,tail=cursor.tail,next=cursor.next,itail=cursor.itail;
@@ -131,10 +131,12 @@ namespace GSStripKickKernel
             if(next<head)
             {
                 vertices[next]=vertices[head];vertices[next+1]=vertices[head+1];vertices[next+2]=vertices[head+2];
+                trace.Rewind(next);
                 head=next;
             }
             indices[0]=static_cast<u16>(head);indices[1]=static_cast<u16>(head+1);indices[2]=static_cast<u16>(head+2);
             indices+=3;itail+=3;tail=head+3;next=tail;++head;
+            trace.Triangle(vertices,tail-3,itail,traceKey);
             const GSVector4i draw=NativeBBox(xy0,xy1,xy2).sra32<4>()+GSVector4i(0,0,1,1);
             if(accState)rect=rect.runion(draw);
             else {rect=draw;accState=(itail==3)?2:1;}

@@ -200,6 +200,9 @@ void GSState::Reset(bool hardware_reset)
 	m_vertex.tail = 0;
 	m_vertex.next = 0;
 	m_index.tail = 0;
+#if defined(ARCH_ARM64)
+	m_fused_trace.Invalidate();
+#endif
 	m_scanmask_used = 0;
 	m_texflush_flag = false;
 	m_channel_shuffle = false;
@@ -1318,6 +1321,9 @@ __forceinline void GSState::ApplyPRIM(u32 prim)
 		m_vertex.next = 0;
 
 	m_vertex.head = m_vertex.tail = m_vertex.next; // remove unused vertices from the end of the vertex buffer
+#if defined(ARCH_ARM64)
+	m_fused_trace.Rewind(m_vertex.next);
+#endif
 }
 
 void GSState::GIFRegHandlerPRIM(const GIFReg* RESTRICT r)
@@ -2337,6 +2343,11 @@ void GSState::FlushPrim()
 		// Update scissor, it may have been modified by a previous draw
 		m_env.CTXT[PRIM->CTXT].UpdateScissor();
 		m_vt.Update(m_vertex.buff, m_index.buff, m_vertex.tail, m_index.tail, GSUtil::GetPrimClass(PRIM->PRIM));
+#if defined(ARCH_ARM64)
+		// Rounding and renderer transforms may mutate referenced vertex bytes.
+		// Any carried window belongs to a fresh draw after this point.
+		m_fused_trace.Invalidate();
+#endif
 
 		// Texel coordinate rounding
 		// Helps Manhunt (lights shining through objects).
@@ -5051,14 +5062,14 @@ u32 GSState::KickPackedStripChunk(const GIFPackedReg* RESTRICT r, u32 remaining,
 	if (s_gsStripKernelObserve)
 	{
 		if (s_gsStripKernelMutation == 1)
-			rect = Emit<false, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls);
+			rect = Emit<false, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM));
 		else
-			rect = Emit<true, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls);
+			rect = Emit<true, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM));
 		++s_gsStripKernelStats[0]; s_gsStripKernelStats[1] += count; s_gsStripKernelStats[3] += scalarCulls;
 	}
 	else
 #endif
-		rect = Emit<true, false>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls);
+		rect = Emit<true, false>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM));
 	if (accState)
 	{
 		// No helper observes the environment inside the chunk. Capture it only
@@ -5624,6 +5635,9 @@ __forceinline void GSState::VertexKick(u32 skip)
 				m_vertex.buff[next + 0] = m_vertex.buff[head + 0];
 				m_vertex.buff[next + 1] = m_vertex.buff[head + 1];
 				m_vertex.buff[next + 2] = m_vertex.buff[head + 2];
+#if defined(ARCH_ARM64)
+				m_fused_trace.Rewind(next);
+#endif
 				head = next;
 				m_vertex.tail = next + 3;
 			}
@@ -5657,6 +5671,13 @@ __forceinline void GSState::VertexKick(u32 skip)
 		default:
 			ASSUME(0);
 	}
+
+#if defined(ARCH_ARM64)
+	if constexpr (prim == GS_TRIANGLELIST || prim == GS_TRIANGLESTRIP)
+		m_fused_trace.Triangle(m_vertex.buff, head, m_index.tail, GSFusedVertexTrace::Key(*PRIM));
+	else
+		m_fused_trace.Invalidate();
+#endif
 
 	// Update the current draw rectangle using exclusive pixel endpoints.
 	const GSVector4i draw_rect = bbox.sra32<4>() + GSVector4i(0, 0, 1, 1);
@@ -5874,6 +5895,9 @@ __forceinline void GSState::VertexKickDirect(u32 skip, const GSVector4i& new_v0,
 				c.vb[next + 0] = c.vb[head + 0];
 				c.vb[next + 1] = c.vb[head + 1];
 				c.vb[next + 2] = c.vb[head + 2];
+#if defined(ARCH_ARM64)
+				m_fused_trace.Rewind(next);
+#endif
 				head = next;
 				c.tail = next + 3;
 			}
@@ -5907,6 +5931,13 @@ __forceinline void GSState::VertexKickDirect(u32 skip, const GSVector4i& new_v0,
 		default:
 			ASSUME(0);
 	}
+
+#if defined(ARCH_ARM64)
+	if constexpr (prim == GS_TRIANGLELIST || prim == GS_TRIANGLESTRIP)
+		m_fused_trace.Triangle(c.vb, head, c.itail, GSFusedVertexTrace::Key(*PRIM));
+	else
+		m_fused_trace.Invalidate();
+#endif
 
 	// Update the current draw rectangle using exclusive pixel endpoints.
 	const GSVector4i draw_rect = bbox.sra32<4>() + GSVector4i(0, 0, 1, 1);

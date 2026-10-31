@@ -7,6 +7,24 @@
 
 #include "common/Console.h"
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+thread_local bool g_gsFusedTraceEnabled = true;
+thread_local bool g_gsFusedTraceObserve = false;
+thread_local u32 g_gsFusedTraceMutation = 0;
+thread_local u64 g_gsFusedTraceStats[4] = {}; // legacy calls/indices, fused calls, unique vertices
+extern "C" void EmuCoreXOracleSetGSFusedTrace(bool enabled, bool observe, u32 mutation)
+{
+	g_gsFusedTraceEnabled = enabled;
+	g_gsFusedTraceObserve = observe;
+	g_gsFusedTraceMutation = mutation;
+	std::fill(std::begin(g_gsFusedTraceStats), std::end(g_gsFusedTraceStats), 0);
+}
+extern "C" void EmuCoreXOracleGSFusedTraceStats(u64* values)
+{
+	std::copy(std::begin(g_gsFusedTraceStats), std::end(g_gsFusedTraceStats), values);
+}
+#endif
+
 GSVertexTrace::GSVertexTrace(const GSState* state)
 	: m_state(state)
 {
@@ -25,7 +43,38 @@ void GSVertexTrace::Update(const void* vertex, const u16* index, int v_count, in
 	const u32 fst = m_state->PRIM->FST;
 	const u32 color = !(m_state->PRIM->TME && m_state->m_context->TEX0.TFX == TFX_DECAL && m_state->m_context->TEX0.TCC);
 
-	m_fmm[color][fst][tme][iip][primclass](*this, vertex, index, i_count);
+	bool fused = false;
+#if defined(ARCH_ARM64)
+	const auto& cache = m_state->m_fused_trace;
+	if (
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		g_gsFusedTraceEnabled &&
+#endif
+		primclass == GS_TRIANGLE_CLASS && cache.valid &&
+		vertex == m_state->m_vertex.buff && index == m_state->m_index.buff &&
+		i_count > 0 && cache.indices == static_cast<u32>(i_count) &&
+		v_count >= 0 && cache.vertexEnd <= static_cast<u32>(v_count) &&
+		cache.watermark <= cache.vertexEnd && cache.key == GSFusedVertexTrace::Key(*m_state->PRIM))
+	{
+		GSFusedVertexTrace::Finish(cache.acc, tme != 0, fst != 0, color != 0,
+			m_state->m_context->XYOFFSET, m_state->m_context->TEX0.TW, m_state->m_context->TEX0.TH, *this);
+		fused = true;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (g_gsFusedTraceObserve) ++g_gsFusedTraceStats[2];
+#endif
+	}
+#endif
+	if (!fused)
+	{
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (g_gsFusedTraceObserve)
+		{
+			++g_gsFusedTraceStats[0];
+			g_gsFusedTraceStats[1] += i_count;
+		}
+#endif
+		m_fmm[color][fst][tme][iip][primclass](*this, vertex, index, i_count);
+	}
 
 	// Potential float overflow detected. Better uses the slower division instead
 	// Note: If Q is too big, 1/Q will end up as 0. 1e30 is a random number

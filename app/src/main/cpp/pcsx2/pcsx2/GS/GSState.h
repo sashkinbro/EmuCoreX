@@ -12,6 +12,7 @@
 #include "GS/Renderers/Common/GSVertexTrace.h"
 #include "GS/Renderers/Common/GSDevice.h"
 #include "GS/GSVector.h"
+#include "GS/GSFusedVertexTrace.h"
 #include "GSAlignedClass.h"
 
 #include <array>
@@ -21,6 +22,7 @@ class GSDumpBase;
 
 class GSState : public GSAlignedClass<32>
 {
+	friend class GSVertexTrace;
 public:
 	GSState();
 	virtual ~GSState();
@@ -562,6 +564,9 @@ protected:
 	// Explicit savestate serialization does not contain this side table.
 	alignas(16) u64 m_strip_side_xy[128] = {};
 	alignas(16) u64 m_strip_side_meta[128] = {};
+#if defined(ARCH_ARM64)
+	GSFusedVertexTrace::State m_fused_trace;
+#endif
 };
 
 // We put this in the header because of Multi-ISA.
