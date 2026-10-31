@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "GS/Renderers/HW/GSRendererHW.h"
+#include "GS/Renderers/Common/GSDrawRoadConfig.h"
 #include "GS/Renderers/HW/GSSpriteEdgeSnap.h"
 #include "GS/Renderers/HW/GSHwHack.h"
 #include "GS/Renderers/HW/GSTextureReplacements.h"
@@ -2763,6 +2764,7 @@ void GSRendererHW::Draw()
 
 				m_last_rt->UpdateValidity(valid_area);
 
+				m_conf.road = GSDecideHWDrawRoad(m_conf, g_gs_device->Features());
 				g_gs_device->RenderHW(m_conf);
 
 				if (GSConfig.DumpGSData)
@@ -7715,16 +7717,18 @@ __ri void GSRendererHW::HandleTextureHazards(const GSTextureCache::Target* rt, c
 				return;
 			}
 
-			if (!m_channel_shuffle)
+			if (!m_channel_shuffle && !g_gs_device->Features().texture_feedback_requires_copy)
 			{
 				const GSVector4i src_box_rect = GSVector4i(m_vt.m_min.t.x, m_vt.m_min.t.y, m_vt.m_max.t.x, m_vt.m_max.t.y);
-				const GSVector4i src_rect = src_box_rect + source_region.GetRect(rt->GetUnscaledSize().x, rt->GetUnscaledSize().y).xyxy();
+				const GSVector4i region_offset = source_region.GetRect(rt->GetUnscaledSize().x, rt->GetUnscaledSize().y).xyxy();
+				const GSVector4i src_rect = src_box_rect + region_offset;
 
 				// If the two don't overlap, there's no need to copy.
 				if (m_r.rintersect(src_rect).rempty())
 				{
 					if (HandleBarrierHazard(true))
 					{
+						m_conf.offset_read_hits_write = !m_r.rintersect(tmm.coverage + region_offset).rempty();
 						unscaled_size = rt->GetUnscaledSize();
 						scale = rt->GetScale();
 						return;
@@ -9356,9 +9360,11 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 		const bool need_barriers_for_depth =
 			GSNeedsDirectDepthFeedbackBarriers(features, m_conf.ps.IsFeedbackLoopDepth());
 
-		if (!need_barriers_for_depth)
+		const bool drop_barriers = g_gs_device->GetRenderAPI() == RenderAPI::Vulkan ?
+			GSDrawDropsBarriers(GSGetDrawRoadDevice(features), m_conf.tex_hazard == GSHWDrawConfig::TEX_HAZARD_RT,
+				m_prim_overlap != PRIM_OVERLAP_NO, need_barriers_for_depth) : !need_barriers_for_depth;
+		if (drop_barriers)
 		{
-			// Barriers aren't needed with fbfetch
 			m_conf.require_one_barrier = false;
 			m_conf.require_full_barrier = false;
 		}
@@ -9366,11 +9372,10 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 	// Multi-pass algorithms shouldn't be needed with full barrier and backends may not handle this correctly
 	pxAssert(!m_conf.require_full_barrier || !m_conf.ps.colclip_hw);
 
-	// Swap full barrier for one barrier when there's no overlap, or a shuffle. On mobile tile
-	// GPUs the per-chunk barrier split costs thousands of pipeline barriers per frame and tanks
-	// performance, so overlapping draws also use a single barrier (matching AetherSX2).
+	// Only non-overlap or a shuffle can reduce a required per-primitive barrier.
+	// An actual ordered fetch has already removed its barriers above.
 	if (GSHasBarrierFeedbackSupport(features) && m_conf.require_full_barrier &&
-		(g_gs_device->IsMobileGPUProfile() || m_prim_overlap == PRIM_OVERLAP_NO || m_conf.ps.shuffle ||
+		(m_prim_overlap == PRIM_OVERLAP_NO || m_conf.ps.shuffle ||
 			m_channel_shuffle))
 	{
 		m_conf.require_full_barrier = false;
@@ -9418,6 +9423,7 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 		GSHWDrawConfig::DumpConfig(GetDrawDumpPath("%05d_hwconfig.txt", s_n), m_conf);
 	}
 
+	m_conf.road = GSDecideHWDrawRoad(m_conf, features);
 	if (!m_channel_shuffle_width)
 		g_gs_device->RenderHW(m_conf);
 	else
@@ -10906,6 +10912,7 @@ void GSRendererHW::EndHLEHardwareDraw(bool force_copy_on_hazard /* = false */)
 	                      (!GSDevice::IsDualSourceBlendFactor(config.blend.src_factor) &&
 	                       !GSDevice::IsDualSourceBlendFactor(config.blend.dst_factor));
 
+	config.road = GSDecideHWDrawRoad(config, g_gs_device->Features());
 	g_gs_device->RenderHW(m_conf);
 
 	if (copy)

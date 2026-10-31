@@ -855,6 +855,7 @@ public:
 	bool TestTFXPreparationResources() const;
 	void TestTextureUploadRing(void (*check)(bool, const char*));
 	void TestRenderPassRestarts(void (*check)(bool, const char*));
+	void TestDrawRoad(void (*check)(bool, const char*));
 	void TestRenderPassOrdering(void (*check)(bool, const char*), VkPipeline sampled_pipeline,
 		VkSampler sampler, VkRenderPass sampled_pass);
 	void SetTFXPreparationFailureStageForTesting(TFXPreparationFailureStage stage)
@@ -947,6 +948,8 @@ public:
 	bool BindDrawPipeline(const PipelineSelector& p);
 
 	void DoRenderHW(GSHWDrawConfig& config) override;
+	bool HWDrawNeedsAttachmentRestart(const GSHWDrawConfig& config, const PipelineSelector& pipe) const;
+	void ApplyHWDrawFeedbackCarry(const GSHWDrawConfig& config, PipelineSelector& pipe, GSTextureVK* rt, GSTextureVK* ds);
 	void UpdateHWPipelineSelector(GSHWDrawConfig& config, PipelineSelector& pipe);
 	void UploadHWDrawVerticesAndIndices(GSHWDrawConfig& config);
 	VkImageMemoryBarrier GetColorBufferFeedbackBarrier(GSTextureVK* rt) const;

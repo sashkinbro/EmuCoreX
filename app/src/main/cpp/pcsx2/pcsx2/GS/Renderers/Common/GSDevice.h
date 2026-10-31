@@ -7,6 +7,7 @@
 #include "common/WindowInfo.h"
 #include "GS/GS.h"
 #include "GS/Renderers/Common/GSFastList.h"
+#include "GS/Renderers/Common/GSDrawRoad.h"
 #include "GS/Renderers/Common/GSGPUProfile.h"
 #include "GS/Renderers/Common/GSShaderEnums.h"
 #include "GS/Renderers/Common/GSTexture.h"
@@ -1279,6 +1280,8 @@ struct alignas(16) GSHWDrawConfig
 
 	bool require_one_barrier;  ///< Require texture barrier before draw (also used to requst an rt copy if texture barrier isn't supported)
 	bool require_full_barrier; ///< Require texture barrier between all prims
+	bool offset_read_hits_write; ///< Filtered offset self-read includes pixels written by this draw.
+	GSDrawRoad road; ///< Renderer-owned self-read and compatible-pass carry decisions.
 
 	enum : u32
 	{
@@ -1445,6 +1448,10 @@ public:
 		bool astc_textures : 1; ///< ASTC LDR sampled textures.
 		bool dxt_textures         : 1; ///< Supports DXTn texture compression, i.e. S3TC and BC1-3.
 		bool bptc_textures        : 1; ///< Supports BC6/7 texture compression.
+		bool feedback_loop_layout : 1; ///< Actual sampler attachment-feedback-loop road.
+		bool framebuffer_fetch_orders_overlap : 1; ///< Actual fetch orders overlapping primitives.
+		bool declared_feedback_loop_orders_overlap : 1; ///< Declared loop orders overlapping primitives.
+		GSFeedbackCarry feedback_carry = GSFeedbackCarry::None;
 		bool framebuffer_fetch    : 1; ///< Can sample from the framebuffer without texture barriers.
 		bool texture_feedback_requires_copy : 1; ///< Framebuffer fetch cannot make ordinary sampler reads of attached textures safe (Haunting Ground-only workaround).
 		bool stencil_buffer       : 1; ///< Supports stencil buffer, and can use for DATE.

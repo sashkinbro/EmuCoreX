@@ -252,10 +252,14 @@ void GSDeviceVK::TestRenderPassOrdering(void (*check)(bool, const char*), VkPipe
         VkDescriptorSetLayout input_layout = VK_NULL_HANDLE;
         VkPipelineLayout layout = VK_NULL_HANDLE;
         VkShaderModule vertex = VK_NULL_HANDLE, fragment = VK_NULL_HANDLE;
-        VkPipeline feedback_pipeline = VK_NULL_HANDLE;
+        VkPipeline feedback_pipeline = VK_NULL_HANDLE, plain_pipeline = VK_NULL_HANDLE;
+        VkShaderModule plain_fragment = VK_NULL_HANDLE;
+        bool carried_pixels = false;
         ScopedGuard cleanup_input = [&]() {
             EndRenderPass(); vkDeviceWaitIdle(m_device);
             if (feedback_pipeline) vkDestroyPipeline(m_device, feedback_pipeline, nullptr);
+            if (plain_pipeline) vkDestroyPipeline(m_device, plain_pipeline, nullptr);
+            if (plain_fragment) vkDestroyShaderModule(m_device, plain_fragment, nullptr);
             if (fragment) vkDestroyShaderModule(m_device, fragment, nullptr);
             if (vertex) vkDestroyShaderModule(m_device, vertex, nullptr);
             if (layout) vkDestroyPipelineLayout(m_device, layout, nullptr);
@@ -321,9 +325,63 @@ void main(){vec2 p=vec2((gl_VertexIndex<<1)&2,gl_VertexIndex&2);gl_Position=vec4
         vkCmdSetViewport(GetCurrentCommandBuffer(), 0, 1, &viewport);
         vkCmdSetScissor(GetCurrentCommandBuffer(), 0, 1, &scissor);
         vkCmdDraw(GetCurrentCommandBuffer(), 3, 1, 0, 0);
+        if (!read_depth && UsesRasterizationOrderAttachmentAccessForFeedback())
+        {
+            GSHWDrawConfig plain{}; plain.rt = output;
+            plain.road = GSDecideHWDrawRoad(plain, m_features);
+            PipelineSelector selected{};
+            UpdateHWPipelineSelector(plain, selected);
+            ApplyHWDrawFeedbackCarry(plain, selected, output, nullptr);
+            check(selected.IsRTFeedbackLoop(), "GS actual ROAA reader to non-reader preserves the compatible feedback pass");
+            plain_fragment = g_vulkan_shader_cache->GetFragmentShader(R"(#version 450
+layout(location=0) out vec4 color;void main(){color=vec4(222.0,188.0,154.0,255.0)/255.0;})");
+            if (selected.IsRTFeedbackLoop() && plain_fragment)
+            {
+                Vulkan::GraphicsPipelineBuilder gp;
+                gp.SetVertexShader(vertex); gp.SetFragmentShader(plain_fragment);
+                gp.SetPrimitiveTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+                gp.SetNoCullRasterizationState(); gp.SetNoDepthTestState(); gp.SetNoStencilState(); gp.SetNoBlendingState();
+                gp.SetDynamicViewportAndScissorState(); gp.SetPipelineLayout(layout); gp.SetRenderPass(feedback_pass, 0);
+                gp.AddBlendFlags(VK_PIPELINE_COLOR_BLEND_STATE_CREATE_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_BIT_EXT);
+                plain_pipeline = gp.Create(m_device);
+            }
+            check(plain_pipeline != VK_NULL_HANDLE, "GS actual ROAA non-reader builds the matching render-pass/pipeline schema");
+            if (plain_pipeline)
+            {
+                const auto active = m_current_render_pass;
+                OMSetRenderTargets(output, nullptr, rect, static_cast<FeedbackLoopFlag>(selected.feedback_loop_flags));
+                check(InRenderPass() && m_current_render_pass == active,
+                    "GS actual ROAA non-reader retains the open pass without changing attachment layout");
+                vkCmdBindPipeline(GetCurrentCommandBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, plain_pipeline);
+                const VkRect2D half{{8, 0}, {8, 16}};
+                vkCmdSetScissor(GetCurrentCommandBuffer(), 0, 1, &half);
+                vkCmdDraw(GetCurrentCommandBuffer(), 3, 1, 0, 0);
+                // The following reader uses the very same input descriptor and
+                // consumes the non-reader's newly produced pixels in this pass.
+                vkCmdBindPipeline(GetCurrentCommandBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, feedback_pipeline);
+                vkCmdSetScissor(GetCurrentCommandBuffer(), 0, 1, &scissor);
+                vkCmdDraw(GetCurrentCommandBuffer(), 3, 1, 0, 0);
+                carried_pixels = true;
+            }
+        }
         EndRenderPass();
         if (!read_depth)
-            check(check_color(read(*output), left, right), "GS consecutive color feedback pass reads the producer's exact per-pixel values");
+        {
+            check(check_color(read(*output), left, carried_pixels ? replacement : right),
+                carried_pixels ? "GS actual ROAA reader/non-reader/reader preserves exact new pixels in one pass" :
+                    "GS consecutive color feedback pass reads the producer's exact per-pixel values");
+            if (carried_pixels)
+            {
+                // Restore the independent later compute fixture's source.
+                OMSetRenderTargets(output, nullptr, rect);
+                BeginRenderPass(sampled_pass, rect);
+                VkClearAttachment restore{}; restore.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                GSVector4::store<false>(&restore.clearValue.color, GSVector4::unorm8(right));
+                const VkClearRect half{{{8, 0}, {8, 16}}, 0, 1};
+                vkCmdClearAttachments(GetCurrentCommandBuffer(), 1, &restore, 1, &half);
+                EndRenderPass();
+            }
+        }
         else
         {
             const auto bytes = read(*output);

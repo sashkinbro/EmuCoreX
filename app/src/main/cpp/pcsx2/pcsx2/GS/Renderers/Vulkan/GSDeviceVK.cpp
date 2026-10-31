@@ -8,6 +8,7 @@
 #include "GS/GSShaderCompileIndicator.h"
 #include "GS/GSUtil.h"
 #include "GS/Renderers/Vulkan/GSDeviceVK.h"
+#include "GS/Renderers/Common/GSDrawRoadConfig.h"
 #include "GS/Renderers/Vulkan/GSLsfg.h"
 #include "GS/Renderers/Vulkan/VKBuilders.h"
 #include "GS/Renderers/Vulkan/VKLoader.h"
@@ -3381,17 +3382,26 @@ bool GSDeviceVK::CheckFeatures()
 	const bool has_framebuffer_fetch_extension = m_optional_extensions.vk_ext_rasterization_order_attachment_access;
 	const std::string_view driver_info = m_optional_extensions.vk_khr_driver_properties ?
 		std::string_view(m_device_driver_properties.driverInfo) : std::string_view{};
-	const bool framebuffer_fetch = ShouldEnableMaliSX2ROAA(driver_info, has_framebuffer_fetch_extension,
-		!GSConfig.DisableFramebufferFetch);
 	const bool texture_barrier = (GSConfig.OverrideTextureBarriers != 0);
+	const bool framebuffer_fetch = GSUsesInTileFeedbackRoad(
+		ShouldEnableMaliSX2ROAA(driver_info, has_framebuffer_fetch_extension, !GSConfig.DisableFramebufferFetch),
+		texture_barrier);
 
 	m_features.multidraw_fb_copy = false;
 	m_features.broken_point_sampler = false;
 
 	m_features.framebuffer_fetch = framebuffer_fetch;
 	m_features.texture_barrier = texture_barrier;
-	// Offset sampler reads also need a bounded source snapshot on the copy path.
-	m_features.texture_feedback_requires_copy = !texture_barrier;
+	m_features.feedback_loop_layout = UseFeedbackLoopLayout();
+	m_features.framebuffer_fetch_orders_overlap = framebuffer_fetch;
+	m_features.declared_feedback_loop_orders_overlap = false;
+	m_features.feedback_carry = GSFeedbackCarryForDevice({
+		.device_is_measured_vendor = m_device_properties.vendorID == 0x13b5,
+		.framebuffer_fetch = framebuffer_fetch,
+		.feedback_loop_layout = m_features.feedback_loop_layout});
+	// In-tile reads cannot serve a sampler read of another pixel.
+	m_features.texture_feedback_requires_copy = !texture_barrier ||
+		GSOffsetSelfReadNeedsCopy(GSGetDrawRoadDevice(m_features));
 	m_features.dual_source_blend = m_device_features.dualSrcBlend;
 
 	// geometryShader is needed because gl_PrimitiveID is part of the Geometry SPIR-V Execution Model.
@@ -9456,8 +9466,7 @@ void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 	// the render pass and pipeline feedback flags.
 	if (InRenderPass())
 	{
-		if ((!pipe.IsRTFeedbackLoop() && config.tex == m_current_render_target) ||
-			(!pipe.IsDepthFeedbackLoop() && config.tex == m_current_depth_target))
+		if (HWDrawNeedsAttachmentRestart(config, pipe))
 			EndRenderPass();
 	}
 
@@ -9614,11 +9623,11 @@ void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 			m_pipeline_selector.ds = true;
 		}
 
-		// Keep feedback-loop state draw-local. Carrying it over can leave later draws
-		// in the previous feedback render pass/layout and cause Vulkan-only flicker.
+		ApplyHWDrawFeedbackCarry(config, pipe, draw_rt, draw_ds);
+
 	}
 
-	if (draw_rt && (config.require_one_barrier || (config.tex && config.tex == config.rt)) && !m_features.texture_barrier)
+	if (draw_rt && config.road.clone_rt)
 	{
 		// Requires a copy of the RT.
 		draw_rt_clone = static_cast<GSTextureVK*>(CreateTexture(rtsize.x, rtsize.y, 1, draw_rt->GetFormat(), true));
@@ -9653,7 +9662,7 @@ void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 				CopyRect(draw_rt, draw_rt_clone, config.drawarea, config.drawarea.left, config.drawarea.top);
 			}
 
-			if (config.require_one_barrier)
+			if (GSNeedsRTSnapshotBinding(config))
 				PSSetShaderResource(2, draw_rt_clone, true);
 			if (config.tex_hazard == GSHWDrawConfig::TEX_HAZARD_RT)
 				PSSetShaderResource(0, draw_rt_clone, true);
@@ -9677,7 +9686,7 @@ void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 	else
 	{
 		// Preserve this draw's snapshot; only unused feedback bindings should be cleared.
-		PSSetShaderResource(TFX_TEXTURE_RT, config.require_one_barrier ? draw_rt_clone : nullptr, false);
+		PSSetShaderResource(TFX_TEXTURE_RT, GSNeedsRTSnapshotBinding(config) ? draw_rt_clone : nullptr, false);
 	}
 	if (pipe.IsDepthFeedbackLoop())
 	{
@@ -9873,6 +9882,24 @@ void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 	config.colclip_mode = GSHWDrawConfig::ColClipMode::NoModify;
 }
 
+bool GSDeviceVK::HWDrawNeedsAttachmentRestart(const GSHWDrawConfig& config, const PipelineSelector& pipe) const
+{
+	return config.tex && ((!pipe.IsRTFeedbackLoop() && config.tex == m_current_render_target) ||
+		(!pipe.IsDepthFeedbackLoop() && config.tex == m_current_depth_target));
+}
+
+void GSDeviceVK::ApplyHWDrawFeedbackCarry(const GSHWDrawConfig& config, PipelineSelector& pipe,
+	GSTextureVK* rt, GSTextureVK* ds)
+{
+	if (!InRenderPass() || config.road.clone_rt)
+		return;
+	if (config.road.carry_rt && rt && m_current_render_target == rt && rt->GetState() != GSTexture::State::Cleared)
+		pipe.feedback_loop_flags |= m_current_framebuffer_feedback_loop & FeedbackLoopFlag_ReadAndWriteRT;
+	if (config.road.carry_depth && ds && m_current_depth_target == ds && ds->GetState() != GSTexture::State::Cleared)
+		pipe.feedback_loop_flags |= m_current_framebuffer_feedback_loop &
+			(FeedbackLoopFlag_ReadAndWriteDepth | FeedbackLoopFlag_ReadDepth);
+}
+
 void GSDeviceVK::UpdateHWPipelineSelector(GSHWDrawConfig& config, PipelineSelector& pipe)
 {
 
@@ -9888,32 +9915,12 @@ void GSDeviceVK::UpdateHWPipelineSelector(GSHWDrawConfig& config, PipelineSelect
 	pipe.ds = config.ds != nullptr && !config.ps.HasDepthROV();
 	pipe.line_width = config.line_expand;
 	pipe.feedback_loop_flags = FeedbackLoopFlag_None;
-	if (m_features.texture_barrier && (config.require_one_barrier || config.require_full_barrier))
-	{
-		if (config.IsFeedbackLoopRT(config.ps))
-			pipe.feedback_loop_flags |= FeedbackLoopFlag_ReadAndWriteRT;
-
-		if (config.IsFeedbackLoopDepth(config.ps))
-			pipe.feedback_loop_flags |= FeedbackLoopFlag_ReadAndWriteDepth;
-	}
-	if (pipe.ds && !(pipe.feedback_loop_flags & FeedbackLoopFlag_ReadAndWriteDepth))
-	{
-		pipe.feedback_loop_flags |= (config.tex && config.tex == config.ds) ? FeedbackLoopFlag_ReadDepth : FeedbackLoopFlag_None;
-	}
-
-	// On tile-based mobile GPUs, use one render pass variant for every TFX draw. Switching between
-	// feedback and non-feedback passes makes the driver end the pass and flush the tile buffer on
-	// every transition, which in feedback-heavy games costs hundreds of restarts per frame.
-	// AetherSX2 gets the same effect by enabling rasterization order attachment access for the
-	// entire pass; where that is unavailable (this driver renders black with it), keeping the
-	// attachments feedback-capable for the whole pass is equivalent.
-	if (IsMobileGPUProfile())
-	{
-		if (pipe.rt)
-			pipe.feedback_loop_flags |= FeedbackLoopFlag_ReadAndWriteRT;
-		if (pipe.ds)
-			pipe.feedback_loop_flags |= FeedbackLoopFlag_ReadAndWriteDepth;
-	}
+	if (pipe.rt && config.road.rt_loop)
+		pipe.feedback_loop_flags |= FeedbackLoopFlag_ReadAndWriteRT;
+	if (pipe.ds && config.road.depth_loop)
+		pipe.feedback_loop_flags |= FeedbackLoopFlag_ReadAndWriteDepth;
+	else if (config.road.depth_read && pipe.ds)
+		pipe.feedback_loop_flags |= FeedbackLoopFlag_ReadDepth;
 
 	// enable point size in the vertex shader if we're rendering points regardless of upscaling.
 	pipe.vs.point_size |= (config.topology == GSHWDrawConfig::Topology::Point);
@@ -9983,12 +9990,6 @@ void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, 
 		Console.Warning("VK: Possible unnecessary barrier detected.");
 #endif
 
-	// With every mobile TFX pass carrying the subpass self-dependency (unified feedback pass), the
-	// explicit per-draw barrier is redundant: the dependency already orders attachment writes
-	// before the input-attachment reads of the following draws.
-	if (IsMobileGPUProfile())
-		one_barrier = false;
-
 	const VkDependencyFlags barrier_flags = GetFeedbackBarrierDependencyFlags();
 
 	std::array<VkImageMemoryBarrier, 2> barriers = {};
@@ -10056,4 +10057,5 @@ void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, 
 #include "GSTextureUploadTests.inl"
 #include "GSRenderPassRestartTests.inl"
 #include "GSRenderPassOrderingTests.inl"
+#include "GSDrawRoadTests.inl"
 #endif
