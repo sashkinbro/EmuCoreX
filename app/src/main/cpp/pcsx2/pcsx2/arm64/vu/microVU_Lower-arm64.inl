@@ -136,7 +136,8 @@ static __fi void mVU_addScalar_oaknut(mV, int to, int from)
 	mVU_clamp3Scalar_oaknut(mVU, to);
 	mVU_clamp3Scalar_oaknut(mVU, from);
 	oakAsm->FADD(oakSRegister(to), oakSRegister(to), oakSRegister(from));
-	mVU_clamp4Scalar_oaknut(mVU, to);
+	if (!mVUTryClampZeroTailResult_oaknut(mVU, to))
+		mVU_clamp4Scalar_oaknut(mVU, to);
 }
 
 static __fi void mVU_subScalar_oaknut(mV, int to, int from)
@@ -144,7 +145,8 @@ static __fi void mVU_subScalar_oaknut(mV, int to, int from)
 	mVU_clamp3Scalar_oaknut(mVU, to);
 	mVU_clamp3Scalar_oaknut(mVU, from);
 	oakAsm->FSUB(oakSRegister(to), oakSRegister(to), oakSRegister(from));
-	mVU_clamp4Scalar_oaknut(mVU, to);
+	if (!mVUTryClampZeroTailResult_oaknut(mVU, to))
+		mVU_clamp4Scalar_oaknut(mVU, to);
 }
 
 static __fi void mVU_mulScalar_oaknut(mV, int to, int from)
@@ -152,7 +154,8 @@ static __fi void mVU_mulScalar_oaknut(mV, int to, int from)
 	mVU_clamp3Scalar_oaknut(mVU, to);
 	mVU_clamp3Scalar_oaknut(mVU, from);
 	oakAsm->FMUL(oakSRegister(to), oakSRegister(to), oakSRegister(from));
-	mVU_clamp4Scalar_oaknut(mVU, to);
+	if (!mVUTryClampZeroTailResult_oaknut(mVU, to))
+		mVU_clamp4Scalar_oaknut(mVU, to);
 }
 
 static __fi void mVU_divScalar_oaknut(mV, int to, int from)
@@ -160,7 +163,8 @@ static __fi void mVU_divScalar_oaknut(mV, int to, int from)
 	mVU_clamp3Scalar_oaknut(mVU, to);
 	mVU_clamp3Scalar_oaknut(mVU, from);
 	oakAsm->FDIV(oakSRegister(to), oakSRegister(to), oakSRegister(from));
-	mVU_clamp4Scalar_oaknut(mVU, to);
+	if (!mVUTryClampZeroTailResult_oaknut(mVU, to))
+		mVU_clamp4Scalar_oaknut(mVU, to);
 }
 
 static __fi void mVU_EFUdivScalarRaw_oaknut(int to, int from)

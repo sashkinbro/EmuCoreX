@@ -193,3 +193,5 @@ void RunVULocalRewriteTests()
 }
 
 #include "jit_oracle_vu_zero_tail.inl"
+
+#include "jit_oracle_vu_lower_zero_tail.inl"

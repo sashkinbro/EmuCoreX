@@ -130,7 +130,7 @@ static __fi void mVUUpperClampZeroTailNumeric_oaknut(int reg)
 	mVUClamp1VectorFast_oaknut(reg);
 }
 
-static __fi void mVUUpperClampZeroTailResult_oaknut(mV, int reg)
+static __fi bool mVUTryClampZeroTailResult_oaknut(mV, int reg)
 {
 	const FPControlRegister fpcr = isCOP2 ? EmuConfig.Cpu.FPUFPCR :
 		(isVU1 ? EmuConfig.Cpu.VU1FPCR : EmuConfig.Cpu.VU0FPCR);
@@ -141,8 +141,15 @@ static __fi void mVUUpperClampZeroTailResult_oaknut(mV, int reg)
 	eligible &= s_vuLocalZeroTailClampEnabled;
 	if (eligible) ++s_vuLocalZeroTailClampEmits;
 #endif
-	if (eligible) mVUUpperClampZeroTailNumeric_oaknut(reg);
-	else mVUUpperClamp4Scalar_oaknut(mVU, reg);
+	if (!eligible) return false;
+	mVUUpperClampZeroTailNumeric_oaknut(reg);
+	return true;
+}
+
+static __fi void mVUUpperClampZeroTailResult_oaknut(mV, int reg)
+{
+	if (!mVUTryClampZeroTailResult_oaknut(mVU, reg))
+		mVUUpperClamp4Scalar_oaknut(mVU, reg);
 }
 
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)

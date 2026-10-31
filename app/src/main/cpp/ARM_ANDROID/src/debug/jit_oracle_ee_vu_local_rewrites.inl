@@ -224,3 +224,5 @@ void EEVuLocalStatusProbeTests()
 #include "jit_oracle_ee_vu_local_identity.inl"
 
 #include "jit_oracle_ee_vu_zero_tail.inl"
+
+#include "jit_oracle_ee_vu_lower_zero_tail.inl"
