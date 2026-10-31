@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0+
 #include "Common.h"
 #include "arm64/vuaot/VuAotPipe.h"
+#include "arm64/vuaot/VuAotLower.h"
+#include "arm64/vuaot/VuAotIR.h"
+#include "arm64/vuaot/VuAotBackground.h"
+#include "arm64/vuaot/VuAotConstants.h"
+#include "Vif_Dynarec.h"
 #include "arm64/vuaot/VuAotRuntime.h"
 #include "arm64/vuaot/VuAotLive.h"
 #include "arm64/vu/microVU_Persist-arm64.h"
@@ -2243,6 +2248,8 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vuaot_end_pq.inl"
 #include "jit_oracle_vuaot_jump.inl"
 #include "jit_oracle_vuaot_saved.inl"
+#include "jit_oracle_vuaot_clamp_reuse.inl"
+#include "jit_oracle_vif_pair_copy.inl"
 #include "jit_oracle_vuaot_division.inl"
 
 void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin_only = false,
@@ -12411,6 +12418,10 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         RunVuAotSavedTests();
     else if (std::strcmp(suite, "vu-aot-division") == 0)
         RunVuAotDivisionTests();
+    else if (std::strcmp(suite, "vu-aot-clamp-reuse") == 0)
+        RunVuAotClampReuseTests();
+    else if (std::strcmp(suite, "vif-pair-copy") == 0)
+        RunVifPairCopyTests();
     else if (std::strcmp(suite, "spu2-volume") == 0)
         EmuCoreXOracleTestVolumeSlide(Check);
     else if (std::strcmp(suite, "vif-mpg") == 0)

@@ -1,4 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2026 isztld <https://isztld.com/>
 // SPDX-License-Identifier: GPL-3.0
 
 #include "arm64/vu/Vif_UnpackNEON-arm64.h"
@@ -7,6 +8,10 @@
 #include "common/Assertions.h"
 #include "common/Perf.h"
 #include "common/StringUtil.h"
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+static thread_local bool s_vifPairCopyEnabled = true;
+#endif
 
 static void vifStoreLane32(oak::QReg reg, int lane, OakMemOperand addr)
 {
@@ -412,6 +417,45 @@ void VifUnpackNEON_Dynarec::ProcessMasks()
 	inputMasked = rowcol_mask == 0x55;
 }
 
+// Adapted from c8f32ece8b21a3e2ff027b77d60b4952b08083ce: adjacent V4-32 rows
+// copy a pair at a time. Packet storage (EE DMA, partial buffer or MTVU ring)
+// does not alias VU memory. Both argument bases are dead after this routine.
+void VifUnpackNEON_Dynarec::EmitCopyRows(const std::vector<CopyRow>& rows) const
+{
+	constexpr s64 pairReach = 1008;
+	const oak::XReg dstBase = dstIndirect.base;
+	const oak::XReg srcBase = srcIndirect.base;
+	s64 dstBias = 0, srcBias = 0;
+	for (size_t i = 0; i < rows.size();)
+	{
+		const auto [dst, src] = rows[i];
+		const bool paired = i + 1 < rows.size() &&
+			rows[i + 1].first == dst + 16 && rows[i + 1].second == src + 16;
+		if (paired)
+		{
+			if (dst - dstBias > pairReach)
+			{
+				oakAddSignedImm(dstBase, dstBase, dst - dstBias, OAK_XSCRATCH);
+				dstBias = dst;
+			}
+			if (src - srcBias > pairReach)
+			{
+				oakAddSignedImm(srcBase, srcBase, src - srcBias, OAK_XSCRATCH);
+				srcBias = src;
+			}
+			oakAsm->LDP(destReg, workReg, srcBase, oak::SOffset<11, 4>(src - srcBias));
+			oakAsm->STP(destReg, workReg, dstBase, oak::SOffset<11, 4>(dst - dstBias));
+			i += 2;
+		}
+		else
+		{
+			oakLoad128(destReg, {srcBase, src - srcBias});
+			oakStore128(destReg, {dstBase, dst - dstBias});
+			++i;
+		}
+	}
+}
+
 void VifUnpackNEON_Dynarec::CompileRoutine()
 {
 	const int wl = vB.wl ? vB.wl : 256; //0 is taken as 256 (KH2)
@@ -430,6 +474,14 @@ void VifUnpackNEON_Dynarec::CompileRoutine()
 	// Value passed determines # of col regs we need to load
 	SetMasks(isFill ? blockSize : cycleSize);
 
+	bool straightCopy = upkNum == 0xc && !doMask && !doMode;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	straightCopy &= s_vifPairCopyEnabled;
+#endif
+	std::vector<CopyRow> copyRows;
+	if (straightCopy)
+		copyRows.reserve(vNum);
+
 	while (vNum)
 	{
 		// Determine if reads/processing can be skipped.
@@ -438,8 +490,13 @@ void VifUnpackNEON_Dynarec::CompileRoutine()
 		if (vCL < cycleSize)
 		{
 			ModUnpack(upkNum, false);
-			xUnpack(upkNum);
-			xMovDest();
+			if (straightCopy)
+				copyRows.emplace_back(dstIndirect.offset, srcIndirect.offset);
+			else
+			{
+				xUnpack(upkNum);
+				xMovDest();
+			}
 			ModUnpack(upkNum, true);
 
 			dstIndirect.offset += 16;
@@ -451,8 +508,13 @@ void VifUnpackNEON_Dynarec::CompileRoutine()
 		}
 		else if (isFill)
 		{
-			xUnpack(upkNum);
-			xMovDest();
+			if (straightCopy)
+				copyRows.emplace_back(dstIndirect.offset, srcIndirect.offset);
+			else
+			{
+				xUnpack(upkNum);
+				xMovDest();
+			}
 
 			// dstIndirect += 16;
 			dstIndirect.offset += 16;
@@ -469,11 +531,33 @@ void VifUnpackNEON_Dynarec::CompileRoutine()
 		}
 	}
 
+	if (straightCopy)
+		EmitCopyRows(copyRows);
+
 	if (doMode >= 2)
 		writeBackRow();
 
 	oakAsm->RET();
 }
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" u32 EmuCoreXOracleCompileVifPairCopy(u32 index, const nVifBlock* block,
+    u8* code, u32 capacity, bool candidate)
+{
+    pxAssert(index < 2 && !oakHasBlock());
+    const u32 savedIndex=nVif[index].idx;
+    const bool savedPairCopy=s_vifPairCopyEnabled;
+    nVif[index].idx=index;
+    s_vifPairCopyEnabled=candidate;
+    oakSetAsmPtr(code,capacity);
+    u8* const begin=oakStartBlock();
+    VifUnpackNEON_Dynarec(nVif[index],*block).CompileRoutine();
+    u8* const end=oakEndBlock();
+    nVif[index].idx=savedIndex;
+    s_vifPairCopyEnabled=savedPairCopy;
+    return static_cast<u32>(end-begin);
+}
+#endif
 
 static u16 dVifComputeLength(uint cl, uint wl, u8 num, bool isFill)
 {

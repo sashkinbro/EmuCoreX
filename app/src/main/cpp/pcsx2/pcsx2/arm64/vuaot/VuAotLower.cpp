@@ -430,7 +430,6 @@ namespace vuaot
 			const LowerEnv& env_;
 			const HomeMap* hm_;
 			const LowerMode mode_;
-			u32 analysisN_ = 0; // f_.insts.size() + 1 (values before the pseudo values)
 			bool BindHomes(std::string& why);
 			int node_ = -1;
 			std::vector<ValueId> order_;
@@ -614,6 +613,22 @@ namespace vuaot
 			std::vector<ValueId> clampOf_;  // per canonical value: its clamped copy (a pseudo value), or 0
 			std::vector<s8> clampLane_;     // per clamped copy: the lane a scalar copy holds its value in
 			std::vector<u8> clampFixed_;    // per canonical value: already the output of this mode's clamp (clamping it changes nothing)
+			// Exact local input transforms stay within this node. In particular a
+			// bitwise sign clamp is never a numeric clampHome or its fixed point.
+			enum class InputClamp : u8 { Numeric, Sign, SignFlush };
+			struct TypedClamp
+			{
+				ValueId source, value;
+				InputClamp kind;
+				u8 shape; // 4: whole vector; 0..3: selected-lane broadcast
+				std::vector<u32> uses;
+			};
+			std::vector<TypedClamp> typedClamps_;
+			bool TypedClampMode() const { return env_.clampOverflow && !env_.clampExtra && !env_.clampSign; }
+			void CollectTypedClamps();
+			template <typename F>
+			int TypedClampOperand(ValueId source, InputClamp kind, u8 shape, F fetch);
+			int VuDoubleOperand(const ArgVec& args, size_t off);
 			// VI arithmetic on constants is folded at compile time; copies and
 			// repeated loads are aliased to the value they repeat.
 			std::vector<u8> folded_;        // per value: a constant computed here (constVal_)
@@ -1469,6 +1484,22 @@ namespace vuaot
 			if (in.op != Op::Fmac || (in.imm & 1))
 				return;
 			const UpperInst u = DecodeUpper(in.word);
+			if (TypedClampMode())
+			{
+				// These local bodies use integer sign transforms, not the generic
+				// numeric clamp. Advertising them reserves unused region homes.
+				if (u.op == UOp::MULAbc || u.op == UOp::ADD ||
+					(u.op == UOp::MSUB && u.mask == 15) ||
+					(u.op == UOp::MADDbc && (u.bc == 0 || u.bc == 3)))
+					return;
+				if (u.op == UOp::MULbc)
+				{
+					if (const ValueId c = SingleSource(in.args, 0))
+						out.push_back(c);
+					// Ft clamps the broadcast, never the unused source lanes.
+					return;
+				}
+			}
 			const bool arith = u.kind != FmacKind::Max && u.kind != FmacKind::Mini;
 			const bool step = E && arith;
 			const int ct = (env_.clampOverflow && !E) ? ClampType(u) : 0;
@@ -1488,6 +1519,91 @@ namespace vuaot
 			if (E && (u.kind == FmacKind::Madd || u.kind == FmacKind::Msub))
 				if (const ValueId c = SingleSource(in.args, 8))
 					out.push_back(c);
+		}
+
+		void Lowerer::CollectTypedClamps()
+		{
+			typedClamps_.clear();
+			if (!TypedClampMode())
+				return;
+			const auto note = [&](ValueId source, InputClamp kind, u8 shape, u32 pos) {
+				if (!source || cls_[source] != Cls::V)
+					return; // assembled/scalar operands retain their exact temporary path
+				for (auto& entry : typedClamps_)
+					if (entry.source == source && entry.kind == kind && entry.shape == shape)
+					{
+						if (entry.uses.back() != pos) entry.uses.push_back(pos);
+						return;
+					}
+				typedClamps_.push_back({source, 0, kind, shape, {pos}});
+			};
+			for (u32 p = 0; p < order_.size(); ++p)
+			{
+				const ValueId id = order_[p];
+				const Inst& in = I(id);
+				if (!emit_[id] || in.op != Op::Fmac || (in.imm & 1)) continue;
+				const UpperInst u = DecodeUpper(in.word);
+				if (u.op == UOp::MULAbc)
+					note(SingleSource(in.args, 0), InputClamp::Sign, 4, p);
+				else if (u.op == UOp::MULbc && u.mask == 15)
+					note(C(in.args[4]), InputClamp::Numeric, in.lane, p);
+				else if (u.op == UOp::ADD || (u.op == UOp::MSUB && u.mask == 15) ||
+					(u.op == UOp::MADDbc && (u.bc == 0 || u.bc == 3)))
+				{
+					const auto kind = env_.softwareFlush ? InputClamp::SignFlush : InputClamp::Sign;
+					note(SingleSource(in.args, 0), kind, 4, p);
+					if (u.op == UOp::MADDbc) note(C(in.args[4]), kind, in.lane, p);
+					else note(SingleSource(in.args, 4), kind, 4, p);
+					if (u.op != UOp::ADD) note(SingleSource(in.args, 8), kind, 4, p);
+				}
+			}
+			for (auto& entry : typedClamps_)
+				if (entry.uses.size() >= 2)
+					entry.value = NewPseudo(Cls::V, Remat::None, entry.uses);
+		}
+
+		template <typename F>
+		int Lowerer::TypedClampOperand(ValueId source, InputClamp kind, u8 shape, F fetch)
+		{
+			ValueId pid = 0;
+			if (TypedClampMode() && source)
+				for (const auto& entry : typedClamps_)
+					if (entry.source == source && entry.kind == kind && entry.shape == shape)
+					{
+						pid = entry.value;
+						break;
+					}
+			if (pid && (reg_[pid] >= 0 || slot_[pid] >= 0)) return UseReg(pid);
+			const int src = fetch();
+			const int dst = pid ? AllocReg(Cls::V, pid) : TempV();
+			if (kind == InputClamp::Numeric)
+			{
+				armAsm->Fminnm(V(dst).V4S(), V(src).V4S(), V(kCMax).V4S());
+				armAsm->Fmaxnm(V(dst).V4S(), V(dst).V4S(), V(kCMin).V4S());
+			}
+			else
+			{
+				armAsm->Smin(V(dst).V4S(), V(src).V4S(), V(kCMax).V4S());
+				armAsm->Umin(V(dst).V4S(), V(dst).V4S(), V(kCMin).V4S());
+				if (kind == InputClamp::SignFlush)
+				{
+					const int e = TempV();
+					armAsm->Shl(V(e).V4S(), V(dst).V4S(), 1);
+					armAsm->Ushr(V(e).V4S(), V(e).V4S(), 24);
+					armAsm->Cmeq(V(e).V4S(), V(e).V4S(), 0);
+					armAsm->Ushr(V(e).V4S(), V(e).V4S(), 1);
+					armAsm->Bic(V(dst).V16B(), V(dst).V16B(), V(e).V16B());
+				}
+			}
+			return dst;
+		}
+
+		int Lowerer::VuDoubleOperand(const ArgVec& args, size_t off)
+		{
+			if (!TypedClampMode()) return VuDoubleInto(VecOperand(args, off), env_.softwareFlush);
+			return TypedClampOperand(SingleSource(args, off),
+				env_.softwareFlush ? InputClamp::SignFlush : InputClamp::Sign, 4,
+				[&] { return VecOperand(args, off); });
 		}
 
 		void Lowerer::ClampKind(int dst, int src)
@@ -2389,23 +2505,39 @@ namespace vuaot
 			// Only a full vector field materializes/clamps Ft (MULA: w broadcast only).
 			if (u.op == UOp::MULbc || u.op == UOp::MULAbc)
 			{
-				int fs = VecOperand(in.args, 0);
+				int fs;
+				if (TypedClampMode())
+				{
+					const ValueId source = SingleSource(in.args, 0);
+					if (u.op == UOp::MULAbc)
+						fs = TypedClampOperand(source, InputClamp::Sign, 4, [&] { return VecOperand(in.args, 0); });
+					else fs = ClampOperand(source, [&] { return VecOperand(in.args, 0); });
+				}
+				else fs = VecOperand(in.args, 0);
 				const int ft = UseReg(in.args[4]);
 				const bool materializeFt = u.mask == 15 && (u.op == UOp::MULbc || u.bc == 3) &&
 					(env_.clampOverflow || env_.clampExtra || env_.clampSign);
-				if (u.op == UOp::MULAbc && env_.clampOverflow) fs = SignClampInto(fs);
-				else if (!env_.clampExtra && env_.clampOverflow) fs = ClampInto(fs);
+				if (!TypedClampMode())
+				{
+					if (u.op == UOp::MULAbc && env_.clampOverflow) fs = SignClampInto(fs);
+					else if (!env_.clampExtra && env_.clampOverflow) fs = ClampInto(fs);
+				}
 				if (!materializeFt)
 				{
 					armAsm->Fmul(V(DefV(id)).V4S(), V(fs).V4S(), S(ft), static_cast<int>(in.lane));
 					return;
 				}
-				int ftCopy = TempV();
-				armAsm->Dup(V(ftCopy).V4S(), V(ft).V4S(), in.lane);
+				const auto broadcastFt = [&] {
+					const int copy = TempV();
+					armAsm->Dup(V(copy).V4S(), V(ft).V4S(), in.lane);
+					return copy;
+				};
+				int ftCopy = TypedClampMode() && u.op == UOp::MULbc ?
+					TypedClampOperand(C(in.args[4]), InputClamp::Numeric, in.lane, broadcastFt) : broadcastFt();
 				if (env_.clampExtra) { fs = ClampE(fs); ftCopy = ClampE(ftCopy); }
 				// MULA.w materializes Ft for the vector multiply helper, but that
 				// helper only clamps inputs in extra mode. MUL has an explicit Ft clamp.
-				else if (env_.clampOverflow && u.op == UOp::MULbc) ftCopy = ClampInto(ftCopy);
+				else if (env_.clampOverflow && u.op == UOp::MULbc && !TypedClampMode()) ftCopy = ClampInto(ftCopy);
 				const int product = TempV();
 				armAsm->Fmul(V(product).V4S(), V(fs).V4S(), V(ftCopy).V4S());
 				const int result = ResultClamp() ? ClampInto(product) : product;
@@ -2419,20 +2551,26 @@ namespace vuaot
 			const bool localMadd = u.op == UOp::MADDbc && (u.bc == 0 || u.bc == 3);
 			if (localAdd || localMsub || localMadd)
 			{
-				int fs = VuDoubleInto(VecOperand(in.args, 0), env_.softwareFlush);
-				int rawFt;
+				int fs = VuDoubleOperand(in.args, 0);
+				int ft;
 				if (localMadd)
 				{
-					const int source = UseReg(in.args[4]); rawFt = TempV();
-					armAsm->Dup(V(rawFt).V4S(), V(source).V4S(), in.lane);
+					const auto broadcastFt = [&] {
+						const int source = UseReg(in.args[4]), copy = TempV();
+						armAsm->Dup(V(copy).V4S(), V(source).V4S(), in.lane);
+						return copy;
+					};
+					if (TypedClampMode())
+						ft = TypedClampOperand(C(in.args[4]), env_.softwareFlush ? InputClamp::SignFlush : InputClamp::Sign,
+							in.lane, broadcastFt);
+					else ft = VuDoubleInto(broadcastFt(), env_.softwareFlush);
 				}
-				else rawFt = VecOperand(in.args, 4);
-				int ft = VuDoubleInto(rawFt, env_.softwareFlush);
+				else ft = VuDoubleOperand(in.args, 4);
 				if (localAdd)
 					armAsm->Fadd(V(DefV(id)).V4S(), V(fs).V4S(), V(ft).V4S());
 				else
 				{
-					int acc = VuDoubleInto(VecOperand(in.args, 8), env_.softwareFlush);
+					int acc = VuDoubleOperand(in.args, 8);
 					if (env_.clampExtra) { fs = ClampE(fs); ft = ClampE(ft); acc = ClampE(acc); }
 					const int prod = TempV(), result = TempV();
 					armAsm->Fmul(V(prod).V4S(), V(fs).V4S(), V(ft).V4S());
@@ -4910,6 +5048,8 @@ namespace vuaot
 				clampLane_.assign(canon_.size(), 0);
 			}
 
+			CollectTypedClamps();
+
 			// Shared sign/zero vectors and mVUglob constants used more than once.
 			{
 				globAddr_.assign(canon_.size(), nullptr);
@@ -5002,7 +5142,6 @@ namespace vuaot
 					}
 				clampLane_.resize(canon_.size(), 0);
 			}
-			analysisN_ = static_cast<u32>(N);
 			return BindHomes(why);
 		}
 
@@ -5069,7 +5208,6 @@ namespace vuaot
 
 		bool Lowerer::BindHomes(std::string& why)
 		{
-			const size_t N = analysisN_;
 			const Inst& lv = LeaveInst();
 			const u32 leavePos = leavePos_;
 			for (size_t v = 1; v < f_.insts.size(); v++)
@@ -5133,10 +5271,13 @@ namespace vuaot
 			gPool_ = limit(gPool_, env_.poolLimitG);
 
 			// Register pressure bound: live values at once must fit the pool
-			// plus the spill area with room for temporaries. At most N values
+			// plus the spill area with room for temporaries. Include owned
+			// pseudo values, since typed input copies can outlive their source.
+			// At most pressureN values
 			// are live at once, so a node of fewer values than the spill area
 			// holds always fits: only the pool sizes can fail it.
-			if (N + 11 <= static_cast<size_t>(kSlots + kOverflowSlots - 16))
+			const size_t pressureN = canon_.size();
+			if (pressureN + 11 <= static_cast<size_t>(kSlots + kOverflowSlots - 16))
 			{
 				const u32 nv = static_cast<u32>(__builtin_popcount(vPool_));
 				const u32 ng = static_cast<u32>(__builtin_popcount(gPool_));
@@ -5150,8 +5291,8 @@ namespace vuaot
 			{
 				u32 liveV = 0, liveG = 0, maxV = 0, maxG = 0;
 				std::vector<u32>& lastUse = lastUse_;
-				lastUse.assign(N, 0);
-				for (size_t c = 1; c < N; c++)
+				lastUse.assign(pressureN, 0);
+				for (size_t c = 1; c < pressureN; c++)
 					if (!uses_[c].empty())
 						lastUse[c] = uses_[c].back();
 				Lists& endAt = endAt_;
@@ -5159,11 +5300,13 @@ namespace vuaot
 				ResetLists(endAt, order_.size() + 1);
 				ResetLists(startAt, order_.size() + 1);
 				std::vector<u32>& posOf = posOf_;
-				posOf.assign(N, 0);
+				posOf.assign(pressureN, 0);
 				for (u32 p = 0; p < order_.size(); p++)
 					if (!posOf[order_[p]])
 						posOf[order_[p]] = p;
-				for (size_t c = 1; c < N; c++)
+				// A pseudo's position defaults to zero: a conservative lifetime
+				// bound, independent of the instruction that first materializes it.
+				for (size_t c = 1; c < pressureN; c++)
 				{
 					if (uses_[c].empty() || canon_[c] != c || (remat_[c] != Remat::None && !homeReg_[c]))
 						continue;

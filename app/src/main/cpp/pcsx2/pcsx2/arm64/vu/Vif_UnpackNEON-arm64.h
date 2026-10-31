@@ -1,4 +1,5 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2026 isztld <https://isztld.com/>
 // SPDX-License-Identifier: GPL-3.0
 
 #pragma once
@@ -7,6 +8,9 @@
 #include "Vif_Dma.h"
 #include "Vif_Dynarec.h"
 #include "arm64/OaknutHelpers-arm64.h"
+
+#include <utility>
+#include <vector>
 
 static constexpr oak::QReg VIF_Q_DEST{0};
 static constexpr oak::QReg VIF_Q_WORK{1};
@@ -135,6 +139,9 @@ public:
 	void CompileRoutine();
 
 protected:
+	using CopyRow = std::pair<s64, s64>; // (destination offset, source offset)
+	void EmitCopyRows(const std::vector<CopyRow>& rows) const;
+
 	virtual void doMaskWrite(oak::QReg regX) const;
 	void SetMasks(int cS) const;
 	void writeBackRow() const;
