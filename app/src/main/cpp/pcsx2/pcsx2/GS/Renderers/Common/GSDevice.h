@@ -833,6 +833,7 @@ struct alignas(16) GSHWDrawConfig
 				u32 rov_color : 1;
 				PS_ROV_DEPTH rov_depth : 2;
 				u32 sprite_edge_clamp : 1;
+				u32 af_in_src1 : 1; // Fixed blend factor carried through the second output.
 			};
 
 			struct
@@ -1436,6 +1437,7 @@ public:
 	// clang-format off
 	struct FeatureSupport
 	{
+		bool broken_blend_constant : 1; ///< Fixed blend constants need the source1 route.
 		bool broken_point_sampler : 1; ///< Issue with AMD cards, see tfx shader for details
 		bool sprite_edge_clamp    : 1; ///< Shader can clamp snapped sprites to their last native sample.
 		bool vs_expand            : 1; ///< Supports expanding points/lines/sprites in the vertex shader

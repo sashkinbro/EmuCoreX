@@ -9,6 +9,7 @@
 #include <cctype>
 #include <string>
 #include <string_view>
+#include <utility>
 
 // Focused adapter for the self-read rules in GSGPUDriverProfile.cpp. It keeps
 // this core's existing coarse RuntimeGpuProfile API and does not tune pools.
@@ -21,6 +22,7 @@ struct Identity
     Driver driver = Driver::Unknown;
     std::string_view name, driver_name, info, platform;
     bool mediatek = false;
+    u32 device_id = 0;
 };
 struct Capabilities
 {
@@ -71,6 +73,54 @@ inline u32 Model(std::string_view name, std::string_view prefix)
     while (p < name.size() && !std::isdigit(static_cast<unsigned char>(name[p]))) ++p;
     return Number(name, p);
 }
+// Exact model-name/Qualcomm chip-ID precedence from GSGPUProfileAdreno.
+// Only listed parts may be inferred from a chip ID; seven-series IDs no
+// longer spell a decimal model and must never enable ordering by guessing.
+inline u32 AdrenoModel(const Identity& id)
+{
+    const auto hints = Lower(std::string(id.name) + " " + std::string(id.driver_name) + " " +
+        std::string(id.info) + " " + std::string(id.platform));
+    static constexpr u16 listed[] = {
+        200,203,205,220,225,302,303,304,305,306,308,320,330,405,418,420,430,
+        505,506,508,509,510,512,530,540,605,608,610,612,613,615,616,618,619,
+        620,630,640,642,643,644,650,660,675,680,685,690,695,702,710,720,722,
+        725,730,735,740,750,810,825,829,830,840};
+    const auto is_listed = [](u32 value) {
+        for (const u16 model : listed) if (value == model) return true;
+        return false;
+    };
+    // The laptop aliases are a separate architecture, never a 6xx/7xx road.
+    for (const auto& alias : {std::pair{"adreno x2-85",285u}, {"adreno x2 85",285u},
+        {"adreno x2-45",245u}, {"adreno x2 45",245u}, {"adreno x1-85",185u},
+        {"adreno x1 85",185u}, {"adreno x1-45",145u}, {"adreno x1 45",145u}})
+        if (hints.find(alias.first) != std::string::npos) return alias.second;
+    u32 model = 0;
+    bool named = false;
+    const auto adreno = hints.find("adreno");
+    if (adreno != std::string::npos)
+    {
+        size_t p = adreno + 6;
+        while (p < hints.size() && !std::isdigit(static_cast<unsigned char>(hints[p]))) ++p;
+        const bool marketing = p >= adreno + 8 && hints[p - 1] == 'a' &&
+            !std::isalnum(static_cast<unsigned char>(hints[p - 2]));
+        named = p < hints.size();
+        while (p < hints.size() && std::isdigit(static_cast<unsigned char>(hints[p])))
+        {
+            model = model * 10 + static_cast<u32>(hints[p++] - '0');
+            if (model > 9999) { named = false; model = 0; break; }
+        }
+        if (named && marketing && model == 12) model = 613;
+        if (named && is_listed(model)) return model;
+    }
+    const u32 core = id.device_id >> 24, major = (id.device_id >> 16) & 255,
+        minor = (id.device_id >> 8) & 255;
+    if (id.vendor == 0x5143 && core >= 2 && core <= 6 && major <= 9 && minor <= 9)
+    {
+        const u32 chip = core * 100 + major * 10 + minor;
+        if (is_listed(chip)) return chip;
+    }
+    return named ? model : 0;
+}
 // Exact strict axfl tag grammar from ParseFixGeneration: token boundary,
 // nonzero decimal generation (at most four digits), trailing hyphen.
 inline u32 FixGeneration(std::string_view info)
@@ -115,7 +165,7 @@ inline Facts ResolveFacts(const Identity& id, bool roaa, u32 max_push)
         else if (f.adreno) f.driver = Driver::Qualcomm;
         else if (f.powervr) f.driver = Driver::Imagination;
     }
-    f.model = f.adreno ? Model(name, "adreno") : Model(name, "mali-g");
+    f.model = f.adreno ? AdrenoModel(id) : Model(name, "mali-g");
     if (f.mali && !f.model) f.model = Model(name, "immortalis-g");
     f.malisx2 = info.find("malisx2") != std::string::npos;
     const bool mt6897 = platform.find("mt6897") != std::string::npos;

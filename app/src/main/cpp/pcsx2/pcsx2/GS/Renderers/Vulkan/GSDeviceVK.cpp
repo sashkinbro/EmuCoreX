@@ -9,6 +9,7 @@
 #include "GS/GSUtil.h"
 #include "GS/Renderers/Vulkan/GSDeviceVK.h"
 #include "GS/Renderers/Common/GSDrawRoadConfig.h"
+#include "GS/Renderers/Common/GSBlendConstantPolicy.h"
 #include "GS/Renderers/Vulkan/GSLsfg.h"
 #include "GS/Renderers/Vulkan/VKBuilders.h"
 #include "GS/Renderers/Vulkan/VKLoader.h"
@@ -3419,6 +3420,8 @@ bool GSDeviceVK::CheckFeatures()
 
 	m_features.multidraw_fb_copy = false;
 	m_features.broken_point_sampler = false;
+	m_features.broken_blend_constant = GSBlendConstantPolicy::DeviceDefect(true, m_road_facts.adreno,
+		m_road_facts.driver == GSVulkanRoad::Driver::Turnip);
 
 	m_features.framebuffer_fetch = framebuffer_fetch;
 	m_features.texture_barrier = texture_barrier;
@@ -6096,6 +6099,42 @@ VkShaderModule GSDeviceVK::GetTFXFragmentShader(const GSHWDrawConfig::PSSelector
 	return mod;
 }
 
+void GSDeviceVK::ConfigureTFXBlendPipeline(Vulkan::GraphicsPipelineBuilder& gpb,
+	const PipelineSelector& p, const GSHWDrawConfig::BlendState& pbs)
+{
+	// Blending
+	if (IsDATEModePrimIDInit(p.ps.date))
+	{
+		// image DATE prepass
+		gpb.SetBlendAttachment(0, true, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_MIN, VK_BLEND_FACTOR_ONE,
+			VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD, VK_COLOR_COMPONENT_R_BIT);
+	}
+	else if (pbs.enable)
+	{
+		// clang-format off
+		static constexpr std::array<VkBlendFactor, 16> vk_blend_factors = { {
+			VK_BLEND_FACTOR_SRC_COLOR, VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR, VK_BLEND_FACTOR_DST_COLOR, VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR,
+			VK_BLEND_FACTOR_SRC1_COLOR, VK_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR, VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+			VK_BLEND_FACTOR_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_SRC1_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA,
+			VK_BLEND_FACTOR_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO
+		}};
+		static constexpr std::array<VkBlendOp, 3> vk_blend_ops = {{
+				VK_BLEND_OP_ADD, VK_BLEND_OP_SUBTRACT, VK_BLEND_OP_REVERSE_SUBTRACT
+		}};
+		// clang-format on
+
+		gpb.SetBlendAttachment(0, true, vk_blend_factors[pbs.src_factor], vk_blend_factors[pbs.dst_factor],
+			vk_blend_ops[pbs.op], vk_blend_factors[pbs.src_factor_alpha], vk_blend_factors[pbs.dst_factor_alpha],
+			VK_BLEND_OP_ADD, p.cms.wrgba);
+	}
+	else
+	{
+		gpb.SetBlendAttachment(0, false, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD,
+			VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD, p.cms.wrgba);
+	}
+
+}
+
 VkPipeline GSDeviceVK::CreateTFXPipelineWithCache(
 	const PipelineSelector& p, VkPipelineCache pipeline_cache, bool lock_pipeline_cache)
 {
@@ -6203,36 +6242,7 @@ VkPipeline GSDeviceVK::CreateTFXPipelineWithCache(
 		gpb.SetStencilState(true, sos, sos);
 	}
 
-	// Blending
-	if (IsDATEModePrimIDInit(p.ps.date))
-	{
-		// image DATE prepass
-		gpb.SetBlendAttachment(0, true, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_MIN, VK_BLEND_FACTOR_ONE,
-			VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD, VK_COLOR_COMPONENT_R_BIT);
-	}
-	else if (pbs.enable)
-	{
-		// clang-format off
-		static constexpr std::array<VkBlendFactor, 16> vk_blend_factors = { {
-			VK_BLEND_FACTOR_SRC_COLOR, VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR, VK_BLEND_FACTOR_DST_COLOR, VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR,
-			VK_BLEND_FACTOR_SRC1_COLOR, VK_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR, VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-			VK_BLEND_FACTOR_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_SRC1_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA,
-			VK_BLEND_FACTOR_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO
-		}};
-		static constexpr std::array<VkBlendOp, 3> vk_blend_ops = {{
-				VK_BLEND_OP_ADD, VK_BLEND_OP_SUBTRACT, VK_BLEND_OP_REVERSE_SUBTRACT
-		}};
-		// clang-format on
-
-		gpb.SetBlendAttachment(0, true, vk_blend_factors[pbs.src_factor], vk_blend_factors[pbs.dst_factor],
-			vk_blend_ops[pbs.op], vk_blend_factors[pbs.src_factor_alpha], vk_blend_factors[pbs.dst_factor_alpha],
-			VK_BLEND_OP_ADD, p.cms.wrgba);
-	}
-	else
-	{
-		gpb.SetBlendAttachment(0, false, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD,
-			VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD, p.cms.wrgba);
-	}
+	ConfigureTFXBlendPipeline(gpb, p, pbs);
 
 	// Tests have shown that it's faster to just enable rast order on the entire pass, rather than alternating
 	// between turning it on and off for different draws, and adding the required barrier between non-rast-order
@@ -6520,6 +6530,7 @@ std::string GSDeviceVK::BuildTFXFragmentShaderSource(std::string_view tfx_source
 	AddMacro(ss, "PS_TCOFFSETHACK", selector.tcoffsethack);
 	AddMacro(ss, "PS_REGION_RECT", selector.region_rect);
 	AddMacro(ss, "PS_SPRITE_EDGE_CLAMP", selector.sprite_edge_clamp);
+	AddMacro(ss, "PS_AF_IN_SRC1", selector.af_in_src1);
 	AddMacro(ss, "PS_BLEND_A", selector.blend_a);
 	AddMacro(ss, "PS_BLEND_B", selector.blend_b);
 	AddMacro(ss, "PS_BLEND_C", selector.blend_c);
@@ -6777,7 +6788,7 @@ bool GSDeviceVK::TestTFXShaderSourceBuilders()
 		if (source.starts_with(prefix))
 			source.insert(prefix.size(), removed_requirement);
 		// The new selector has its own checks below; preserve all pre-port fixtures.
-		for (const std::string_view macro : {"#define VS_SPRITE_EDGE_CLAMP ", "#define PS_SPRITE_EDGE_CLAMP "})
+		for (const std::string_view macro : {"#define VS_SPRITE_EDGE_CLAMP ", "#define PS_SPRITE_EDGE_CLAMP ", "#define PS_AF_IN_SRC1 "})
 		{
 			const size_t at = source.find(macro);
 			if (at != std::string::npos)
@@ -9924,7 +9935,8 @@ GSVulkanRoad::Identity GSDeviceVK::GetRoadIdentity() const
     return {.vendor = m_device_properties.vendorID, .driver = driver, .name = m_device_properties.deviceName,
         .driver_name = m_optional_extensions.vk_khr_driver_properties ? std::string_view(m_device_driver_properties.driverName) : std::string_view{},
         .info = m_optional_extensions.vk_khr_driver_properties ? std::string_view(m_device_driver_properties.driverInfo) : std::string_view{},
-        .platform = m_road_platform_hints, .mediatek = GpuProfileDetector::DetectMediaTekSoC()};
+        .platform = m_road_platform_hints, .mediatek = GpuProfileDetector::DetectMediaTekSoC(),
+        .device_id = m_device_properties.deviceID};
 }
 
 GSVulkanRoad::Capabilities GSDeviceVK::GetRoadCapabilities(u32 push_count) const
@@ -10157,4 +10169,7 @@ void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, 
 #include "GSRenderPassOrderingTests.inl"
 #include "GSDrawRoadTests.inl"
 #include "GSRoadFamilyTests.inl"
+#include "GSBlendConstantTests.inl"
+#include "GSBlendConstantPixelTests.inl"
+#include "GSRoadModelTests.inl"
 #endif

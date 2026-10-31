@@ -863,6 +863,9 @@ public:
 	void TestRenderPassRestarts(void (*check)(bool, const char*));
 	void TestDrawRoad(void (*check)(bool, const char*));
 	void TestRoadFamilies(void (*check)(bool, const char*));
+	void TestBlendConstant(void (*check)(bool, const char*));
+	void TestBlendConstantPixels(void (*check)(bool, const char*));
+	void TestRoadModelParity(void (*check)(bool, const char*));
 	void TestRenderPassOrdering(void (*check)(bool, const char*), VkPipeline sampled_pipeline,
 		VkSampler sampler, VkRenderPass sampled_pass);
 	void SetTFXPreparationFailureStageForTesting(TFXPreparationFailureStage stage)
@@ -957,6 +960,8 @@ public:
 	void DoRenderHW(GSHWDrawConfig& config) override;
 	GSVulkanRoad::Identity GetRoadIdentity() const;
 	GSVulkanRoad::Capabilities GetRoadCapabilities(u32 push_count = 0) const;
+	static void ConfigureTFXBlendPipeline(Vulkan::GraphicsPipelineBuilder& builder, const PipelineSelector& pipe,
+		const GSHWDrawConfig::BlendState& blend);
 	void ConfigureTFXFeedbackPipeline(Vulkan::GraphicsPipelineBuilder& builder, const PipelineSelector& pipe) const;
 	void DeclareDrawFeedbackLoop(const GSHWDrawConfig& config, const PipelineSelector& pipe);
 	GSVulkanRoad::Facts m_road_facts;

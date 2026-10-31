@@ -4,6 +4,7 @@
 
 #include "GS/Renderers/HW/GSRendererHW.h"
 #include "GS/Renderers/Common/GSDrawRoadConfig.h"
+#include "GS/Renderers/Common/GSBlendConstantPolicy.h"
 #include "GS/Renderers/HW/GSSpriteEdgeSnap.h"
 #include "GS/Renderers/HW/GSHwHack.h"
 #include "GS/Renderers/HW/GSTextureReplacements.h"
@@ -6819,6 +6820,8 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, DATEOptio
 		m_conf.ps.no_color1 &= !GSDevice::IsDualSourceBlendFactor(m_conf.blend.src_factor) &&
 		                       !GSDevice::IsDualSourceBlendFactor(m_conf.blend.dst_factor);
 	}
+
+	GSBlendConstantPolicy::ApplyFixedFactor(m_conf, features);
 
 	// Notify the shader that it needs to invert rounding
 	if (m_conf.blend.op == GSDevice::OP_REV_SUBTRACT)

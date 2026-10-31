@@ -1852,7 +1852,9 @@ void main()
 	}
 #endif
 
-#if SW_AD_TO_HW
+#if PS_AF_IN_SRC1
+	vec4 alpha_blend = vec4(Af);
+#elif SW_AD_TO_HW
 	#if PS_RTA_CORRECTION
 		vec4 RT = trunc(sample_from_rt() * 128.0f + 0.1f);
 	#else
