@@ -972,6 +972,21 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 	mVUbranch = 0;
 	u32 x = 0;
 	u32 profiler_last_pc = mVUstartPC;
+	if (isVU1 && mvu_aot::Enabled())
+	{
+		vuaot::MvuBlockTrace trace;
+		mVUbuildBlockTrace(mVU, startPC, trace);
+		if (mvu_aot::CompileBody(mVU, trace))
+		{
+			// The body hook leaves the same memory/flag/PQ homes as the
+			// ordinary second pass. Keep this core's exact E-bit framing.
+			iPC = ((trace.ops.back().pc + 8) >> 2) & mVU.progMemMask;
+			setCode();
+			mVUsetupRange(mVU, xPC, false);
+			mVUendProgram(mVU, &mFC, 1);
+			goto perf_and_return;
+		}
+	}
 
 	for (; x < endCount; ++x)
 	{

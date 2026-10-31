@@ -878,6 +878,109 @@ namespace mvu_aot
 			}
 		p.traces.push_back({trace, mvu.prog.IRinfo.pBlock});
 	}
+	bool CompileBody(microVU& mvu, const vuaot::MvuBlockTrace& trace)
+	{
+		if (mvu.index != 1 || !Enabled() || !oakHasBlock() ||
+			vuaot::g_vuAotShadowCompile || trace.ops.empty())
+			return false;
+		const auto owner = runtime.programs.find(mvu.prog.cur);
+		if (owner == runtime.programs.end() || owner->second.jobs.empty())
+			return false; // only blocks encountered after this program tiered up
+		if (trace.ops.back().pc < trace.startPC || trace.ops.back().pc + 8 >= mvu.microMemSize)
+			return false; // preserve the baseline second pass's wrapped-range bookkeeping
+
+		// First close the direct-child coverage hole for plain program ends.
+		// Runtime T/D/M boundaries and branch tails retain baseline framing.
+		for (const auto& op : trace.ops)
+			if (op.tBit || op.dBit || op.mBit || op.badBranch || op.evilBranch || op.branch)
+				return false;
+		std::array<u8, 0x4000> image;
+		std::memcpy(image.data(), mvu.regs().Micro, image.size());
+		const MvuBlockTrace captured = trace;
+		const auto env = Environment(mvu);
+		BodyTier tier(1, image.data());
+		tier.schedule = true;
+		bg::CodeSink sink;
+		sink.Begin();
+		bool lowered = false;
+		try
+		{
+			lowered = tier.TryLower(captured, env, nullptr);
+		}
+		catch (const std::exception&)
+		{
+			// The ordinary second pass remains untouched on any decline.
+		}
+		const u32 bytes = sink.End();
+		if (!lowered || !sink.failed.empty() || tier.Block().endKind != BlockEnd::EBit ||
+			tier.Block().eBitOnBranch)
+			return false;
+		// Inline bodies are part of the baseline persistence episode. Accept
+		// only process-independent module/data relocations, then forward every
+		// address-bearing site to its existing ASLR-safe recorder.
+		for (const auto& fixup : sink.fixups)
+		{
+			if (fixup.kind != bg::Fixup::OutsideAbs && fixup.kind != bg::Fixup::External26)
+				return false;
+			const size_t width = fixup.kind == bg::Fixup::OutsideAbs ? 16 : 4;
+			if (fixup.offset > bytes || width > bytes - fixup.offset)
+				return false;
+			mVUPersist::AddressRegion region;
+			s64 offset;
+			if (!mVUPersist::ClassifyAddressRegion(reinterpret_cast<const void*>(fixup.value), region, offset))
+				return false;
+		}
+
+		EntryAbi(mvu);
+		oakLoad128(oak::QReg(26), {oak::util::X25, offsetof(vuaot::mVU_Globals, minvals)});
+		oakLoad128(oak::QReg(25), {oak::util::X25, offsetof(vuaot::mVU_Globals, maxvals)});
+		u8* const body = oakGetCurrentCodePointer();
+		for (u32 at = 0; at < bytes; at += 4)
+		{
+			u32 instruction;
+			std::memcpy(&instruction, sink.Base() + at, 4);
+			oakAsm->dw(instruction);
+		}
+		const bool hasCalls = std::any_of(sink.fixups.begin(), sink.fixups.end(), [](const auto& fixup) {
+			return fixup.kind == bg::Fixup::External26;
+		});
+		oak::Label afterCalls;
+		if (hasCalls) oakAsm->B(afterCalls);
+		for (const auto& fixup : sink.fixups)
+		{
+			const auto* target = reinterpret_cast<const void*>(fixup.value);
+			u8* const at = body + fixup.offset;
+			if (fixup.kind == bg::Fixup::OutsideAbs)
+			{
+				if (oakAddressRecorder) oakAddressRecorder->OnMovRun(at, 4, target);
+			}
+			else
+			{
+				// A nearby veneer keeps BL in range from any code-cache placement.
+				// Its absolute helper address is recorded by the ordinary emitter.
+				const void* veneer = oakGetCurrentCodePointer();
+				oakMoveAddressToReg(oak::util::X17, target);
+				oakAsm->BR(oak::util::X17);
+				const bool patched = bg::PatchRel26(reinterpret_cast<u32*>(at), at, veneer);
+				pxAssertRel(patched, "inline VU body helper veneer out of range");
+				if (oakAddressRecorder)
+					oakAddressRecorder->OnBranch(at, veneer, OakAddressRecorder::BranchForm::Rel26);
+			}
+		}
+		if (hasCalls) oakAsm->l(afterCalls);
+		ExitAbi();
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (forceSync || countEntries)
+		{
+			oakMoveAddressToReg(oak::util::X9, &nativeEndCount);
+			oakAsm->LDR(oak::util::X10, oak::util::X9, oak::POffset<15, 3>(0));
+			oakAsm->ADD(oak::util::X10, oak::util::X10, 1);
+			oakAsm->STR(oak::util::X10, oak::util::X9, oak::POffset<15, 3>(0));
+		}
+#endif
+		++runtime.stats.bodyBlocks;
+		return true;
+	}
 	static void* DispatchState(microVU& mvu, u32 pc, const void* state, void* baselineEntry, bool viaJump)
 	{
 		// Baseline resolution during publication can compile another node and

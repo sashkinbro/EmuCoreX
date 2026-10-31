@@ -16,6 +16,8 @@ namespace mvu_aot
 	void ObserveImage(microVU& mvu);
 	void BeforeProgram(microVU& mvu);
 	void Remember(microVU& mvu, const vuaot::MvuBlockTrace& trace);
+	// Owner-only framed body hook; never publishes into an active compiler.
+	bool CompileBody(microVU& mvu, const vuaot::MvuBlockTrace& trace);
 	void* Dispatch(microVU& mvu, u32 pc, void* baselineEntry);
 	void* AfterJump(microVU& mvu, u32 pc, const void* state, void* baselineEntry);
 	void OnJumpMiss(microVU& mvu);
