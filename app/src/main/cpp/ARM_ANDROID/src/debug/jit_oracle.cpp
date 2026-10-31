@@ -194,6 +194,7 @@ void CheckBits(bool pass, u32 actual, u32 expected, const char* name)
 #include "jit_oracle_gs_vertices.inl"
 #include "jit_oracle_gs_uploads.inl"
 #include "jit_oracle_gs_restarts.inl"
+#include "jit_oracle_gif_copy.inl"
 
 void GSPreparationDeviceTests()
 {
@@ -12482,6 +12483,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         GSRestartTests();
     else if (std::strcmp(suite, "gs-uploads") == 0)
         GSUploadTests();
+    else if (std::strcmp(suite, "gif-copy") == 0)
+        GifCopyTests();
     else if (std::strcmp(suite, "gs-vertices") == 0)
         GSVertexPacketTests();
     else if (std::strcmp(suite, "gs-alpha-selectors") == 0)

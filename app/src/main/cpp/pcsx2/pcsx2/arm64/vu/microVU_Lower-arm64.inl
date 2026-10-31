@@ -3329,24 +3329,6 @@ void mVU_XGKICK_(u32 addr)
 		return;
 	}
 
-	if (THREAD_VU1)
-	{
-		const u32 first = std::min<u32>(size, 0x10);
-		if (first < size)
-			gifUnit.gifPath[GIF_PATH_1].CopyGSPacketData(&g_cpuRegistersPack.vuRegs[1].Mem[addr], first, true);
-		else
-			gifUnit.TransferGSPacketData(GIF_TRANS_XGKICK, &g_cpuRegistersPack.vuRegs[1].Mem[addr], first, true);
-
-		addr = (addr + first) & 0x3FFF;
-		diff -= first;
-		size -= first;
-
-		if (!size)
-		{
-			return;
-		}
-	}
-
 	if (size > diff)
 	{
 		gifUnit.gifPath[GIF_PATH_1].CopyGSPacketData(&g_cpuRegistersPack.vuRegs[1].Mem[addr], diff, true);

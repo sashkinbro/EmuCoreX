@@ -10,6 +10,9 @@
 #include "DEV9/ACJV.h"
 
 Gif_Unit gifUnit;
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+thread_local GifCopyTestHooks* g_gif_copy_test_hooks = nullptr;
+#endif
 
 // Returns true on stalling SIGNAL
 bool Gif_HandlerAD(u8* pMem)
@@ -85,6 +88,10 @@ bool Gif_HandlerAD(u8* pMem)
 
 void Gif_HandlerAD_MTVU(u8* pMem)
 {
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+	if (g_gif_copy_test_hooks && g_gif_copy_test_hooks->ad)
+		g_gif_copy_test_hooks->ad(pMem);
+#endif
 	// Note: Atomic communication is with MTVU.cpp Get_GSChanges
 	const u8 reg = pMem[8] & 0x7f;
 	const u32* data = (u32*)pMem;

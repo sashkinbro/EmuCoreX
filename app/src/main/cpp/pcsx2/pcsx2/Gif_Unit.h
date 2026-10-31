@@ -16,6 +16,19 @@
 
 struct GS_Packet;
 #ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+struct Gif_Path;
+struct GifCopyTestHooks
+{
+	void (*copy)(Gif_Path&, const u8*, u32) = nullptr;
+	void (*wait)(Gif_Path&) = nullptr;
+	void (*ad)(const u8*) = nullptr;
+};
+// Thread-local and test-only: isolated fixtures still exercise the real ring.
+extern thread_local GifCopyTestHooks* g_gif_copy_test_hooks;
+#if defined(ARCH_ARM64)
+// Global declaration for fixtures included inside the oracle's private namespace.
+extern void mVU_XGKICK_(u32 addr);
+#endif
 // Suppresses GS submission only in isolated replay; live capture returns false.
 extern bool EmuCoreXOracleRecordGif(const u8* data, u32 size, bool liveCopy = true);
 #endif
@@ -296,6 +309,13 @@ struct Gif_Path
 	// Waits on the MTGS to process gs packets
 	void mtgsReadWait()
 	{
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+		if (g_gif_copy_test_hooks && g_gif_copy_test_hooks->wait)
+		{
+			g_gif_copy_test_hooks->wait(*this);
+			return;
+		}
+#endif
 		if (IsDevBuild)
 		{
 			DevCon.WriteLn(Color_Red, "Gif Path[%d] - MTGS Wait! [r=0x%x]", idx + 1, getReadAmount());
@@ -342,6 +362,8 @@ struct Gif_Path
 	void CopyGSPacketData(u8* pMem, u32 size, bool aligned = false)
 	{
 #ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+		if (g_gif_copy_test_hooks && g_gif_copy_test_hooks->copy)
+			g_gif_copy_test_hooks->copy(*this, pMem, size);
 		if (EmuCoreXOracleRecordGif(pMem, size))
 			return;
 #endif
