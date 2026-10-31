@@ -186,6 +186,39 @@ protected:
 
 	template <u32 prim, bool auto_flush> void VertexKick(u32 skip);
 
+	// Transient batch state. Any callee which grows or flushes the draw must see
+	// current cursors, and may replace both buffer pointers before returning.
+	struct VertexKickCursor
+	{
+		GSVertex* vb;
+		u16* ib;
+		u32 head, tail, next, xy_tail, maxcount, itail;
+
+		__fi void Load(const GSState& s)
+		{
+			vb = s.m_vertex.buff;
+			ib = s.m_index.buff;
+			head = s.m_vertex.head;
+			tail = s.m_vertex.tail;
+			next = s.m_vertex.next;
+			xy_tail = s.m_vertex.xy_tail;
+			maxcount = s.m_vertex.maxcount;
+			itail = s.m_index.tail;
+		}
+
+		__fi void Store(GSState& s) const
+		{
+			s.m_vertex.head = head;
+			s.m_vertex.tail = tail;
+			s.m_vertex.next = next;
+			s.m_vertex.xy_tail = xy_tail;
+			s.m_index.tail = itail;
+		}
+	};
+	GSLimit24BitDepth GetDepthClampMode() const;
+	template <u32 prim> void VertexKickDirect(u32 skip, const GSVector4i& v0, const GSVector4i& v1, VertexKickCursor& c);
+	template <u32 prim, bool xyzf2> void KickPackedBatch(const GIFPackedReg* RESTRICT r, u32 size);
+
 	// following functions need m_vt to be initialized
 
 	GSVertexTrace m_vt;

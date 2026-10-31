@@ -1054,6 +1054,22 @@ static __fi GSVector4i GSPackSTQRGBA(const GIFPackedReg* RESTRICT r)
 }
 
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+static thread_local bool s_gsPackedBatchEnabled = true;
+static thread_local bool s_gsPackedBatchObserve = false;
+static thread_local u64 s_gsPackedBatchStats[3] = {};
+
+extern "C" void EmuCoreXOracleSetGSPackedBatch(bool enabled, bool observe)
+{
+	s_gsPackedBatchEnabled = enabled;
+	s_gsPackedBatchObserve = observe;
+	std::fill(std::begin(s_gsPackedBatchStats), std::end(s_gsPackedBatchStats), 0);
+}
+
+extern "C" void EmuCoreXOracleGSPackedBatchStats(u64* values)
+{
+	std::copy(std::begin(s_gsPackedBatchStats), std::end(s_gsPackedBatchStats), values);
+}
+
 extern "C" void EmuCoreXOraclePackSTQRGBA(const GIFPackedReg* input, GSVector4i* output, u32 vertices, bool reference)
 {
 	if (reference)
@@ -1063,6 +1079,61 @@ extern "C" void EmuCoreXOraclePackSTQRGBA(const GIFPackedReg* input, GSVector4i*
 }
 #endif
 
+// Parse directly into vectors and retain the live buffer cursors across a
+// complete fused packet. Auto-flush handlers retain the staged path below.
+template <u32 prim, bool xyzf2>
+void GSState::KickPackedBatch(const GIFPackedReg* RESTRICT r, u32 size)
+{
+	u64 uvfog;
+	std::memcpy(&uvfog, &m_v.UV, sizeof(uvfog));
+	const GSLimit24BitDepth depth = GetDepthClampMode();
+	VertexKickCursor c;
+	c.Load(*this);
+	GSVector4i m0, m1;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (s_gsPackedBatchObserve) ++s_gsPackedBatchStats[1];
+#endif
+	for (const GIFPackedReg* end = r + size; r < end; r += 3)
+	{
+		m0 = GSPackSTQRGBA(r);
+		if constexpr (xyzf2)
+		{
+#if defined(ARCH_ARM64)
+			const uint8x16_t raw = vld1q_u8(reinterpret_cast<const u8*>(&r[2]));
+			const uint8x16x2_t table = {{raw, vreinterpretq_u8_u32(vshrq_n_u32(vreinterpretq_u32_u8(raw), 4))}};
+			const uint8x16_t indices = {0, 1, 4, 5, 24, 25, 26, 255, 255, 255, 255, 255, 28, 255, 255, 255};
+			m1 = GSVector4i(vreinterpretq_s32_u32(vsetq_lane_u32(static_cast<u32>(uvfog), vreinterpretq_u32_u8(vqtbl2q_u8(table, indices)), 2)));
+#else
+			GSVector4i xy = GSVector4i::loadl(&r[2].U64[0]);
+			GSVector4i zf = GSVector4i::loadl(&r[2].U64[1]);
+			xy = xy.upl16(xy.srl<4>()).upl32(GSVector4i::load(static_cast<int>(uvfog)));
+			zf = zf.srl32<4>() & GSVector4i::x00ffffff().upl32(GSVector4i::x000000ff());
+			m1 = xy.upl32(zf);
+#endif
+		}
+		else
+		{
+			const GSVector4i xy = GSVector4i::loadl(&r[2].U64[0]);
+			const GSVector4i z = GSVector4i::loadl(&r[2].U64[1]);
+			m1 = xy.upl16(xy.srl<4>()).upl32(z).upl64(GSVector4i::loadl(&uvfog));
+		}
+		if (depth == GSLimit24BitDepth::PrioritizeUpper)
+			m1.U32[1] = ((m1.U32[1] >> 8) & ~0xFF) | (m1.U32[1] & 0xFF);
+		else if (depth == GSLimit24BitDepth::PrioritizeLower)
+			m1.U32[1] &= 0x00FFFFFF;
+		VertexKickDirect<prim>(r[2].XYZ2.Skip(), m0, m1, c);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (s_gsPackedBatchObserve) ++s_gsPackedBatchStats[0];
+#endif
+	}
+	c.Store(*this);
+	m_v.m[0] = m0;
+	m_v.m[1] = m1;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (s_gsPackedBatchObserve) ++s_gsPackedBatchStats[2];
+#endif
+}
+
 template <u32 prim, bool auto_flush>
 void GSState::GIFPackedRegHandlerSTQRGBAXYZF2(const GIFPackedReg* RESTRICT r, u32 size)
 {
@@ -1070,10 +1141,25 @@ void GSState::GIFPackedRegHandlerSTQRGBAXYZF2(const GIFPackedReg* RESTRICT r, u3
 
 	CheckFlushes();
 
+	if constexpr (!auto_flush)
+	{
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (s_gsPackedBatchEnabled)
+#endif
+		{
+			KickPackedBatch<prim, true>(r, size);
+			m_q = r[size - 3].STQ.Q;
+			return;
+		}
+	}
+
 	const GIFPackedReg* RESTRICT r_end = r + size;
 
 	while (r < r_end)
 	{
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (s_gsPackedBatchObserve) ++s_gsPackedBatchStats[2];
+#endif
 		m_v.m[0] = GSPackSTQRGBA(r); // TODO: only store the last one
 
 #if defined(ARCH_ARM64)
@@ -1107,10 +1193,25 @@ void GSState::GIFPackedRegHandlerSTQRGBAXYZ2(const GIFPackedReg* RESTRICT r, u32
 
 	CheckFlushes();
 
+	if constexpr (!auto_flush)
+	{
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (s_gsPackedBatchEnabled)
+#endif
+		{
+			KickPackedBatch<prim, false>(r, size);
+			m_q = r[size - 3].STQ.Q;
+			return;
+		}
+	}
+
 	const GIFPackedReg* RESTRICT r_end = r + size;
 
 	while (r < r_end)
 	{
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (s_gsPackedBatchObserve) ++s_gsPackedBatchStats[2];
+#endif
 		m_v.m[0] = GSPackSTQRGBA(r); // TODO: only store the last one
 
 #if defined(ARCH_ARM64)
@@ -5427,6 +5528,264 @@ __forceinline void GSState::VertexKick(u32 skip)
 	constexpr u32 max_vertices = MaxVerticesForPrim(prim);
 	if (max_vertices != 0 && m_vertex.tail >= max_vertices)
 		Flush(VERTEXCOUNT);
+}
+
+// Resolve the existing depth policy once per fused batch. Context and config
+// are stable across the only internal flush (which restores the current context).
+__forceinline GSLimit24BitDepth GSState::GetDepthClampMode() const
+{
+	const GSLimit24BitDepth mode = GSConfig.UserHacks_Limit24BitDepth;
+	if (mode != GSLimit24BitDepth::Disabled && GSIsHardwareRenderer() &&
+		GSLocalMemory::m_psm[m_context->ZBUF.PSM].bpp == 32)
+		return mode;
+	return GSLimit24BitDepth::Disabled;
+}
+
+// Keep the staged VertexKick above as the independent reference. This path
+// changes vertex transport and cursor ownership, retaining local cull equations.
+template <u32 prim>
+__forceinline void GSState::VertexKickDirect(u32 skip, const GSVector4i& new_v0, const GSVector4i& new_v1, VertexKickCursor& c)
+{
+	constexpr u32 n = NumIndicesForPrim(prim);
+	constexpr int primclass = GSUtil::GetPrimClass(prim);
+	static_assert(n > 0);
+
+	pxAssert(c.tail < c.maxcount + 3);
+
+	if constexpr (prim == GS_INVALID)
+	{
+		c.tail = c.head;
+		return;
+	}
+
+	u32 head = c.head;
+	u32 tail = c.tail;
+	u32 next = c.next;
+	u32 xy_tail = c.xy_tail;
+
+	GSVector4i* RESTRICT tailptr = (GSVector4i*)&c.vb[tail];
+
+	tailptr[0] = new_v0;
+	tailptr[1] = new_v1;
+
+	// We maintain the X/Y coordinates for the last 4 vertices, as well as the head for triangle fans, so we can compute
+	// the min/max, and cull degenerate triangles, which saves draws in some cases. Why 4? Mod 4 is cheaper than Mod 3.
+	// The 2.8 rectangle culler expects all four lanes in GS fixed-point units:
+	// <X, Y, X, Y>. Mixing pixel coordinates into Z/W shrinks the upper bounds
+	// by 16 and incorrectly rejects almost every primitive. (AI-assisted)
+	const GSVector4i xy = new_v1.upl16().xyxy().sub32(m_xyof);
+	m_vertex.xy[xy_tail & 3] = xy;
+
+	// Backup head for triangle fans so we can read it later, otherwise it'll get lost after the 4th vertex.
+	if (prim == GS_TRIANGLEFAN && tail == head)
+		m_vertex.xyhead = xy;
+
+	c.tail = ++tail;
+	c.xy_tail = ++xy_tail;
+
+	const u32 m = tail - head;
+
+	if (m < n)
+		return;
+
+
+	// Skip draws when scissor is out of range (i.e. bottom-right is less than top-left), since everything will get clipped.
+	skip |= static_cast<u32>(m_scissor_invalid);
+
+	GSVector4i bbox;
+	if (skip == 0)
+	{
+		const GSVector4i v0 = m_vertex.xy[(xy_tail - 1) & 3];
+		const GSVector4i v1 = m_vertex.xy[(xy_tail - 2) & 3];
+		const GSVector4i v2 = (prim == GS_TRIANGLEFAN) ? m_vertex.xyhead : m_vertex.xy[(xy_tail - 3) & 3];
+
+		if constexpr (n == 1)
+		{
+			bbox = v0;
+		}
+		else if constexpr (n == 2)
+		{
+			bbox = v0.runion(v1);
+		}
+		else if constexpr (n == 3)
+		{
+			bbox = v0.runion(v1).runion(v2);
+		}
+
+		if constexpr (primclass == GS_TRIANGLE_CLASS || primclass == GS_SPRITE_CLASS)
+		{
+			if (m_nativeres)
+			{
+				// For triangles and sprites at native res take the interior pixel centers.
+				const GSVector4i interior = (bbox + GSVector4i(0xF, 0xF, -1, -1)) & GSVector4i(~0xF);
+				bbox = interior + GSVector4i(0, 0, 1, 1); // +1 to bottom/right so empty test works correctly.
+			}
+			else
+			{
+				// For upscaling, remove bottom/right subtexels.
+				bbox -= ((bbox & GSVector4i(0xF)) == GSVector4i(0)) & GSVector4i(0, 0, 1, 1);
+			}
+
+			// For AA1 triangles and lines, expand the bounds by 1 pixel on all sides.
+			// Note: redundant check for the AA1 flag to avoid calling a function if not needed.
+			if (PRIM->AA1 && IsCoverageAlphaSupported())
+			{
+				bbox += GSVector4i(-0x10, -0x10, 0x10, 0x10);
+			}
+		}
+
+		skip |= static_cast<u32>(GSVertexIsRejected<static_cast<GS_PRIM_CLASS>(primclass)>(
+			bbox, m_context->scissor.cull, v0, v1, v2));
+	}
+
+	if (skip != 0)
+	{
+		switch (prim)
+		{
+			case GS_POINTLIST:
+			case GS_LINELIST:
+			case GS_TRIANGLELIST:
+			case GS_SPRITE:
+				c.tail = head; // no need to check or grow the buffer length
+				break;
+			case GS_LINESTRIP:
+			case GS_TRIANGLESTRIP:
+				c.head = head + 1;
+				[[fallthrough]];
+			case GS_TRIANGLEFAN:
+				if (tail >= c.maxcount)
+					{ // in case too many vertices were skipped
+						c.Store(*this);
+						GrowVertexBuffer();
+						c.Load(*this);
+					}
+				break;
+			default:
+				ASSUME(0);
+		}
+
+		return;
+	}
+
+	if (tail >= c.maxcount)
+		{
+			c.Store(*this);
+			GrowVertexBuffer();
+			c.Load(*this);
+		}
+
+	if (c.itail == 0 && ((m_backed_up_ctx != m_env.PRIM.CTXT) || m_dirty_gs_regs))
+	{
+		const int ctx = m_env.PRIM.CTXT;
+		std::memcpy(&m_prev_env, &m_env, 88);
+		std::memcpy(&m_prev_env.CTXT[ctx], &m_env.CTXT[ctx], 96);
+		std::memcpy(&m_prev_env.CTXT[ctx].offset, &m_env.CTXT[ctx].offset, sizeof(m_env.CTXT[ctx].offset));
+		std::memcpy(&m_prev_env.CTXT[ctx].scissor, &m_env.CTXT[ctx].scissor, sizeof(m_env.CTXT[ctx].scissor));
+		m_dirty_gs_regs = 0;
+		m_backed_up_ctx = m_env.PRIM.CTXT;
+	}
+
+	u16* RESTRICT buff = &c.ib[c.itail];
+
+	switch (prim)
+	{
+		case GS_POINTLIST:
+			buff[0] = static_cast<u16>(head + 0);
+			c.head = head + 1;
+			c.next = head + 1;
+			c.itail += 1;
+			break;
+		case GS_LINELIST:
+			buff[0] = static_cast<u16>(head + 0);
+			buff[1] = static_cast<u16>(head + 1);
+			c.head = head + 2;
+			c.next = head + 2;
+			c.itail += 2;
+			break;
+		case GS_LINESTRIP:
+			if (next < head)
+			{
+				c.vb[next + 0] = c.vb[head + 0];
+				c.vb[next + 1] = c.vb[head + 1];
+				head = next;
+				c.tail = next + 2;
+			}
+			buff[0] = static_cast<u16>(head + 0);
+			buff[1] = static_cast<u16>(head + 1);
+			c.head = head + 1;
+			c.next = head + 2;
+			c.itail += 2;
+			break;
+		case GS_TRIANGLELIST:
+			buff[0] = static_cast<u16>(head + 0);
+			buff[1] = static_cast<u16>(head + 1);
+			buff[2] = static_cast<u16>(head + 2);
+			c.head = head + 3;
+			c.next = head + 3;
+			c.itail += 3;
+			break;
+		case GS_TRIANGLESTRIP:
+			if (next < head)
+			{
+				c.vb[next + 0] = c.vb[head + 0];
+				c.vb[next + 1] = c.vb[head + 1];
+				c.vb[next + 2] = c.vb[head + 2];
+				head = next;
+				c.tail = next + 3;
+			}
+			buff[0] = static_cast<u16>(head + 0);
+			buff[1] = static_cast<u16>(head + 1);
+			buff[2] = static_cast<u16>(head + 2);
+			c.head = head + 1;
+			c.next = head + 3;
+			c.itail += 3;
+			break;
+		case GS_TRIANGLEFAN:
+			// TODO: remove gaps, next == head && head < tail - 3 || next > head && next < tail - 2 (very rare)
+			buff[0] = static_cast<u16>(head + 0);
+			buff[1] = static_cast<u16>(tail - 2);
+			buff[2] = static_cast<u16>(tail - 1);
+			c.next = tail;
+			c.itail += 3;
+			break;
+		case GS_SPRITE:
+			buff[0] = static_cast<u16>(head + 0);
+			buff[1] = static_cast<u16>(head + 1);
+
+			// Update the first vert's Q for ease of doing Autoflush
+			if (!m_env.PRIM.FST)
+				c.vb[buff[0]].RGBAQ.Q = c.vb[buff[1]].RGBAQ.Q;
+
+			c.head = head + 2;
+			c.next = head + 2;
+			c.itail += 2;
+			break;
+		default:
+			ASSUME(0);
+	}
+
+	// Update the current draw rectangle using exclusive pixel endpoints.
+	const GSVector4i draw_rect = bbox.sra32<4>() + GSVector4i(0, 0, 1, 1);
+	if (c.itail != n)
+		temp_draw_rect = temp_draw_rect.runion(draw_rect);
+	else
+		temp_draw_rect = draw_rect;
+	temp_draw_rect = temp_draw_rect.rintersect(m_context->scissor.in);
+
+	constexpr u32 max_vertices = MaxVerticesForPrim(prim);
+	if (max_vertices != 0 && c.tail >= max_vertices)
+	{
+		// The renderer reads current m_v (including UV) during Draw. Publish the
+		// incoming vertex before a real flush, not only at the end of the batch.
+		m_v.m[0] = new_v0;
+		m_v.m[1] = new_v1;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (s_gsPackedBatchObserve) ++s_gsPackedBatchStats[2];
+#endif
+		c.Store(*this);
+		Flush(VERTEXCOUNT);
+		c.Load(*this);
+	}
 }
 
 /// Checks if region repeat is used (applying it does something to at least one of the values in min...max)
