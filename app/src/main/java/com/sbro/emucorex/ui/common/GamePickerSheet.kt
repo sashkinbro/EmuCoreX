@@ -166,9 +166,9 @@ private fun GamePickerSheetContent(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = listState,
+            // Horizontal padding is applied per item (not here) so the letter row and
+            // TV focus highlights can draw edge-to-edge while scrolling.
             contentPadding = PaddingValues(
-                start = ScreenHorizontalPadding,
-                end = ScreenHorizontalPadding,
                 top = topInset,
                 bottom = 24.dp + navBarPadding
             ),
@@ -185,6 +185,7 @@ private fun GamePickerSheetContent(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(horizontal = ScreenHorizontalPadding)
                         .focusRequester(focusRequester),
                     textStyle = MaterialTheme.typography.bodyMedium,
                     placeholder = {
@@ -237,7 +238,7 @@ private fun GamePickerSheetContent(
                             .fillMaxWidth()
                             .padding(top = 2.dp, bottom = 2.dp)
                             .tvFocusGroup(),
-                        contentPadding = PaddingValues(0.dp),
+                        contentPadding = PaddingValues(horizontal = ScreenHorizontalPadding),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         item(key = "letter-filter-all") {
@@ -276,6 +277,7 @@ private fun GamePickerSheetContent(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
+                            .padding(horizontal = ScreenHorizontalPadding)
                             .padding(top = 40.dp)
                     )
                 }
@@ -366,6 +368,7 @@ private fun GamePickerItem(
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .padding(horizontal = ScreenHorizontalPadding)
             .padding(vertical = 2.dp)
             .tvGamepadFocusableCard(
                 shape = shape,
