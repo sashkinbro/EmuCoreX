@@ -3001,4 +3001,10 @@
     <string name="settings_shader_presets_remove_body">Predefinições selecionadas: %1$d. Removê-las da lista?</string>
     <string name="settings_shader_presets_remove_failed">Não foi possível remover as predefinições selecionadas.</string>
     <string name="onboarding_supported_consoles">Consoles compatíveis</string>
+    <string name="game_picker_search_hint">Pesquisar jogos…</string>
+    <string name="game_picker_no_results">Nenhum jogo corresponde à sua pesquisa</string>
+    <string name="game_picker_tap_to_select">Toque para selecionar um jogo</string>
+    <string name="game_picker_change_game">Alterar jogo</string>
+    <string name="game_picker_all_filter">Todos</string>
+    <string name="game_picker_clear_search">Limpar pesquisa</string>
 </resources>

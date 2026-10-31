@@ -3021,4 +3021,10 @@
     <string name="settings_shader_presets_remove_body">Wybrane ustawienia: %1$d. Usunąć je z listy?</string>
     <string name="settings_shader_presets_remove_failed">Nie udało się usunąć wybranych ustawień shaderów.</string>
     <string name="onboarding_supported_consoles">Obsługiwane konsole</string>
+    <string name="game_picker_search_hint">Szukaj gier…</string>
+    <string name="game_picker_no_results">Brak gier pasujących do wyszukiwania</string>
+    <string name="game_picker_tap_to_select">Dotknij, aby wybrać grę</string>
+    <string name="game_picker_change_game">Zmień grę</string>
+    <string name="game_picker_all_filter">Wszystkie</string>
+    <string name="game_picker_clear_search">Wyczyść wyszukiwanie</string>
 </resources>

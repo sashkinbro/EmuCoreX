@@ -3000,4 +3000,10 @@
     <string name="settings_shader_presets_remove_body">已选预设：%1$d。是否从列表中移除？</string>
     <string name="settings_shader_presets_remove_failed">无法移除所选预设。</string>
     <string name="onboarding_supported_consoles">支持的游戏机</string>
+    <string name="game_picker_search_hint">搜索游戏…</string>
+    <string name="game_picker_no_results">未找到匹配的游戏</string>
+    <string name="game_picker_tap_to_select">点击选择游戏</string>
+    <string name="game_picker_change_game">更换游戏</string>
+    <string name="game_picker_all_filter">全部</string>
+    <string name="game_picker_clear_search">清除搜索</string>
 </resources>

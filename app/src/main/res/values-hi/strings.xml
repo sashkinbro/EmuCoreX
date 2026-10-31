@@ -2999,4 +2999,10 @@
     <string name="settings_shader_presets_remove_body">चुने हुए प्रीसेट: %1$d। उन्हें सूची से हटाएँ?</string>
     <string name="settings_shader_presets_remove_failed">चुने हुए प्रीसेट नहीं हटाए जा सके।</string>
     <string name="onboarding_supported_consoles">समर्थित कंसोल</string>
+    <string name="game_picker_search_hint">गेम खोजें…</string>
+    <string name="game_picker_no_results">आपकी खोज से कोई गेम मेल नहीं खाता</string>
+    <string name="game_picker_tap_to_select">गेम चुनने के लिए टैप करें</string>
+    <string name="game_picker_change_game">गेम बदलें</string>
+    <string name="game_picker_all_filter">सभी</string>
+    <string name="game_picker_clear_search">खोज साफ़ करें</string>
 </resources>

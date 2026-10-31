@@ -3014,4 +3014,10 @@
     <string name="settings_shader_presets_remove_body">پیش‌تنظیم‌های انتخاب‌شده: %1$d. از فهرست حذف شوند؟</string>
     <string name="settings_shader_presets_remove_failed">پیش‌تنظیم‌های انتخاب‌شده حذف نشدند.</string>
     <string name="onboarding_supported_consoles">کنسول‌های پشتیبانی‌شده</string>
+    <string name="game_picker_search_hint">جستجوی بازی…</string>
+    <string name="game_picker_no_results">هیچ بازی با جستجوی شما مطابقت ندارد</string>
+    <string name="game_picker_tap_to_select">برای انتخاب بازی ضربه بزنید</string>
+    <string name="game_picker_change_game">تغییر بازی</string>
+    <string name="game_picker_all_filter">همه</string>
+    <string name="game_picker_clear_search">پاک کردن جستجو</string>
 </resources>

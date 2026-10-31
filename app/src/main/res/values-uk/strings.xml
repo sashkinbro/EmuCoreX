@@ -2105,6 +2105,12 @@
     <string name="cheat_manager_category_hotkeys">Комбінації кнопок</string>
     <string name="cheat_manager_category_other">Інше</string>
     <string name="content_select_game_named">Вибрана гра: %1$s</string>
+    <string name="game_picker_search_hint">Пошук ігор…</string>
+    <string name="game_picker_no_results">Ігор не знайдено за вашим запитом</string>
+    <string name="game_picker_tap_to_select">Натисніть, щоб вибрати гру</string>
+    <string name="game_picker_change_game">Змінити гру</string>
+    <string name="game_picker_all_filter">Всі</string>
+    <string name="game_picker_clear_search">Очистити пошук</string>
     <string name="settings_network_mode">Режим мережі</string>
     <string name="settings_network_mode_online">Онлайн (Sockets)</string>
     <string name="settings_network_mode_local_host">Створити локальну гру</string>

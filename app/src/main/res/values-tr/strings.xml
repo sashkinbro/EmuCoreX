@@ -2999,4 +2999,10 @@
     <string name="settings_shader_presets_remove_body">Seçilen ön ayarlar: %1$d. Listeden kaldırılsın mı?</string>
     <string name="settings_shader_presets_remove_failed">Seçilen ön ayarlar kaldırılamadı.</string>
     <string name="onboarding_supported_consoles">Desteklenen konsollar</string>
+    <string name="game_picker_search_hint">Oyun ara…</string>
+    <string name="game_picker_no_results">Aramanızla eşleşen oyun bulunamadı</string>
+    <string name="game_picker_tap_to_select">Oyun seçmek için dokunun</string>
+    <string name="game_picker_change_game">Oyunu değiştir</string>
+    <string name="game_picker_all_filter">Tümü</string>
+    <string name="game_picker_clear_search">Aramayı temizle</string>
 </resources>

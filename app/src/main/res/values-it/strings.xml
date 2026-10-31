@@ -2999,4 +2999,10 @@
     <string name="settings_shader_presets_remove_body">Preimpostazioni selezionate: %1$d. Rimuoverle dall’elenco?</string>
     <string name="settings_shader_presets_remove_failed">Impossibile rimuovere le preimpostazioni selezionate.</string>
     <string name="onboarding_supported_consoles">Console supportate</string>
+    <string name="game_picker_search_hint">Cerca giochi…</string>
+    <string name="game_picker_no_results">Nessun gioco corrisponde alla ricerca</string>
+    <string name="game_picker_tap_to_select">Tocca per selezionare un gioco</string>
+    <string name="game_picker_change_game">Cambia gioco</string>
+    <string name="game_picker_all_filter">Tutti</string>
+    <string name="game_picker_clear_search">Cancella ricerca</string>
 </resources>

@@ -83,7 +83,7 @@ import com.sbro.emucorex.data.RemoteCheatPack
 import com.sbro.emucorex.data.RemoteContentCatalogRepository
 import com.sbro.emucorex.data.SelectedGameIdentity
 import com.sbro.emucorex.ui.common.AppAlertDialog
-import com.sbro.emucorex.ui.common.LibraryGamePicker
+import com.sbro.emucorex.ui.common.ManagerGameSelector
 import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.cheatCatalogGameTitleKey
@@ -379,7 +379,7 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
                 }
             }
             item {
-                LibraryGamePicker(
+                ManagerGameSelector(
                     games = games,
                     selectedPath = selectedPath,
                     onSelected = { game ->

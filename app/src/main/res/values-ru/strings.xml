@@ -3004,4 +3004,10 @@
     <string name="settings_shader_presets_remove_body">Выбрано пресетов: %1$d. Убрать их из списка?</string>
     <string name="settings_shader_presets_remove_failed">Не удалось убрать выбранные пресеты.</string>
     <string name="onboarding_supported_consoles">Поддерживаемые консоли</string>
+    <string name="game_picker_search_hint">Поиск игр…</string>
+    <string name="game_picker_no_results">Игр не найдено по вашему запросу</string>
+    <string name="game_picker_tap_to_select">Нажмите, чтобы выбрать игру</string>
+    <string name="game_picker_change_game">Сменить игру</string>
+    <string name="game_picker_all_filter">Все</string>
+    <string name="game_picker_clear_search">Очистить поиск</string>
 </resources>

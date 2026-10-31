@@ -3019,4 +3019,10 @@
     <string name="settings_shader_presets_remove_body">Vybrané předvolby: %1$d. Odebrat je ze seznamu?</string>
     <string name="settings_shader_presets_remove_failed">Vybrané předvolby se nepodařilo odebrat.</string>
     <string name="onboarding_supported_consoles">Podporované konzole</string>
+    <string name="game_picker_search_hint">Hledat hry…</string>
+    <string name="game_picker_no_results">Hledání neodpovídají žádné hry</string>
+    <string name="game_picker_tap_to_select">Klepnutím vyberte hru</string>
+    <string name="game_picker_change_game">Změnit hru</string>
+    <string name="game_picker_all_filter">Vše</string>
+    <string name="game_picker_clear_search">Vymazat hledání</string>
 </resources>

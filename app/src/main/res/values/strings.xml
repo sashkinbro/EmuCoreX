@@ -2169,6 +2169,12 @@
     <string name="cheat_manager_category_hotkeys">Button combinations</string>
     <string name="cheat_manager_category_other">Other</string>
     <string name="content_select_game_named">Selected game: %1$s</string>
+    <string name="game_picker_search_hint">Search games…</string>
+    <string name="game_picker_no_results">No games match your search</string>
+    <string name="game_picker_tap_to_select">Tap to select a game</string>
+    <string name="game_picker_change_game">Change game</string>
+    <string name="game_picker_all_filter">All</string>
+    <string name="game_picker_clear_search">Clear search</string>
     <string name="settings_network_mode">Network mode</string>
     <string name="settings_network_mode_online">Online (Sockets)</string>
     <string name="settings_network_mode_local_host">Host local game</string>

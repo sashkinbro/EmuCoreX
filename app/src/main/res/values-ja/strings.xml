@@ -2998,4 +2998,10 @@
     <string name="settings_shader_presets_remove_body">選択したプリセット：%1$d件。リストから削除しますか？</string>
     <string name="settings_shader_presets_remove_failed">選択したプリセットを削除できませんでした。</string>
     <string name="onboarding_supported_consoles">対応コンソール</string>
+    <string name="game_picker_search_hint">ゲームを検索…</string>
+    <string name="game_picker_no_results">一致するゲームが見つかりません</string>
+    <string name="game_picker_tap_to_select">タップしてゲームを選択</string>
+    <string name="game_picker_change_game">ゲームを変更</string>
+    <string name="game_picker_all_filter">すべて</string>
+    <string name="game_picker_clear_search">検索をクリア</string>
 </resources>
