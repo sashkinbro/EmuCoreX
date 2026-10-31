@@ -7,6 +7,7 @@
 
 #include "GS/Renderers/Common/GSVertex.h"
 #include "Config.h"
+#include "GS/GSFusedVertexTrace.h"
 
 namespace GSStripKickKernel
 {

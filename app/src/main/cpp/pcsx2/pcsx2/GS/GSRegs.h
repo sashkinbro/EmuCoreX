@@ -69,6 +69,12 @@ enum GIF_REG_COMPLEX
 {
 	GIF_REG_STQRGBAXYZF2 = 0x00,
 	GIF_REG_STQRGBAXYZ2 = 0x01,
+	GIF_REG_NOPSTQRGBAXYZF2 = 0x02,
+	GIF_REG_STQXYZ2 = 0x03,
+	GIF_REG_UVXYZ2 = 0x04,
+	GIF_REG_RGBAQXYZ2 = 0x05,
+	GIF_REG_UVRGBAQXYZF2 = 0x06,
+	GIF_REG_COMPLEX_COUNT = 0x07,
 };
 
 enum GIF_A_D_REG
@@ -1101,6 +1107,24 @@ REG128_SET(GIFPackedReg)
 	GIFPackedNOP    NOP;
 REG_SET_END
 
+// Transient descriptor offsets occupy GIFPath's existing tail padding.
+struct GIFPackedLayout
+{
+	u32 stride, off_a, off_rgba, off_xyz;
+};
+__noinline bool GIFClassifyPaddedLayout(const GSVector4i& regs, u32 nreg, u32& type, GIFPackedLayout& layout);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern thread_local bool g_gsCarryingLayoutsEnabled;
+#endif
+__forceinline_odr bool GIFCarryingLayoutsEnabled()
+{
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	return g_gsCarryingLayoutsEnabled;
+#else
+	return true;
+#endif
+}
+
 struct alignas(32) GIFPath
 {
 	GIFTag tag;
@@ -1109,13 +1133,19 @@ struct alignas(32) GIFPath
 	u32 reg;
 	u32 type;
 	GSVector4i regs;
+	GIFPackedLayout layout;
 
 	enum
 	{
 		TYPE_UNKNOWN,
 		TYPE_ADONLY,
 		TYPE_STQRGBAXYZF2,
-		TYPE_STQRGBAXYZ2
+		TYPE_STQRGBAXYZ2,
+		TYPE_NOPSTQRGBAXYZF2,
+		TYPE_STQXYZ2,
+		TYPE_UVXYZ2,
+		TYPE_RGBAQXYZ2,
+		TYPE_UVRGBAQXYZF2
 	};
 
 	__forceinline void SetTag(const void* mem)
@@ -1156,6 +1186,13 @@ struct alignas(32) GIFPath
 					case 1:
 						break;
 					case 2:
+						if (GIFCarryingLayoutsEnabled())
+						{
+							if (regs.U32[0] == 0x00000502) type = TYPE_STQXYZ2;
+							else if (regs.U32[0] == 0x00000503) type = TYPE_UVXYZ2;
+							else if (regs.U32[0] == 0x00000501) type = TYPE_RGBAQXYZ2;
+							if (type != TYPE_UNKNOWN) layout = {2, 0, 0, 1};
+						}
 						break;
 					case 3:
 						// many games, TODO: formats mixed with NOPs (xeno2: 040f010f02, 04010f020f, mgs3: 04010f0f02, 0401020f0f, 04010f020f)
@@ -1164,9 +1201,21 @@ struct alignas(32) GIFPath
 						// GoW (has other crazy formats, like ...030503050103)
 						if (regs.U32[0] == 0x00050102)
 							type = TYPE_STQRGBAXYZ2;
-						// TODO: common types with UV instead
+						if (regs.U32[0] == 0x00040103 && GIFCarryingLayoutsEnabled())
+						{
+							type = TYPE_UVRGBAQXYZF2; layout = {3, 0, 1, 2};
+						}
 						break;
 					case 4:
+						if (GIFCarryingLayoutsEnabled())
+						{
+							if (regs.U32[0] == 0x05020502) type = TYPE_STQXYZ2;
+							else if (regs.U32[0] == 0x05030503) type = TYPE_UVXYZ2;
+							else if (regs.U32[0] == 0x05010501) type = TYPE_RGBAQXYZ2;
+							// Preserve the original tag's NREG/NLOOP. Expanding a
+							// 15-bit loop count would truncate it during Freeze.
+							if (type != TYPE_UNKNOWN) layout = {2, 0, 0, 1};
+						}
 						break;
 					case 5:
 						break;
@@ -1209,6 +1258,10 @@ struct alignas(32) GIFPath
 					default:
 						ASSUME(0);
 				}
+				if (type == TYPE_UNKNOWN && nreg <= 6 &&
+					(regs.eq8(GSVector4i(0x0f0f0f0f)).mask() & ((1u << nreg) - 1)) != 0 &&
+					GIFCarryingLayoutsEnabled())
+					GIFClassifyPaddedLayout(regs, nreg, type, layout);
 			}
 		}
 	}
@@ -1238,6 +1291,10 @@ struct alignas(32) GIFPath
 		return true;
 	}
 };
+
+static_assert(sizeof(GIFPath) == 64 && alignof(GIFPath) == 32 && offsetof(GIFPath, regs) == 32);
+static_assert(GIFPath::TYPE_NOPSTQRGBAXYZF2 - GIFPath::TYPE_STQRGBAXYZF2 == GIF_REG_NOPSTQRGBAXYZF2);
+static_assert(GIFPath::TYPE_UVRGBAQXYZF2 - GIFPath::TYPE_STQRGBAXYZF2 == GIF_REG_UVRGBAQXYZF2);
 
 struct GSPrivRegSet
 {

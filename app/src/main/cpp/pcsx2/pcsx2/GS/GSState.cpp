@@ -215,6 +215,17 @@ void GSState::Reset(bool hardware_reset)
 	m_perfmon_frame.Reset();
 }
 
+template <u32 prim, GSCarryingVertex::Layout layout, bool auto_flush>
+constexpr GSState::GIFPackedRegHandlerC GSState::CarryingHandlerOrNull()
+{
+	using GSCarryingVertex::Layout;
+	if constexpr ((prim == GS_TRIANGLESTRIP && (layout == Layout::NopTriple || layout == Layout::RGBAPair || layout == Layout::UVTriple)) ||
+		(prim == GS_SPRITE && (layout == Layout::STQPair || layout == Layout::UVPair)))
+		return &GSState::GIFPackedRegHandlerCarrying<prim, layout, auto_flush>;
+	else
+		return nullptr;
+}
+
 template<bool auto_flush, bool sprites_only>
 void GSState::SetPrimHandlers()
 {
@@ -230,7 +241,12 @@ void GSState::SetPrimHandlers()
 	m_fpGIFRegHandlerXYZ[P][2] = &GSState::GIFRegHandlerXYZ2<P, 0, auto_flush>; \
 	m_fpGIFRegHandlerXYZ[P][3] = &GSState::GIFRegHandlerXYZ2<P, 1, auto_flush>; \
 	m_fpGIFPackedRegHandlerSTQRGBAXYZF2[P] = &GSState::GIFPackedRegHandlerSTQRGBAXYZF2<P, auto_flush>; \
-	m_fpGIFPackedRegHandlerSTQRGBAXYZ2[P] = &GSState::GIFPackedRegHandlerSTQRGBAXYZ2<P, auto_flush>;
+	m_fpGIFPackedRegHandlerSTQRGBAXYZ2[P] = &GSState::GIFPackedRegHandlerSTQRGBAXYZ2<P, auto_flush>; \
+	m_fpGIFPackedCarrying[0][P] = CarryingHandlerOrNull<P, GSCarryingVertex::Layout::NopTriple, auto_flush>(); \
+	m_fpGIFPackedCarrying[1][P] = CarryingHandlerOrNull<P, GSCarryingVertex::Layout::STQPair, auto_flush>(); \
+	m_fpGIFPackedCarrying[2][P] = CarryingHandlerOrNull<P, GSCarryingVertex::Layout::UVPair, auto_flush>(); \
+	m_fpGIFPackedCarrying[3][P] = CarryingHandlerOrNull<P, GSCarryingVertex::Layout::RGBAPair, auto_flush>(); \
+	m_fpGIFPackedCarrying[4][P] = CarryingHandlerOrNull<P, GSCarryingVertex::Layout::UVTriple, auto_flush>();
 
 	SetHandlerXYZ(GS_POINTLIST, true);
 	SetHandlerXYZ(GS_LINELIST, non_sprite_af);
@@ -917,6 +933,39 @@ void GSState::GIFPackedRegHandlerNull(const GIFPackedReg* RESTRICT r)
 {
 }
 
+// NOPs advance the source pointer but have no state effects. Only ordered
+// descriptor sets with the existing scalar carry semantics are recognized.
+__noinline bool GIFClassifyPaddedLayout(const GSVector4i& regs, u32 nreg, u32& type, GIFPackedLayout& layout)
+{
+	u32 positions[3] = {}, count = 0;
+	u8 descriptors[3] = {};
+	for (u32 i = 0; i < nreg; ++i)
+	{
+		const u8 descriptor = regs.U8[i];
+		if (descriptor == GIF_REG_NOP) continue;
+		if (count == 3) return false;
+		positions[count] = i; descriptors[count++] = descriptor;
+	}
+	if (count == 3 && descriptors[1] == GIF_REG_RGBA && descriptors[2] == GIF_REG_XYZF2)
+	{
+		if (descriptors[0] == GIF_REG_STQ) type = GIFPath::TYPE_NOPSTQRGBAXYZF2;
+		else if (descriptors[0] == GIF_REG_UV) type = GIFPath::TYPE_UVRGBAQXYZF2;
+		else return false;
+		layout = {nreg, positions[0], positions[1], positions[2]};
+		return true;
+	}
+	if (count == 2 && descriptors[1] == GIF_REG_XYZ2)
+	{
+		if (descriptors[0] == GIF_REG_STQ) type = GIFPath::TYPE_STQXYZ2;
+		else if (descriptors[0] == GIF_REG_UV) type = GIFPath::TYPE_UVXYZ2;
+		else if (descriptors[0] == GIF_REG_RGBA) type = GIFPath::TYPE_RGBAQXYZ2;
+		else return false;
+		layout = {nreg, positions[0], 0, positions[1]};
+		return true;
+	}
+	return false;
+}
+
 void GSState::GIFPackedRegHandlerRGBA(const GIFPackedReg* RESTRICT r)
 {
 	const GSVector4i mask = GSVector4i::load(0x0c080400);
@@ -1065,6 +1114,36 @@ static thread_local bool s_gsStripKernelEnabled = true;
 static thread_local bool s_gsStripKernelObserve = false;
 static thread_local u32 s_gsStripKernelMutation = 0;
 static thread_local u64 s_gsStripKernelStats[4] = {}; // chunks, vertices, direct vector culls, scalar culls
+thread_local bool g_gsCarryingLayoutsEnabled = true;
+static thread_local bool s_gsCarryingLayoutsObserve = false;
+static thread_local u64 s_gsCarryingLayoutsStats[4] = {}; // handlers, vertices, kernel vertices, scalar descriptors
+static thread_local u64 s_gsCarryingStagedVertices = 0;
+
+extern "C" void EmuCoreXOracleSetGSCarryingLayouts(bool enabled, bool observe)
+{
+	g_gsCarryingLayoutsEnabled = enabled;
+	s_gsCarryingLayoutsObserve = observe;
+	std::fill(std::begin(s_gsCarryingLayoutsStats), std::end(s_gsCarryingLayoutsStats), 0);
+	s_gsCarryingStagedVertices = 0;
+}
+extern "C" void EmuCoreXOracleGSCarryingLayoutsStats(u64* values)
+{
+	std::copy(std::begin(s_gsCarryingLayoutsStats), std::end(s_gsCarryingLayoutsStats), values);
+}
+extern "C" u64 EmuCoreXOracleGSCarryingStagedVertices() { return s_gsCarryingStagedVertices; }
+extern "C" bool EmuCoreXOracleGSClassifyCarryingLayout(const GIFPackedReg* tag, u32* info)
+{
+	GIFPath path{};
+	path.SetTag(tag);
+	std::fill(info, info + 8, 0);
+	info[0] = path.type; info[1] = path.nreg; info[2] = path.nloop; info[3] = path.reg;
+	if (path.type > GIFPath::TYPE_STQRGBAXYZ2)
+	{
+		info[4] = path.layout.stride; info[5] = path.layout.off_a;
+		info[6] = path.layout.off_rgba; info[7] = path.layout.off_xyz;
+	}
+	return path.type > GIFPath::TYPE_STQRGBAXYZ2;
+}
 
 extern "C" void EmuCoreXOracleSetGSStripKernel(bool enabled, bool observe, u32 mutation)
 {
@@ -3201,6 +3280,9 @@ void GSState::Transfer(const u8* mem, u32 size)
 						do
 						{
 							(this->*m_fpGIFPackedRegHandlers[path.GetReg()])((GIFPackedReg*)mem);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+							if (s_gsCarryingLayoutsObserve) ++s_gsCarryingLayoutsStats[3];
+#endif
 
 							mem += sizeof(GIFPackedReg);
 							size--;
@@ -3221,6 +3303,22 @@ void GSState::Transfer(const u8* mem, u32 size)
 
 						switch (path.type)
 						{
+							case GIFPath::TYPE_NOPSTQRGBAXYZF2:
+							case GIFPath::TYPE_STQXYZ2:
+							case GIFPath::TYPE_UVXYZ2:
+							case GIFPath::TYPE_RGBAQXYZ2:
+							case GIFPath::TYPE_UVRGBAQXYZF2:
+							{
+								const auto handler = m_fpGIFPackedCarryingC[path.type - GIFPath::TYPE_NOPSTQRGBAXYZF2];
+								if (handler)
+								{
+									m_packed_layout = path.layout;
+									(this->*handler)((GIFPackedReg*)mem, total);
+									mem += total * sizeof(GIFPackedReg);
+									break;
+								}
+							}
+							[[fallthrough]];
 							case GIFPath::TYPE_UNKNOWN:
 							{
 								u32 reg = 0;
@@ -3229,6 +3327,9 @@ void GSState::Transfer(const u8* mem, u32 size)
 								{
 									const u32 cur_reg = path.GetReg(reg++);
 									(this->*m_fpGIFPackedRegHandlers[cur_reg])((GIFPackedReg*)mem);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+									if (s_gsCarryingLayoutsObserve) ++s_gsCarryingLayoutsStats[3];
+#endif
 
 									mem += sizeof(GIFPackedReg);
 
@@ -3268,6 +3369,9 @@ void GSState::Transfer(const u8* mem, u32 size)
 						do
 						{
 							(this->*m_fpGIFPackedRegHandlers[path.GetReg()])((GIFPackedReg*)mem);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+							if (s_gsCarryingLayoutsObserve) ++s_gsCarryingLayoutsStats[3];
+#endif
 
 							mem += sizeof(GIFPackedReg);
 							size--;
@@ -3575,14 +3679,15 @@ int GSState::Defrost(const freezeData* fd)
 	for (GIFPath& path : m_path)
 	{
 		ReadState(&path.tag, data);
-		ReadState(&path.reg, data);
+		u32 saved_reg;
+		ReadState(&saved_reg, data);
 
 		path.SetTag(&path.tag); // expand regs
+		path.reg = saved_reg; // SetTag resets the cursor; resume the serialized descriptor.
 	}
 
 	ReadState(&m_q, data);
 
-	m_prev_env = m_env;
 	PRIM = &m_env.PRIM;
 
 	UpdateContext();
@@ -3599,6 +3704,10 @@ int GSState::Defrost(const freezeData* fd)
 	}
 
 	UpdateScissor();
+
+	// Back up the reconstructed contexts, including the inactive context's
+	// derived scissor/offset caches, rather than the values left by Reset.
+	m_prev_env = m_env;
 
 	// Force CLUT to be reloaded.
 	m_mem.m_clut.Reset();
@@ -3647,6 +3756,8 @@ void GSState::UpdateVertexKick()
 
 	m_fpGIFPackedRegHandlersC[GIF_REG_STQRGBAXYZF2] = m_fpGIFPackedRegHandlerSTQRGBAXYZF2[prim];
 	m_fpGIFPackedRegHandlersC[GIF_REG_STQRGBAXYZ2] = m_fpGIFPackedRegHandlerSTQRGBAXYZ2[prim];
+	for (u32 i = 0; i < GIF_REG_COMPLEX_COUNT - 2; ++i)
+		m_fpGIFPackedCarryingC[i] = m_fpGIFPackedCarrying[i][prim];
 }
 
 static void GrowBuffer(void** pbuff, size_t old_size, size_t new_size, bool vertices)
@@ -5007,7 +5118,18 @@ static constexpr u32 MaxVerticesForPrim(u32 prim)
 
 template <bool xyzf2>
 u32 GSState::KickPackedStripChunk(const GIFPackedReg* RESTRICT r, u32 remaining,
-	VertexKickCursor& c, u64 uvfog, GSLimit24BitDepth depth, GSVector4i& last0, GSVector4i& last1)
+    VertexKickCursor& c, u64 uvfog, GSLimit24BitDepth depth, GSVector4i& last0, GSVector4i& last1)
+{
+#if defined(ARCH_ARM64)
+    return KickPackedStripChunkParsed(r, remaining, c, GSCarryingVertex::TripleBatchParser<xyzf2>{uvfog, depth}, last0, last1);
+#else
+    return 0;
+#endif
+}
+
+template <class Parser>
+u32 GSState::KickPackedStripChunkParsed(const GIFPackedReg* RESTRICT r, u32 remaining,
+    VertexKickCursor& c, const Parser& parser, GSVector4i& last0, GSVector4i& last1)
 {
 #if defined(ARCH_ARM64)
 	using namespace GSStripKickKernel;
@@ -5041,18 +5163,7 @@ u32 GSState::KickPackedStripChunk(const GIFPackedReg* RESTRICT r, u32 remaining,
 	// Current offsets must also be the proved, duplicated native lanes.
 	if (m_xyof.z != ofx || m_xyof.w != ofy || ofx < 0 || ofx > 65535 || ofy < 0 || ofy > 65535) return 0;
 	GSVertex* const provisional = c.vb + c.tail;
-	switch (depth)
-	{
-		case GSLimit24BitDepth::PrioritizeUpper:
-			Parse<xyzf2, GSLimit24BitDepth::PrioritizeUpper>(r, count, provisional,
-				m_strip_side_xy, m_strip_side_meta, bounds, ofx, ofy, uvfog); break;
-		case GSLimit24BitDepth::PrioritizeLower:
-			Parse<xyzf2, GSLimit24BitDepth::PrioritizeLower>(r, count, provisional,
-				m_strip_side_xy, m_strip_side_meta, bounds, ofx, ofy, uvfog); break;
-		default:
-			Parse<xyzf2, GSLimit24BitDepth::Disabled>(r, count, provisional,
-				m_strip_side_xy, m_strip_side_meta, bounds, ofx, ofy, uvfog); break;
-	}
+	parser(r, count, provisional, m_strip_side_xy, m_strip_side_meta, bounds, ofx, ofy);
 	// Capture before compaction can overwrite its provisional source slot.
 	last0 = GSVector4i(provisional[count - 1].m[0]);
 	last1 = GSVector4i(provisional[count - 1].m[1]);
@@ -5966,6 +6077,106 @@ __forceinline void GSState::VertexKickDirect(u32 skip, const GSVector4i& new_v0,
 		Flush(VERTEXCOUNT);
 		c.Load(*this);
 	}
+}
+
+// New layouts replace scalar descriptor replay, so dirty prefixes must retain
+// its exact check/alpha/ADC order. The existing two triples stay unchanged.
+template <u32 prim, GSCarryingVertex::Layout layout, bool auto_flush>
+void GSState::GIFPackedRegHandlerCarrying(const GIFPackedReg* RESTRICT r, u32 size)
+{
+	using namespace GSCarryingVertex;
+	const GIFPackedLayout off = m_packed_layout;
+	pxAssert(size > 0 && off.stride > 0 && size % off.stride == 0);
+	const u32 count = size / off.stride;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (s_gsCarryingLayoutsObserve)
+	{
+		++s_gsCarryingLayoutsStats[0]; s_gsCarryingLayoutsStats[1] += count;
+	}
+#endif
+	const auto latch = [&](const GIFPackedReg* record) {
+		if constexpr (LatchesQ(layout))
+		{
+			const u32 q = NormalizeQ(record[off.off_a].U32[2]);
+			std::memcpy(&m_q, &q, sizeof(q));
+		}
+	};
+	const auto replay = [&](u32 descriptor, const GIFPackedReg* value) {
+		(this->*m_fpGIFPackedRegHandlers[descriptor])(value);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (s_gsCarryingLayoutsObserve) ++s_gsCarryingLayoutsStats[3];
+#endif
+	};
+	u32 done = 0;
+	while (done < count && m_dirty_gs_regs)
+	{
+		const GIFPackedReg* record = r + done * off.stride;
+		constexpr u32 first = HasUV(layout) ? GIF_REG_UV : layout == Layout::RGBAPair ? GIF_REG_RGBA : GIF_REG_STQ;
+		replay(first, record + off.off_a);
+		if constexpr (HasRGBA(layout)) replay(GIF_REG_RGBA, record + off.off_rgba);
+		replay(XYZF(layout) ? GIF_REG_XYZF2 : GIF_REG_XYZ2, record + off.off_xyz);
+		++done;
+	}
+	if constexpr (HasUV(layout))
+		if (GSConfig.UserHacks_ForceEvenSpritePosition) m_isPackedUV_HackFlag = true;
+	if (done < count)
+	{
+		const Consts constants;
+		if constexpr (auto_flush)
+		{
+			for (; done < count; ++done)
+			{
+				const GIFPackedReg* record = r + done * off.stride;
+				u64 uvfog; std::memcpy(&uvfog, &m_v.UV, sizeof(uvfog));
+				u32 q; std::memcpy(&q, &m_q, sizeof(q));
+				const GSVector4i carry = MakeCarry(layout, GSVector4i(m_v.m[0]), q);
+				GSVector4i m0, m1; Parse<layout>(record, off, uvfog, carry, constants, m0, m1);
+				latch(record); m_v.m[0] = m0; m_v.m[1] = m1;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+				if (s_gsCarryingLayoutsObserve) ++s_gsCarryingStagedVertices;
+#endif
+				// VertexKick applies depth policy and observes incoming m_v for autoflush.
+				VertexKick<prim, true>(record[off.off_xyz].XYZ2.Skip());
+			}
+		}
+		else
+		{
+			u64 uvfog; std::memcpy(&uvfog, &m_v.UV, sizeof(uvfog));
+			u32 q; std::memcpy(&q, &m_q, sizeof(q));
+			const GSVector4i carry = MakeCarry(layout, GSVector4i(m_v.m[0]), q);
+			const GSLimit24BitDepth depth = GetDepthClampMode();
+			VertexKickCursor c; c.Load(*this);
+			GSVector4i m0, m1;
+			while (done < count)
+			{
+				const GIFPackedReg* record = r + done * off.stride;
+#if defined(ARCH_ARM64)
+				if constexpr (prim == GS_TRIANGLESTRIP)
+				{
+					const BatchParser<layout> parser{off, uvfog, carry, constants, depth};
+					const u32 consumed = KickPackedStripChunkParsed(record, count - done, c, parser, m0, m1);
+					if (consumed)
+					{
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+						if (s_gsCarryingLayoutsObserve) s_gsCarryingLayoutsStats[2] += consumed;
+#endif
+						done += consumed;
+						continue;
+					}
+				}
+#endif
+				Parse<layout>(record, off, uvfog, carry, constants, m0, m1);
+				ClampDepth(m1, depth);
+				// Helper-free chunks defer the latch store, but a real Flush
+				// must observe the same current Q as scalar descriptor replay.
+				if (c.tail + 1 >= MaxVerticesForPrim(prim)) latch(record);
+				VertexKickDirect<prim>(record[off.off_xyz].XYZ2.Skip(), m0, m1, c);
+				++done;
+			}
+			c.Store(*this); m_v.m[0] = m0; m_v.m[1] = m1;
+		}
+	}
+	latch(r + (count - 1) * off.stride);
 }
 
 /// Checks if region repeat is used (applying it does something to at least one of the values in min...max)

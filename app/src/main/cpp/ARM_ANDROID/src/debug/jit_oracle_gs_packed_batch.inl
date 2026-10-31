@@ -14,6 +14,7 @@ struct GSPackedBatchOracle final : GSState
     std::vector<u8> draws;
     u32 drawCount = 0;
     u32 vertexFlushes = 0;
+    u32 autoFlushes = 0;
     bool captureTrace = false;
     bool IsCoverageAlphaSupported() override { return true; }
 
@@ -67,6 +68,7 @@ struct GSPackedBatchOracle final : GSState
         }
         ++drawCount;
         vertexFlushes += m_state_flush_reason == GSFlushReason::VERTEXCOUNT;
+        autoFlushes += m_state_flush_reason == GSFlushReason::AUTOFLUSH;
     }
 
     std::vector<u8> TraceSnapshot() const
@@ -126,6 +128,55 @@ struct GSPackedBatchOracle final : GSState
 
     void SetKnownTraceCarry() { m_v.FOG = 31; }
 
+    void SeedCarryingLayout(u32 latch = 0x40000000)
+    {
+        std::memset(&m_path, 0, sizeof(m_path));
+        m_texflush_flag = false;
+        m_v.ST.S = 1.25f; m_v.ST.T = -2.5f;
+        m_v.RGBAQ.U32[0] = 0x44332211; m_v.RGBAQ.Q = 3.0f;
+        m_v.UV = 0x81238023; m_v.FOG = 0x89abcdef;
+        std::memcpy(&m_q, &latch, sizeof(latch));
+        m_isPackedUV_HackFlag = false;
+    }
+
+    std::vector<u8> CarryingSnapshot() const
+    {
+        auto out = Snapshot();
+        Append(out, m_isPackedUV_HackFlag);
+        Append(out, m_texflush_flag);
+        for (const auto& path : m_path)
+        {
+            Append(out, path.nloop);
+            if (path.nloop)
+            {
+                Append(out, path.nreg); Append(out, path.reg); Append(out, path.regs);
+            }
+        }
+        return out;
+    }
+
+    u32 ParserReg(u32 path) const { return m_path[path].reg; }
+    u32 ParserLoops(u32 path) const { return m_path[path].nloop; }
+    u32 ParserRegisters(u32 path) const { return m_path[path].nreg; }
+
+    void SubmitCarrying(const std::vector<GIFPackedReg>& packet, u32 chunk, u32 path)
+    {
+        for (u32 at = 0; at < packet.size();)
+        {
+            const u32 count = chunk ? std::min<u32>(chunk, packet.size() - at) : packet.size() - at;
+            const auto* data = reinterpret_cast<const u8*>(packet.data() + at);
+            if (path == 2) Transfer<2>(data, count); else Transfer<3>(data, count);
+            at += count;
+        }
+    }
+
+    void SetCarryingNativePolicy() { m_nativeres = true; }
+    u32 CarryingCurrentZ() const { return m_v.XYZ.Z; }
+    void SeedCarryingAutoFlush()
+    {
+        m_v.ST.S = 0.625f; m_v.ST.T = 0.40625f; m_v.RGBAQ.Q = 2.0f;
+    }
+
     bool KnownTraceMatches() const
     {
         const GSVector4 lo(6.25f, 6.25f, 305419904.0f, 31.0f), hi(25.0f, 25.0f, 305419904.0f, 31.0f);
@@ -152,7 +203,7 @@ struct GSPackedBatchOracle final : GSState
 
     void Prepare(u32 prim, bool native, bool offset, bool aa1, bool smallBuffer, bool invalidScissor = false)
     {
-        draws.clear(); drawCount = vertexFlushes = 0;
+        draws.clear(); drawCount = vertexFlushes = autoFlushes = 0;
         m_vertex.head = m_vertex.tail = m_vertex.next = m_vertex.xy_tail = 0;
         m_index.tail = 0;
         for (auto& xy : m_vertex.xy) xy = GSVector4i::zero();

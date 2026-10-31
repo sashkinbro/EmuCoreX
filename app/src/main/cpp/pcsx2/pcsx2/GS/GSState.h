@@ -13,6 +13,7 @@
 #include "GS/Renderers/Common/GSDevice.h"
 #include "GS/GSVector.h"
 #include "GS/GSFusedVertexTrace.h"
+#include "GS/GSCarryingVertex.h"
 #include "GSAlignedClass.h"
 
 #include <array>
@@ -222,6 +223,12 @@ protected:
 	template <u32 prim, bool xyzf2> void KickPackedBatch(const GIFPackedReg* RESTRICT r, u32 size);
 	template <bool xyzf2> u32 KickPackedStripChunk(const GIFPackedReg* RESTRICT r, u32 remaining,
 		VertexKickCursor& cursor, u64 uvfog, GSLimit24BitDepth depth, GSVector4i& last0, GSVector4i& last1);
+	template <class Parser> u32 KickPackedStripChunkParsed(const GIFPackedReg* RESTRICT r, u32 remaining,
+		VertexKickCursor& cursor, const Parser& parser, GSVector4i& last0, GSVector4i& last1);
+	template <u32 prim, GSCarryingVertex::Layout layout, bool auto_flush>
+	void GIFPackedRegHandlerCarrying(const GIFPackedReg* RESTRICT r, u32 size);
+	template <u32 prim, GSCarryingVertex::Layout layout, bool auto_flush>
+	static constexpr GIFPackedRegHandlerC CarryingHandlerOrNull();
 
 	// following functions need m_vt to be initialized
 
@@ -567,6 +574,9 @@ protected:
 #if defined(ARCH_ARM64)
 	GSFusedVertexTrace::State m_fused_trace;
 #endif
+	GIFPackedRegHandlerC m_fpGIFPackedCarrying[GIF_REG_COMPLEX_COUNT - 2][8] = {};
+	GIFPackedRegHandlerC m_fpGIFPackedCarryingC[GIF_REG_COMPLEX_COUNT - 2] = {};
+	GIFPackedLayout m_packed_layout = {};
 };
 
 // We put this in the header because of Multi-ISA.
