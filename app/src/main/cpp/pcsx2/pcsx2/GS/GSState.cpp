@@ -6,6 +6,7 @@
 #include "GS/GSGL.h"
 #include "GS/GSPerfMon.h"
 #include "GS/GSUtil.h"
+#include "GS/GSStripKickKernel.h"
 
 #include "common/Console.h"
 #include "common/BitUtils.h"
@@ -1057,6 +1058,44 @@ static __fi GSVector4i GSPackSTQRGBA(const GIFPackedReg* RESTRICT r)
 static thread_local bool s_gsPackedBatchEnabled = true;
 static thread_local bool s_gsPackedBatchObserve = false;
 static thread_local u64 s_gsPackedBatchStats[3] = {};
+static thread_local bool s_gsStripKernelEnabled = true;
+static thread_local bool s_gsStripKernelObserve = false;
+static thread_local u32 s_gsStripKernelMutation = 0;
+static thread_local u64 s_gsStripKernelStats[4] = {}; // chunks, vertices, direct vector culls, scalar culls
+
+extern "C" void EmuCoreXOracleSetGSStripKernel(bool enabled, bool observe, u32 mutation)
+{
+	s_gsStripKernelEnabled = enabled;
+	s_gsStripKernelObserve = observe;
+	s_gsStripKernelMutation = mutation;
+	std::fill(std::begin(s_gsStripKernelStats), std::end(s_gsStripKernelStats), 0);
+}
+
+extern "C" void EmuCoreXOracleGSStripKernelStats(u64* values)
+{
+	std::copy(std::begin(s_gsStripKernelStats), std::end(s_gsStripKernelStats), values);
+}
+
+extern "C" u32 EmuCoreXOracleGSStripCull(const s32* positions, const s32* scissor, bool candidate)
+{
+	if (candidate && GSStripKickKernel::InDomain(positions[0],positions[1]) &&
+		GSStripKickKernel::InDomain(positions[2],positions[3]) &&
+		GSStripKickKernel::InDomain(positions[4],positions[5]) &&
+		GSStripKickKernel::ScissorInDomain(GSVector4i::load<false>(scissor)))
+	{
+		const auto bounds=GSStripKickKernel::BandedBounds(GSVector4i::load<false>(scissor));
+		const auto a=GSStripKickKernel::MakeEntry(positions[0],positions[1],bounds);
+		const auto b=GSStripKickKernel::MakeEntry(positions[2],positions[3],bounds);
+		const auto c=GSStripKickKernel::MakeEntry(positions[4],positions[5],bounds);
+		return GSStripKickKernel::Reject(a.xy,a.meta,b.xy,b.meta,c.xy,c.meta);
+	}
+	const GSVector4i a(positions[0], positions[1], positions[0], positions[1]);
+	const GSVector4i b(positions[2], positions[3], positions[2], positions[3]);
+	const GSVector4i c(positions[4], positions[5], positions[4], positions[5]);
+	const GSVector4i raw = a.runion(b).runion(c);
+	const GSVector4i bbox = ((raw + GSVector4i(15, 15, -1, -1)) & GSVector4i(~15)) + GSVector4i(0, 0, 1, 1);
+	return GSVertexIsRejected<GS_TRIANGLE_CLASS>(bbox, GSVector4i::load<false>(scissor), a, b, c);
+}
 
 extern "C" void EmuCoreXOracleSetGSPackedBatch(bool enabled, bool observe)
 {
@@ -1093,8 +1132,20 @@ void GSState::KickPackedBatch(const GIFPackedReg* RESTRICT r, u32 size)
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	if (s_gsPackedBatchObserve) ++s_gsPackedBatchStats[1];
 #endif
-	for (const GIFPackedReg* end = r + size; r < end; r += 3)
+	for (const GIFPackedReg* end = r + size; r < end;)
 	{
+		if constexpr (prim == GS_TRIANGLESTRIP)
+		{
+			const u32 consumed = KickPackedStripChunk<xyzf2>(r, static_cast<u32>((end - r) / 3), c, uvfog, depth, m0, m1);
+			if (consumed)
+			{
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+				if (s_gsPackedBatchObserve) s_gsPackedBatchStats[0] += consumed;
+#endif
+				r += consumed * 3;
+				continue;
+			}
+		}
 		m0 = GSPackSTQRGBA(r);
 		if constexpr (xyzf2)
 		{
@@ -1125,6 +1176,7 @@ void GSState::KickPackedBatch(const GIFPackedReg* RESTRICT r, u32 size)
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 		if (s_gsPackedBatchObserve) ++s_gsPackedBatchStats[0];
 #endif
+		r += 3;
 	}
 	c.Store(*this);
 	m_v.m[0] = m0;
@@ -4942,6 +4994,92 @@ static constexpr u32 MaxVerticesForPrim(u32 prim)
 	}
 }
 
+template <bool xyzf2>
+u32 GSState::KickPackedStripChunk(const GIFPackedReg* RESTRICT r, u32 remaining,
+	VertexKickCursor& c, u64 uvfog, GSLimit24BitDepth depth, GSVector4i& last0, GSVector4i& last1)
+{
+#if defined(ARCH_ARM64)
+	using namespace GSStripKickKernel;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (!s_gsStripKernelEnabled) return 0;
+#endif
+	if (remaining < kMinVertices || !m_nativeres || PRIM->AA1 || m_scissor_invalid ||
+		(m_context->XYOFFSET.U64 & ~0x0000ffff0000ffffull)) return 0;
+	constexpr u32 vertexLimit = MaxVerticesForPrim(GS_TRIANGLESTRIP);
+	if (c.tail >= c.maxcount || c.tail >= vertexLimit) return 0;
+	const u32 indexLimit = (c.maxcount + 3) * 6;
+	if (c.itail >= indexLimit) return 0;
+	const u32 count = std::min({remaining, kChunkVertices, c.maxcount - c.tail - 1,
+		vertexLimit - c.tail - 1, (indexLimit - c.itail) / 3});
+	if (count < kMinVertices) return 0;
+	const GSVector4i cull = m_context->scissor.cull;
+	if (!ScissorInDomain(cull)) return 0;
+	const Bounds bounds = BandedBounds(cull);
+	Entry seed[4];
+	for (u32 i = 0; i < 4; ++i)
+	{
+		const GSVector4i xy = m_vertex.xy[i];
+		// A carried entry can predate the current XYOFFSET. Do not reinterpret
+		// a previous pad-bit/wrapped coordinate as a native pixel band.
+		if (xy.x != xy.z || xy.y != xy.w || !InDomain(xy.x, xy.y)) return 0;
+		seed[i] = MakeEntry(xy.x, xy.y, bounds);
+	}
+	static_assert(sizeof(m_strip_side_xy) == kChunkVertices * sizeof(u64));
+	const bool snapshot = c.itail == 0 && ((m_backed_up_ctx != m_env.PRIM.CTXT) || m_dirty_gs_regs);
+	const s32 ofx = m_xyof.x, ofy = m_xyof.y;
+	// Current offsets must also be the proved, duplicated native lanes.
+	if (m_xyof.z != ofx || m_xyof.w != ofy || ofx < 0 || ofx > 65535 || ofy < 0 || ofy > 65535) return 0;
+	GSVertex* const provisional = c.vb + c.tail;
+	switch (depth)
+	{
+		case GSLimit24BitDepth::PrioritizeUpper:
+			Parse<xyzf2, GSLimit24BitDepth::PrioritizeUpper>(r, count, provisional,
+				m_strip_side_xy, m_strip_side_meta, bounds, ofx, ofy, uvfog); break;
+		case GSLimit24BitDepth::PrioritizeLower:
+			Parse<xyzf2, GSLimit24BitDepth::PrioritizeLower>(r, count, provisional,
+				m_strip_side_xy, m_strip_side_meta, bounds, ofx, ofy, uvfog); break;
+		default:
+			Parse<xyzf2, GSLimit24BitDepth::Disabled>(r, count, provisional,
+				m_strip_side_xy, m_strip_side_meta, bounds, ofx, ofy, uvfog); break;
+	}
+	// Capture before compaction can overwrite its provisional source slot.
+	last0 = GSVector4i(provisional[count - 1].m[0]);
+	last1 = GSVector4i(provisional[count - 1].m[1]);
+	u32 accState = 0, scalarCulls = 0;
+	GSVector4i rect;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (s_gsStripKernelObserve)
+	{
+		if (s_gsStripKernelMutation == 1)
+			rect = Emit<false, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls);
+		else
+			rect = Emit<true, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls);
+		++s_gsStripKernelStats[0]; s_gsStripKernelStats[1] += count; s_gsStripKernelStats[3] += scalarCulls;
+	}
+	else
+#endif
+		rect = Emit<true, false>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls);
+	if (accState)
+	{
+		// No helper observes the environment inside the chunk. Capture it only
+		// when a primitive was accepted, just as the direct path does.
+		if (snapshot)
+		{
+			const int ctx = m_env.PRIM.CTXT;
+			std::memcpy(&m_prev_env, &m_env, 88);
+			std::memcpy(&m_prev_env.CTXT[ctx], &m_env.CTXT[ctx], 96);
+			std::memcpy(&m_prev_env.CTXT[ctx].offset, &m_env.CTXT[ctx].offset, sizeof(m_env.CTXT[ctx].offset));
+			std::memcpy(&m_prev_env.CTXT[ctx].scissor, &m_env.CTXT[ctx].scissor, sizeof(m_env.CTXT[ctx].scissor));
+			m_dirty_gs_regs = 0; m_backed_up_ctx = m_env.PRIM.CTXT;
+		}
+		temp_draw_rect = (accState == 2 ? rect : temp_draw_rect.runion(rect)).rintersect(m_context->scissor.in);
+	}
+	return count;
+#else
+	return 0;
+#endif
+}
+
 __forceinline void GSState::CheckCLUTValidity(u32 prim)
 {
 	if (m_mem.m_clut.IsInvalid() & 2)
@@ -5356,6 +5494,9 @@ __forceinline void GSState::VertexKick(u32 skip)
 	GSVector4i bbox;
 	if (skip == 0)
 	{
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (s_gsStripKernelObserve) ++s_gsStripKernelStats[2];
+#endif
 		const GSVector4i v0 = m_vertex.xy[(xy_tail - 1) & 3];
 		const GSVector4i v1 = m_vertex.xy[(xy_tail - 2) & 3];
 		const GSVector4i v2 = (prim == GS_TRIANGLEFAN) ? m_vertex.xyhead : m_vertex.xy[(xy_tail - 3) & 3];
@@ -5595,6 +5736,9 @@ __forceinline void GSState::VertexKickDirect(u32 skip, const GSVector4i& new_v0,
 	GSVector4i bbox;
 	if (skip == 0)
 	{
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (s_gsStripKernelObserve) ++s_gsStripKernelStats[2];
+#endif
 		const GSVector4i v0 = m_vertex.xy[(xy_tail - 1) & 3];
 		const GSVector4i v1 = m_vertex.xy[(xy_tail - 2) & 3];
 		const GSVector4i v2 = (prim == GS_TRIANGLEFAN) ? m_vertex.xyhead : m_vertex.xy[(xy_tail - 3) & 3];
@@ -5777,8 +5921,13 @@ __forceinline void GSState::VertexKickDirect(u32 skip, const GSVector4i& new_v0,
 	{
 		// The renderer reads current m_v (including UV) during Draw. Publish the
 		// incoming vertex before a real flush, not only at the end of the batch.
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (!(s_gsStripKernelEnabled && s_gsStripKernelMutation == 2))
+#endif
+		{
 		m_v.m[0] = new_v0;
 		m_v.m[1] = new_v1;
+		}
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 		if (s_gsPackedBatchObserve) ++s_gsPackedBatchStats[2];
 #endif

@@ -202,6 +202,7 @@ void CheckBits(bool pass, u32 actual, u32 expected, const char* name)
 #include "jit_oracle_gs_alpha_selectors.inl"
 #include "jit_oracle_gs_vertices.inl"
 #include "jit_oracle_gs_packed_batch.inl"
+#include "jit_oracle_gs_strip_kernel.inl"
 #include "jit_oracle_gs_uploads.inl"
 #include "jit_oracle_gs_restarts.inl"
 #include "jit_oracle_gif_copy.inl"
@@ -12538,6 +12539,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         GSVertexPacketTests();
     else if (std::strcmp(suite, "gs-packed-batch") == 0)
         GSPackedBatchTests();
+    else if (std::strcmp(suite, "gs-strip-kernel") == 0)
+        GSStripKernelTests();
     else if (std::strcmp(suite, "gs-alpha-selectors") == 0)
         GSAlphaSelectorTests();
     else if (std::strcmp(suite, "gs-stq-pack") == 0)

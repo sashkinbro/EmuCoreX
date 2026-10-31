@@ -218,6 +218,8 @@ protected:
 	GSLimit24BitDepth GetDepthClampMode() const;
 	template <u32 prim> void VertexKickDirect(u32 skip, const GSVector4i& v0, const GSVector4i& v1, VertexKickCursor& c);
 	template <u32 prim, bool xyzf2> void KickPackedBatch(const GIFPackedReg* RESTRICT r, u32 size);
+	template <bool xyzf2> u32 KickPackedStripChunk(const GIFPackedReg* RESTRICT r, u32 remaining,
+		VertexKickCursor& cursor, u64 uvfog, GSLimit24BitDepth depth, GSVector4i& last0, GSVector4i& last1);
 
 	// following functions need m_vt to be initialized
 
@@ -554,6 +556,12 @@ public:
 	bool SpriteDrawWithoutGaps();
 	void CalculatePrimitiveCoversWithoutGaps();
 	GIFRegTEX0 GetTex0Layer(u32 lod);
+
+protected:
+	// Transient scratch only: appended so existing hot members keep their offsets.
+	// Explicit savestate serialization does not contain this side table.
+	alignas(16) u64 m_strip_side_xy[128] = {};
+	alignas(16) u64 m_strip_side_meta[128] = {};
 };
 
 // We put this in the header because of Multi-ISA.

@@ -104,6 +104,34 @@ struct GSPackedBatchOracle final : GSState
             (!fog || m_v.FOG == last[2].XYZF2.F);
     }
 
+    bool StripGoldenMatches(const std::vector<GIFPackedReg>& packet,bool fog) const
+    {
+        const u32 count=static_cast<u32>((packet.size()-1)/3);
+        if(m_vertex.tail!=count || m_vertex.xy_tail!=count ||
+            m_index.tail!=(count<3?0:(count-2)*3))return false;
+        for(u32 i=0;i<count;++i)
+        {
+            const auto* r=packet.data()+1+i*3;
+            std::array<u32,8> expected{r[0].U32[0],r[0].U32[1],0,
+                r[0].U32[2]?r[0].U32[2]:0x00800000u,0,
+                fog?r[2].XYZF2.Z:r[2].XYZ2.Z,0x24681357u,
+                fog?r[2].XYZF2.F:0x89abcdefu};
+            for(u32 lane=0;lane<4;++lane)expected[2]|=(r[1].U32[lane]&255)<<(lane*8);
+            expected[4]=static_cast<u32>(r[2].XYZ2.X)|(static_cast<u32>(r[2].XYZ2.Y)<<16);
+            if(std::memcmp(&m_vertex.buff[i],expected.data(),sizeof(GSVertex)))return false;
+            if(i>=2)
+                for(u32 j=0;j<3;++j)
+                    if(m_index.buff[(i-2)*3+j]!=i-2+j)return false;
+        }
+        return true;
+    }
+
+    void SetRawXYOffsetForStrip(u64 raw)
+    {
+        for(auto& context:m_env.CTXT){context.XYOFFSET.U64=raw;context.UpdateScissor();}
+        UpdateScissor();
+    }
+
     void Submit(const std::vector<GIFPackedReg>& packet, u32 chunk)
     {
         for (u32 at = 0; at < packet.size();)
