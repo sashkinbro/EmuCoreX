@@ -291,4 +291,5 @@ void main(){color=texelFetch(source,ivec2(0),0)*params.factor;})");
         check(has_pixel(first, pixel), "GS source update preserves pixels already sampled in the current command buffer");
         check(has_pixel(second, replacement), "GS source update supplies new pixels to the subsequent sampled draw");
     }
+    TestRenderPassOrdering(check, pipeline, sampler, pass);
 }

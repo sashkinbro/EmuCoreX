@@ -2033,7 +2033,7 @@ VkRenderPass GSDeviceVK::CreateCachedRenderPass(RenderPassCacheKey key)
 	VkAttachmentReference* depth_reference_ptr = nullptr;
 	std::array<VkAttachmentReference, 2> input_reference;
 	u32 num_subpass_inputs = 0;
-	std::array<VkSubpassDependency, 2> subpass_dependency;
+	std::array<VkSubpassDependency, 3> subpass_dependency;
 	u32 num_subpass_dependencies = 0;
 	std::array<VkAttachmentDescription, 2> attachments;
 	u32 num_attachments = 0;
@@ -2131,6 +2131,41 @@ VkRenderPass GSDeviceVK::CreateCachedRenderPass(RenderPassCacheKey key)
 		}
 
 		num_attachments++;
+	}
+
+	// Consecutive passes can retain the same attachment layout, in which case
+	// no transition barrier supplies availability for the next LOAD/input read.
+	// Keep this dependency framebuffer-local instead of flushing every ARM
+	// attachment at pass end (9877eba5 and320f7e9a ordering contracts).
+	if (num_attachments > 0)
+	{
+		VkSubpassDependency& dep = subpass_dependency[num_subpass_dependencies++];
+		dep = {};
+		dep.srcSubpass = VK_SUBPASS_EXTERNAL;
+		dep.dstSubpass = 0;
+		if (color_reference_ptr)
+		{
+			dep.srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			dep.srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		}
+		if (depth_reference_ptr)
+		{
+			dep.srcStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+			dep.srcAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		}
+		dep.dstStageMask = dep.srcStageMask;
+		dep.dstAccessMask = dep.srcAccessMask;
+		if (num_subpass_inputs > 0)
+		{
+			dep.dstStageMask |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			dep.dstAccessMask |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+		}
+		if ((key.color_feedback_loop || key.depth_sampling) && UseFeedbackLoopLayout())
+		{
+			dep.dstStageMask |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			dep.dstAccessMask |= VK_ACCESS_SHADER_READ_BIT;
+		}
+		dep.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 	}
 
 	VkSubpassDescriptionFlags subpass_flags = 0;
@@ -5751,6 +5786,11 @@ void GSDeviceVK::RenderBlankFrame()
 	ActivateCommandBuffer((m_current_frame + 1) % NUM_COMMAND_BUFFERS);
 }
 
+static constexpr GSTextureVK::Layout GetCASSourceLayout()
+{
+	return GSTextureVK::Layout::ComputeReadOnly;
+}
+
 bool GSDeviceVK::DoCAS(
 	GSTexture* sTex, GSTexture* dTex, bool sharpen_only, const std::array<u32, NUM_CAS_CONSTANTS>& constants)
 {
@@ -5762,7 +5802,7 @@ bool GSDeviceVK::DoCAS(
 	GSTextureVK* const dTexVK = static_cast<GSTextureVK*>(dTex);
 	VkCommandBuffer cmdbuf = GetCurrentCommandBuffer();
 
-	sTexVK->TransitionToLayout(cmdbuf, GSTextureVK::Layout::ShaderReadOnly);
+	sTexVK->TransitionToLayout(cmdbuf, GetCASSourceLayout());
 	dTexVK->TransitionToLayout(cmdbuf, GSTextureVK::Layout::ComputeReadWriteImage);
 
 	// only happening once a frame, so the update isn't a huge deal.
@@ -8905,22 +8945,8 @@ void GSDeviceVK::EndRenderPass()
 
 	vkCmdEndRenderPass(GetCurrentCommandBuffer());
 
-	// Mali (r-driver) does not reliably make attachment writes visible to later reads when a
-	// render pass ends; subsequent passes can then sample stale contents and flicker. Emit an
-	// explicit same-layout memory barrier for the current colour/depth attachments, matching the
-	// AetherSX2 Mali workaround. The barrier is recorded, not a GPU stall.
-	if (m_device_properties.vendorID == 0x13B5u)
-	{
-		for (GSTexture* attachment : {m_current_render_target, m_current_depth_target})
-		{
-			if (!attachment)
-				continue;
-
-			GSTextureVK* vktex = static_cast<GSTextureVK*>(attachment);
-			vktex->TransitionSubresourcesToLayout(
-				GetCurrentCommandBuffer(), 0, 1, vktex->GetLayout(), vktex->GetLayout());
-		}
-	}
+	// Same-attachment pass consumers are ordered by the incoming dependency.
+	// Sampling, transfer and compute consumers retain their explicit transitions.
 }
 
 void GSDeviceVK::SetViewport(const VkViewport& viewport)
@@ -10029,4 +10055,5 @@ void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, 
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 #include "GSTextureUploadTests.inl"
 #include "GSRenderPassRestartTests.inl"
+#include "GSRenderPassOrderingTests.inl"
 #endif

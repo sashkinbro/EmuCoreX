@@ -49,6 +49,7 @@ static VkImageLayout GetVkImageLayout(GSTextureVK::Layout layout)
 		VK_IMAGE_LAYOUT_GENERAL, // ReadWriteImage
 		VK_IMAGE_LAYOUT_GENERAL, // ComputeReadWriteImage
 		VK_IMAGE_LAYOUT_GENERAL, // General
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, // ComputeReadOnly
 	}};
 	return (layout == GSTextureVK::Layout::FeedbackLoop && GSDeviceVK::GetInstance()->UseFeedbackLoopLayout()) ?
 	           VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT :
@@ -731,6 +732,11 @@ void GSTextureVK::TransitionSubresourcesToLayout(
 			srcStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 			break;
 
+		case Layout::ComputeReadOnly:
+			barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			srcStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+			break;
+
 		case Layout::General:
 		default:
 			barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
@@ -802,6 +808,11 @@ void GSTextureVK::TransitionSubresourcesToLayout(
 
 		case Layout::ComputeReadWriteImage:
 			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+			dstStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+			break;
+
+		case Layout::ComputeReadOnly:
+			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 			dstStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 			break;
 

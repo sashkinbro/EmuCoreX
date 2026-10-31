@@ -28,6 +28,7 @@ public:
 		ReadWriteImage,
 		ComputeReadWriteImage,
 		General,
+		ComputeReadOnly,
 		Count
 	};
 
