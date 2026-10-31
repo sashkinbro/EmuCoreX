@@ -239,6 +239,9 @@ VULKAN_DEVICE_ENTRY_POINT(vkReleaseFullScreenExclusiveModeEXT, false)
 // VK_EXT_calibrated_timestamps
 VULKAN_DEVICE_ENTRY_POINT(vkGetCalibratedTimestampsEXT, false)
 
+// VK_EXT_attachment_feedback_loop_dynamic_state
+VULKAN_DEVICE_ENTRY_POINT(vkCmdSetAttachmentFeedbackLoopEnableEXT, false)
+
 // VK_KHR_push_descriptor
 VULKAN_DEVICE_ENTRY_POINT(vkCmdPushDescriptorSetKHR, false)
 

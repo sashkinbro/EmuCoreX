@@ -4,6 +4,7 @@
 #pragma once
 
 #include "GS/Renderers/Common/GSDevice.h"
+#include "GS/Renderers/Common/GSVulkanRoadDevicePolicy.h"
 #include "GS/Renderers/Common/GSStreamRingMemoryPolicy.h"
 #include "GS/GSVector.h"
 #include "GS/Renderers/Vulkan/GSTextureVK.h"
@@ -32,6 +33,8 @@
 
 class VKSwapChain;
 
+namespace Vulkan { class GraphicsPipelineBuilder; }
+
 class GSDeviceVK final : public GSDevice
 {
 public:
@@ -54,6 +57,7 @@ public:
 		bool vk_khr_driver_properties : 1;
 		bool vk_khr_shader_non_semantic_info : 1;
 		bool vk_ext_attachment_feedback_loop_layout : 1;
+		bool vk_ext_attachment_feedback_loop_dynamic_state : 1;
 		bool vk_ext_fragment_shader_interlock : 1;
 	};
 
@@ -140,14 +144,15 @@ public:
 
 	__fi VulkanFeedbackPath GetFeedbackPath() const
 	{
-		return SelectVulkanFeedbackPath(m_features.texture_barrier,
-			UsesRasterizationOrderAttachmentAccessForFeedback(),
-			m_optional_extensions.vk_ext_attachment_feedback_loop_layout);
+		if (!m_features.texture_barrier)
+			return VulkanFeedbackPath::SampledImage;
+		return UseFeedbackLoopLayout() ? VulkanFeedbackPath::AttachmentFeedbackLoopLayout : VulkanFeedbackPath::InputAttachment;
 	}
 
 	__fi bool UseFeedbackLoopLayout() const
 	{
-		return (GetFeedbackPath() == VulkanFeedbackPath::AttachmentFeedbackLoopLayout);
+		return m_features.texture_barrier && m_optional_extensions.vk_ext_attachment_feedback_loop_layout &&
+			(m_force_feedback_loop_layout || !m_optional_extensions.vk_ext_rasterization_order_attachment_access);
 	}
 
 	__fi bool UsesInputAttachmentFeedbackPath() const
@@ -513,6 +518,7 @@ public:
 				u32 ds : 1;
 				u32 line_width : 1;
 				u32 feedback_loop_flags : 3;
+				u32 raster_order : 1;
 			};
 
 			u32 key;
@@ -856,6 +862,7 @@ public:
 	void TestTextureUploadRing(void (*check)(bool, const char*));
 	void TestRenderPassRestarts(void (*check)(bool, const char*));
 	void TestDrawRoad(void (*check)(bool, const char*));
+	void TestRoadFamilies(void (*check)(bool, const char*));
 	void TestRenderPassOrdering(void (*check)(bool, const char*), VkPipeline sampled_pipeline,
 		VkSampler sampler, VkRenderPass sampled_pass);
 	void SetTFXPreparationFailureStageForTesting(TFXPreparationFailureStage stage)
@@ -948,6 +955,16 @@ public:
 	bool BindDrawPipeline(const PipelineSelector& p);
 
 	void DoRenderHW(GSHWDrawConfig& config) override;
+	GSVulkanRoad::Identity GetRoadIdentity() const;
+	GSVulkanRoad::Capabilities GetRoadCapabilities(u32 push_count = 0) const;
+	void ConfigureTFXFeedbackPipeline(Vulkan::GraphicsPipelineBuilder& builder, const PipelineSelector& pipe) const;
+	void DeclareDrawFeedbackLoop(const GSHWDrawConfig& config, const PipelineSelector& pipe);
+	GSVulkanRoad::Facts m_road_facts;
+	u32 m_max_push_descriptors = 0;
+	std::string m_road_platform_hints;
+	bool m_force_feedback_loop_layout = false;
+	bool m_declare_loop_per_draw = false;
+	bool m_loop_declared_in_pass = false;
 	bool HWDrawNeedsAttachmentRestart(const GSHWDrawConfig& config, const PipelineSelector& pipe) const;
 	void ApplyHWDrawFeedbackCarry(const GSHWDrawConfig& config, PipelineSelector& pipe, GSTextureVK* rt, GSTextureVK* ds);
 	void UpdateHWPipelineSelector(GSHWDrawConfig& config, PipelineSelector& pipe);

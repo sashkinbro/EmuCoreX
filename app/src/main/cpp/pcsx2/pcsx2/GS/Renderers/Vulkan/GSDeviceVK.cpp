@@ -57,9 +57,7 @@
 #if defined(__ANDROID__)
 #include "common/AndroidLogging.h"
 #include <sys/resource.h>
-#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 #include <sys/system_properties.h>
-#endif
 
 // Implemented by android_crash_diagnostics.cpp. Weak so other platforms and the
 // standalone native tools do not need to link the Android runtime.
@@ -600,6 +598,8 @@ bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enab
 		SupportsExtension(VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, false);
 	m_optional_extensions.vk_ext_attachment_feedback_loop_layout =
 		SupportsExtension(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME, false);
+	m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state =
+		SupportsExtension(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_EXTENSION_NAME, false);
 	m_optional_extensions.vk_ext_line_rasterization = SupportsExtension(VK_EXT_LINE_RASTERIZATION_EXTENSION_NAME, false);
 	m_optional_extensions.vk_khr_push_descriptor =
 		SupportsExtension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME, false);
@@ -822,16 +822,14 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 		IsAdrenoGPUProfile() ? GpuProfileDetector::ParseAdrenoGeneration(m_name) : 0);
 #endif
 
-	// The unified mobile path uses input attachments for feedback. Keep the explicit
-	// feedback-loop layout only on drivers that are trusted with it.
-	if (IsMobileGPUProfile())
-		m_optional_extensions.vk_ext_attachment_feedback_loop_layout = false;
 
 	device_info.enabledExtensionCount = static_cast<uint32_t>(enabled_extensions.size());
 	device_info.ppEnabledExtensionNames = enabled_extensions.data();
 
 	// Check for required features before creating.
 	if (!SelectDeviceFeatures())
+		return false;
+	if (!ProcessDeviceExtensions())
 		return false;
 
 	device_info.pEnabledFeatures = &m_device_features;
@@ -853,6 +851,8 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_FEATURES_EXT};
 	VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT attachment_feedback_loop_feature = {
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_FEATURES_EXT};
+	VkPhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT dynamic_feedback_loop_feature = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_FEATURES_EXT};
 	// VK_EXT_swapchain_maintenance1 types/enums are aliases of VK_KHR_swapchain_maintenance1 types/enums.
 	VkPhysicalDeviceSwapchainMaintenance1FeaturesKHR swapchain_maintenance1_feature = {
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_KHR};
@@ -864,7 +864,8 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 	// than making logical-device creation fail.
 	if (m_optional_extensions.vk_ext_provoking_vertex ||
 		m_optional_extensions.vk_ext_rasterization_order_attachment_access ||
-		m_optional_extensions.vk_ext_attachment_feedback_loop_layout)
+		m_optional_extensions.vk_ext_attachment_feedback_loop_layout ||
+		m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state)
 	{
 		VkPhysicalDeviceFeatures2 supported_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
 		VkPhysicalDeviceProvokingVertexFeaturesEXT supported_provoking_vertex = {
@@ -873,12 +874,16 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_FEATURES_EXT};
 		VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT supported_attachment_feedback_loop = {
 			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_FEATURES_EXT};
+		VkPhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT supported_dynamic_feedback_loop = {
+			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_FEATURES_EXT};
 		if (m_optional_extensions.vk_ext_provoking_vertex)
 			Vulkan::AddPointerToChain(&supported_features, &supported_provoking_vertex);
 		if (m_optional_extensions.vk_ext_rasterization_order_attachment_access)
 			Vulkan::AddPointerToChain(&supported_features, &supported_rasterization_order_access);
 		if (m_optional_extensions.vk_ext_attachment_feedback_loop_layout)
 			Vulkan::AddPointerToChain(&supported_features, &supported_attachment_feedback_loop);
+		if (m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state)
+			Vulkan::AddPointerToChain(&supported_features, &supported_dynamic_feedback_loop);
 		vkGetPhysicalDeviceFeatures2(m_physical_device, &supported_features);
 		m_optional_extensions.vk_ext_provoking_vertex &=
 			(supported_provoking_vertex.provokingVertexLast == VK_TRUE);
@@ -886,6 +891,8 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 			(supported_rasterization_order_access.rasterizationOrderColorAttachmentAccess == VK_TRUE);
 		m_optional_extensions.vk_ext_attachment_feedback_loop_layout &=
 			(supported_attachment_feedback_loop.attachmentFeedbackLoopLayout == VK_TRUE);
+		m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state &=
+			(supported_dynamic_feedback_loop.attachmentFeedbackLoopDynamicState == VK_TRUE);
 	}
 
 	if (m_optional_extensions.vk_ext_provoking_vertex)
@@ -908,6 +915,11 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 		attachment_feedback_loop_feature.attachmentFeedbackLoopLayout = VK_TRUE;
 		Vulkan::AddPointerToChain(&device_info, &attachment_feedback_loop_feature);
 	}
+	if (m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state)
+	{
+		dynamic_feedback_loop_feature.attachmentFeedbackLoopDynamicState = VK_TRUE;
+		Vulkan::AddPointerToChain(&device_info, &dynamic_feedback_loop_feature);
+	}
 	if (m_optional_extensions.vk_swapchain_maintenance1)
 	{
 		swapchain_maintenance1_feature.swapchainMaintenance1 = VK_TRUE;
@@ -929,6 +941,10 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 	// With the device created, we can fill the remaining entry points.
 	if (!Vulkan::LoadVulkanDeviceFunctions(m_device))
 		return false;
+	if (!vkCmdSetAttachmentFeedbackLoopEnableEXT)
+		m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state = false;
+	if (!vkCmdPushDescriptorSetKHR)
+		m_use_push_descriptors = false;
 
 	// Grab the graphics and present queues.
 	vkGetDeviceQueue(m_device, m_graphics_queue_family_index, 0, &m_graphics_queue);
@@ -956,8 +972,6 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 	m_gpu_pipeline_statistics_supported = (m_device_features.pipelineStatisticsQuery != 0);
 	DevCon.WriteLn("GPU pipeline statistics is %s", m_gpu_pipeline_statistics_supported ? "supported" : "not supported");
 
-	if (!ProcessDeviceExtensions())
-		return false;
 
 	if (m_spinning_supported)
 	{
@@ -993,6 +1007,8 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_KHR, nullptr, VK_FALSE};
 	VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT attachment_feedback_loop_feature = {
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_FEATURES_EXT};
+	VkPhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT dynamic_feedback_loop_feature = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_FEATURES_EXT};
 	VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT fragment_shader_interlock_ext_feature = {
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT };
 
@@ -1005,6 +1021,8 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 		Vulkan::AddPointerToChain(&features2, &rasterization_order_access_feature);
 	if (m_optional_extensions.vk_ext_attachment_feedback_loop_layout)
 		Vulkan::AddPointerToChain(&features2, &attachment_feedback_loop_feature);
+	if (m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state)
+		Vulkan::AddPointerToChain(&features2, &dynamic_feedback_loop_feature);
 	if (m_optional_extensions.vk_swapchain_maintenance1)
 		Vulkan::AddPointerToChain(&features2, &swapchain_maintenance1_feature);
 	if (m_optional_extensions.vk_ext_fragment_shader_interlock)
@@ -1019,6 +1037,8 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 		(rasterization_order_access_feature.rasterizationOrderColorAttachmentAccess == VK_TRUE);
 	m_optional_extensions.vk_ext_attachment_feedback_loop_layout &=
 		(attachment_feedback_loop_feature.attachmentFeedbackLoopLayout == VK_TRUE);
+	m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state &=
+		(dynamic_feedback_loop_feature.attachmentFeedbackLoopDynamicState == VK_TRUE);
 	m_optional_extensions.vk_ext_fragment_shader_interlock &=
 		(fragment_shader_interlock_ext_feature.fragmentShaderPixelInterlock == VK_TRUE);
 
@@ -1037,22 +1057,30 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 
 	// query
 	vkGetPhysicalDeviceProperties2(m_physical_device, &properties2);
-
+	m_max_push_descriptors = push_descriptor_properties.maxPushDescriptors;
+	m_road_platform_hints.clear();
 #if defined(__ANDROID__)
-	// Stock ARM drivers can fail inside vkCmdPushDescriptorSetKHR. The custom MaliSX2
-	// driver is enabled only when its Vulkan identity, extension, and full descriptor count
-	// are all confirmed; every other Android driver retains descriptor-set binding.
-	m_use_push_descriptors = ShouldUseMaliSX2PushDescriptors(m_device_driver_properties.driverInfo,
-		m_optional_extensions.vk_khr_push_descriptor, push_descriptor_properties.maxPushDescriptors,
-		NUM_TFX_TEXTURES);
-#else
-	m_use_push_descriptors = m_optional_extensions.vk_khr_push_descriptor;
-	if (m_use_push_descriptors &&
-		(properties2.properties.vendorID == 0x13B5u || properties2.properties.vendorID == 0x1010u))
+	for (const char* property : {"ro.soc.manufacturer", "ro.soc.model", "ro.soc.platform", "ro.board.platform",
+		"ro.hardware", "ro.hardware.chipname", "ro.chipname", "ro.product.board", "ro.product.manufacturer",
+		"ro.product.model", "ro.vendor.product.manufacturer", "ro.vendor.product.model", "ro.mediatek.platform",
+		"ro.vendor.mediatek.platform", "ro.product.cpu.abi", "ro.vendor.product.cpu.abilist"})
 	{
-		m_use_push_descriptors = false;
+		char value[PROP_VALUE_MAX]{};
+		if (__system_property_get(property, value) > 0) { m_road_platform_hints += value; m_road_platform_hints += ' '; }
 	}
 #endif
+	m_road_facts = GSVulkanRoad::ResolveFacts(GetRoadIdentity(),
+		m_optional_extensions.vk_ext_rasterization_order_attachment_access, push_descriptor_properties.maxPushDescriptors);
+	const auto device_road = GSVulkanRoad::ResolveSelection(m_road_facts,
+		GetRoadCapabilities(push_descriptor_properties.maxPushDescriptors));
+	if (device_road.avoid_layout)
+		m_optional_extensions.vk_ext_attachment_feedback_loop_layout = false;
+	m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state &=
+		m_road_facts.measured_layout && m_optional_extensions.vk_ext_attachment_feedback_loop_layout;
+
+
+	m_use_push_descriptors = device_road.push_descriptors;
+
 	if (m_use_push_descriptors && push_descriptor_properties.maxPushDescriptors < NUM_TFX_TEXTURES)
 	{
 		Console.Warning("VK: maxPushDescriptors (%u) below required (%u) - using descriptor-set fallback.",
@@ -2170,7 +2198,8 @@ VkRenderPass GSDeviceVK::CreateCachedRenderPass(RenderPassCacheKey key)
 	}
 
 	VkSubpassDescriptionFlags subpass_flags = 0;
-	if (UsesRasterizationOrderAttachmentAccessForFeedback())
+	if (UsesRasterizationOrderAttachmentAccessForFeedback() ||
+		(m_features.declared_loop_overlap_needs_raster_order && m_optional_extensions.vk_ext_rasterization_order_attachment_access))
 	{
 		if (key.color_feedback_loop)
 			subpass_flags |= VK_SUBPASS_DESCRIPTION_RASTERIZATION_ORDER_ATTACHMENT_COLOR_ACCESS_BIT_EXT;
@@ -3382,10 +3411,11 @@ bool GSDeviceVK::CheckFeatures()
 	const bool has_framebuffer_fetch_extension = m_optional_extensions.vk_ext_rasterization_order_attachment_access;
 	const std::string_view driver_info = m_optional_extensions.vk_khr_driver_properties ?
 		std::string_view(m_device_driver_properties.driverInfo) : std::string_view{};
-	const bool texture_barrier = (GSConfig.OverrideTextureBarriers != 0);
-	const bool framebuffer_fetch = GSUsesInTileFeedbackRoad(
-		ShouldEnableMaliSX2ROAA(driver_info, has_framebuffer_fetch_extension, !GSConfig.DisableFramebufferFetch),
-		texture_barrier);
+	const auto road = GSVulkanRoad::ResolveSelection(m_road_facts, GetRoadCapabilities());
+	const bool texture_barrier = road.road.texture_barrier;
+	const bool framebuffer_fetch = road.road.in_tile_read;
+	m_force_feedback_loop_layout = road.road.force_feedback_loop_layout;
+	m_declare_loop_per_draw = road.dynamic_loop;
 
 	m_features.multidraw_fb_copy = false;
 	m_features.broken_point_sampler = false;
@@ -3394,11 +3424,9 @@ bool GSDeviceVK::CheckFeatures()
 	m_features.texture_barrier = texture_barrier;
 	m_features.feedback_loop_layout = UseFeedbackLoopLayout();
 	m_features.framebuffer_fetch_orders_overlap = framebuffer_fetch;
-	m_features.declared_feedback_loop_orders_overlap = false;
-	m_features.feedback_carry = GSFeedbackCarryForDevice({
-		.device_is_measured_vendor = m_device_properties.vendorID == 0x13b5,
-		.framebuffer_fetch = framebuffer_fetch,
-		.feedback_loop_layout = m_features.feedback_loop_layout});
+	m_features.declared_feedback_loop_orders_overlap = road.road.orders_overlapping_prims;
+	m_features.declared_loop_overlap_needs_raster_order = road.raster_order_on_overlap;
+	m_features.feedback_carry = road.carry;
 	// In-tile reads cannot serve a sampler read of another pixel.
 	m_features.texture_feedback_requires_copy = !texture_barrier ||
 		GSOffsetSelfReadNeedsCopy(GSGetDrawRoadDevice(m_features));
@@ -3616,6 +3644,7 @@ void GSDeviceVK::DrawIndexedPrimitiveVSExpand(int offset, int count, bool vs_ind
 
 void GSDeviceVK::Draw(const GSHWDrawConfig& config, int offset, int count)
 {
+	DeclareDrawFeedbackLoop(config, m_pipeline_selector);
 	if (config.vs.expand != GSHWDrawConfig::VSExpand::None)
 	{
 		const bool vs_indexing = config.vs.UseVSExpandIndexBuffer();
@@ -6121,14 +6150,6 @@ VkPipeline GSDeviceVK::CreateTFXPipelineWithCache(
 
 	// Common state
 	gpb.SetPipelineLayout(m_tfx_pipeline_layout);
-	const std::uint8_t feedback_aspects =
-		GetVulkanFeedbackPipelineAspects(GetFeedbackPath(), p.IsRTFeedbackLoop(), p.IsTestingAndSamplingDepth());
-	VkPipelineCreateFlags feedback_flags = 0;
-	if (feedback_aspects & VulkanFeedbackPipelineAspectColor)
-		feedback_flags |= VK_PIPELINE_CREATE_COLOR_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
-	if (feedback_aspects & VulkanFeedbackPipelineAspectDepthStencil)
-		feedback_flags |= VK_PIPELINE_CREATE_DEPTH_STENCIL_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
-	gpb.AddPipelineFlags(feedback_flags);
 	if (IsDATEModePrimIDInit(p.ps.date))
 	{
 		// DATE image prepass
@@ -6216,8 +6237,7 @@ VkPipeline GSDeviceVK::CreateTFXPipelineWithCache(
 	// Tests have shown that it's faster to just enable rast order on the entire pass, rather than alternating
 	// between turning it on and off for different draws, and adding the required barrier between non-rast-order
 	// and rast-order draws.
-	if (m_features.framebuffer_fetch && p.IsRTFeedbackLoop())
-		gpb.AddBlendFlags(VK_PIPELINE_COLOR_BLEND_STATE_CREATE_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_BIT_EXT);
+	ConfigureTFXFeedbackPipeline(gpb, p);
 
 #if defined(__ANDROID__)
 	// If the PowerVR driver aborts inside vkCreateGraphicsPipelines, the crash handler
@@ -8902,6 +8922,7 @@ void GSDeviceVK::BeginRenderPass(VkRenderPass rp, const GSVector4i& rect)
 		EndRenderPass();
 
 	m_current_render_pass = rp;
+	m_loop_declared_in_pass = false;
 	m_current_render_pass_area = rect;
 
 	const VkRenderPassBeginInfo begin_info = {VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, nullptr, m_current_render_pass,
@@ -8918,6 +8939,7 @@ void GSDeviceVK::BeginClearRenderPass(VkRenderPass rp, const GSVector4i& rect, c
 		EndRenderPass();
 
 	m_current_render_pass = rp;
+	m_loop_declared_in_pass = false;
 	m_current_render_pass_area = rect;
 
 	const VkRenderPassBeginInfo begin_info = {VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, nullptr, m_current_render_pass,
@@ -8951,6 +8973,7 @@ void GSDeviceVK::EndRenderPass()
 		return;
 
 	m_current_render_pass = VK_NULL_HANDLE;
+	m_loop_declared_in_pass = false;
 	g_perfmon.Put(GSPerfMon::RenderPasses, 1);
 
 	vkCmdEndRenderPass(GetCurrentCommandBuffer());
@@ -9882,6 +9905,80 @@ void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 	config.colclip_mode = GSHWDrawConfig::ColClipMode::NoModify;
 }
 
+GSVulkanRoad::Identity GSDeviceVK::GetRoadIdentity() const
+{
+    using Driver = GSVulkanRoad::Driver;
+    Driver driver = Driver::Unknown;
+    if (m_optional_extensions.vk_khr_driver_properties)
+    switch (m_device_driver_properties.driverID)
+    {
+        case VK_DRIVER_ID_ARM_PROPRIETARY: driver = Driver::Arm; break;
+        case VK_DRIVER_ID_MESA_PANVK: driver = Driver::PanVK; break;
+        case VK_DRIVER_ID_QUALCOMM_PROPRIETARY: driver = Driver::Qualcomm; break;
+        case VK_DRIVER_ID_MESA_TURNIP: driver = Driver::Turnip; break;
+        case VK_DRIVER_ID_IMAGINATION_PROPRIETARY: driver = Driver::Imagination; break;
+        case VK_DRIVER_ID_IMAGINATION_OPEN_SOURCE_MESA: driver = Driver::MesaPowerVR; break;
+        case VK_DRIVER_ID_MESA_HONEYKRISP: driver = Driver::Honeykrisp; break;
+        default: break;
+    }
+    return {.vendor = m_device_properties.vendorID, .driver = driver, .name = m_device_properties.deviceName,
+        .driver_name = m_optional_extensions.vk_khr_driver_properties ? std::string_view(m_device_driver_properties.driverName) : std::string_view{},
+        .info = m_optional_extensions.vk_khr_driver_properties ? std::string_view(m_device_driver_properties.driverInfo) : std::string_view{},
+        .platform = m_road_platform_hints, .mediatek = GpuProfileDetector::DetectMediaTekSoC()};
+}
+
+GSVulkanRoad::Capabilities GSDeviceVK::GetRoadCapabilities(u32 push_count) const
+{
+    return {.roaa = m_optional_extensions.vk_ext_rasterization_order_attachment_access,
+        .layout = m_optional_extensions.vk_ext_attachment_feedback_loop_layout,
+        .dynamic_state = m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state,
+        .dynamic_command = vkCmdSetAttachmentFeedbackLoopEnableEXT != nullptr,
+        .push_descriptors = m_optional_extensions.vk_khr_push_descriptor,
+        .max_push_descriptors = push_count ? push_count : m_max_push_descriptors,
+        .texture_barriers = static_cast<s8>(GSConfig.OverrideTextureBarriers),
+        .disable_fetch = GSConfig.DisableFramebufferFetch,
+#if defined(__ANDROID__)
+        .android = true,
+#else
+        .android = false,
+#endif
+        .mobile_profile = IsMobileGPUProfile()};
+}
+
+void GSDeviceVK::ConfigureTFXFeedbackPipeline(Vulkan::GraphicsPipelineBuilder& gpb, const PipelineSelector& p) const
+{
+    const auto aspects = GetVulkanFeedbackPipelineAspects(GetFeedbackPath(), p.IsRTFeedbackLoop(), p.IsTestingAndSamplingDepth());
+    if (aspects && m_declare_loop_per_draw)
+        gpb.AddDynamicState(VK_DYNAMIC_STATE_ATTACHMENT_FEEDBACK_LOOP_ENABLE_EXT);
+    else
+    {
+        VkPipelineCreateFlags flags = 0;
+        if (aspects & VulkanFeedbackPipelineAspectColor) flags |= VK_PIPELINE_CREATE_COLOR_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+        if (aspects & VulkanFeedbackPipelineAspectDepthStencil) flags |= VK_PIPELINE_CREATE_DEPTH_STENCIL_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+        gpb.AddPipelineFlags(flags);
+    }
+    // Proprietary PowerVR's ordered input read is not the ROAA extension.
+    // Tagged Adreno7xx requests its overlap mode only on the affected draws.
+    if (p.IsRTFeedbackLoop() && (UsesRasterizationOrderAttachmentAccessForFeedback() ||
+        (p.raster_order && m_features.declared_loop_overlap_needs_raster_order &&
+            m_optional_extensions.vk_ext_rasterization_order_attachment_access)))
+        gpb.AddBlendFlags(VK_PIPELINE_COLOR_BLEND_STATE_CREATE_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_BIT_EXT);
+}
+
+void GSDeviceVK::DeclareDrawFeedbackLoop(const GSHWDrawConfig& config, const PipelineSelector& pipe)
+{
+    if (!m_declare_loop_per_draw || !vkCmdSetAttachmentFeedbackLoopEnableEXT ||
+        (!pipe.IsRTFeedbackLoop() && !pipe.IsTestingAndSamplingDepth()))
+        return;
+    VkImageAspectFlags aspects = 0;
+    if (pipe.IsRTFeedbackLoop() && config.IsFeedbackLoopRT(pipe.ps)) aspects |= VK_IMAGE_ASPECT_COLOR_BIT;
+    if (pipe.IsTestingAndSamplingDepth()) aspects |= VK_IMAGE_ASPECT_DEPTH_BIT;
+    const auto writes = GSLoopEnableWritesForDraw(aspects, m_loop_declared_in_pass);
+    for (u32 i = 0; i < writes.count; ++i)
+        vkCmdSetAttachmentFeedbackLoopEnableEXT(GetCurrentCommandBuffer(), writes.values[i]);
+    if (aspects) m_loop_declared_in_pass = true;
+}
+
 bool GSDeviceVK::HWDrawNeedsAttachmentRestart(const GSHWDrawConfig& config, const PipelineSelector& pipe) const
 {
 	return config.tex && ((!pipe.IsRTFeedbackLoop() && config.tex == m_current_render_target) ||
@@ -9914,6 +10011,7 @@ void GSDeviceVK::UpdateHWPipelineSelector(GSHWDrawConfig& config, PipelineSelect
 	pipe.rt = config.rt != nullptr && !config.ps.HasColorROV();
 	pipe.ds = config.ds != nullptr && !config.ps.HasDepthROV();
 	pipe.line_width = config.line_expand;
+	pipe.raster_order = config.raster_order && config.road.rt_loop;
 	pipe.feedback_loop_flags = FeedbackLoopFlag_None;
 	if (pipe.rt && config.road.rt_loop)
 		pipe.feedback_loop_flags |= FeedbackLoopFlag_ReadAndWriteRT;
@@ -10058,4 +10156,5 @@ void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, 
 #include "GSRenderPassRestartTests.inl"
 #include "GSRenderPassOrderingTests.inl"
 #include "GSDrawRoadTests.inl"
+#include "GSRoadFamilyTests.inl"
 #endif

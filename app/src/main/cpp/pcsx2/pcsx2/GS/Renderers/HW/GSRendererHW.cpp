@@ -9347,12 +9347,12 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 		m_conf.ps.rta_correction = rt->m_rt_alpha_scale;
 	}
 
-	if (features.framebuffer_fetch)
+	if (features.framebuffer_fetch || features.declared_feedback_loop_orders_overlap)
 	{
 		// Intel GPUs on Metal lock up if you try to use DSB and framebuffer fetch at once
 		// We should never need to do that (since using framebuffer fetch means you should be able to do all blending in shader),
 		// but sometimes it slips through
-		if (m_conf.require_one_barrier || m_conf.require_full_barrier)
+		if (features.framebuffer_fetch && (m_conf.require_one_barrier || m_conf.require_full_barrier))
 			pxAssert(!m_conf.blend.enable);
 
 		// If we use depth feedback directly, we must use barriers for the depth texture.
@@ -9365,6 +9365,8 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 				m_prim_overlap != PRIM_OVERLAP_NO, need_barriers_for_depth) : !need_barriers_for_depth;
 		if (drop_barriers)
 		{
+			m_conf.raster_order = features.declared_loop_overlap_needs_raster_order && m_conf.require_full_barrier &&
+				m_prim_overlap != PRIM_OVERLAP_NO && !m_conf.ps.shuffle && !m_channel_shuffle;
 			m_conf.require_one_barrier = false;
 			m_conf.require_full_barrier = false;
 		}

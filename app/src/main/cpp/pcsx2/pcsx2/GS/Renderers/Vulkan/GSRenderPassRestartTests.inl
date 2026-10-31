@@ -293,4 +293,5 @@ void main(){color=texelFetch(source,ivec2(0),0)*params.factor;})");
     }
     TestRenderPassOrdering(check, pipeline, sampler, pass);
     TestDrawRoad(check);
+    TestRoadFamilies(check);
 }

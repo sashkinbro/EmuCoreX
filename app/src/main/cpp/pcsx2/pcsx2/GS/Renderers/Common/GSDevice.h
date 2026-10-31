@@ -1282,6 +1282,7 @@ struct alignas(16) GSHWDrawConfig
 	bool require_full_barrier; ///< Require texture barrier between all prims
 	bool offset_read_hits_write; ///< Filtered offset self-read includes pixels written by this draw.
 	GSDrawRoad road; ///< Renderer-owned self-read and compatible-pass carry decisions.
+	bool raster_order; ///< Request driver ordering for overlapping declared-loop primitives.
 
 	enum : u32
 	{
@@ -1450,6 +1451,7 @@ public:
 		bool bptc_textures        : 1; ///< Supports BC6/7 texture compression.
 		bool feedback_loop_layout : 1; ///< Actual sampler attachment-feedback-loop road.
 		bool framebuffer_fetch_orders_overlap : 1; ///< Actual fetch orders overlapping primitives.
+		bool declared_loop_overlap_needs_raster_order : 1; ///< Declared ordered driver requires a per-pipeline request.
 		bool declared_feedback_loop_orders_overlap : 1; ///< Declared loop orders overlapping primitives.
 		GSFeedbackCarry feedback_carry = GSFeedbackCarry::None;
 		bool framebuffer_fetch    : 1; ///< Can sample from the framebuffer without texture barriers.
