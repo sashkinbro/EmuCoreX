@@ -269,27 +269,19 @@ void recTLBWR()
 	g_branch = 2;
 }
 
-static void recSetNextEventDelta4_inline_oaknut()
+static void recTestIntsAfterStatusChange_inline_oaknut()
 {
-	oak::Label done;
-
+	// Each caller has flushed the allocator with FLUSH_INTERPRETER. Preserve
+	// this core's pinned cycle convention around the shared scheduling gate.
 	recFlushReccycle();
-	oakLoad32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.cycle))});
-	oakLoad32(OAK_WSCRATCH2, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.nextEventCycle))});
-	oakAsm->SUB(OAK_WSCRATCH2, OAK_WSCRATCH2, OAK_WSCRATCH);
-	oakAsm->CMP(OAK_WSCRATCH2, 4);
-	oakAsm->B(oak::Cond::LE, done);
-	oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, 4);
-	oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.nextEventCycle))});
+	oakEmitCall(reinterpret_cast<void*>(cpuTestIntsAfterStatusChange));
 	recReloadReccycle();
-
-	oakAsm->l(done);
 }
 
-static void recSetNextEventDelta4_emit_oaknut()
+static void recTestIntsAfterStatusChange_emit_oaknut()
 {
 	recBeginOaknutEmit();
-	recSetNextEventDelta4_inline_oaknut();
+	recTestIntsAfterStatusChange_inline_oaknut();
 	recEndOaknutEmit();
 }
 
@@ -320,7 +312,7 @@ static void recERET_emit_oaknut()
 	oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.CP0.n.Status))});
 
 	oakAsm->l(done);
-	recSetNextEventDelta4_inline_oaknut();
+	recTestIntsAfterStatusChange_inline_oaknut();
 	recEndOaknutEmit();
 }
 
@@ -351,7 +343,7 @@ static void recEI_emit_oaknut()
 	oakAsm->MOV(OAK_WSCRATCH2, 0x10000);
 	oakAsm->ORR(OAK_WSCRATCH, OAK_WSCRATCH, OAK_WSCRATCH2);
 	oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.CP0.n.Status))});
-	recSetNextEventDelta4_inline_oaknut();
+	recTestIntsAfterStatusChange_inline_oaknut();
 
 	oakAsm->l(done);
 	recEndOaknutEmit();
@@ -614,7 +606,7 @@ static void recMTC0Status_emit_oaknut(int rt)
 	oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.lastPERFCycle[0]))});
 	oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.lastPERFCycle[1]))});
 	recEndOaknutEmit();
-	recSetNextEventDelta4_emit_oaknut();
+	recTestIntsAfterStatusChange_emit_oaknut();
 	recBeginOaknutEmit();
 	oakAsm->B(done);
 

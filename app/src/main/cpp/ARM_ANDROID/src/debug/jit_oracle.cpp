@@ -12,6 +12,7 @@
 #include "arm64/vu/microVU_Persist-arm64.h"
 #include "arm64/vu/microVU_ProgCache-arm64.h"
 #include "IopThread/IopThread.h"
+#include "IopThread/IopThreadVm.h"
 #include "DebugTools/Breakpoints.h"
 #include "IopMem.h"
 #include "IopHw.h"
@@ -3127,6 +3128,8 @@ EESnapshot RunEEProgramWithIrMode(int mode, const std::vector<u32>& program,
     EmuCoreXOracleSetEeIrMode(-1);
     return result;
 }
+
+#include "jit_oracle_ee_status_gate.inl"
 
 IOPSnapshot RunIOPProgram(bool jit, const std::vector<u32>& program, s32 eeCycles = -1, bool forceGteInterpreter = false, u64 forcedFamilies = 0)
 {
@@ -12376,6 +12379,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
     }
     if (std::strcmp(suite, "breakpoint-probes") == 0)
         BreakpointProbeTests();
+    else if (std::strcmp(suite, "ee-status-gate") == 0)
+        EeStatusGateTests();
     else if (std::strcmp(suite, "ee-irq-events") == 0)
         EeIRQEventTests();
     else if (std::strcmp(suite, "ee-vu-sync") == 0)

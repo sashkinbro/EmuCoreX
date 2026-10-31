@@ -270,6 +270,12 @@ __fi void cpuClearInt( uint i )
 	cpuRegs.dmastall &= ~(1 << i);
 }
 
+static __fi bool cpuIntcDmacCausePending()
+{
+	return (psHu32(INTC_STAT) & psHu32(INTC_MASK)) |
+		(psHu16(DMAC_STAT + 2) & psHu16(DMAC_STAT)) | (psHu16(DMAC_STAT) & 0x8000);
+}
+
 static __fi void TESTINT( u8 n, void (*callback)() )
 {
 	if( !(cpuRegs.interrupt & (1 << n)) ) return;
@@ -433,9 +439,14 @@ void _cpuEventTest_Shared()
 	// cycles (fixes Grandia II [PAL], which does a spin loop on a vsync and expects to
 	// be able to read the value before the exception handler clears it).
 
-	uint mask = intcInterrupt() | dmacInterrupt();
-	if (cpuIntsEnabled(mask))
-		cpuException(mask, cpuRegs.branch);
+	// HOLD latching is independent of CP0 Status, so only the raw device
+	// causes may gate these calls. The remaining event work still runs.
+	if (cpuIntcDmacCausePending())
+	{
+		const uint mask = intcInterrupt() | dmacInterrupt();
+		if (cpuIntsEnabled(mask))
+			cpuException(mask, cpuRegs.branch);
+	}
 
 	// ---- IOP -------------
 	if constexpr (M == IopThreadMode::Threaded)
@@ -561,6 +572,18 @@ __fi void cpuTestDMACInts()
 	cpuSetNextEventDelta(4);
 	if (IopThread::GetMode() != IopThreadMode::Threaded && eeEventTestIsActive && (psxRegs.iopCycleEE > 0))
 		EeBridge::BreakIopSlice();
+}
+
+void cpuTestIntsAfterStatusChange()
+{
+	// A Status write under EXL followed by ERET must retain the deferred test.
+	// IM7 is checked even with IE clear, because event tests drive the COP0 timer.
+	// Do not sample MTVU flags here: those become causes at the next event test
+	// and must not make the EE schedule depend on host thread arrival time.
+	const bool timer = (cpuRegs.CP0.n.Status.val & 0x8000) != 0;
+	const bool queued = IopThread::GetMode() == IopThreadMode::Threaded && IopThread::g_thread.MayHaveI2E();
+	if (cpuIntcDmacCausePending() || timer || queued)
+		cpuSetNextEventDelta(4);
 }
 
 __fi void cpuTestTIMRInts()
