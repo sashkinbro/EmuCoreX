@@ -30,6 +30,7 @@ namespace mvu_aot
 		u64 targetsRecorded = 0, crossProgramTargets = 0, retierChecks = 0, retiers = 0;
 		u64 savedRecords = 0, savedPlanJobs = 0;
 		u64 singleDeclines = 0, timingDeclines = 0, unsupportedDeclines = 0, publishRejects = 0;
+		u64 readyDeferred = 0, readyPublished = 0, readyStale = 0, readyEvicted = 0, readyDuplicates = 0;
 	};
 	// Read on the VU owner, or with that owner quiescent.
 	Stats GetStats();
@@ -52,5 +53,14 @@ namespace mvu_aot
     void HoldWorker(bool hold);
     void WaitWorker();
     u32 PendingCount();
+	u32 ReadyCountForTest();
+	u64 ReadyBytesForTest();
+	void TestReadyLimits(u64 bytes, u32 jobs, u32 perProgram);
+	void TestHoldReadyPublication(bool hold);
+	bool TestDuplicateReady();
+	bool TestStaleReady(u32 kind); // 0: epoch; 1: captured CPU configuration
+	bool TestExpandReadyOwner(bool observed);
+	bool TestRetryReadySnapshot();
+	bool TestReadyBodyExit(u32 mode, u32& targetPC); // conflict live / change unread snapshot / unrelated live word
 #endif
 } // namespace mvu_aot

@@ -55,6 +55,7 @@ namespace mvu_aot
 			Pcsx2Config::SpeedhackOptions speed;
 			microProgram* program = nullptr;
 			u64 generation = 0;
+			u64 readyOrder = 0;
 			ProgramCounters counters;
 			std::vector<std::unique_ptr<Node>> nodes;
 			std::vector<Site> sites;
@@ -89,6 +90,7 @@ namespace mvu_aot
 			std::vector<std::shared_ptr<BuildJob>> jobs;
 			std::unordered_set<void*> entries;
 			std::shared_ptr<BuildJob> pending;
+			std::vector<std::shared_ptr<BuildJob>> ready;
 			std::vector<vuaot::persist::DeclinedRoot> declined;
             bool IsDeclined(u32 pc, const void* key) const
             {
@@ -113,6 +115,8 @@ namespace mvu_aot
 			std::unordered_map<microBlock*, void*> original;
 			u64 generation = 1;
 			u64 jumpMisses = 0;
+			u64 readyBytes = 0, readySerial = 0;
+			u32 readyJobs = 0;
 			Stats stats;
 		};
 		Runtime& runtime = *new Runtime(); // Generated entries outlive static destructor ordering.
@@ -120,7 +124,12 @@ namespace mvu_aot
 		bool forceSync = false;
 		u32 tierUpRuns = 200;
 		u32 jumpTierUpRuns = 32;
+		constexpr u64 kReadyCodeBytes = 64ull << 20;
+		constexpr u32 kReadyJobs = 256, kReadyProgramJobs = 8;
+		u64 readyByteLimit = kReadyCodeBytes;
+		u32 readyJobLimit = kReadyJobs, readyProgramLimit = kReadyProgramJobs;
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		bool holdReadyPublication = false;
 		bool relinkJumpCachesForTest = true;
 		u64 entryCount = 0;
 		u64 nativeEndCount = 0;
@@ -133,6 +142,14 @@ namespace mvu_aot
 #endif
 #endif
 		thread_local bool resolving = false;
+		__fi void ReadyStat(u64 Stats::*counter)
+		{
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+			++(runtime.stats.*counter);
+#else
+			(void)counter;
+#endif
+		}
         void LogStats()
         {
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && defined(__ANDROID__) && !defined(NDEBUG)
@@ -464,7 +481,7 @@ namespace mvu_aot
 			auto it = runtime.original.find(block);
 			return it == runtime.original.end() ? block->x86ptrStart : it->second;
 		}
-		bool Valid(const BuildJob& job, microVU& mvu)
+		bool ValidRuntime(const BuildJob& job, microVU& mvu)
 		{
 			if (job.dropped)
             {
@@ -477,10 +494,55 @@ namespace mvu_aot
             }
             if (job.generation != runtime.generation || !(job.cpu == EmuConfig.Cpu) || !(job.fixes == EmuConfig.Gamefixes) || !(job.speed == EmuConfig.Speedhacks))
 				return false;
+			return true;
+		}
+		bool ImageMatches(const BuildJob& job, const microVU& mvu)
+		{
 			for (u32 i = 0; i < 0x1000; ++i)
 				if (job.read[i] && std::memcmp(job.micro.data() + i * 4, mvu.regs().Micro + i * 4, 4))
 					return false;
 			return true;
+		}
+		bool OwnerMatches(const BuildJob& job)
+		{
+			if (!job.program || !job.program->ranges) return false;
+			// A partial owner can expand while an old job waits for its image.
+			// Already observed required words also describe cached baseline bail
+			// targets; they must still agree with this job's immutable snapshot.
+			// Unobserved words have no such cached assumption and remain allowed.
+			for (const auto& range : *job.program->ranges)
+			{
+				if (range.start < 0 || range.end <= range.start) continue;
+				const u32 first = (static_cast<u32>(range.start) + 3) / 4;
+				const u32 last = std::min(static_cast<u32>(range.end), 0x4000u) / 4;
+				for (u32 word = first; word < last; ++word)
+					if (job.read[word] && std::memcmp(job.micro.data() + word * 4,
+						reinterpret_cast<const u8*>(job.program->data) + word * 4, 4))
+						return false;
+			}
+			return true;
+		}
+		bool OwnerImageMatches(const BuildJob& job, const microVU& mvu)
+		{
+			if (!job.program || !job.program->ranges) return false;
+			// A body may leave through a cached baseline child it never read.
+			// Every already compiled owner range must therefore describe the
+			// live image before Baseline can reuse its static or budget targets.
+			// Unlike a required-read snapshot conflict, another live overlay is
+			// temporary: keep the accepted job until these ranges agree again.
+			for (const auto& range : *job.program->ranges)
+			{
+				if (range.start < 0 || range.end <= range.start) continue;
+				const u32 first = std::min(static_cast<u32>(range.start), 0x4000u);
+				const u32 last = std::min(static_cast<u32>(range.end), 0x4000u);
+				if (std::memcmp(reinterpret_cast<const u8*>(job.program->data) + first,
+					mvu.regs().Micro + first, last - first)) return false;
+			}
+			return true;
+		}
+		bool Valid(const BuildJob& job, microVU& mvu)
+		{
+			return ValidRuntime(job, mvu) && OwnerMatches(job) && ImageMatches(job, mvu) && OwnerImageMatches(job, mvu);
 		}
         void RelinkCachedEntries(microVU& mvu, microProgram* target,
             const std::unordered_map<void*, void*>& replacements, std::vector<u32> slots)
@@ -825,6 +887,8 @@ namespace mvu_aot
 			block->x86ptrStart = static_cast<u8*>(entry);
 		++runtime.generation;
 		runtime.programs.clear();
+		runtime.readyBytes = runtime.readyJobs = 0;
+		runtime.readySerial = 0;
 		runtime.original.clear();
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && defined(__ANDROID__) && !defined(NDEBUG)
         char property[PROP_VALUE_MAX]{};
@@ -877,6 +941,105 @@ namespace mvu_aot
 				return;
 			}
 		p.traces.push_back({trace, mvu.prog.IRinfo.pBlock});
+	}
+	static void RemoveReady(Program& program, size_t index)
+	{
+		const auto& job = program.ready[index];
+		pxAssert(runtime.readyJobs && runtime.readyBytes >= job->code.size());
+		--runtime.readyJobs;
+		runtime.readyBytes -= job->code.size();
+		program.ready.erase(program.ready.begin() + index);
+	}
+	static bool EquivalentReady(const BuildJob& a, const BuildJob& b)
+	{
+		if (a.generation != b.generation || a.trace.startPC != b.trace.startPC ||
+			std::memcmp(a.trace.entryState, b.trace.entryState, 96) ||
+			!(a.cpu == b.cpu) || !(a.fixes == b.fixes) || !(a.speed == b.speed) ||
+			a.viaJump != b.viaJump || a.retier != b.retier || a.dropAllowed != b.dropAllowed ||
+			a.jumpTargets != b.jumpTargets)
+			return false;
+		// The pending snapshot need not have been analyzed yet. Every word
+		// the already accepted job read must have the same meaning in it.
+		for (u32 i = 0; i < 0x1000; ++i)
+			if (a.read[i] && std::memcmp(a.micro.data() + i * 4, b.micro.data() + i * 4, 4))
+				return false;
+		return true;
+	}
+	static bool HasReady(const Program& program, const BuildJob& job)
+	{
+		return std::any_of(program.ready.begin(), program.ready.end(), [&](const auto& ready) {
+			return EquivalentReady(*ready, job);
+		});
+	}
+	static void EnforceReadyLimits(Program& program)
+	{
+		while (program.ready.size() > readyProgramLimit)
+		{
+			RemoveReady(program, 0);
+			ReadyStat(&Stats::readyEvicted);
+		}
+		while (runtime.readyJobs > readyJobLimit || runtime.readyBytes > readyByteLimit)
+		{
+			Program* oldest = nullptr;
+			for (auto& item : runtime.programs)
+				if (!item.second.ready.empty() && (!oldest ||
+					item.second.ready.front()->readyOrder < oldest->ready.front()->readyOrder))
+					oldest = &item.second;
+			pxAssert(oldest);
+			RemoveReady(*oldest, 0);
+			ReadyStat(&Stats::readyEvicted);
+		}
+	}
+	static void AddReady(Program& program, const std::shared_ptr<BuildJob>& job)
+	{
+		if (HasReady(program, *job))
+		{
+			ReadyStat(&Stats::readyDuplicates);
+			return;
+		}
+		if (job->code.size() > readyByteLimit || !readyJobLimit || !readyProgramLimit)
+		{
+			ReadyStat(&Stats::readyEvicted);
+			return;
+		}
+		job->readyOrder = ++runtime.readySerial;
+		program.ready.push_back(job);
+		++runtime.readyJobs;
+		runtime.readyBytes += job->code.size();
+		EnforceReadyLimits(program);
+	}
+	static bool PublishReady(microVU& mvu, Program& program)
+	{
+		if (oakHasBlock()) return false;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (holdReadyPublication) return false;
+#endif
+		bool changed = false;
+		for (size_t i = 0; i < program.ready.size();)
+		{
+			const auto job = program.ready[i];
+			if (!ValidRuntime(*job, mvu) || !OwnerMatches(*job))
+			{
+				RemoveReady(program, i);
+				ReadyStat(&Stats::readyStale);
+				continue;
+			}
+			if (!ImageMatches(*job, mvu) || !OwnerImageMatches(*job, mvu))
+			{
+				++i;
+				continue;
+			}
+			RemoveReady(program, i);
+			// Publish retains the full validation immediately before touching
+			// code, and owns its normal code-cache episode on this VU thread.
+			if (Publish(mvu, job))
+			{
+				changed = true;
+				ReadyStat(&Stats::readyPublished);
+			}
+			else NoteDecline(*job);
+		}
+		return changed;
 	}
 	bool CompileBody(microVU& mvu, const vuaot::MvuBlockTrace& trace)
 	{
@@ -991,8 +1154,10 @@ namespace mvu_aot
         // raw carried state still contains expired backup/flag labels.
         entryKey.viBackUp = mVUcanonicalViBackup(entryKey);
         entryKey.flagInfo = mVUcanonicalFlagInfo(entryKey);
-		bool changed = saved::Load(mvu, runtime.programs[mvu.prog.cur]);
+		auto& program = runtime.programs[mvu.prog.cur];
+		bool changed = saved::Load(mvu, program);
 		std::vector<std::shared_ptr<bg::Job>> completed;
+		std::vector<microProgram*> touched;
 		if (runtime.worker.CompletedCount())
 			runtime.worker.TakeCompleted(completed);
 		for (auto& item : completed)
@@ -1001,22 +1166,39 @@ namespace mvu_aot
 			auto it = runtime.programs.find(job->program);
 			if (it != runtime.programs.end())
 			{
-				it->second.pending.reset();
-				if (Publish(mvu, job))
-					changed |= job->program == mvu.prog.cur;
-				else
+				if (it->second.pending == job) it->second.pending.reset();
+				if (!ValidRuntime(*job, mvu) || !OwnerMatches(*job))
 				{
-					if (!job->accepted) it->second.NoteDeclined(job->trace);
+					ReadyStat(&Stats::readyStale);
+					continue;
+				}
+				if (!job->accepted)
+				{
+					it->second.NoteDeclined(job->trace);
 					NoteDecline(*job);
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 					if (countEntries)
 						std::fprintf(stderr, "VU1 AOT worker rejected: accepted=%d reason=%s\n",
 							job->accepted, job->error.c_str());
 #endif
+					continue;
 				}
+				if (!ImageMatches(*job, mvu) || !OwnerImageMatches(*job, mvu)) ReadyStat(&Stats::readyDeferred);
+				AddReady(it->second, job);
+				if (std::find(touched.begin(), touched.end(), job->program) == touched.end())
+					touched.push_back(job->program);
 			}
 		}
-		auto& program = runtime.programs[mvu.prog.cur];
+		// Retry the current program even without a new worker completion:
+		// its overlay may just have returned. Publishing may compile baseline
+		// fallbacks, so never iterate the program hash table across that call.
+		changed |= PublishReady(mvu, program);
+		for (microProgram* owner : touched)
+			if (owner != mvu.prog.cur)
+			{
+				const auto it = runtime.programs.find(owner);
+				if (it != runtime.programs.end()) PublishReady(mvu, it->second);
+			}
 		if (viaJump)
 		{
 			++program.jumpRuns;
@@ -1118,6 +1300,11 @@ namespace mvu_aot
 		job->cpu = EmuConfig.Cpu;
 		job->fixes = EmuConfig.Gamefixes;
 		job->speed = EmuConfig.Speedhacks;
+		if (HasReady(program, *job))
+		{
+			ReadyStat(&Stats::readyDuplicates);
+			return baselineEntry;
+		}
 		if (forceSync)
 		{
 			job->Run();
@@ -1229,5 +1416,146 @@ namespace mvu_aot
         for (const auto& entry : runtime.programs) count += entry.second.pending != nullptr;
         return count;
     }
+	u32 ReadyCountForTest() { return runtime.readyJobs; }
+	u64 ReadyBytesForTest() { return runtime.readyBytes; }
+	void TestReadyLimits(u64 bytes, u32 jobs, u32 perProgram)
+	{
+		readyByteLimit = bytes; readyJobLimit = jobs; readyProgramLimit = perProgram;
+		for (auto& item : runtime.programs) EnforceReadyLimits(item.second);
+	}
+	void TestHoldReadyPublication(bool hold) { holdReadyPublication = hold; }
+	bool TestDuplicateReady()
+	{
+		for (auto& item : runtime.programs)
+			if (!item.second.ready.empty())
+			{
+				const auto job = item.second.ready.front();
+				AddReady(item.second, job);
+				return true;
+			}
+		return false;
+	}
+	bool TestStaleReady(u32 kind)
+	{
+		for (auto& item : runtime.programs)
+			if (!item.second.ready.empty())
+			{
+				auto& job = *item.second.ready.front();
+				if (kind == 0) job.generation ^= 1;
+				else job.cpu.VU1FPCR.bitmask ^= u64(1) << 22;
+				return true;
+			}
+		return false;
+	}
+	bool TestExpandReadyOwner(bool observed)
+	{
+		microVU& mvu = microVU1;
+		for (auto& item : runtime.programs)
+			if (!item.second.ready.empty())
+			{
+				const auto job = item.second.ready.front();
+				auto& owner = *job->program;
+				for (u32 word = 0; word < 0x1000; ++word)
+				{
+					u32 snapshot, live;
+					std::memcpy(&snapshot, job->micro.data() + word * 4, 4);
+					std::memcpy(&live, mvu.regs().Micro + word * 4, 4);
+					const s32 pc = word * 4;
+					if (!job->read[word] || snapshot == live ||
+						!std::any_of(owner.ranges->begin(), owner.ranges->end(), [&](const auto& range) {
+							return range.start <= pc && pc < range.end;
+						})) continue;
+					// Model a partial owner before this word was observed, then
+					// optionally expand it through the actual range/cache writer.
+					std::deque<microRange> partial;
+					for (const auto& range : *owner.ranges)
+						if (range.start <= pc && pc < range.end)
+						{
+							if (range.start < pc) partial.push_back({range.start, pc});
+							if (pc + 4 < range.end) partial.push_back({pc + 4, range.end});
+						}
+						else partial.push_back(range);
+					owner.ranges->swap(partial);
+					owner.data[word] = live;
+					if (observed)
+					{
+						auto* previous = mvu.prog.cur;
+						const auto isSame = mvu.prog.isSame;
+						mvu.prog.cur = &owner; mvu.prog.isSame = -1;
+						mVUsetupRange(mvu, pc, true); mVUsetupRange(mvu, pc + 4, false);
+						mvu.prog.cur = previous; mvu.prog.isSame = isSame;
+					}
+					const bool known = std::any_of(owner.ranges->begin(), owner.ranges->end(), [&](const auto& range) {
+						return range.start <= pc && pc < range.end;
+					});
+					return known == observed && owner.data[word] != snapshot;
+				}
+			}
+		return false;
+	}
+	bool TestRetryReadySnapshot()
+	{
+		microVU& mvu = microVU1;
+		for (auto& item : runtime.programs)
+			if (!item.second.ready.empty())
+			{
+				const auto job = item.second.ready.front();
+				std::array<u8, 0x4000> live;
+				std::memcpy(live.data(), mvu.regs().Micro, live.size());
+				std::memcpy(mvu.regs().Micro, job->micro.data(), live.size());
+				ScopedGuard restore([&] { std::memcpy(mvu.regs().Micro, live.data(), live.size()); });
+				return PublishReady(mvu, item.second);
+			}
+		return false;
+	}
+	bool TestReadyBodyExit(u32 mode, u32& targetPC)
+	{
+		targetPC = 0;
+		microVU& mvu = microVU1;
+		for (auto& item : runtime.programs)
+			for (const auto& retained : item.second.ready)
+			{
+				const auto job = retained;
+				if (!job->body) continue;
+				for (const auto& site : job->sites)
+				{
+					if (site.jump || site.end.valid || site.pc == job->trace.startPC) continue;
+					const auto known = [&](u32 word) {
+						return std::any_of(job->program->ranges->begin(), job->program->ranges->end(), [&](const auto& range) {
+							return range.start <= static_cast<s32>(word * 4) && static_cast<s32>(word * 4 + 4) <= range.end;
+						});
+					};
+					// Flag lookahead reads the first T-bit pair and then stops.
+					// Its later cached child instructions remain genuine baseline
+					// dependencies even though BodyTier never decoded them.
+					u32 childWord = site.pc / 4;
+					const u32 childEnd = std::min(childWord + 16, 0x1000u);
+					while (childWord < childEnd && (job->read[childWord] || !known(childWord))) ++childWord;
+					if (childWord == childEnd) continue;
+					u32 live, snapshot;
+					std::memcpy(&live, mvu.regs().Micro + childWord * 4, 4);
+					std::memcpy(&snapshot, job->micro.data() + childWord * 4, 4);
+					if (live != snapshot || job->program->data[childWord] != live) continue;
+					// The job and cached baseline child are real. Mutate only the
+					// publication input named by this compatibility control; never
+					// execute while the temporary live instruction is changed.
+					u32 word = childWord;
+					if (mode == 2)
+					{
+						for (word = 0xfff; word > 0 && (known(word) || job->read[word]); --word) {}
+						if (word == 0) continue;
+					}
+					u8* const bytes = mode == 1 ? job->micro.data() : mvu.regs().Micro;
+					u32 original;
+					std::memcpy(&original, bytes + word * 4, 4);
+					const u32 altered = original ^ 1u;
+					std::memcpy(bytes + word * 4, &altered, 4);
+					ScopedGuard restore([&] { std::memcpy(bytes + word * 4, &original, 4); });
+					targetPC = site.pc;
+					return PublishReady(mvu, item.second);
+				}
+			}
+		return false;
+	}
 #endif
 } // namespace mvu_aot

@@ -2254,6 +2254,7 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vuaot_saved.inl"
 #include "jit_oracle_vuaot_clamp_reuse.inl"
 #include "jit_oracle_vuaot_compile_roots.inl"
+#include "jit_oracle_vuaot_ready_jobs.inl"
 #include "jit_oracle_vif_pair_copy.inl"
 #include "jit_oracle_vuaot_division.inl"
 
@@ -12435,6 +12436,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         RunVuAotCompileRootsColdTests(true);
     else if (std::strcmp(suite, "vu-aot-compile-roots-read") == 0)
         RunVuAotCompileRootsColdTests(false);
+    else if (std::strcmp(suite, "vu-aot-ready-jobs") == 0)
+        RunVuAotReadyJobsTests();
     else if (std::strcmp(suite, "vif-pair-copy") == 0)
         RunVifPairCopyTests();
     else if (std::strcmp(suite, "spu2-volume") == 0)
