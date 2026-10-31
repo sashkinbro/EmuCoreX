@@ -51,6 +51,10 @@
 #include "VMManager.h"
 #include "ps2/BiosTools.h"
 #include "common/ARCADE.h"
+#if defined(EMUCOREX_ANDROID_JIT)
+#include "arm64/vu/microVU_ProgCache-arm64.h"
+#include "arm64/vuaot/VuAotLive.h"
+#endif
 #if defined(__ANDROID__)
 #include <sys/resource.h>
 #endif
@@ -1320,6 +1324,24 @@ void VMManager::UpdateDiscDetails(bool booting)
 	Console.WriteLn(Color_StrongGreen, fmt::format("  Version: {}", s_disc_version));
 	Console.WriteLn(Color_StrongGreen, fmt::format("  CRC: {:08X}", s_disc_crc));
 
+#if defined(EMUCOREX_ANDROID_JIT)
+	// The old live programs must be saved to their old pack before the VU
+	// resets open packs for this disc identity.
+	if (!booting && (EmuConfig.Cpu.Recompiler.EnableVUProgramCache || EmuConfig.Cpu.Recompiler.EnableVUAot))
+	{
+		IopThread::VmHold iop_hold;
+		if (THREAD_VU1)
+			vu1Thread.WaitVU();
+		mVUProgCache::SetTitle(s_disc_serial, s_disc_crc);
+		vuaot::live::SetTitle(s_disc_serial, s_disc_crc);
+		Internal::ClearCPUExecutionCaches();
+	}
+	else
+	{
+		mVUProgCache::SetTitle(s_disc_serial, s_disc_crc);
+		vuaot::live::SetTitle(s_disc_serial, s_disc_crc);
+	}
+#endif
 	UpdateGameSettingsLayer();
 	ApplySettings();
 
@@ -1341,12 +1363,18 @@ void VMManager::UpdateDiscDetails(bool booting)
 
 void VMManager::ClearDiscDetails()
 {
-	std::unique_lock lock(s_info_mutex);
-	s_disc_crc = 0;
-	s_title = {};
-	s_disc_version = {};
-	s_disc_elf = {};
-	s_disc_serial = {};
+	{
+		std::unique_lock lock(s_info_mutex);
+		s_disc_crc = 0;
+		s_title = {};
+		s_disc_version = {};
+		s_disc_elf = {};
+		s_disc_serial = {};
+	}
+#if defined(EMUCOREX_ANDROID_JIT)
+	mVUProgCache::SetTitle({}, 0);
+	vuaot::live::SetTitle({}, 0);
+#endif
 }
 
 void VMManager::HandleELFChange(bool verbose_patches_if_changed)
@@ -2005,6 +2033,9 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 	mmap_ResetBlockTracking();
 	memSetExtraMemMode(EmuConfig.Cpu.ExtraMemory);
 	g_cpuRegistersPack.Cpu = EmuConfig.Cpu;
+#if defined(EMUCOREX_ANDROID_JIT)
+	vuaot::live::ResetStickyTripwire();
+#endif
 	Internal::ClearCPUExecutionCaches();
 	FPControlRegister::SetCurrent(EmuConfig.Cpu.FPUFPCR);
 	memBindConditionalHandlers();
@@ -2300,6 +2331,9 @@ void VMManager::Reset()
 	mmap_ResetBlockTracking();
 	memSetExtraMemMode(EmuConfig.Cpu.ExtraMemory);
 	IopThread::ChooseModeForReset();
+#if defined(EMUCOREX_ANDROID_JIT)
+	vuaot::live::ResetStickyTripwire();
+#endif
 	Internal::ClearCPUExecutionCaches();
 	memBindConditionalHandlers();
 	SysMemory::Reset();

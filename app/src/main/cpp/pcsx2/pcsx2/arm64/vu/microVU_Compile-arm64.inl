@@ -760,6 +760,7 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 		u8* const physical_end = mVU.prog.x86end + (mVUcacheSafeZone * _1mb);
 		oakSetAsmPtr(mVU.prog.x86ptr, physical_end - mVU.prog.x86ptr);
 		thisPtr = oakStartBlock();
+		mVUPersist::BeginEpisode(mVU, thisPtr);
 		startedOakBlock = true;
 	}
 	JitProfiler::BlockCompileScope compile_scope(isVU1 ? 3 : 2, startPC);
@@ -771,6 +772,7 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 	mVUsetupRange(mVU, startPC, 1); // Setup Program Bounds/Range
 	mVU.regAlloc->reset(false);          // Reset regAlloc
 	mVUinitFirstPass(mVU, pState, thisPtr);
+	mVUPersist::OnBlockCompiled(mVU, mVUpBlock, thisPtr, startPC);
 	if (HangTrace::IsActive())
 	{
 		u32 upper = 0;
@@ -939,6 +941,12 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 	mVUregs.vi15v = (doConstProp && mVUconstReg[15].isValid) ? 1 : 0;
 	mVUsetFlags(mVU, mFC);           // Sets Up Flag instances
 	mVUoptimizePipeState(mVU);       // Optimize the End Pipeline State for nicer Block Linking
+	if (isVU1 && EmuConfig.Cpu.Recompiler.EnableVUAot)
+	{
+		vuaot::MvuBlockTrace trace;
+		mVUbuildBlockTrace(mVU, startPC, trace);
+		mvu_aot::Remember(mVU, trace);
+	}
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	if (vuaot::g_mvuBlockHook)
 	{
@@ -1151,7 +1159,10 @@ perf_and_return:
 	const u8* const compiledHostEnd = oakGetCurrentCodePointer();
 
 	if (startedOakBlock)
+	{
+		mVUPersist::EndEpisode(mVU, thisPtr, oakGetCurrentCodePointer());
 		mVU.prog.x86ptr = oakEndBlock();
+	}
 	if (compiledBlock)
 		compile_scope.Finish(compiledBlock->guest_size, compiledBlock->host_size, thisPtr, compiledHostEnd);
 
@@ -1204,12 +1215,21 @@ _mVUt void* mVUcompileJIT(u32 startPC, uptr ptr)
 			{
 				return jc.x86ptrStart;
 			}
+			if constexpr (vuIndex == 1)
+				mvu_aot::OnJumpMiss(mVU);
 			void* v = mVUblockFetch(mVUx, startPC, (uptr)&pBlock->pStateEnd);
+			if constexpr (vuIndex == 1)
+				v = mvu_aot::AfterJump(mVU, startPC, &pBlock->pStateEnd, v);
 			jc.prog = mVU.prog.quick[startPC_8].prog;
 			jc.x86ptrStart = v;
 			return v;
 		}
-		return mVUblockFetch(mVUx, startPC, ptr);
+		if constexpr (vuIndex == 1)
+			mvu_aot::OnJumpMiss(mVUx);
+		void* result = mVUblockFetch(mVUx, startPC, ptr);
+		if constexpr (vuIndex == 1)
+			result = mvu_aot::AfterJump(mVUx, startPC, reinterpret_cast<const void*>(ptr), result);
+		return result;
 	}
 	mVUx.regs().start_pc = startPC;
 	if (doJumpCaching) // When doJumpCaching, ptr is a microBlock pointer
@@ -1221,13 +1241,22 @@ _mVUt void* mVUcompileJIT(u32 startPC, uptr ptr)
 		{
 			return jc.x86ptrStart;
 		}
+		if constexpr (vuIndex == 1)
+			mvu_aot::OnJumpMiss(mVU);
 		void* v = mVUsearchProg<vuIndex>(startPC, (uptr)&pBlock->pStateEnd);
+		if constexpr (vuIndex == 1)
+			v = mvu_aot::AfterJump(mVU, startPC, &pBlock->pStateEnd, v);
 		jc.prog = mVU.prog.quick[startPC_8].prog;
 		jc.x86ptrStart = v;
 		return v;
 	}
 	else // When !doJumpCaching, pBlock param is really a microRegInfo pointer
 	{
-		return mVUsearchProg<vuIndex>(startPC, ptr); // Find and set correct program
+		if constexpr (vuIndex == 1)
+			mvu_aot::OnJumpMiss(mVUx);
+		void* result = mVUsearchProg<vuIndex>(startPC, ptr);
+		if constexpr (vuIndex == 1)
+			result = mvu_aot::AfterJump(mVUx, startPC, reinterpret_cast<const void*>(ptr), result);
+		return result;
 	}
 }

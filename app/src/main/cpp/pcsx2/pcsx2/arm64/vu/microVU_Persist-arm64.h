@@ -68,6 +68,13 @@ struct MvuPersistLog;
 // itself dropped).
 namespace mVUPersist
 {
+	// Read-only native sidecar address relocation. Offsets use the same
+	// current module/data bases as baseline images. Unknown pointers, region
+	// kinds and offsets outside the current region are rejected.
+	enum class AddressRegion : u8 { Image, Data };
+	bool ClassifyAddressRegion(const void* address, AddressRegion& region, s64& offset);
+	// Clears address on failure; does not open or modify a code cache.
+	bool ResolveAddressRegion(AddressRegion region, s64 offset, const void*& address);
 	XXH128_hash_t OptionsSentinel(const microVU& mVU);
 	void MarkUnpersistable(microVU& mVU, const char* reason);
 	// Master gate for emit-time recording. Default off. In production,

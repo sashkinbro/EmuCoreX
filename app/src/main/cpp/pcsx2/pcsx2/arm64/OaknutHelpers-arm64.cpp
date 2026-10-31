@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #include "OaknutHelpers-arm64.h"
+#include "vu/microVU_Persist-arm64.h"
 
 #include "common/Assertions.h"
 #include "common/HostSys.h"
@@ -155,6 +156,20 @@ u8* oakEndBlock()
 void oakMoveAddressToReg(oak::XReg reg, const void* addr)
 {
 	pxAssert(oakAsm);
+	if (oakAddressRecorder)
+	{
+		// Record a fixed-width run so every relocated address is representable,
+		// including tagged pointers and a differently placed module or arena.
+		oakAddressRecorder->ClassifyAddress(addr);
+		u8* const at = oakGetCurrentCodePointer();
+		const u64 value = reinterpret_cast<uintptr_t>(addr);
+		oakAsm->MOVZ(reg, static_cast<u16>(value));
+		oakAsm->MOVK(reg, {static_cast<u16>(value >> 16), oak::MovImm16Shift::SHL_16});
+		oakAsm->MOVK(reg, {static_cast<u16>(value >> 32), oak::MovImm16Shift::SHL_32});
+		oakAsm->MOVK(reg, {static_cast<u16>(value >> 48), oak::MovImm16Shift::SHL_48});
+		oakAddressRecorder->OnMovRun(at, 4, addr);
+		return;
+	}
 	oakAsm->MOVP2R(reg, addr);
 }
 
@@ -174,6 +189,8 @@ void oakEmitJmp(const void* ptr)
 	pxAssert(oakAsm);
 	if (oakBranchTargetInRange<28>(ptr))
 	{
+		if (oakAddressRecorder)
+			oakAddressRecorder->OnBranch(oakGetCurrentCodePointer(), ptr, OakAddressRecorder::BranchForm::Rel26);
 		oakAsm->B(ptr);
 		return;
 	}
@@ -186,6 +203,8 @@ void oakEmitCall(const void* ptr)
 	pxAssert(oakAsm);
 	if (oakBranchTargetInRange<28>(ptr))
 	{
+		if (oakAddressRecorder)
+			oakAddressRecorder->OnBranch(oakGetCurrentCodePointer(), ptr, OakAddressRecorder::BranchForm::Rel26);
 		oakAsm->BL(ptr);
 		return;
 	}
@@ -198,6 +217,8 @@ void oakEmitCondBranch(oak::Cond cond, const void* ptr)
 	pxAssert(oakAsm);
 	if (static_cast<unsigned>(cond) < 14 && oakBranchTargetInRange<21>(ptr))
 	{
+		if (oakAddressRecorder)
+			oakAddressRecorder->OnBranch(oakGetCurrentCodePointer(), ptr, OakAddressRecorder::BranchForm::Rel19);
 		oakAsm->B(cond, ptr);
 		return;
 	}
@@ -212,6 +233,8 @@ void oakEmitCbz(oak::WReg reg, const void* ptr)
 	pxAssert(oakAsm);
 	if (oakBranchTargetInRange<21>(ptr))
 	{
+		if (oakAddressRecorder)
+			oakAddressRecorder->OnBranch(oakGetCurrentCodePointer(), ptr, OakAddressRecorder::BranchForm::Rel19);
 		oakAsm->CBZ(reg, ptr);
 		return;
 	}
@@ -226,6 +249,8 @@ void oakEmitCbz(oak::XReg reg, const void* ptr)
 	pxAssert(oakAsm);
 	if (oakBranchTargetInRange<21>(ptr))
 	{
+		if (oakAddressRecorder)
+			oakAddressRecorder->OnBranch(oakGetCurrentCodePointer(), ptr, OakAddressRecorder::BranchForm::Rel19);
 		oakAsm->CBZ(reg, ptr);
 		return;
 	}
@@ -240,6 +265,8 @@ void oakEmitCbnz(oak::WReg reg, const void* ptr)
 	pxAssert(oakAsm);
 	if (oakBranchTargetInRange<21>(ptr))
 	{
+		if (oakAddressRecorder)
+			oakAddressRecorder->OnBranch(oakGetCurrentCodePointer(), ptr, OakAddressRecorder::BranchForm::Rel19);
 		oakAsm->CBNZ(reg, ptr);
 		return;
 	}
@@ -254,6 +281,8 @@ void oakEmitCbnz(oak::XReg reg, const void* ptr)
 	pxAssert(oakAsm);
 	if (oakBranchTargetInRange<21>(ptr))
 	{
+		if (oakAddressRecorder)
+			oakAddressRecorder->OnBranch(oakGetCurrentCodePointer(), ptr, OakAddressRecorder::BranchForm::Rel19);
 		oakAsm->CBNZ(reg, ptr);
 		return;
 	}
@@ -272,6 +301,8 @@ void oakEmitJmpPtr(void* code, const void* dst, bool flush_icache)
 	const u32 imm26 = static_cast<u32>((displacement >> 2) & 0x03ffffff);
 	const u32 encoded = 0x14000000u | imm26;
 	std::memcpy(code, &encoded, sizeof(encoded));
+	if (oakAddressRecorder)
+		oakAddressRecorder->OnBranch(static_cast<u8*>(code), dst, OakAddressRecorder::BranchForm::Rel26);
 
 	if (flush_icache)
 		HostSys::FlushInstructionCache(code, sizeof(encoded));
@@ -286,6 +317,8 @@ void oakPatchCondBranch(void* code, const void* dst, oak::Cond cond, bool flush_
 	const u32 imm19 = static_cast<u32>((displacement >> 2) & 0x0007ffff);
 	const u32 encoded = 0x54000000u | (imm19 << 5) | static_cast<u32>(cond);
 	std::memcpy(code, &encoded, sizeof(encoded));
+	if (oakAddressRecorder)
+		oakAddressRecorder->OnBranch(static_cast<u8*>(code), dst, OakAddressRecorder::BranchForm::Rel19);
 
 	if (flush_icache)
 		HostSys::FlushInstructionCache(code, sizeof(encoded));

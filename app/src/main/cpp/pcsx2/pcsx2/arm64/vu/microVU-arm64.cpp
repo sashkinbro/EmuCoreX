@@ -4,6 +4,15 @@
 // SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "arm64/vuaot/VuAotRegion.h"
+#include "arm64/vuaot/VuAotBackground.h"
+#include "arm64/vuaot/VuAotOaknut.h"
+#include "microVU_Persist-arm64.h"
+#include "microVU_ProgCache-arm64.h"
+#include "common/Path.h"
+#include "common/FileSystem.h"
+#include "common/Error.h"
+#include "fmt/format.h"
 #include "microVU-arm64.h"
 #include "JitProfiler.h"
 
@@ -314,10 +323,9 @@ void mVUinit(microVU& mVU, uint vuIndex)
 }
 
 // Resets Rec Data
-void mVUreset(microVU& mVU, bool resetReserve)
+void mVUreset(microVU& mVU, bool resetReserve, bool vu1Idle)
 {
-
-	if (THREAD_VU1)
+	if (THREAD_VU1 && !vu1Idle)
 	{
 		DevCon.Warning("mVU Reset");
 		// If MTVU is toggled on during gameplay we need to flush the running VU1 program, else it gets in a mess
@@ -327,6 +335,14 @@ void mVUreset(microVU& mVU, bool resetReserve)
 		}
 		VU0.VI[REG_VPU_STAT].UL &= ~0x100;
 	}
+	// A pending program can still execute during the MTVU-toggle drain above.
+	// Keep its region nodes and bail targets alive until that execution ends.
+	mvu_aot::Reset(mVU);
+	// Snapshot the immutable baseline episodes before the cache is overwritten.
+	mVUProgCache::SaveAllPrograms(mVU);
+	mVUPersist::SyncRecordingFromConfig(EmuConfig.Cpu.Recompiler.EnableVUAot || EmuConfig.Cpu.Recompiler.EnableVUProgramCache);
+	if (!mVUPersist::IsRecordingEnabled())
+		mVUProgCache::Close(mVU);
 	u8* const old_start = mVU.prog.x86start;
 	u8* const old_high_water = mVU.prog.x86ptr;
 	const u64 discarded_host_bytes = (old_start && old_high_water > old_start) ?
@@ -381,11 +397,16 @@ void mVUreset(microVU& mVU, bool resetReserve)
 		}
 		mVU.prog.prog[i]->clear();
 	}
+	mVUProgCache::Rekey(mVU);
+	mVUProgCache::Init(mVU);
 }
 
 // Free Allocated Resources
 void mVUclose(microVU& mVU)
 {
+	mvu_aot::Reset(mVU);
+	mVUProgCache::SaveAllPrograms(mVU);
+	mVUProgCache::Close(mVU);
 	for (auto& entry : mVU.contentPrograms)
 		mVUdeleteProg(mVU, entry.second);
 	mVU.contentPrograms.clear();
@@ -499,6 +520,7 @@ extern "C" const void* EmuCoreXOracleGetVUQuick(u32 index, u32 start_pc)
 // Deletes a program
 __ri void mVUdeleteProg(microVU& mVU, microProgram*& prog)
 {
+	mVUPersist::OnProgramDeleted(*prog);
     u32 i, e = (mVU.progSize >> 1); // mVU.progSize / 2
 	for (i = 0; i < e; ++i)
 	{
@@ -533,6 +555,7 @@ static __fi void mVUlistPushUnique(microProgramList* list, microProgram* prog)
 // Creates a new Micro Program
 __ri microProgram* mVUcreateProg(microVU& mVU, int startPC, const MvuContentKey& contentKey)
 {
+	mvu_aot::ObserveImage(mVU);
 	auto* prog = (microProgram*)_aligned_malloc(sizeof(microProgram), 64);
 	memset(prog, 0, sizeof(microProgram));
 	prog->idx = mVU.prog.total++;
@@ -741,6 +764,16 @@ _mVUt __fi void* mVUsearchProg(u32 startPC, uptr pState)
 		}
 
 		// If cleared and program not found, make a new program instance
+		if (microProgram* restored = mVUProgCache::TryLoadProgram(mVU, liveKey))
+		{
+			mVUlistPushUnique(list, restored);
+			mVU.prog.cleared = 0;
+			mVU.prog.isSame = 1;
+			mVU.prog.cur = restored;
+			mVU.prog.cacheQuick(regs_start_pc_8, restored);
+			microBlockManager* block = restored->block[start_pc_8];
+			return block ? mVUentryGet(mVU, block, startPC, pState) : mVUblockFetch(mVU, startPC, pState);
+		}
 		mVU.prog.cleared = 0;
 		mVU.prog.isSame  = 1;
 		mVU.prog.cur     = mVUcreateProg(mVU, regs_start_pc_8, liveKey);
@@ -766,6 +799,10 @@ _mVUt __fi void* mVUsearchProg(u32 startPC, uptr pState)
 	}
 	return mVUentryGet(mVU, block, startPC, pState);
 }
+
+#include "arm64/vuaot/microVU_VuAotRuntime-arm64.inl"
+#include "microVU_Persist-arm64.inl"
+#include "microVU_ProgCache-arm64.inl"
 
 //------------------------------------------------------------------
 // recMicroVU0 / recMicroVU1
@@ -904,6 +941,7 @@ void recMicroVU0::Execute(u32 cycles)
 
 void recMicroVU1::SetStartPC(u32 startPC)
 {
+	mvu_aot::BeforeProgram(microVU1);
 	VU1.start_pc = startPC;
 	mVUSelectInterpreter(microVU1, startPC);
 }

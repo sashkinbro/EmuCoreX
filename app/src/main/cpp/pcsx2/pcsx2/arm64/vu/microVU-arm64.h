@@ -23,6 +23,7 @@
 #include "arm64/vu/microVU_Misc-arm64.h"
 #include "microVU_IR-arm64.h"
 #include "arm64/vuaot/VuAotMvuTrace.h"
+#include "arm64/vuaot/VuAotRuntime.h"
 #include "common/Perf.h"
 
 class microBlockManager;
@@ -71,8 +72,10 @@ struct MvuContentKeyHash
 	}
 };
 
+struct MvuPersistLog;
 struct microProgram
 {
+	MvuPersistLog* persist; // Native baseline emission log; owned by mVUPersist.
 	u32                data [mProgSize];     // Holds a copy of the VU microProgram
 	microBlockManager* block[mProgSizeHalf]; // Array of Block Managers
 	std::deque<microRange>* ranges;          // The ranges of the microProgram that have already been recompiled
@@ -139,6 +142,7 @@ struct microVU
 	alignas(16) u32 macFlag [4]; // 4 instances of mac    flag (used in execution)
 	alignas(16) u32 clipFlag[4]; // 4 instances of clip   flag (used in execution)
 	alignas(16) u32 xmmBackup[16][4]; // Backup for xmm0~xmm15
+	alignas(16) u32 aotBackup[32][4]; // Region spills and ABI call preservation; separate from baseline.
 
 	// Hot scalar state. Generated code touches these constantly: the block-entry
 	// guard reads/writes `cycles` on every block, branches park results in
@@ -323,7 +327,7 @@ public:
 					{
 						// A later add appends through fBlockEnd. When the promoted
 						// node was the tail, its predecessor is the new tail.
-						if (linkI == fBlockEnd)
+						if (mVUlocalRuleEnabled(20) && linkI == fBlockEnd)
 							fBlockEnd = prevI;
 						prevI->next = linkI->next;
 						linkI->next = fBlockList;
@@ -420,7 +424,7 @@ static microVU& microVU1 = g_vuRegistersPack.microVU[1];
 
 // Main Functions
 extern void mVUclear(mV, u32, u32);
-extern void mVUreset(microVU& mVU, bool resetReserve);
+extern void mVUreset(microVU& mVU, bool resetReserve, bool vu1Idle = false);
 extern void* mVUblockFetch(microVU& mVU, u32 startPC, uptr pState);
 _mVUt extern void* mVUcompileJIT(u32 startPC, uptr ptr);
 

@@ -72,7 +72,7 @@ namespace vuaot
 		// a JR/JALR, or a program end (a plain E bit, or one on B/BAL), and
 		// nothing in it needs microVU's run-time checks (T/D/M bits, branches
 		// in delay slots).
-		bool Internal(const BlockResult& b)
+		bool Internal(const BlockResult& b, bool nativeEnd)
 		{
 			switch (b.endKind)
 			{
@@ -83,9 +83,9 @@ namespace vuaot
 						return false;
 					break;
 				case BlockEnd::EBit:
-					// Local microVU owns pending P/Q, final flags and pipeline teardown.
-					// Keep native EmitEnd available for differential validation.
-					return false;
+					if (!nativeEnd)
+						return false;
+					break;
 				default:
 					return false;
 			}
@@ -207,7 +207,7 @@ namespace vuaot
 		{
 			ir::BuildOptions bo;
 			bo.vuIndex = env_.vuIndex;
-			bo.clampIImmediate = env_.clampOverflow && !env_.clampSign;
+			bo.clampIImmediate = env_.clampOverflow; // Local doIbit clamps in sign mode too.
 			bo.clampExtra = env_.clampExtra;
 			bo.clampSign = env_.clampSign;
 			bo.dropSticky = le_.dropSticky;
@@ -219,7 +219,7 @@ namespace vuaot
 		// Builds the node's IR and checks that it lowers.
 		bool Lowerable(BlockResult& br, Node& n) const
 		{
-			if (!Internal(br))
+			if (!Internal(br, t_.emitEndTail != nullptr))
 				return false;
 			n.fn = ir::BuildNodeLocal(br, BuildOpts());
 			return NodeLowering::Lowerable(n.fn, le_);
@@ -1645,6 +1645,11 @@ namespace vuaot
 		const ir::EndInfo& e = n.fn.end;
 		pxAssertRel(e.valid, "vu-aot region: program end without its end info");
 		EmitStoreHomes(maps_[n.map], le_, env_.offCycles);
+		if (t_.emitEndTail)
+		{
+			t_.emitEndTail(env_.vuIndex, n.blk, e);
+			return;
+		}
 		armEmitCall(env_.clearLpState);
 		// P/Q to VI[REG_Q] / pending_q and VI[REG_P] / pending_p, choosing lanes
 		// by qInst / pInst exactly as mVUendProgram rotates qmmPQ.
@@ -1962,8 +1967,9 @@ namespace vuaot
 		BlockResult br = an_->Analyze(b.startPC, st);
 		MvuBlockTrace ours;
 		br.ToTrace(ours, vu_);
-		if (!CompareBlockTraces(b, ours).empty())
-			return Decline("timing port disagrees", why);
+        const auto differences = CompareBlockTraces(b, ours);
+        if (!differences.empty())
+            return Decline("timing port disagrees: " + differences.front(), why);
 		if (env.vuIndex != 1)
 			return Decline("VU0", why);
 		if (env.clampExact)

@@ -149,6 +149,9 @@ namespace vuaot
 		// seen at run time. A region dispatches these directly; any other
 		// target goes through microVU's jump cache.
 		std::map<u32, std::vector<u32>> jumpTargets;
+		// Owner-provided end sequence after homes are stored. Allows the host
+		// to reuse its exact pending-PQ, final-flag and dispatcher ABI helpers.
+		void (*emitEndTail)(u32, void*, const ir::EndInfo&) = nullptr;
 
 		// Analysis only: count each node's executions and keep its code split
 		// by the IR operation that emitted it; PrintProfile() writes both.

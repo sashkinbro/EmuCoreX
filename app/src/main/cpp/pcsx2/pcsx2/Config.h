@@ -675,6 +675,8 @@ struct Pcsx2Config
 			PauseOnTLBMiss : 1;
 		bool
 			EnableVUAot : 1;
+		bool
+			EnableVUProgramCache : 1;
 		BITFIELD_END
 
 		RecompilerOptions();

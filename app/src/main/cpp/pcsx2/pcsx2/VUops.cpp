@@ -1134,7 +1134,11 @@ __fi u32* GET_VU_MEM(VURegs* VU, u32 addr) // non-static, also used by sVU for n
 	if (VU == &g_cpuRegistersPack.vuRegs[1])
 		return (u32*)(g_cpuRegistersPack.vuRegs[1].Mem + (addr & 0x3fff));
 	else if (addr & 0x4000)
-		return (u32*)((u8*)g_cpuRegistersPack.vuRegs[1].VF + (addr & 0x3ff)); // get VF and VI regs (they're mapped to 0x4xx0 in VU0 mem!)
+    {
+        if ((addr & 0x3f0) == (32 + REG_STATUS_FLAG) * 16)
+            vuAotNoteOutsideStatusRead();
+		return (u32*)((u8*)g_cpuRegistersPack.vuRegs[1].VF + (addr & 0x3ff));
+    } // get VF and VI regs (they're mapped to 0x4xx0 in VU0 mem!)
 	else
 		return (u32*)(g_cpuRegistersPack.vuRegs[0].Mem + (addr & 0xfff)); // for addr 0x0000 to 0x4000 just wrap around
 }

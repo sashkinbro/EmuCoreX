@@ -502,8 +502,19 @@ static inline u32 branchAddr(const mV)
 	return ((((iPC + 2) + (_Imm11_ << 1)) & mVU.progMemMask) << 2);
 }
 
-static void mVUwaitMTVU()
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+static thread_local u64 s_vuWaitMTVUCalls = 0;
+extern "C" u64 EmuCoreXOracleVUWaitMTVUCalls() { return s_vuWaitMTVUCalls; }
+#endif
+
+static void mVUwaitMTVU(u32 qword)
 {
-	vu1Thread.WaitVU();
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	++s_vuWaitMTVUCalls;
+#endif
+	if (THREAD_VU1)
+		vu1Thread.WaitVU();
+	if (EmuConfig.Cpu.Recompiler.EnableVUAot && (qword & 0x3f) == 32 + REG_STATUS_FLAG)
+		vuAotNoteOutsideStatusRead();
 }
 

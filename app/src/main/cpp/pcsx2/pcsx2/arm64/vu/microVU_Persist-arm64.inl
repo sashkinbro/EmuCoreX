@@ -287,6 +287,37 @@ namespace mVUPersist
 		return (target == kTargetImage) ? r.imageBase : r.dataBase;
 	}
 
+	bool ClassifyAddressRegion(const void* address, AddressRegion& region, s64& offset)
+	{
+		offset = 0;
+		const u8 target = RegionOf(address);
+		if (target != kTargetImage && target != kTargetData) return false;
+		const uptr delta = reinterpret_cast<uptr>(address) - RegionBase(target);
+		if (delta > static_cast<uptr>(INT64_MAX)) return false;
+		region = target == kTargetImage ? AddressRegion::Image : AddressRegion::Data;
+		offset = static_cast<s64>(delta);
+		return true;
+	}
+
+	bool ResolveAddressRegion(AddressRegion region, s64 offset, const void*& address)
+	{
+		address = nullptr;
+		if (offset < 0 || !GetRegions().valid) return false;
+		u8 target;
+		switch (region)
+		{
+			case AddressRegion::Image: target = kTargetImage; break;
+			case AddressRegion::Data: target = kTargetData; break;
+			default: return false;
+		}
+		const uptr base = RegionBase(target);
+		if (static_cast<u64>(offset) > static_cast<u64>(~uptr{0} - base)) return false;
+		const void* resolved = reinterpret_cast<const void*>(base + static_cast<uptr>(offset));
+		if (RegionOf(resolved) != target) return false;
+		address = resolved;
+		return true;
+	}
+
 	//------------------------------------------------------------------
 	// Build identity
 	//------------------------------------------------------------------
@@ -429,8 +460,9 @@ namespace mVUPersist
         add(IsRecordingEnabled());
         const auto& rewrites = mVUlocalRewriteOptions(); add(rewrites.enabled);add(rewrites.natural);add(rewrites.rule_mask);
         add(mVUSharedIrEnabled(vu.index));
+        add(EmuConfig.Cpu.Recompiler.EnableVUAot);add(mvu_aot::CodegenModes());
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
-        add(s_vuLocalNaturalEnabled);
+        add(s_vuLocalNaturalEnabled);add(s_vuLocalReadonlyClipEnabled);add(s_vuLocalIdentityEnabled);add(s_vuLocalZeroTailClampEnabled);
 #endif
         return XXH3_128bits(words.data(),words.size()*sizeof(u64));
     }

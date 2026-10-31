@@ -308,6 +308,14 @@ void ApplyOldCoreJitSettings(SettingsInterface& si, const VmLaunchConfig& config
 		enable_vu_aot = vu_aot_override[0] == '1';
 #endif
 	si.SetBoolValue("EmuCore/CPU/Recompiler", "EnableVUAot", enable_vu_aot);
+	bool enable_vu_program_cache = GetBoolSetting(config.settings, "EmuCore/CPU/Recompiler", "EnableVUProgramCache", false);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	char vu_program_cache_override[PROP_VALUE_MAX] = {};
+	if (__system_property_get("debug.emucorex.vu_program_cache", vu_program_cache_override) == 1 &&
+		(vu_program_cache_override[0] == '0' || vu_program_cache_override[0] == '1'))
+		enable_vu_program_cache = vu_program_cache_override[0] == '1';
+#endif
+	si.SetBoolValue("EmuCore/CPU/Recompiler", "EnableVUProgramCache", enable_vu_program_cache);
 	si.SetBoolValue("EmuCore/CPU/Recompiler", "EnableFastmem",
 		GetBoolSetting(config.settings, "EmuCore/CPU/Recompiler", "EnableFastmem", true));
 	si.SetBoolValue("EmuCore/CPU/Recompiler", "EnableEECache",

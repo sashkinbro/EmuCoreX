@@ -2277,8 +2277,21 @@ static void mVUaddrFix_oaknut(mV, int gprReg)
 		oakAsm->B(done);
 
 		oakAsm->l(vu1_reg_map);
+		// Every memory-address caller passes T1/X0, the thunk's qword argument.
+		pxAssert(gprReg == VU_HOST_T1);
 		if (THREAD_VU1)
 			oakEmitCall(reinterpret_cast<void*>(mVU.waitMTVU));
+		else if (EmuConfig.Cpu.Recompiler.EnableVUAot)
+		{
+			// STATUS is VI16 after the 32 VF quadwords. Neighboring VU1 window
+			// accesses avoid the call when there is no MTVU synchronization.
+			oak::Label no_status_read;
+			oakAsm->AND(OAK_WSCRATCH2, addr_w, 0x3f);
+			oakAsm->CMP(OAK_WSCRATCH2, 32 + REG_STATUS_FLAG);
+			oakAsm->B(oak::Cond::NE, no_status_read);
+			oakEmitCall(reinterpret_cast<void*>(mVU.waitMTVU));
+			oakAsm->l(no_status_read);
+		}
 		oakAsm->AND(addr_w, addr_w, 0x3f);
 		oakAsm->LSL(addr_x, addr_x, 4);
 		// The common memory emitters add VU0.Mem after this helper. Convert the

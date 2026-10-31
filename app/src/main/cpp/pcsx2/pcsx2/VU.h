@@ -69,3 +69,10 @@ extern void vuMemAllocate();
 extern void vuMemReset();
 extern void vuMemRelease();
 extern u32* GET_VU_MEM(VURegs* VU, u32 addr);
+
+// VU0's register window can observe VU1 STATUS outside VU1 microcode.
+#if defined(EMUCOREX_ANDROID_JIT) || (defined(__aarch64__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS))
+void vuAotNoteOutsideStatusRead();
+#else
+inline void vuAotNoteOutsideStatusRead() {}
+#endif

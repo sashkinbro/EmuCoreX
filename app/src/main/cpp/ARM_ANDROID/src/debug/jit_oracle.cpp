@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0+
 #include "Common.h"
 #include "arm64/vuaot/VuAotPipe.h"
+#include "arm64/vuaot/VuAotRuntime.h"
+#include "arm64/vuaot/VuAotLive.h"
+#include "arm64/vu/microVU_Persist-arm64.h"
+#include "arm64/vu/microVU_ProgCache-arm64.h"
 #include "IopThread/IopThread.h"
 #include "DebugTools/Breakpoints.h"
 #include "IopMem.h"
@@ -2230,6 +2234,15 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vu_scalar_clamp.inl"
 #include "jit_oracle_vu_local_rewrites.inl"
 #include "jit_oracle_vuaot_trace.inl"
+#include "jit_oracle_vuaot_region.inl"
+#include "jit_oracle_vu_persist.inl"
+#include "jit_oracle_vu_outside_status.inl"
+#include "jit_oracle_vu_cold_cache.inl"
+#include "jit_oracle_vuaot_lifecycle.inl"
+#include "jit_oracle_vuaot_end_pq.inl"
+#include "jit_oracle_vuaot_jump.inl"
+#include "jit_oracle_vuaot_saved.inl"
+#include "jit_oracle_vuaot_division.inl"
 
 void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin_only = false,
     bool maxmin_route_only = false, bool maxmin_broadcast_only = false,
@@ -12373,6 +12386,30 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         RunVULowerZeroTailClampTests();
     else if (std::strcmp(suite, "vu-aot-trace") == 0)
         RunVuAotTraceTests();
+    else if (std::strcmp(suite, "vu-aot-region") == 0)
+        RunVuAotRegionTests();
+    else if (std::strcmp(suite, "vu-cold-clip-write") == 0)
+        RunVUColdCacheTests(false, true);
+    else if (std::strcmp(suite, "vu-cold-clip-read") == 0)
+        RunVUColdCacheTests(false, false);
+    else if (std::strcmp(suite, "vu-cold-aot-write") == 0)
+        RunVUColdCacheTests(true, true);
+    else if (std::strcmp(suite, "vu-cold-aot-read") == 0)
+        RunVUColdCacheTests(true, false);
+    else if (std::strcmp(suite, "vu-outside-status") == 0)
+        RunVUOutsideStatusReadTests();
+    else if (std::strcmp(suite, "vu-persist") == 0)
+        RunVuPersistTests();
+    else if (std::strcmp(suite, "vu-aot-lifecycle") == 0)
+        RunVuAotLifecycleTests();
+    else if (std::strcmp(suite, "vu-aot-end-pq") == 0)
+        RunVuAotEndPQTests();
+    else if (std::strcmp(suite, "vu-aot-jump") == 0)
+        RunVuAotJumpTests();
+    else if (std::strcmp(suite, "vu-aot-saved") == 0)
+        RunVuAotSavedTests();
+    else if (std::strcmp(suite, "vu-aot-division") == 0)
+        RunVuAotDivisionTests();
     else if (std::strcmp(suite, "spu2-volume") == 0)
         EmuCoreXOracleTestVolumeSlide(Check);
     else if (std::strcmp(suite, "vif-mpg") == 0)
@@ -12479,12 +12516,12 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         IOPTests(false, false, true);
     else if (std::strcmp(suite, "iop-avsz") == 0)
         IOPTests(false, false, false, true);
+    else if (std::strcmp(suite, "gif-copy") == 0)
+        GifCopyTests();
     else if (std::strcmp(suite, "gs-restarts") == 0)
         GSRestartTests();
     else if (std::strcmp(suite, "gs-uploads") == 0)
         GSUploadTests();
-    else if (std::strcmp(suite, "gif-copy") == 0)
-        GifCopyTests();
     else if (std::strcmp(suite, "gs-vertices") == 0)
         GSVertexPacketTests();
     else if (std::strcmp(suite, "gs-alpha-selectors") == 0)
