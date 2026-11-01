@@ -653,6 +653,10 @@ static void recSWL_emit_oaknut()
 	_freeX86reg(EE_HOST_RCX);
 	_freeX86reg(EE_HOST_RDX);
 
+	// The full-width branch must also write back dirty cached registers.
+	if (!CHECK_FASTMEM || vtlb_IsFaultingPC(recLoadStoreGuestPC()))
+		iFlushCall(FLUSH_FULLVTLB);
+
 	recBeginOaknutEmit();
 
 	const oak::WReg addr = oakWRegister(EE_HOST_RCX);
@@ -667,9 +671,6 @@ static void recSWL_emit_oaknut()
 	oakAsm->NOP();
 
 	recEndOaknutEmit();
-
-	if (!CHECK_FASTMEM || vtlb_IsFaultingPC(recLoadStoreGuestPC()))
-		iFlushCall(FLUSH_FULLVTLB);
 
 	recBeginOaknutEmit();
 	oakAsm->LSL(temp_w, temp_w, 3);
@@ -741,6 +742,10 @@ static void recSWR_emit_oaknut()
 	_freeX86reg(EE_HOST_RCX);
 	_freeX86reg(EE_HOST_RDX);
 
+	// The full-width branch must also write back dirty cached registers.
+	if (!CHECK_FASTMEM || vtlb_IsFaultingPC(recLoadStoreGuestPC()))
+		iFlushCall(FLUSH_FULLVTLB);
+
 	recBeginOaknutEmit();
 
 	const oak::WReg addr = oakWRegister(EE_HOST_RCX);
@@ -754,9 +759,6 @@ static void recSWR_emit_oaknut()
 	oakAsm->NOP();
 
 	recEndOaknutEmit();
-
-	if (!CHECK_FASTMEM || vtlb_IsFaultingPC(recLoadStoreGuestPC()))
-		iFlushCall(FLUSH_FULLVTLB);
 
 	recBeginOaknutEmit();
 	oakAsm->LSL(temp_w, temp_w, 3);
