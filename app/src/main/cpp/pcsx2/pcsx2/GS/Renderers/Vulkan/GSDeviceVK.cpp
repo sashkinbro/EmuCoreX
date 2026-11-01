@@ -180,6 +180,14 @@ static constexpr GSDevice::DepthFeedbackSupport GetVKDepthFeedbackSupport(bool t
 	}
 }
 
+void GSDeviceVK::ResolveDepthSamplingFeatures()
+{
+	// Ordering a color feedback loop does not validate barrier-free reads of
+	// Adreno's live depth attachment. Require the renderer's explicit depth
+	// hazard handling; HLE draws use their existing depth-copy fallback.
+	m_features.test_and_sample_depth = m_features.texture_barrier && !m_road_facts.adreno;
+}
+
 static VkAttachmentLoadOp GetLoadOpForTexture(GSTextureVK* tex)
 {
 	if (!tex)
@@ -3476,7 +3484,7 @@ bool GSDeviceVK::CheckFeatures()
 		m_features.framebuffer_fetch ? "enabled" : "disabled", m_features.texture_barrier ? "enabled" : "disabled");
 
 	// Concurrent depth testing/sampling relies on the same feedback synchronization path.
-	m_features.test_and_sample_depth = m_features.texture_barrier;
+	ResolveDepthSamplingFeatures();
 
 	// Use D32F depth instead of a stencil format when framebuffer fetch needs it.
 	if (m_features.framebuffer_fetch)
@@ -10172,4 +10180,5 @@ void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, 
 #include "GSBlendConstantTests.inl"
 #include "GSBlendConstantPixelTests.inl"
 #include "GSRoadModelTests.inl"
+#include "GSDepthSamplingTests.inl"
 #endif

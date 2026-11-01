@@ -297,4 +297,5 @@ void main(){color=texelFetch(source,ivec2(0),0)*params.factor;})");
     TestBlendConstant(check);
     TestBlendConstantPixels(check);
     TestRoadModelParity(check);
+    TestDepthSamplingPolicy(check);
 }

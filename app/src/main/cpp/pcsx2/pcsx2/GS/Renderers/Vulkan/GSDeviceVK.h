@@ -781,6 +781,7 @@ private:
 	bool CreateVulkanInstanceAndDevice(bool force_surfaceless, VkSurfaceKHR* surface,
 		bool enable_debug_utils, bool enable_validation_layer);
 	bool CheckFeatures();
+	void ResolveDepthSamplingFeatures();
 	bool CreateNullTexture();
 	bool CreateBuffers();
 	void FlushStreamRingWrites();
@@ -866,6 +867,7 @@ public:
 	void TestBlendConstant(void (*check)(bool, const char*));
 	void TestBlendConstantPixels(void (*check)(bool, const char*));
 	void TestRoadModelParity(void (*check)(bool, const char*));
+	void TestDepthSamplingPolicy(void (*check)(bool, const char*));
 	void TestRenderPassOrdering(void (*check)(bool, const char*), VkPipeline sampled_pipeline,
 		VkSampler sampler, VkRenderPass sampled_pass);
 	void SetTFXPreparationFailureStageForTesting(TFXPreparationFailureStage stage)
