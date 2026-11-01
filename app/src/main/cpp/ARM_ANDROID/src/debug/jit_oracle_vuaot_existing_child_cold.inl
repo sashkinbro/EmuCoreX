@@ -3,6 +3,7 @@
 // Include after existing-child and the independent VU cold-cache helpers.
 // The reader must hydrate the old baseline caller, rebuild its inbound B26,
 // install the saved C region and run it without any compiler worker.
+#include "jit_oracle_vuaot_fast_dispatch_cold.inl"
 void RunVuAotExistingChildColdTests(bool writer)
 {
     using namespace VuCompileBranchOracle;
@@ -107,6 +108,7 @@ void RunVuAotExistingChildColdTests(bool writer)
             header.rings == rings && expected.regs.pending_p == actual.regs.pending_p &&
             expected.regs.pending_q == actual.regs.pending_q,
             "fresh-ASLR static inbound execution preserves literal goldens exact cycles PQ and rings");
+        CheckVuAotWarmImportedChild(code, expected, header.rings);
         std::printf("AOT_STATIC_INBOUND_COLD compiles=%llu entries=%llu ends=%llu jobs=%llu pending=%u\n",
             static_cast<unsigned long long>(mVUPersist::GetBlockCompileCount(1) - compiles),
             static_cast<unsigned long long>(mvu_aot::NativeRegionEntryCount(0xc0) - entered),

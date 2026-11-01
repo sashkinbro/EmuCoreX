@@ -42,6 +42,7 @@ namespace mvu_aot
 		u64 readyDeferred = 0, readyPublished = 0, readyStale = 0, readyEvicted = 0, readyDuplicates = 0;
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 		u64 automaticJobs = 0;
+		u64 dispatchSlowKeys = 0, dispatchFastEntries = 0;
 		u64 quietSaveAttempts = 0, quietSaveQueues = 0;
 #endif
 	};
@@ -64,6 +65,8 @@ namespace mvu_aot
 	u64 CurrentOwnerForTest();
 	u32 BoundStaticLinksForTest();
 	bool TestStaticLinkWords(bool restore);
+	bool TestCompileWarmRoot(u32 pc, const void* key);
+	bool ReadDispatchCadenceForTest(u32& runs, u32& jumpRuns, u32& bucket);
 	void TestDirtyQuietSave();
 	bool QuietSaveDirtyForTest();
 	u32 TestFillQuietWorkerQueue();

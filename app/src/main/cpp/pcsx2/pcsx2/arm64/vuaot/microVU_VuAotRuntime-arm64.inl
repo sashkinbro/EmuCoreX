@@ -65,6 +65,9 @@ namespace mvu_aot
 			std::vector<bg::Fixup> fixups;
 			std::string error;
 			bool accepted = false, body = false;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+			u32 publishedCodegenModes = 0;
+#endif
 			bool dropAllowed = false, dropped = false;
 			bool viaJump = false, retier = false;
 			std::shared_ptr<const vuaot::persist::Record> loadedPlan;
@@ -102,6 +105,10 @@ namespace mvu_aot
 			std::unordered_set<microBlock*> queuedRoots, coveredRoots;
 			std::set<RootIdentity> queuedRootKeys, coveredRootKeys;
 			bool rootsSeeded = false;
+			u64 rootEpoch = 0, nativeRootEpoch = 0;
+			u32 nativePlanEpoch = 0, nativeCodegenModes = 0;
+			void* lastNativeEntry = nullptr;
+			BuildJob* lastNativeJob = nullptr; // retained by jobs until Reset
 			bool saveDirty = false;
 			u32 publishRuns = 0, saveAttemptRuns = 0, planEpoch = 0;
 			std::vector<std::shared_ptr<BuildJob>> jobs;
@@ -157,6 +164,9 @@ namespace mvu_aot
 			std::unordered_map<const void*, NativeBinding> privateForNative;
 			std::unordered_map<void*, NativeBinding> nativeForPrivate;
 			u64 generation = 1;
+			microProgram* cursorOwner = nullptr;
+			Program* cursorProgram = nullptr; // map values survive rehash, cleared before owner free
+			u64 cursorGeneration = 0;
 			u64 jumpMisses = 0;
 			u64 readyBytes = 0, readySerial = 0;
 			u32 readyJobs = 0;
@@ -218,11 +228,13 @@ namespace mvu_aot
 			root.block = block; root.pc = pc;
 			std::memcpy(root.key.bytes, identity.second.data(), sizeof(root.key.bytes));
 			program.automaticRoots.push_back(root);
+			++program.rootEpoch;
 		}
 		void SeedAutomaticRoots(Program& program)
 		{
 			if (program.rootsSeeded) return;
 			program.rootsSeeded = true;
+			++program.rootEpoch;
 			for (size_t i = 0; i < program.traces.size(); ++i)
 			{
 				const auto& remembered = program.traces[i];
@@ -909,6 +921,9 @@ namespace mvu_aot
 					patched &= bg::PatchRel26(insn, base + f.offset, veneer);
 				}
 			}
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+			job->publishedCodegenModes = CodegenModes();
+#endif
 			for (auto& n : job->nodes)
 			{
 				n->entry = oakGetCurrentCodePointer();
@@ -1052,6 +1067,9 @@ namespace mvu_aot
 	{
 		if (mvu.index != 1)
 			return;
+		runtime.cursorOwner = nullptr;
+		runtime.cursorProgram = nullptr;
+		runtime.cursorGeneration = 0;
 		runtime.worker.Stop();
 		RestoreStaticBranches(); // before sidecars/save or any baseline owner can be freed
         sticky::state.active.store(EmuConfig.Cpu.Recompiler.EnableVUAot, std::memory_order_release);
@@ -1455,10 +1473,85 @@ namespace mvu_aot
 					return node->entry;
 		return fallback;
 	}
+	static void CountDispatch(Program& program, bool viaJump)
+	{
+		if (viaJump)
+		{
+			++program.jumpRuns;
+			++runtime.stats.jumpEntries;
+		}
+		else
+		{
+			++program.runs;
+			++runtime.stats.dispatches;
+		}
+		LogStats();
+	}
+	static void ClassifyNativeEntry(Program& program, void* entry)
+	{
+		if (program.lastNativeEntry != entry || !program.lastNativeJob)
+		{
+			program.lastNativeEntry = nullptr;
+			program.lastNativeJob = nullptr;
+			for (auto job = program.jobs.rbegin(); job != program.jobs.rend(); ++job)
+				for (const auto& node : (*job)->nodes)
+					if (node->entry == entry)
+					{
+						program.lastNativeEntry = entry;
+						program.lastNativeJob = job->get();
+						goto classified;
+					}
+		}
+	classified:
+		program.nativeRootEpoch = program.rootEpoch;
+		program.nativePlanEpoch = program.planEpoch;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		program.nativeCodegenModes = program.lastNativeJob ? program.lastNativeJob->publishedCodegenModes : CodegenModes();
+#else
+		program.nativeCodegenModes = 0;
+#endif
+	}
+	static bool CanDispatchWarm(microVU& mvu, void* entry)
+	{
+		// Resolve the owner before dereferencing a cached map value. Only Reset
+		// frees Programs/jobs, and it clears this cursor before stopping/freeing.
+		if (forceSync || oakHasBlock() || runtime.cursorOwner != mvu.prog.cur ||
+			runtime.cursorGeneration != runtime.generation || !runtime.cursorProgram)
+			return false;
+		const Program& program = *runtime.cursorProgram;
+		const BuildJob* const job = program.lastNativeJob;
+		if (program.lastNativeEntry != entry || !job || job->dropped ||
+			!program.sidecarTried || program.pending || !program.ready.empty() ||
+			!program.savedPlans.empty() || !program.rootsSeeded || !program.automaticRoots.empty() ||
+			program.nativeRootEpoch != program.rootEpoch || program.nativePlanEpoch != program.planEpoch ||
+			program.nativeCodegenModes != CodegenModes() || runtime.worker.CompletedCount())
+			return false;
+		if (job->generation != runtime.generation || !(job->cpu == EmuConfig.Cpu) ||
+			!(job->fixes == EmuConfig.Gamefixes) || !(job->speed == EmuConfig.Speedhacks))
+			return false;
+		const u32 total = program.runs + program.jumpRuns + 1;
+		if (!program.settled && (total >> 10) != program.checkBucket)
+			return false;
+		constexpr u32 quiet = live::kRetierCheckMask + 1;
+		if (program.saveDirty && total - program.publishRuns >= quiet && total - program.saveAttemptRuns >= quiet)
+			return false;
+		return true;
+	}
 	static void* DispatchState(microVU& mvu, u32 pc, const void* state, void* baselineEntry, bool viaJump)
 	{
+		if (CanDispatchWarm(mvu, baselineEntry))
+		{
+			CountDispatch(*runtime.cursorProgram, viaJump);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+			++runtime.stats.dispatchFastEntries;
+#endif
+			return baselineEntry;
+		}
 		// Baseline resolution during publication can compile another node and
 		// overwrite lpState. Selection must use this dispatch's original key.
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		++runtime.stats.dispatchSlowKeys;
+#endif
 		microRegInfo entryKey;
 		std::memcpy(&entryKey, state, sizeof(entryKey));
         // Match the baseline entry lookup, including hydrated programs whose
@@ -1466,6 +1559,9 @@ namespace mvu_aot
         entryKey.viBackUp = mVUcanonicalViBackup(entryKey);
         entryKey.flagInfo = mVUcanonicalFlagInfo(entryKey);
 		auto& program = runtime.programs[mvu.prog.cur];
+		runtime.cursorOwner = mvu.prog.cur;
+		runtime.cursorProgram = &program;
+		runtime.cursorGeneration = runtime.generation;
 		bool changed = saved::Load(mvu, program);
 		std::vector<std::shared_ptr<bg::Job>> completed;
 		std::vector<microProgram*> touched;
@@ -1510,17 +1606,7 @@ namespace mvu_aot
 				const auto it = runtime.programs.find(owner);
 				if (it != runtime.programs.end()) PublishReady(mvu, it->second);
 			}
-		if (viaJump)
-		{
-			++program.jumpRuns;
-			++runtime.stats.jumpEntries;
-		}
-		else
-		{
-			++program.runs;
-			++runtime.stats.dispatches;
-		}
-		LogStats();
+		CountDispatch(program, viaJump);
 		saved::MaybeSave(mvu, *mvu.prog.cur, program);
 		// A normal lookup already returns the latest patched entry. Only a job
 		// published during this call needs a search through its new node keys.
@@ -1567,7 +1653,10 @@ namespace mvu_aot
 			if (TryAutomaticRoot(mvu, program))
 				return program.jobs.size() != priorJobs ? RefetchPublishedEntry(program, pc, entryKey, baselineEntry) : baselineEntry;
 			if (program.entries.count(baselineEntry))
+			{
+				ClassifyNativeEntry(program, baselineEntry);
 				return baselineEntry;
+			}
 			const bool hot = viaJump ? (program.jumpRuns >= jumpTierUpRuns &&
 				static_cast<u64>(program.runs) * 16 <= program.jumpRuns) : program.runs >= tierUpRuns;
 			if ((!forceSync && program.jobs.empty() && !hot) ||
@@ -1710,7 +1799,17 @@ namespace mvu_aot
         mVUProgCache::FlushSidecars(1);
         return true;
     }
-	void ForceSynchronous(bool enabled) { forceSync = enabled; }
+	static void InvalidateWarmCursorForTest()
+	{
+		runtime.cursorOwner = nullptr;
+		runtime.cursorProgram = nullptr;
+		runtime.cursorGeneration = 0;
+	}
+	void ForceSynchronous(bool enabled)
+	{
+		if (forceSync != enabled) InvalidateWarmCursorForTest();
+		forceSync = enabled;
+	}
     void AllowStickyElisionForTest(bool enabled) { sticky::state.keepExact = !enabled; sticky::state.manualKeepExact = true; }
 	u64 RegionCount() { return regionCount.load(std::memory_order_relaxed); }
 	u64 EntryCount() { return entryCount; }
@@ -1718,6 +1817,33 @@ namespace mvu_aot
 	u64 InlineBodyEntryCount(u32 pc) { return inlineBodyEntries[(pc & 0x3ff8) >> 3]; }
 	u64 NativeRegionEntryCount(u32 pc) { return nativeRegionEntries[(pc & 0x3ff8) >> 3]; }
 	u64 CurrentOwnerForTest() { return reinterpret_cast<u64>(microVU1.prog.cur); }
+	bool ReadDispatchCadenceForTest(u32& runs, u32& jumpRuns, u32& bucket)
+	{
+		const auto found = runtime.programs.find(microVU1.prog.cur);
+		if (found == runtime.programs.end()) return false;
+		runs = found->second.runs;
+		jumpRuns = found->second.jumpRuns;
+		bucket = found->second.checkBucket;
+		return true;
+	}
+	bool TestCompileWarmRoot(u32 pc, const void* key)
+	{
+		auto& mvu = microVU1;
+		if (!Enabled() || oakHasBlock() || !mvu.prog.cur || !key || (pc & 7) || pc >= mvu.microMemSize)
+			return false;
+		const auto found = runtime.programs.find(mvu.prog.cur);
+		if (found == runtime.programs.end() || found->second.jobs.empty() || found->second.pending)
+			return false;
+		Program* const program = &found->second; // no iterator retained across recursive compile
+		microProgram* const owner = mvu.prog.cur;
+		const microRegInfo carried = mvu.prog.lpState;
+		const ScopedGuard restore([&] { mvu.prog.lpState = carried; });
+		PipeState pipeline;
+		std::memcpy(pipeline.bytes, key, 96);
+		microBlock* block = nullptr;
+		Baseline(mvu, pc, pipeline, &block);
+		return mvu.prog.cur == owner && block && program->queuedRoots.count(block) && !program->automaticRoots.empty();
+	}
 	void TestDirtyQuietSave()
 	{
 		const auto it=runtime.programs.find(microVU1.prog.cur);
@@ -1790,9 +1916,23 @@ namespace mvu_aot
 				count += job->counters.bail[0] + job->counters.bail[1];
 		return count;
 	}
-    void CountEntries(bool on) { countEntries = on; manualEntryCount = true; }
-    void SetTierUpRuns(u32 runs) { tierUpRuns = std::max(1u, runs); }
-	void SetJumpTierUpRuns(u32 runs) { jumpTierUpRuns = std::max(1u, runs); }
+    void CountEntries(bool on)
+    {
+        if (countEntries != on) InvalidateWarmCursorForTest();
+        countEntries = on; manualEntryCount = true;
+    }
+    void SetTierUpRuns(u32 runs)
+    {
+        const u32 next = std::max(1u, runs);
+        if (tierUpRuns != next) InvalidateWarmCursorForTest();
+        tierUpRuns = next;
+    }
+	void SetJumpTierUpRuns(u32 runs)
+	{
+		const u32 next = std::max(1u, runs);
+		if (jumpTierUpRuns != next) InvalidateWarmCursorForTest();
+		jumpTierUpRuns = next;
+	}
     void HoldWorker(bool hold) { runtime.worker.Hold(hold); }
     void WaitWorker() { runtime.worker.WaitIdle(); }
     u32 PendingCount()
