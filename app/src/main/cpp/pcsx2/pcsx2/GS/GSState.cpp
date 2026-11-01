@@ -1130,6 +1130,20 @@ static thread_local bool s_gsStripKernelEnabled = true;
 static thread_local bool s_gsStripKernelObserve = false;
 static thread_local u32 s_gsStripKernelMutation = 0;
 static thread_local u64 s_gsStripKernelStats[4] = {}; // chunks, vertices, direct vector culls, scalar culls
+// Native ownership observation is off by default and compiled out of Release.
+static thread_local bool s_gsStripOutlineEnabled = true;
+static thread_local bool s_gsStripOutlineObserve = false;
+static thread_local u64 s_gsStripOutlineStats[3] = {}; // outlined chunks, inline chunks, outlined vertices
+extern "C" void EmuCoreXOracleSetGSStripOutline(bool enabled, bool observe)
+{
+    s_gsStripOutlineEnabled = enabled;
+    s_gsStripOutlineObserve = observe;
+    std::fill(std::begin(s_gsStripOutlineStats), std::end(s_gsStripOutlineStats), 0);
+}
+extern "C" void EmuCoreXOracleGSStripOutlineStats(u64* values)
+{
+    std::copy(std::begin(s_gsStripOutlineStats), std::end(s_gsStripOutlineStats), values);
+}
 thread_local bool g_gsCarryingLayoutsEnabled = true;
 static thread_local bool s_gsCarryingLayoutsObserve = false;
 static thread_local u64 s_gsCarryingLayoutsStats[4] = {}; // handlers, vertices, kernel vertices, scalar descriptors
@@ -5351,25 +5365,57 @@ u32 GSState::KickPackedStripChunkParsed(const GIFPackedReg* RESTRICT r, u32 rema
 	const s32 ofx = m_xyof.x, ofy = m_xyof.y;
 	// Current offsets must also be the proved, duplicated native lanes.
 	if (m_xyof.z != ofx || m_xyof.w != ofy || ofx < 0 || ofx > 65535 || ofy < 0 || ofy > 65535) return 0;
-	GSVertex* const provisional = c.vb + c.tail;
-	parser(r, count, provisional, m_strip_side_xy, m_strip_side_meta, bounds, ofx, ofy);
-	// Capture before compaction can overwrite its provisional source slot.
-	last0 = GSVector4i(provisional[count - 1].m[0]);
-	last1 = GSVector4i(provisional[count - 1].m[1]);
 	u32 accState = 0, scalarCulls = 0;
 	GSVector4i rect;
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
-	if (s_gsStripKernelObserve)
+	if (!s_gsStripOutlineEnabled)
 	{
-		if (s_gsStripKernelMutation == 1)
-			rect = Emit<false, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM));
+		// Native differential control: execute the exact previous inline body.
+		if (s_gsStripOutlineObserve) ++s_gsStripOutlineStats[1];
+		GSVertex* const provisional = c.vb + c.tail;
+		parser(r, count, provisional, m_strip_side_xy, m_strip_side_meta, bounds, ofx, ofy);
+		last0 = GSVector4i(provisional[count - 1].m[0]);
+		last1 = GSVector4i(provisional[count - 1].m[1]);
+		if (s_gsStripKernelObserve)
+		{
+			if (s_gsStripKernelMutation == 1)
+				rect = Emit<false, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM));
+			else
+				rect = Emit<true, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM));
+		}
 		else
-			rect = Emit<true, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM));
-		++s_gsStripKernelStats[0]; s_gsStripKernelStats[1] += count; s_gsStripKernelStats[3] += scalarCulls;
+			rect = Emit<true, false>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM));
 	}
 	else
 #endif
-		rect = Emit<true, false>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM));
+	{
+		const ChunkInvariants<Parser> inv{parser, bounds, ofx, ofy, seed, m_vertex.xy,
+			m_strip_side_xy, m_strip_side_meta, &m_fused_trace, GSFusedVertexTrace::Key(*PRIM)
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+			, s_gsStripOutlineObserve ? s_gsStripOutlineStats : nullptr
+#endif
+		};
+		ChunkOutput output;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (s_gsStripKernelObserve)
+		{
+			if (s_gsStripKernelMutation == 1)
+				RunChunk<false, true>(r, count, c, inv, output);
+			else
+				RunChunk<true, true>(r, count, c, inv, output);
+		}
+		else
+#endif
+			RunChunk<true, false>(r, count, c, inv, output);
+		last0 = output.last0; last1 = output.last1;
+		rect = output.rect; accState = output.accState; scalarCulls = output.scalarCulls;
+	}
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (s_gsStripKernelObserve)
+	{
+		++s_gsStripKernelStats[0]; s_gsStripKernelStats[1] += count; s_gsStripKernelStats[3] += scalarCulls;
+	}
+#endif
 	PublishNativeMirror(c.xy_tail,count,cull,bounds,m_strip_side_xy,m_strip_side_meta);
 	if (accState)
 	{

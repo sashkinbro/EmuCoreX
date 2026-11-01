@@ -242,4 +242,49 @@ namespace GSStripKickKernel
         cursor.head=head;cursor.tail=tail;cursor.next=next;cursor.itail=itail;cursor.xy_tail=xyTail+count;
         return rect;
     }
+
+    // Fixed per-chunk inputs. No GSState owner or callback can enter the pure
+    // two-pass run; its caller owns every grow/flush/snapshot/publication seam.
+    template<class Parser> struct ChunkInvariants
+    {
+        Parser parser;
+        Bounds bounds;
+        s32 ofx,ofy;
+        const Entry* seed;
+        GSVector4i* ring;
+        u64* sideXY;
+        u64* sideMeta;
+        GSFusedVertexTrace::State* trace;
+        u32 traceKey;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        u64* outlinedWork = nullptr;
+#endif
+    };
+    struct ChunkOutput
+    {
+        GSVector4i last0,last1,rect;
+        u32 accState,scalarCulls;
+    };
+    // Keep both passes together, but prevent LTO from fusing them into every
+    // handler and its legacy seam kick. Quad and parse helpers stay inline here.
+    template<bool writeRing=true,bool observe=false,class Parser,class Cursor>
+    __noinline void RunChunk(const GIFPackedReg* RESTRICT packet,u32 count,
+        Cursor& cursor,const ChunkInvariants<Parser>& inv,ChunkOutput& output)
+    {
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        if(inv.outlinedWork)
+        {
+            ++inv.outlinedWork[0];
+            inv.outlinedWork[2]+=count;
+        }
+#endif
+        GSVertex* const provisional=cursor.vb+cursor.tail;
+        inv.parser(packet,count,provisional,inv.sideXY,inv.sideMeta,inv.bounds,inv.ofx,inv.ofy);
+        // Capture the last original parse before compaction can overwrite it.
+        output.last0=GSVector4i(provisional[count-1].m[0]);
+        output.last1=GSVector4i(provisional[count-1].m[1]);
+        output.accState=output.scalarCulls=0;
+        output.rect=Emit<writeRing,observe>(cursor,inv.ring,inv.seed,inv.sideXY,
+            inv.sideMeta,count,output.accState,output.scalarCulls,*inv.trace,inv.traceKey);
+    }
 }
