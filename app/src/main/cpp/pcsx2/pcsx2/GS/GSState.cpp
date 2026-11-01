@@ -1153,6 +1153,38 @@ extern "C" void EmuCoreXOracleSetGSStripKernel(bool enabled, bool observe, u32 m
 	std::fill(std::begin(s_gsStripKernelStats), std::end(s_gsStripKernelStats), 0);
 }
 
+#if defined(ARCH_ARM64)
+extern "C" void EmuCoreXOracleSetGSMirrorObserve(bool enabled)
+{
+    GSStripKickKernel::MirrorObserve=enabled;
+    std::fill(std::begin(GSStripKickKernel::MirrorStats),std::end(GSStripKickKernel::MirrorStats),0);
+}
+extern "C" void EmuCoreXOracleGSMirrorStats(u64* values)
+{
+    std::copy(std::begin(GSStripKickKernel::MirrorStats),std::end(GSStripKickKernel::MirrorStats),values);
+}
+extern "C" void EmuCoreXOracleGSStripParse(const GIFPackedReg* packet,u32 count,GSVertex* vertices,
+    u64* xy,u64* meta,const s32* bounds,s32 ofx,s32 ofy,u64 uvfog,bool fog,u32 depth)
+{
+    const GSStripKickKernel::Bounds b{bounds[0],bounds[1],bounds[2],bounds[3]};
+    const auto run=[&]<bool F,GSLimit24BitDepth D>(){
+        GSStripKickKernel::Parse<F,D>(packet,count,vertices,xy,meta,b,ofx,ofy,uvfog);
+    };
+    if(fog)
+    {
+        if(depth==static_cast<u32>(GSLimit24BitDepth::PrioritizeUpper))run.operator()<true,GSLimit24BitDepth::PrioritizeUpper>();
+        else if(depth==static_cast<u32>(GSLimit24BitDepth::PrioritizeLower))run.operator()<true,GSLimit24BitDepth::PrioritizeLower>();
+        else run.operator()<true,GSLimit24BitDepth::Disabled>();
+    }
+    else
+    {
+        if(depth==static_cast<u32>(GSLimit24BitDepth::PrioritizeUpper))run.operator()<false,GSLimit24BitDepth::PrioritizeUpper>();
+        else if(depth==static_cast<u32>(GSLimit24BitDepth::PrioritizeLower))run.operator()<false,GSLimit24BitDepth::PrioritizeLower>();
+        else run.operator()<false,GSLimit24BitDepth::Disabled>();
+    }
+}
+#endif
+
 extern "C" void EmuCoreXOracleGSStripKernelStats(u64* values)
 {
 	std::copy(std::begin(s_gsStripKernelStats), std::end(s_gsStripKernelStats), values);

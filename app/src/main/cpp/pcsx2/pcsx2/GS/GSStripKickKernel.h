@@ -62,46 +62,141 @@ namespace GSStripKickKernel
     }
 
 #if defined(ARCH_ARM64)
-    // Pass one touches only the packet, provisional vertex slots and side
-    // arrays. Constants and the depth-clamp choice stay outside the row loop.
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+    inline thread_local bool MirrorObserve=false;
+    inline thread_local u64 MirrorStats[3]={}; // actual quad calls, scalar entries, overlap-tail quads
+#endif
+    // Native-grid specialization of GSVertexKickKernel::BuildMirrorQuad.
+    // Only provisional side arrays are written; last-register and primitive
+    // state are not touched by an idempotent overlap-tail rebuild.
+    struct MirrorBounds {int32x4_t ofx,ofy,l,t,r,b;};
+    __forceinline_odr MirrorBounds MakeMirrorBounds(const Bounds& bounds,s32 ofx,s32 ofy)
+    {
+        return {vdupq_n_s32(ofx),vdupq_n_s32(ofy),vdupq_n_s32(bounds.l),
+            vdupq_n_s32(bounds.t),vdupq_n_s32(bounds.r),vdupq_n_s32(bounds.b)};
+    }
+    template<bool observe=false>
+    __forceinline_odr void BuildMirrorQuad(uint32x4_t v0,uint32x4_t v1,uint32x4_t v2,uint32x4_t v3,
+        const MirrorBounds& k,u64* RESTRICT sideXY,u64* RESTRICT sideMeta)
+    {
+        const uint64x2_t a01=vreinterpretq_u64_u32(vzip1q_u32(v0,v1));
+        const uint64x2_t a23=vreinterpretq_u64_u32(vzip1q_u32(v2,v3));
+        const uint64x2_t b01=vreinterpretq_u64_u32(vzip2q_u32(v0,v1));
+        const uint64x2_t b23=vreinterpretq_u64_u32(vzip2q_u32(v2,v3));
+        const uint32x4_t X=vreinterpretq_u32_u64(vzip1q_u64(a01,a23));
+        const uint32x4_t Y=vreinterpretq_u32_u64(vzip2q_u64(a01,a23));
+        const uint32x4_t F=vreinterpretq_u32_u64(vzip2q_u64(b01,b23));
+        const uint32x4_t mask16=vdupq_n_u32(65535);
+        const int32x4_t wx=vsubq_s32(vreinterpretq_s32_u32(vandq_u32(X,mask16)),k.ofx);
+        const int32x4_t wy=vsubq_s32(vreinterpretq_s32_u32(vandq_u32(Y,mask16)),k.ofy);
+        const int32x4_t bx=vshrq_n_s32(vsubq_s32(wx,vdupq_n_s32(1)),4);
+        const int32x4_t by=vshrq_n_s32(vsubq_s32(wy,vdupq_n_s32(1)),4);
+        uint32x4_t oc=vandq_u32(vcltq_s32(bx,k.l),vdupq_n_u32(1));
+        oc=vorrq_u32(oc,vandq_u32(vcgeq_s32(bx,k.r),vdupq_n_u32(2)));
+        oc=vorrq_u32(oc,vandq_u32(vcltq_s32(by,k.t),vdupq_n_u32(4)));
+        oc=vorrq_u32(oc,vandq_u32(vcgeq_s32(by,k.b),vdupq_n_u32(8)));
+        oc=vorrq_u32(oc,vshrq_n_u32(vandq_u32(F,vdupq_n_u32(0x8000)),11));
+        const uint32x4_t lo=vorrq_u32(vandq_u32(vreinterpretq_u32_s32(bx),vdupq_n_u32(0x0fffffff)),
+            vshlq_n_u32(vreinterpretq_u32_s32(by),28));
+        const uint32x4_t hi=vorrq_u32(vandq_u32(vshrq_n_u32(vreinterpretq_u32_s32(by),4),vdupq_n_u32(0x00ffffff)),
+            vshlq_n_u32(oc,24));
+        vst1q_u64(sideXY,vreinterpretq_u64_u32(vzip1q_u32(vreinterpretq_u32_s32(wx),vreinterpretq_u32_s32(wy))));
+        vst1q_u64(sideXY+2,vreinterpretq_u64_u32(vzip2q_u32(vreinterpretq_u32_s32(wx),vreinterpretq_u32_s32(wy))));
+        vst1q_u64(sideMeta,vreinterpretq_u64_u32(vzip1q_u32(lo,hi)));
+        vst1q_u64(sideMeta+2,vreinterpretq_u64_u32(vzip2q_u32(lo,hi)));
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        if constexpr(observe)++MirrorStats[0];
+#endif
+    }
+    struct ParseConstants
+    {
+        uint8x16_t colourIndices={0,1,2,3,4,5,6,7,16,20,24,28,8,9,10,11};
+        uint8x16_t fogIndices={0,1,4,5,24,25,26,255,255,255,255,255,28,255,255,255};
+        uint32x4_t qMin={0,0,0x00800000,0};
+    };
+    template<bool fog,GSLimit24BitDepth depth>
+    __forceinline_odr void Decode(const GIFPackedReg* RESTRICT packet,GSVertex& output,
+        u64 uvfog,const ParseConstants& k)
+    {
+        uint32x4_t stq=vld1q_u32(packet[0].U32);
+        stq=vorrq_u32(stq,vandq_u32(vceqq_u32(stq,vdupq_n_u32(0)),k.qMin));
+        const uint8x16x2_t colours={{vreinterpretq_u8_u32(stq),vreinterpretq_u8_u32(vld1q_u32(packet[1].U32))}};
+        const GSVector4i m0(vreinterpretq_s32_u8(vqtbl2q_u8(colours,k.colourIndices)));
+        GSVector4i m1;
+        if constexpr(fog)
+        {
+            const uint8x16_t raw=vld1q_u8(reinterpret_cast<const u8*>(&packet[2]));
+            const uint8x16x2_t table={{raw,vreinterpretq_u8_u32(vshrq_n_u32(vreinterpretq_u32_u8(raw),4))}};
+            m1=GSVector4i(vreinterpretq_s32_u32(vsetq_lane_u32(static_cast<u32>(uvfog),
+                vreinterpretq_u32_u8(vqtbl2q_u8(table,k.fogIndices)),2)));
+        }
+        else
+        {
+            const GSVector4i xy=GSVector4i::loadl(&packet[2].U64[0]);
+            const GSVector4i z=GSVector4i::loadl(&packet[2].U64[1]);
+            m1=xy.upl16(xy.srl<4>()).upl32(z).upl64(GSVector4i::loadl(&uvfog));
+        }
+        if constexpr(depth==GSLimit24BitDepth::PrioritizeUpper)
+            m1.U32[1]=((m1.U32[1]>>8)&~0xffu)|(m1.U32[1]&0xffu);
+        else if constexpr(depth==GSLimit24BitDepth::PrioritizeLower)
+            m1.U32[1]&=0x00ffffff;
+        output.m[0]=m0;output.m[1]=m1;
+    }
+    // Parse each vertex once, but build its signed mirror in four-wide groups.
+    template<bool fog,GSLimit24BitDepth depth,bool observe=false>
+    __forceinline_odr void ParseRows(const GIFPackedReg* RESTRICT packet,u32 count,
+        GSVertex* RESTRICT provisional,u64* RESTRICT sideXY,u64* RESTRICT sideMeta,
+        const Bounds& bounds,s32 ofx,s32 ofy,u64 uvfog)
+    {
+        const ParseConstants constants;
+        const MirrorBounds mirror=MakeMirrorBounds(bounds,ofx,ofy);
+        u32 i=0;
+        for(const u32 quads=count&~3u;i<quads;i+=4)
+        {
+            for(u32 j=0;j<4;++j)Decode<fog,depth>(packet+(i+j)*3,provisional[i+j],uvfog,constants);
+            BuildMirrorQuad<observe>(vld1q_u32(packet[(i+0)*3+2].U32),
+                vld1q_u32(packet[(i+1)*3+2].U32),vld1q_u32(packet[(i+2)*3+2].U32),
+                vld1q_u32(packet[(i+3)*3+2].U32),mirror,sideXY+i,sideMeta+i);
+        }
+        if(i<count&&count>=4)
+        {
+            // The final four real inputs cover the remainder without any
+            // scalar metadata tail or read before/after this bounded packet.
+            const u32 back=count-4;
+            BuildMirrorQuad<observe>(vld1q_u32(packet[(back+0)*3+2].U32),
+                vld1q_u32(packet[(back+1)*3+2].U32),vld1q_u32(packet[(back+2)*3+2].U32),
+                vld1q_u32(packet[(back+3)*3+2].U32),mirror,sideXY+back,sideMeta+back);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+            if constexpr(observe)++MirrorStats[2];
+#endif
+            for(;i<count;++i)Decode<fog,depth>(packet+i*3,provisional[i],uvfog,constants);
+            return;
+        }
+        for(;i<count;++i)
+        {
+            const auto* row=packet+i*3;
+            Decode<fog,depth>(row,provisional[i],uvfog,constants);
+            const Entry entry=MakeEntry(static_cast<s32>(row[2].XYZ2.X)-ofx,
+                static_cast<s32>(row[2].XYZ2.Y)-ofy,bounds);
+            sideXY[i]=entry.xy;sideMeta[i]=entry.meta|(static_cast<u64>(row[2].U32[3]&0x8000)<<45);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+            if constexpr(observe)++MirrorStats[1];
+#endif
+        }
+    }
     template<bool fog,GSLimit24BitDepth depth>
     __forceinline_odr void Parse(const GIFPackedReg* RESTRICT packet,u32 count,
         GSVertex* RESTRICT provisional,u64* RESTRICT sideXY,u64* RESTRICT sideMeta,
         const Bounds& bounds,s32 ofx,s32 ofy,u64 uvfog)
     {
-        const uint8x16_t colourIndices={0,1,2,3,4,5,6,7,16,20,24,28,8,9,10,11};
-        const uint8x16_t fogIndices={0,1,4,5,24,25,26,255,255,255,255,255,28,255,255,255};
-        const uint32x4_t qMin={0,0,0x00800000,0};
-        for(u32 i=0;i<count;++i,packet+=3)
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        if(MirrorObserve)
         {
-            uint32x4_t stq=vld1q_u32(packet[0].U32);
-            stq=vorrq_u32(stq,vandq_u32(vceqq_u32(stq,vdupq_n_u32(0)),qMin));
-            const uint8x16x2_t colours={{vreinterpretq_u8_u32(stq),vreinterpretq_u8_u32(vld1q_u32(packet[1].U32))}};
-            const GSVector4i m0(vreinterpretq_s32_u8(vqtbl2q_u8(colours,colourIndices)));
-            GSVector4i m1;
-            if constexpr(fog)
-            {
-                const uint8x16_t raw=vld1q_u8(reinterpret_cast<const u8*>(&packet[2]));
-                const uint8x16x2_t table={{raw,vreinterpretq_u8_u32(vshrq_n_u32(vreinterpretq_u32_u8(raw),4))}};
-                m1=GSVector4i(vreinterpretq_s32_u32(vsetq_lane_u32(static_cast<u32>(uvfog),
-                    vreinterpretq_u32_u8(vqtbl2q_u8(table,fogIndices)),2)));
-            }
-            else
-            {
-                const GSVector4i xy=GSVector4i::loadl(&packet[2].U64[0]);
-                const GSVector4i z=GSVector4i::loadl(&packet[2].U64[1]);
-                m1=xy.upl16(xy.srl<4>()).upl32(z).upl64(GSVector4i::loadl(&uvfog));
-            }
-            if constexpr(depth==GSLimit24BitDepth::PrioritizeUpper)
-                m1.U32[1]=((m1.U32[1]>>8)&~0xffu)|(m1.U32[1]&0xffu);
-            else if constexpr(depth==GSLimit24BitDepth::PrioritizeLower)
-                m1.U32[1]&=0x00ffffff;
-            provisional[i].m[0]=m0;provisional[i].m[1]=m1;
-            const Entry entry=MakeEntry(static_cast<s32>(packet[2].XYZ2.X)-ofx,
-                static_cast<s32>(packet[2].XYZ2.Y)-ofy,bounds);
-            sideXY[i]=entry.xy;
-            sideMeta[i]=entry.meta|((static_cast<u64>(packet[2].U32[3]&0x8000))<<45);
+            ParseRows<fog,depth,true>(packet,count,provisional,sideXY,sideMeta,bounds,ofx,ofy,uvfog);
+            return;
         }
+#endif
+        ParseRows<fog,depth,false>(packet,count,provisional,sideXY,sideMeta,bounds,ofx,ofy,uvfog);
     }
 #endif
 
