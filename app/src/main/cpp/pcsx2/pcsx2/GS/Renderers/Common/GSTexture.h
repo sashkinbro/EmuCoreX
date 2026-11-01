@@ -100,6 +100,8 @@ protected:
 	int m_mipmap_levels = 0;
 	Usage m_usage = Usage::Texture;
 	Format m_format = Format::Invalid;
+	// Zero preserves semantic-format storage for all existing backends.
+	u8 m_storage_bytes_per_pixel = 0;
 	State m_state = State::Dirty;
 
 	// frame number (arbitrary base) the texture was recycled on
@@ -347,6 +349,7 @@ protected:
 	u32 m_width;
 	u32 m_height;
 	GSTexture::Format m_format;
+	u8 m_storage_bytes_per_pixel = 0;
 
 	const u8* m_map_pointer = nullptr;
 	u32 m_current_pitch = 0;

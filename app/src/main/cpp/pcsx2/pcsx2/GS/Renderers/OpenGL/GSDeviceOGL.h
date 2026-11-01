@@ -7,6 +7,7 @@
 #include "GS/Renderers/OpenGL/GLProgram.h"
 #include "GS/Renderers/OpenGL/GLShaderCache.h"
 #include "GS/Renderers/OpenGL/GLState.h"
+#include "GS/Renderers/OpenGL/GLFramebufferFetchPlan.h"
 #include "GS/Renderers/OpenGL/GLStreamBuffer.h"
 #include "GS/Renderers/OpenGL/GSTextureOGL.h"
 #include "GS/GS.h"
@@ -131,14 +132,15 @@ public:
 	{
 		PSSelector ps;
 		VSSelector vs;
-		u8 pad[15];
+		GLFramebufferFetchPlan fetch;
+		u8 pad[14];
 
 		// Compare only the meaningful key fields, matching ProgramSelectorHash. BitEqual()
 		// memcmp'd all 32 bytes including padding, so logically identical selectors could hash
 		// to the same bucket yet fail equality, making m_programs.find() miss.
 		__fi bool operator==(const ProgramSelector& p) const
 		{
-			return (vs.key == p.vs.key && ps.key_hi == p.ps.key_hi && ps.key_lo == p.ps.key_lo);
+			return (vs.key == p.vs.key && ps.key_hi == p.ps.key_hi && ps.key_lo == p.ps.key_lo && fetch == p.fetch);
 		}
 		__fi bool operator!=(const ProgramSelector& p) const { return !(*this == p); }
 	};
@@ -150,7 +152,7 @@ public:
 		__fi std::size_t operator()(const ProgramSelector& p) const noexcept
 		{
 			std::size_t h = 0;
-			HashCombine(h, p.vs.key, p.ps.key_hi, p.ps.key_lo);
+			HashCombine(h, p.vs.key, p.ps.key_hi, p.ps.key_lo, p.fetch.key);
 			return h;
 		}
 	};
@@ -170,6 +172,9 @@ private:
 	} m_bugs;
 
 	bool m_disable_download_pbo = false;
+	GLFramebufferFetchCaps m_fetch_caps;
+	GLFramebufferFetchPlan SelectFetchPlan(const PSSelector& ps, bool color0_unorm, bool mrt) const;
+	bool SupportsFetchPlan(GLFramebufferFetchPlan fetch) const;
 
 	GLuint m_fbo = 0; // frame buffer container
 	GLuint m_fbo_read = 0; // frame buffer container only for reading
@@ -377,6 +382,12 @@ protected:
 public:
 	GSDeviceOGL();
 	virtual ~GSDeviceOGL();
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	static void TestFramebufferFetch(void (*check)(bool, const char*));
+	void TestFramebufferFetchPlanProof(void (*check)(bool, const char*));
+	void TestFramebufferFetchPixelProof(void (*check)(bool, const char*));
+	void TestFramebufferFetchPlannerProof(void (*check)(bool, const char*));
+#endif
 	static std::vector<GSAdapterInfo> GetAdapterInfo();
 
 	__fi static GSDeviceOGL* GetInstance() { return static_cast<GSDeviceOGL*>(g_gs_device.get()); }
@@ -449,8 +460,10 @@ public:
 	void FeedbackCopyAndBind(const GSHWDrawConfig& config,
 		GSTexture* rt, GSTexture* rt_clone, GSTexture* ds, GSTexture* ds_clone,
 		const GSVector4i& copyarea, const GSVector4i& samplearea);
+	void BindFeedbackTextures(const GSHWDrawConfig& config, GSTexture* colclip_rt);
 	void SendHWDraw(const GSHWDrawConfig& config, GSTexture* draw_rt_clone, GSTexture* draw_rt,
-		GSTexture* draw_ds_clone, GSTexture* draw_ds, bool one_barrier, bool full_barrier);
+		GSTexture* draw_ds_clone, GSTexture* draw_ds, bool one_barrier, bool full_barrier,
+		const PSSelector& ps, GLFramebufferFetchPlan fetch);
 
 	void SetupDATE(GSTexture* rt, GSTexture* ds, SetDATM datm, const GSVector4i& bbox);
 
@@ -480,8 +493,10 @@ public:
 	std::string GetShaderSource(const std::string_view entry, GLenum type, const std::string_view glsl_h_code,
 		const std::string_view macro_sel = std::string_view());
 	std::string GenGlslHeader(const std::string_view entry, GLenum type, const std::string_view macro);
+	std::string GenGlslHeader(const std::string_view entry, GLenum type, const std::string_view macro, GLFramebufferFetchPlan fetch);
 	std::string GetVSSource(VSSelector sel);
 	std::string GetPSSource(const PSSelector& sel);
+	std::string GetPSSource(const PSSelector& sel, GLFramebufferFetchPlan fetch);
 	GLuint CreateSampler(PSSamplerSelector sel);
 	GSDepthStencilOGL* CreateDepthStencil(OMDepthStencilSelector dssel);
 

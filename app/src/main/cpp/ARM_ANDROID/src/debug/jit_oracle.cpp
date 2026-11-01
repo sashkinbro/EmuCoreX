@@ -43,6 +43,7 @@
 #include "GS/GSState.h"
 #include "GS/GS.h"
 #include "GS/Renderers/Vulkan/GSDeviceVK.h"
+#include "GS/Renderers/OpenGL/GSDeviceOGL.h"
 #include "GS/Renderers/Vulkan/VKShaderCache.h"
 #include "GS/Renderers/Vulkan/VKSwapchainCreate.h"
 #include "GS/Renderers/HW/GSSpriteEdgeSnap.h"
@@ -12616,6 +12617,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         GifCopyTests();
     else if (std::strcmp(suite, "gs-depth-floor") == 0)
         GSRendererHW::TestDepthFloor(Check);
+    else if (std::strcmp(suite, "gs-gl-fetch") == 0)
+        GSDeviceOGL::TestFramebufferFetch(Check);
     else if (std::strcmp(suite, "gs-restarts") == 0)
         GSRestartTests();
     else if (std::strcmp(suite, "gs-uploads") == 0)

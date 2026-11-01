@@ -3,6 +3,7 @@
 
 #include "GS/Renderers/OpenGL/GSDeviceOGL.h"
 #include "GS/Renderers/OpenGL/GSTextureOGL.h"
+#include "GS/Renderers/OpenGL/GLTextureStorage.h"
 #include "GS/Renderers/OpenGL/GLState.h"
 #include "GS/GSExtra.h"
 #include "GS/GSPerfMon.h"
@@ -82,11 +83,16 @@ GSTextureOGL::GSTextureOGL(Usage usage, int width, int height, int levels, Forma
 
 		// 4 channel float
 		case Format::ColorClip:
-			m_gl_format = GL_RGBA16;
+		{
+			const auto storage = ResolveOGLColorClipStorage(GSDeviceOGL::GetInstance()->Features().rgba16_unorm);
+			m_gl_format = storage.format;
 			m_int_format = GL_RGBA;
-			m_int_type = GL_UNSIGNED_SHORT;
-			m_int_shift = 3;
+			m_int_type = storage.upload_type;
+			m_int_shift = storage.pixel_shift;
+			if (storage.pixel_shift == 4)
+				m_storage_bytes_per_pixel = 16;
 			break;
+		}
 
 		// Depth buffer
 		case Format::DepthStencil:
@@ -220,6 +226,13 @@ GSTextureOGL::GSTextureOGL(Usage usage, int width, int height, int levels, Forma
 	}
 
 	glTextureStorage2D(m_texture_id, m_mipmap_levels, m_gl_format, m_size.x, m_size.y);
+	if (m_format == Format::DepthStencil || m_gl_format == GL_RGBA32F)
+	{
+		// ES depth textures without comparison and non-filterable FP32 textures
+		// require point filters to remain complete, including texelFetch.
+		glTextureParameteri(m_texture_id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTextureParameteri(m_texture_id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	}
 }
 
 GSTextureOGL::~GSTextureOGL()
@@ -408,6 +421,8 @@ void GSTextureOGL::SetDebugName(std::string_view name)
 GSDownloadTextureOGL::GSDownloadTextureOGL(u32 width, u32 height, GSTexture::Format format)
 	: GSDownloadTexture(width, height, format)
 {
+	if (format == GSTexture::Format::ColorClip && !GSDeviceOGL::GetInstance()->Features().rgba16_unorm)
+		m_storage_bytes_per_pixel = 16;
 }
 
 GSDownloadTextureOGL::~GSDownloadTextureOGL()
@@ -434,7 +449,19 @@ GSDownloadTextureOGL::~GSDownloadTextureOGL()
 
 std::unique_ptr<GSDownloadTextureOGL> GSDownloadTextureOGL::Create(u32 width, u32 height, GSTexture::Format format)
 {
-	const u32 buffer_size = GetBufferSize(width, height, format, TEXTURE_UPLOAD_PITCH_ALIGNMENT);
+	u32 buffer_size;
+	if (format == GSTexture::Format::ColorClip && !GSDeviceOGL::GetInstance()->Features().rgba16_unorm)
+	{
+		const u64 pitch = Common::AlignUpPow2(static_cast<u64>(width) * 16, static_cast<u64>(TEXTURE_UPLOAD_PITCH_ALIGNMENT));
+		if (pitch > std::numeric_limits<u32>::max())
+			return {};
+		const u64 bytes = pitch * height;
+		if (bytes > std::numeric_limits<u32>::max())
+			return {};
+		buffer_size = static_cast<u32>(bytes);
+	}
+	else
+		buffer_size = GetBufferSize(width, height, format, TEXTURE_UPLOAD_PITCH_ALIGNMENT);
 
 	const bool use_buffer_storage = (GLAD_GL_VERSION_4_4 || GLAD_GL_ARB_buffer_storage || GLAD_GL_EXT_buffer_storage) &&
 	                                !GSDeviceOGL::GetInstance()->IsDownloadPBODisabled();
@@ -521,8 +548,9 @@ void GSDownloadTextureOGL::DoCopyFromTexture(
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, GSDeviceOGL::GetInstance()->GetFBORead());
 	glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, glTex->GetID(), 0);
 
-	glPixelStorei(GL_PACK_ALIGNMENT, 1u << glTex->GetIntShift());
-	glPixelStorei(GL_PACK_ROW_LENGTH, GSTexture::CalcUploadRowLengthFromPitch(m_format, m_current_pitch));
+	glPixelStorei(GL_PACK_ALIGNMENT, std::min(8u, 1u << glTex->GetIntShift()));
+	glPixelStorei(GL_PACK_ROW_LENGTH, m_storage_bytes_per_pixel ? m_current_pitch / m_storage_bytes_per_pixel :
+		GSTexture::CalcUploadRowLengthFromPitch(m_format, m_current_pitch));
 
 	if (!m_cpu_buffer)
 	{

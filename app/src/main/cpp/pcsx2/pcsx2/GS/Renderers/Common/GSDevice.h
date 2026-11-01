@@ -1640,6 +1640,10 @@ public:
 	__fi u64 GetPoolMemoryUsage() const { return m_pool_memory_usage; }
 
 	__fi FeatureSupport Features() const { return m_features; }
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	// CPU fixtures use an uncreated device and destroy it before GPU commands.
+	void SetFeaturesForTesting(FeatureSupport features) { m_features = features; }
+#endif
 	__fi u32 GetMaxTextureSize() const { return m_max_texture_size; }
 	__fi void SetRuntimeGPUProfile(RuntimeGpuProfile profile) { m_runtime_gpu_profile = profile; }
 	__fi void SetMediaTekSoC(bool is_mediatek_soc) { m_is_mediatek_soc = is_mediatek_soc; }

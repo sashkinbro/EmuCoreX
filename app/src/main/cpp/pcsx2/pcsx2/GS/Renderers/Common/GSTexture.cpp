@@ -194,7 +194,7 @@ bool GSTexture::IsBlockCompressedFormat(Format format)
 
 u32 GSTexture::GetCompressedBytesPerBlock() const
 {
-	return GetCompressedBytesPerBlock(m_format);
+	return m_storage_bytes_per_pixel ? m_storage_bytes_per_pixel : GetCompressedBytesPerBlock(m_format);
 }
 
 u32 GSTexture::GetCompressedBytesPerBlock(Format format)
@@ -259,11 +259,15 @@ u32 GSTexture::CalcUploadPitch(Format format, u32 width)
 
 u32 GSTexture::CalcUploadPitch(u32 width) const
 {
+	if (m_storage_bytes_per_pixel)
+		return width * m_storage_bytes_per_pixel;
 	return CalcUploadPitch(m_format, width);
 }
 
 u32 GSTexture::CalcUploadRowLengthFromPitch(u32 pitch) const
 {
+	if (m_storage_bytes_per_pixel)
+		return pitch / m_storage_bytes_per_pixel + (pitch % m_storage_bytes_per_pixel != 0);
 	return CalcUploadRowLengthFromPitch(m_format, pitch);
 }
 
@@ -339,7 +343,7 @@ u32 GSDownloadTexture::GetBufferSize(u32 width, u32 height, GSTexture::Format fo
 u32 GSDownloadTexture::GetTransferPitch(u32 width, u32 pitch_align) const
 {
 	const u32 block_size = GSTexture::GetCompressedBlockSize(m_format);
-	const u32 bytes_per_block = GSTexture::GetCompressedBytesPerBlock(m_format);
+	const u32 bytes_per_block = m_storage_bytes_per_pixel ? m_storage_bytes_per_pixel : GSTexture::GetCompressedBytesPerBlock(m_format);
 	const u32 bw = (width + (block_size - 1)) / block_size;
 
 	pxAssert(std::has_single_bit(pitch_align));
@@ -350,7 +354,7 @@ void GSDownloadTexture::GetTransferSize(const GSVector4i& rc, u32* copy_offset, 
 {
 	const u32 block_size = GSTexture::GetCompressedBlockSize(m_format);
 	const u32 block_height = GSTexture::GetCompressedBlockHeight(m_format);
-	const u32 bytes_per_block = GSTexture::GetCompressedBytesPerBlock(m_format);
+	const u32 bytes_per_block = m_storage_bytes_per_pixel ? m_storage_bytes_per_pixel : GSTexture::GetCompressedBytesPerBlock(m_format);
 	const u32 tw = static_cast<u32>(rc.width());
 	const u32 tb = ((tw + (block_size - 1)) / block_size);
 
@@ -362,6 +366,8 @@ void GSDownloadTexture::GetTransferSize(const GSVector4i& rc, u32* copy_offset, 
 
 bool GSDownloadTexture::ReadTexels(const GSVector4i& rc, void* out_ptr, u32 out_stride)
 {
+	if (m_storage_bytes_per_pixel && static_cast<u32>(rc.width()) > out_stride / m_storage_bytes_per_pixel)
+		return false;
 	if (m_needs_flush)
 		Flush();
 
@@ -370,7 +376,7 @@ bool GSDownloadTexture::ReadTexels(const GSVector4i& rc, void* out_ptr, u32 out_
 
 	const u32 block_size = GSTexture::GetCompressedBlockSize(m_format);
 	const u32 block_height = GSTexture::GetCompressedBlockHeight(m_format);
-	const u32 bytes_per_block = GSTexture::GetCompressedBytesPerBlock(m_format);
+	const u32 bytes_per_block = m_storage_bytes_per_pixel ? m_storage_bytes_per_pixel : GSTexture::GetCompressedBytesPerBlock(m_format);
 	const u32 tw = static_cast<u32>(rc.width());
 	const u32 tb = ((tw + (block_size - 1)) / block_size);
 

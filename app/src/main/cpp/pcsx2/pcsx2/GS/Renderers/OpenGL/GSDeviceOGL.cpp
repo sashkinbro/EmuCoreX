@@ -4,6 +4,7 @@
 #include "GS/Renderers/OpenGL/GLContext.h"
 #include "GS/Renderers/OpenGL/GSDeviceOGL.h"
 #include "GS/Renderers/OpenGL/GLState.h"
+#include "GS/Renderers/OpenGL/GLTextureStorage.h"
 #include "GS/Renderers/Common/GSGPUProfile.h"
 #include "GS/GSState.h"
 #include "GS/GSGL.h"
@@ -59,16 +60,14 @@ static constexpr bool ShouldUseOGLInsideTargetFallbackOnGLES(bool is_gles,
 	return is_gles && !features.texture_barrier && (current_mode == GSTextureInRtMode::Disabled);
 }
 
-static constexpr GSDevice::DepthFeedbackSupport GetOGLDepthFeedbackSupport(bool texture_barrier,
-	GSDepthFeedbackMode mode)
+static constexpr GSDevice::DepthFeedbackSupport GetOGLDepthFeedbackSupport(GSDepthFeedbackMode mode)
 {
 	switch (mode)
 	{
 		case GSDepthFeedbackMode::DepthAsRT:
 			return GSDevice::DepthFeedbackSupport::DepthAsRT;
 		case GSDepthFeedbackMode::Depth:
-			return texture_barrier ? GSDevice::DepthFeedbackSupport::Depth :
-				GSDevice::DepthFeedbackSupport::None;
+			return GSDevice::DepthFeedbackSupport::Depth; // native barrier, coherent fetch, or explicit copy
 		case GSDepthFeedbackMode::Auto:
 			return GSDevice::DepthFeedbackSupport::DepthAsRT;
 		case GSDepthFeedbackMode::None:
@@ -80,16 +79,19 @@ static constexpr GSDevice::DepthFeedbackSupport GetOGLDepthFeedbackSupport(bool 
 static constexpr bool ShouldBindOGLColorFeedbackTexture(const GSDevice::FeatureSupport& features,
 	const GSHWDrawConfig& config)
 {
-	return features.texture_barrier && (config.require_one_barrier || config.require_full_barrier);
+	return features.texture_barrier && (config.require_one_barrier || config.require_full_barrier ||
+		config.ps.IsFeedbackLoopRT() ||
+		(config.alpha_second_pass.enable && config.alpha_second_pass.ps.IsFeedbackLoopRT()));
 }
 
 static constexpr bool ShouldBindOGLDepthFeedbackTexture(const GSDevice::FeatureSupport& features,
 	const GSHWDrawConfig& config)
 {
-	if (!config.ps.IsFeedbackLoopDepth())
+	if (!config.ps.IsFeedbackLoopDepth() &&
+		!(config.alpha_second_pass.enable && config.alpha_second_pass.ps.IsFeedbackLoopDepth()))
 		return false;
 
-	return ShouldBindOGLColorFeedbackTexture(features, config) ||
+	return features.texture_barrier ||
 		(features.depth_feedback == GSDevice::DepthFeedbackSupport::DepthAsRT);
 }
 
@@ -368,6 +370,9 @@ std::vector<GSAdapterInfo> GSDeviceOGL::GetAdapterInfo()
 GSTexture* GSDeviceOGL::CreateSurface(GSTexture::Usage usage, int width, int height, int levels, GSTexture::Format format)
 {
 	GL_PUSH("Create surface");
+	if (format == GSTexture::Format::ColorClip && GSTexture::IsRenderTarget(usage) &&
+		m_is_gles && !m_features.rgba16_unorm && !GLAD_GL_EXT_color_buffer_float)
+		return nullptr;
 	pxAssert(GLAD_GL_ARB_shader_image_load_store || !GSTexture::IsShaderWrite(usage));
 	return new GSTextureOGL(usage, width, height, levels, format);
 }
@@ -1095,17 +1100,19 @@ bool GSDeviceOGL::CheckFeatures()
 	const bool has_arm_framebuffer_fetch = GLAD_GL_ARM_shader_framebuffer_fetch;
 	const bool has_ext_framebuffer_fetch = GLAD_GL_EXT_shader_framebuffer_fetch;
 	const bool has_texture_barrier_extension = GLAD_GL_ARB_texture_barrier;
-	// ARM fetch only exposes gl_LastFragColorARM for color attachment zero. It cannot satisfy
-	// the generic inout/MRT feedback contract used by GS, and treating it as EXT fetch caused
-	// missing target-backed textures and incorrect colors on Mali. Keep the standardized EXT
-	// fast path when present; otherwise use the copy fallback below.
-	bool framebuffer_fetch = has_ext_framebuffer_fetch;
-	if (framebuffer_fetch && GSConfig.DisableFramebufferFetch)
+	const auto fetch = DecideGLFramebufferFetch(has_arm_framebuffer_fetch, has_ext_framebuffer_fetch,
+		false, false, GSConfig.DisableFramebufferFetch, gpu_profile_mobile);
+	const bool framebuffer_fetch = fetch.enabled;
+	if (fetch.veto == GSFramebufferFetchVeto::UserSetting)
 	{
 		Host::AddOSDMessage(
 			"Framebuffer fetch was found but is disabled. This will reduce performance.", Host::OSD_ERROR_DURATION);
-		framebuffer_fetch = false;
 	}
+	GLboolean arm_mrt = GL_FALSE;
+	if (has_arm_framebuffer_fetch)
+		glGetBooleanv(GL_FRAGMENT_SHADER_FRAMEBUFFER_FETCH_MRT_ARM, &arm_mrt);
+	m_fetch_caps = {fetch.backend, has_ext_framebuffer_fetch,
+		GLAD_GL_ARM_shader_framebuffer_fetch_depth_stencil != 0, arm_mrt != GL_FALSE, gpu_profile_adreno};
 
 	m_features.provoking_vertex_last = true;
 	m_features.astc_textures = GLAD_GL_KHR_texture_compression_astc_ldr || GLAD_GL_ES_VERSION_3_2;
@@ -1114,15 +1121,17 @@ bool GSDeviceOGL::CheckFeatures()
 		GLAD_GL_VERSION_4_2 || GLAD_GL_ARB_texture_compression_bptc || GLAD_GL_EXT_texture_compression_bptc;
 	m_features.prefer_new_textures = m_is_gles || gpu_profile_mobile || gpu_profile_adreno;
 	m_features.stencil_buffer = true;
+	m_features.rgba16_unorm = !m_is_gles || GLAD_GL_EXT_texture_norm16;
 
 	if (GSConfig.OverrideTextureBarriers == 0)
-		m_features.texture_barrier = framebuffer_fetch; // Force Disabled
+		m_features.texture_barrier = false; // Disable native sampler barriers; coherent colour fetch is independent.
 	else if (GSConfig.OverrideTextureBarriers == 1)
-		m_features.texture_barrier = true; // Force Enabled
+		m_features.texture_barrier = has_texture_barrier_extension;
 	else
-		m_features.texture_barrier = framebuffer_fetch || has_texture_barrier_extension;
+		m_features.texture_barrier = has_texture_barrier_extension;
 
 	m_features.framebuffer_fetch = framebuffer_fetch;
+	m_features.framebuffer_fetch_orders_overlap = FbFetchOrdersOverlappingPrims(fetch.backend);
 	// Framebuffer fetch cannot stand in for a texture barrier when a draw samples its attached
 	// target. Only Haunting Ground performs the offset reads which need the bounded source copy;
 	// every other game keeps the cheap fetch path.
@@ -1130,8 +1139,7 @@ bool GSDeviceOGL::CheckFeatures()
 		GSIsHauntingGround() && (!has_texture_barrier_extension || GSConfig.OverrideTextureBarriers == 0);
 	m_features.dual_source_blend =
 		!m_is_gles || GLAD_GL_EXT_blend_func_extended || GLAD_GL_ARB_blend_func_extended;
-	if (gpu_profile_mobile && has_arm_framebuffer_fetch && !has_ext_framebuffer_fetch)
-		DevCon.WriteLn("GL: ARM-only framebuffer fetch cannot implement generic GS feedback; using copy fallback.");
+	// Unsupported ARM formats/MRT and depth reads retain a per-draw copy path.
 	DevCon.WriteLn("GL: Mobile GPU caps: profile=%s framebuffer_fetch=%s texture_barrier=%s arm_fetch=%s ext_fetch=%s prefer_new=%s.",
 		GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()),
 		m_features.framebuffer_fetch ? "yes" : "no",
@@ -1173,7 +1181,7 @@ bool GSDeviceOGL::CheckFeatures()
 	m_features.test_and_sample_depth = m_features.texture_barrier;
 	// Depth-as-RT feedback works from a copied R32 target, so it doesn't need texture barriers.
 	// Direct depth feedback still requires texture barriers.
-	m_features.depth_feedback = GetOGLDepthFeedbackSupport(m_features.texture_barrier, GSConfig.DepthFeedbackMode);
+	m_features.depth_feedback = GetOGLDepthFeedbackSupport(GSConfig.DepthFeedbackMode);
 
 	GLint max_vertex_ssbos = 0;
 	// GLES 3.2 has SSBOs and base-vertex draws in core, without desktop ARB flags. (AI-assisted)
@@ -1885,6 +1893,12 @@ std::string GSDeviceOGL::GetShaderSource(const std::string_view entry, GLenum ty
 
 std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type, const std::string_view macro)
 {
+	return GenGlslHeader(entry, type, macro, {static_cast<unsigned char>(m_fetch_caps.preferred)});
+}
+
+std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type,
+	const std::string_view macro, GLFramebufferFetchPlan fetch)
+{
 	std::string header;
 
 	if (m_is_gles)
@@ -1900,11 +1914,15 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type
 			header += "#extension GL_EXT_blend_func_extended : require\n";
 		if (GLAD_GL_ARB_blend_func_extended)
 			header += "#extension GL_ARB_blend_func_extended : require\n";
-		if (m_features.framebuffer_fetch)
+		if (fetch.Color() == GSFramebufferFetchBackend::ARM)
+			header += "#extension GL_ARM_shader_framebuffer_fetch : require\n";
+		if (fetch.Color() == GSFramebufferFetchBackend::EXT || fetch.Depth() == GLDepthFetch::EXT)
 		{
 			if (GLAD_GL_EXT_shader_framebuffer_fetch)
 				header += "#extension GL_EXT_shader_framebuffer_fetch : require\n";
 		}
+		if (fetch.Depth() == GLDepthFetch::ARM)
+			header += "#extension GL_ARM_shader_framebuffer_fetch_depth_stencil : require\n";
 
 #ifdef __ANDROID__
 		// highp is required for correct PS2 GS rendering — mediump causes visual corruption
@@ -1945,16 +1963,19 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type
 				header += "#extension GL_ARB_shader_storage_buffer_object: require\n";
 		}
 
-		if (m_features.framebuffer_fetch && GLAD_GL_EXT_shader_framebuffer_fetch)
+		if ((fetch.Color() == GSFramebufferFetchBackend::EXT || fetch.Depth() == GLDepthFetch::EXT) && GLAD_GL_EXT_shader_framebuffer_fetch)
 			header += "#extension GL_EXT_shader_framebuffer_fetch : require\n";
 		if (GLAD_GL_ARB_shader_draw_parameters)
 			header += "#extension GL_ARB_shader_draw_parameters : require\n";
 	}
 
-	if (m_features.framebuffer_fetch)
+	if (fetch.Color() != GSFramebufferFetchBackend::None)
 		header += "#define HAS_FRAMEBUFFER_FETCH 1\n";
 	else
 		header += "#define HAS_FRAMEBUFFER_FETCH 0\n";
+	header += fmt::format("#define COLOR_FETCH_BACKEND {}\n", static_cast<unsigned>(fetch.Color()));
+	header += fmt::format("#define HAS_DEPTH_RT_FETCH {}\n", fetch.Depth() == GLDepthFetch::EXT ? 1 : 0);
+	header += fmt::format("#define HAS_ARM_DEPTH_FETCH {}\n", fetch.Depth() == GLDepthFetch::ARM ? 1 : 0);
 	header += fmt::format("#define HAS_EXT_SHADER_FRAMEBUFFER_FETCH {}\n", GLAD_GL_EXT_shader_framebuffer_fetch ? 1 : 0);
 	header += fmt::format("#define HAS_ARM_SHADER_FRAMEBUFFER_FETCH {}\n", GLAD_GL_ARM_shader_framebuffer_fetch ? 1 : 0);
 	header += fmt::format("#define HAS_EXT_SHADER_PIXEL_LOCAL_STORAGE {}\n", GLAD_GL_EXT_shader_pixel_local_storage ? 1 : 0);
@@ -2083,6 +2104,32 @@ std::string GSDeviceOGL::GetVSSource(VSSelector sel)
 
 std::string GSDeviceOGL::GetPSSource(const PSSelector& sel)
 {
+	return GetPSSource(sel, SelectFetchPlan(sel, true,
+		m_features.depth_feedback == DepthFeedbackSupport::DepthAsRT && sel.IsFeedbackLoopDepth()));
+}
+
+GLFramebufferFetchPlan GSDeviceOGL::SelectFetchPlan(const PSSelector& ps, bool color0_unorm, bool mrt) const
+{
+	return DecideGLFramebufferFetchPlan(m_fetch_caps, ps.IsFeedbackLoopRT(), ps.IsFeedbackLoopDepth(),
+		m_features.depth_feedback == DepthFeedbackSupport::DepthAsRT, color0_unorm, mrt);
+}
+
+bool GSDeviceOGL::SupportsFetchPlan(GLFramebufferFetchPlan fetch) const
+{
+	if ((fetch.key & ~15u) || fetch.Color() > GSFramebufferFetchBackend::EXT || fetch.Depth() > GLDepthFetch::ARM)
+		return false;
+	if (fetch.Color() != GSFramebufferFetchBackend::None && fetch.Color() != m_fetch_caps.preferred)
+		return false;
+	if (fetch.Depth() == GLDepthFetch::ARM && (!m_fetch_caps.arm_depth || m_fetch_caps.preferred == GSFramebufferFetchBackend::None))
+		return false;
+	if (fetch.Depth() == GLDepthFetch::EXT && (!m_fetch_caps.ext || m_fetch_caps.preferred != GSFramebufferFetchBackend::EXT ||
+		(m_fetch_caps.adreno && fetch.Color() == GSFramebufferFetchBackend::EXT)))
+		return false;
+	return true;
+}
+
+std::string GSDeviceOGL::GetPSSource(const PSSelector& sel, GLFramebufferFetchPlan fetch)
+{
 	DevCon.WriteLn("GL: Compiling new pixel shader with selector 0x%016" PRIX64 "_%016" PRIX64, sel.key_hi, sel.key_lo);
 
 	std::string macro = fmt::format("#define PS_FST {}\n", sel.fst)
@@ -2151,7 +2198,7 @@ std::string GSDeviceOGL::GetPSSource(const PSSelector& sel)
 		+ fmt::format("#define PS_ANISOTROPIC_FILTERING {}\n", sel.sw_aniso)
 	;
 
-	std::string src = GenGlslHeader("ps_main", GL_FRAGMENT_SHADER, macro);
+	std::string src = GenGlslHeader("ps_main", GL_FRAGMENT_SHADER, macro, fetch);
 	src += m_shader_tfx_fs;
 	return src;
 }
@@ -3558,7 +3605,7 @@ GLProgram& GSDeviceOGL::GetTFXProgram(const ProgramSelector& psel)
 	}
 
 	const std::string vs(GetVSSource(psel.vs));
-	const std::string ps(GetPSSource(psel.ps));
+	const std::string ps(GetPSSource(psel.ps, psel.fetch));
 
 	GLProgram prog;
 	m_shader_cache.GetProgram(&prog, vs, ps);
@@ -3587,7 +3634,7 @@ namespace
 #pragma pack(pop)
 
 	static constexpr u32 LEARNED_TFX_PROGRAMS_MAGIC = 0x4C505847; // 'GXPL'
-	static constexpr u32 LEARNED_TFX_PROGRAMS_VERSION = 1;
+	static constexpr u32 LEARNED_TFX_PROGRAMS_VERSION = 2; // per-draw colour/depth fetch variant is part of the key
 
 	static std::string GetLearnedTFXProgramsFileName()
 	{
@@ -3621,6 +3668,8 @@ void GSDeviceOGL::LoadLearnedTFXPrograms()
 	{
 		ProgramSelector psel;
 		std::memcpy(&psel, data->data() + sizeof(header) + i * sizeof(ProgramSelector), sizeof(psel));
+		if (!SupportsFetchPlan(psel.fetch))
+			continue; // settings/capability changes must not revive a learned fetch backend
 		if (m_learned_programs_set.insert(psel).second)
 			m_learned_programs_order.push_back(psel);
 	}
@@ -3637,8 +3686,9 @@ void GSDeviceOGL::WarmupLearnedTFXPrograms()
 	size_t replayed = 0;
 	for (const ProgramSelector& psel : m_learned_programs_order)
 	{
+		if (!SupportsFetchPlan(psel.fetch)) continue;
 		const std::string vs(GetVSSource(psel.vs));
-		const std::string ps(GetPSSource(psel.ps));
+		const std::string ps(GetPSSource(psel.ps, psel.fetch));
 		if (!m_shader_cache.HasProgram(vs, ps))
 			continue;
 
@@ -3871,10 +3921,7 @@ void GSDeviceOGL::DoRenderHW(GSHWDrawConfig& config)
 		PSSetShaderResource(0, config.tex);
 	if (config.pal)
 		PSSetShaderResource(1, config.pal);
-	if (ShouldBindOGLColorFeedbackTexture(m_features, config))
-		PSSetShaderResource(2, colclip_rt ? colclip_rt : config.rt);
-	if (ShouldBindOGLDepthFeedbackTexture(m_features, config))
-		PSSetShaderResource(4, GetOGLDepthFeedbackTexture(m_features, config));
+	BindFeedbackTextures(config, colclip_rt);
 
 	SetupSampler(config.sampler);
 
@@ -3889,10 +3936,26 @@ void GSDeviceOGL::DoRenderHW(GSHWDrawConfig& config)
 			m_uniform_buffer_alignment, &config.cb_ps, sizeof(config.cb_ps));
 	}
 
+	const GSTexture* const fetch_target = colclip_rt ? colclip_rt : config.rt;
+	const bool fetch_unorm = fetch_target && OGLStorageSupportsARMColorFetch(
+		static_cast<const GSTextureOGL*>(fetch_target)->GetGLFormat());
+	const bool fetch_mrt = fetch_target && config.ds_as_rt;
+	const auto primary_fetch = SelectFetchPlan(config.ps, fetch_unorm, fetch_mrt);
+	const auto alpha_fetch = SelectFetchPlan(config.alpha_second_pass.ps, fetch_unorm, fetch_mrt);
+	const bool copy_color = !m_features.texture_barrier &&
+		((config.ps.IsFeedbackLoopRT() && primary_fetch.Color() == GSFramebufferFetchBackend::None) ||
+		 (config.alpha_second_pass.enable && config.alpha_second_pass.ps.IsFeedbackLoopRT() &&
+		  alpha_fetch.Color() == GSFramebufferFetchBackend::None));
+	const bool copy_depth = !m_features.texture_barrier &&
+		((config.ps.IsFeedbackLoopDepth() && primary_fetch.Depth() == GLDepthFetch::Sampler) ||
+		 (config.alpha_second_pass.enable && config.alpha_second_pass.ps.IsFeedbackLoopDepth() &&
+		  alpha_fetch.Depth() == GLDepthFetch::Sampler) || config.tex_hazard == GSHWDrawConfig::TEX_HAZARD_DEPTH ||
+		 (config.tex && (config.tex == config.ds || config.tex == config.ds_as_rt)));
 	ProgramSelector psel;
 	psel.vs = config.vs;
 	psel.ps.key_hi = config.ps.key_hi;
 	psel.ps.key_lo = config.ps.key_lo;
+	psel.fetch = primary_fetch;
 	std::memset(psel.pad, 0, sizeof(psel.pad));
 
 	SetupPipeline(psel);
@@ -3950,6 +4013,7 @@ void GSDeviceOGL::DoRenderHW(GSHWDrawConfig& config)
 
 		psel.ps.date = 3;
 		config.alpha_second_pass.ps.date = 3;
+		psel.fetch = SelectFetchPlan(psel.ps, fetch_unorm, fetch_mrt);
 		SetupPipeline(psel);
 		PSSetShaderResource(TEXTURE_PRIMID, primid_texture);
 	}
@@ -4012,7 +4076,8 @@ void GSDeviceOGL::DoRenderHW(GSHWDrawConfig& config)
 
 	const bool multidraw_fb_copy = HasOGLMultiDrawCopyFallback(m_features, config);
 
-	if (ShouldCloneOGLRenderTargetForFeedback(m_features, config, draw_rt))
+	if (draw_rt && !m_features.texture_barrier && (copy_color ||
+		config.tex_hazard == GSHWDrawConfig::TEX_HAZARD_RT || (config.tex && config.tex == config.rt)))
 	{
 		// Requires a copy of the RT.
 		draw_rt_clone = CreateTexture(rtsize.x, rtsize.y, 1, draw_rt->GetFormat(), true);
@@ -4032,17 +4097,18 @@ void GSDeviceOGL::DoRenderHW(GSHWDrawConfig& config)
 			Console.Warning("GL: Failed to allocate temp texture for RT copy.");
 	}
 
-	if (ShouldCloneOGLDepthFeedbackTarget(m_features, draw_ds_as_rt))
+	GSTexture* const depth_copy_source = draw_ds_as_rt ? draw_ds_as_rt : draw_ds;
+	if (depth_copy_source && copy_depth)
 	{
-		const GSVector2i dssize = draw_ds_as_rt->GetSize();
-		draw_ds_clone = CreateTexture(dssize.x, dssize.y, 1, draw_ds_as_rt->GetFormat(), true);
+		const GSVector2i dssize = depth_copy_source->GetSize();
+		draw_ds_clone = CreateTexture(dssize.x, dssize.y, 1, depth_copy_source->GetFormat(), true);
 		if (draw_ds_clone)
 		{
 			GL_PUSH("GL: Copy depth-feedback RT to temp texture {%d,%d %dx%d}",
 				config.drawarea.left, config.drawarea.top,
 				config.drawarea.width(), config.drawarea.height());
 			const GSVector4i snapped_drawarea = ProcessCopyArea(GSVector4i(0, 0, dssize.x, dssize.y), config.drawarea);
-			CopyRect(draw_ds_as_rt, draw_ds_clone, snapped_drawarea, snapped_drawarea.left, snapped_drawarea.top);
+			CopyRect(depth_copy_source, draw_ds_clone, snapped_drawarea, snapped_drawarea.left, snapped_drawarea.top);
 			PSSetShaderResource(4, draw_ds_clone);
 		}
 		else
@@ -4063,8 +4129,8 @@ void GSDeviceOGL::DoRenderHW(GSHWDrawConfig& config)
 		glClearBufferiv(GL_STENCIL, 0, &clear_color);
 	}
 
-	SendHWDraw(config, draw_rt_clone, draw_rt, draw_ds_clone, draw_ds_as_rt,
-		config.require_one_barrier, config.require_full_barrier);
+	SendHWDraw(config, draw_rt_clone, draw_rt, draw_ds_clone, depth_copy_source,
+		config.require_one_barrier, config.require_full_barrier, psel.ps, psel.fetch);
 
 	if (config.blend_multi_pass.enable)
 	{
@@ -4082,8 +4148,10 @@ void GSDeviceOGL::DoRenderHW(GSHWDrawConfig& config)
 		psel.ps.no_color1 = config.blend_multi_pass.no_color1;
 		psel.ps.blend_hw = config.blend_multi_pass.blend_hw;
 		psel.ps.dither = config.blend_multi_pass.dither;
+		psel.fetch = SelectFetchPlan(psel.ps, fetch_unorm, fetch_mrt);
 		SetupPipeline(psel);
-		Draw(config);
+		SendHWDraw(config, draw_rt_clone, draw_rt, draw_ds_clone, depth_copy_source,
+			config.require_one_barrier, config.require_full_barrier, psel.ps, psel.fetch);
 	}
 
 	if (config.alpha_second_pass.enable)
@@ -4097,6 +4165,7 @@ void GSDeviceOGL::DoRenderHW(GSHWDrawConfig& config)
 		}
 
 		psel.ps = config.alpha_second_pass.ps;
+		psel.fetch = SelectFetchPlan(psel.ps, fetch_unorm, fetch_mrt);
 		SetupPipeline(psel);
 		OMSetColorMaskState(config.alpha_second_pass.colormask);
 		if (config.blend.IsEffective(config.alpha_second_pass.colormask))
@@ -4111,8 +4180,8 @@ void GSDeviceOGL::DoRenderHW(GSHWDrawConfig& config)
 			OMSetBlendState();
 		}
 		SetupOM(config.alpha_second_pass.depth);
-		SendHWDraw(config, draw_rt_clone, draw_rt, draw_ds_clone, draw_ds_as_rt,
-			config.alpha_second_pass.require_one_barrier, config.alpha_second_pass.require_full_barrier);
+		SendHWDraw(config, draw_rt_clone, draw_rt, draw_ds_clone, depth_copy_source,
+			config.alpha_second_pass.require_one_barrier, config.alpha_second_pass.require_full_barrier, psel.ps, psel.fetch);
 	}
 
 	if (primid_texture)
@@ -4146,14 +4215,16 @@ void GSDeviceOGL::FeedbackCopyAndBind(const GSHWDrawConfig& config,
 	{
 		CopyRect(rt, rt_clone, copyarea, copyarea.left, copyarea.top);
 		PSSetShaderResource(2, rt_clone);
-		if (config.tex_hazard == GSHWDrawConfig::TEX_HAZARD_RT)
+		if (config.tex_hazard == GSHWDrawConfig::TEX_HAZARD_RT ||
+			(config.tex && (config.tex == rt || config.tex == config.rt)))
 			PSSetShaderResource(0, rt_clone);
 	}
 	if (ds_clone)
 	{
 		CopyRect(ds, ds_clone, copyarea, copyarea.left, copyarea.top);
 		PSSetShaderResource(4, ds_clone);
-		if (config.tex_hazard == GSHWDrawConfig::TEX_HAZARD_DEPTH)
+		if (config.tex_hazard == GSHWDrawConfig::TEX_HAZARD_DEPTH ||
+			(config.tex && (config.tex == ds || config.tex == config.ds || config.tex == config.ds_as_rt)))
 			PSSetShaderResource(0, ds_clone);
 	}
 }
@@ -4186,9 +4257,40 @@ void GSDeviceOGL::FeedbackCopyAndBind(const GSHWDrawConfig& config,
 	}
 }
 
-void GSDeviceOGL::SendHWDraw(const GSHWDrawConfig& config, GSTexture* draw_rt_clone, GSTexture* draw_rt,
-	GSTexture* draw_ds_clone, GSTexture* draw_ds, bool one_barrier, bool full_barrier)
+void GSDeviceOGL::BindFeedbackTextures(const GSHWDrawConfig& config, GSTexture* colclip_rt)
 {
+	if (ShouldBindOGLColorFeedbackTexture(m_features, config))
+		PSSetShaderResource(2, colclip_rt ? colclip_rt : config.rt);
+	if (ShouldBindOGLDepthFeedbackTexture(m_features, config))
+		PSSetShaderResource(4, GetOGLDepthFeedbackTexture(m_features, config));
+}
+
+void GSDeviceOGL::SendHWDraw(const GSHWDrawConfig& config, GSTexture* draw_rt_clone, GSTexture* draw_rt,
+	GSTexture* draw_ds_clone, GSTexture* draw_ds, bool one_barrier, bool full_barrier,
+	const PSSelector& ps, GLFramebufferFetchPlan fetch)
+{
+	const bool sampler_color = ps.IsFeedbackLoopRT() && fetch.Color() == GSFramebufferFetchBackend::None;
+	const bool sampler_depth = ps.IsFeedbackLoopDepth() && fetch.Depth() == GLDepthFetch::Sampler;
+	const bool attached_alias = config.tex && (config.tex == draw_rt || config.tex == config.rt || config.tex == draw_ds ||
+		config.tex == config.ds || config.tex == config.ds_as_rt);
+	const bool sampler_read = sampler_color || sampler_depth || attached_alias || config.tex_hazard != GSHWDrawConfig::TEX_HAZARD_NONE;
+	if (!m_features.texture_barrier && sampler_read)
+	{
+		// A copied depth/HDR/MRT read must observe prior primitives even if
+		// the HW planner dropped colour-only barriers for ARM coherent fetch.
+		const u32 step = config.indices_per_prim;
+		pxAssert(step && config.nindices % step == 0);
+		if (!step || config.nindices % step) return;
+		for (u32 i = 0; i < config.nindices; i += step)
+		{
+			FeedbackCopyAndBind(config, draw_rt, draw_rt_clone, draw_ds, draw_ds_clone,
+				config.drawarea, config.samplearea);
+			Draw(config, i, step);
+		}
+		return;
+	}
+	if (!sampler_read && m_features.framebuffer_fetch_orders_overlap)
+		one_barrier = full_barrier = false;
 
 #ifdef PCSX2_DEVBUILD
 	if ((one_barrier || full_barrier) && !(config.IsFeedbackLoopRT(config.ps) || config.IsFeedbackLoopDepth(config.ps))) [[unlikely]]
@@ -4393,3 +4495,10 @@ void GSDeviceOGL::InsertDebugMessage(DebugMessageCategory category, const char* 
 		glDebugMessageInsert(GL_DEBUG_SOURCE_APPLICATION, type, id, severity, buf.size(), buf.c_str());
 #endif
 }
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#include "GLFramebufferFetchTests.inl"
+#include "GLFramebufferFetchPlanTests.inl"
+#include "GLFramebufferFetchPixelTests.inl"
+#include "GLFramebufferFetchPlannerTests.inl"
+#endif

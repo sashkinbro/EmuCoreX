@@ -352,6 +352,7 @@ public:
 	virtual ~GSRendererHW() override;
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	static void TestDepthFloor(void (*check)(bool, const char*));
+	static void TestFeedbackBlendStages(void (*check)(bool, const char*));
 #endif
 
 	__fi static GSRendererHW* GetInstance() { return static_cast<GSRendererHW*>(g_gs_renderer.get()); }

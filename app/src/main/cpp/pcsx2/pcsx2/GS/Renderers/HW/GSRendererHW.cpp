@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "GS/Renderers/HW/GSRendererHW.h"
+#include "GS/Renderers/HW/GSFeedbackDrawlistTarget.h"
 #include "GS/Renderers/Common/GSDrawRoadConfig.h"
+#include "GS/Renderers/Common/GSFeedbackBarrierPlan.h"
 #include "GS/Renderers/Common/GSBlendConstantPolicy.h"
 #include "GS/Renderers/HW/GSSpriteEdgeSnap.h"
 #include "GS/Renderers/HW/GSHwHack.h"
@@ -9355,29 +9357,9 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 	}
 
 	if (features.framebuffer_fetch || features.declared_feedback_loop_orders_overlap)
-	{
-		// Intel GPUs on Metal lock up if you try to use DSB and framebuffer fetch at once
-		// We should never need to do that (since using framebuffer fetch means you should be able to do all blending in shader),
-		// but sometimes it slips through
-		if (features.framebuffer_fetch && (m_conf.require_one_barrier || m_conf.require_full_barrier))
-			pxAssert(!m_conf.blend.enable);
-
-		// If we use depth feedback directly, we must use barriers for the depth texture.
-		// If we use depth-as-color feedback, then FB fetch can be used for depth also.
-		const bool need_barriers_for_depth =
-			GSNeedsDirectDepthFeedbackBarriers(features, m_conf.ps.IsFeedbackLoopDepth());
-
-		const bool drop_barriers = g_gs_device->GetRenderAPI() == RenderAPI::Vulkan ?
-			GSDrawDropsBarriers(GSGetDrawRoadDevice(features), m_conf.tex_hazard == GSHWDrawConfig::TEX_HAZARD_RT,
-				m_prim_overlap != PRIM_OVERLAP_NO, need_barriers_for_depth) : !need_barriers_for_depth;
-		if (drop_barriers)
-		{
-			m_conf.raster_order = features.declared_loop_overlap_needs_raster_order && m_conf.require_full_barrier &&
-				m_prim_overlap != PRIM_OVERLAP_NO && !m_conf.ps.shuffle && !m_channel_shuffle;
-			m_conf.require_one_barrier = false;
-			m_conf.require_full_barrier = false;
-		}
-	}
+		GSApplyPlannedFeedbackBarriers(m_conf, features, g_gs_device->GetRenderAPI(),
+			m_prim_overlap != PRIM_OVERLAP_NO, GSNeedsDirectDepthFeedbackBarriers(features, m_conf.ps.IsFeedbackLoopDepth()),
+			m_channel_shuffle);
 	// Multi-pass algorithms shouldn't be needed with full barrier and backends may not handle this correctly
 	pxAssert(!m_conf.require_full_barrier || !m_conf.ps.colclip_hw);
 
@@ -9416,7 +9398,7 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 	// ComputeDrawlistGetSize expects the original index layout, so needs to be called before we modify it via HandleProvokingVertexFirst/SetupIA.
 	if (m_conf.require_full_barrier && (g_gs_device->Features().texture_barrier || g_gs_device->Features().multidraw_fb_copy))
 	{
-		ComputeDrawlistGetSize(rt->m_scale);
+		ComputeDrawlistGetSize(GSResolveFeedbackDrawlistTarget(rt, ds)->GetScale());
 		m_conf.drawlist = &m_drawlist;
 		m_conf.drawlist_bbox = &m_drawlist_bbox;
 	}
@@ -10990,4 +10972,6 @@ void GSRendererHW::CleanupDepthAsRTFeedback()
 
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 #include "GSDepthFloorTests.inl"
+#include "GSFeedbackDrawlistTargetTests.inl"
+#include "GSFeedbackBlendStageTests.inl"
 #endif
