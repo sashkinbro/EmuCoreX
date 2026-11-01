@@ -3606,6 +3606,12 @@ void VMManager::CheckForGSConfigChanges(const Pcsx2Config& old_config)
 		MTGS::UpdateVSyncMode();
 	}
 
+	// Software workers inherit the GS thread's mask when they start. Release
+	// the hardware-only tier before reopening that renderer, not afterward.
+#if defined(__ANDROID__)
+	if (EmuConfig.GS.Renderer != old_config.GS.Renderer)
+		SetEmuThreadAffinities();
+#endif
 	MTGS::ApplySettings();
 }
 
@@ -4322,14 +4328,26 @@ void VMManager::EnsureCPUInfoInitialized()
 void VMManager::SetEmuThreadAffinities()
 {
 	const bool new_pin_enable = (GetState() != VMState::Shutdown && EmuConfig.EnableThreadPinning);
+#if defined(__ANDROID__)
+	// Leave placement within the performance tier to EAS. Explicit ordered
+	// pinning retains its existing setting; the software renderer's additional
+	// workers need a separate placement plan and stay on the unrestricted path.
+	const bool new_tier_enable = GetState() != VMState::Shutdown && !EmuConfig.EnableThreadPinning &&
+		EmuConfig.GS.Renderer != GSRendererType::SW;
+#else
+	const bool new_tier_enable = false;
+#endif
 	static u32 placed_iop = 0;
 	static bool placed_mtvu = false;
+	static bool placed_tier = false;
 	const u32 current_iop = IopThread::PlacementToken();
 	const bool mtvu = EmuConfig.Speedhacks.vuThread;
-	if (s_thread_affinities_set == new_pin_enable && placed_iop == current_iop && placed_mtvu == mtvu)
+	if (s_thread_affinities_set == new_pin_enable && placed_iop == current_iop && placed_mtvu == mtvu &&
+		placed_tier == new_tier_enable)
 		return;
 	placed_iop = current_iop;
 	placed_mtvu = mtvu;
+	placed_tier = new_tier_enable;
 	if (IopThread::g_thread.IsRunning())
 		IopThread::g_thread.GetThreadHandle().SetAffinity(0);
 
@@ -4345,6 +4363,22 @@ void VMManager::SetEmuThreadAffinities()
 	}
 
 	const bool iop_thread = IopThread::PlacesThread();
+#if defined(__ANDROID__)
+	if (new_tier_enable)
+	{
+		const u64 performance_mask = IopThread::PerformanceCoreMask();
+		const IopThread::TierPlan tier = IopThread::PlanTier(performance_mask, mtvu, iop_thread);
+		// An unknown topology or fewer cores than concurrent emulation threads
+		// must release every mask, rather than make them share too small a tier.
+		const u64 mask = tier.tier_fits ? performance_mask : 0;
+		s_vm_thread_handle.SetAffinity(mask);
+		MTGS::GetThreadHandle().SetAffinity(mask);
+		vu1Thread.GetThreadHandle().SetAffinity(mtvu ? mask : 0);
+		if (IopThread::g_thread.IsRunning())
+			IopThread::g_thread.GetThreadHandle().SetAffinity(mask);
+		return;
+	}
+#endif
 	const size_t occupied_count = (mtvu ? 3 : 2) + (iop_thread ? 1 : 0);
 	if (!new_pin_enable || s_processor_list.size() < occupied_count)
 	{
