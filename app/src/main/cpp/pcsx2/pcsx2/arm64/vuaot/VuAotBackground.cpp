@@ -3,6 +3,7 @@
 // Adapted for EmuCoreX oaknut from ARMSX2 aa52a1fdc7cd03fb02bd404ebaa9940944e7fc60.
 
 #include "VuAotBackground.h"
+#include "VuAotCompileObserve.h"
 
 #include "VuAotOaknut.h"
 #include "common/Assertions.h"
@@ -14,6 +15,32 @@
 #include <sched.h>
 #include <unistd.h>
 #include <sys/resource.h>
+#endif
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#include <ctime>
+namespace vuaot::observe
+{
+    thread_local Hooks* active=nullptr;
+    u64 ThreadCpuNs()
+    {
+#if defined(__linux__)
+        timespec now{};
+        if(clock_gettime(CLOCK_THREAD_CPUTIME_ID,&now)==0)
+            return u64(now.tv_sec)*1000000000ull+u64(now.tv_nsec);
+#endif
+        return 0;
+    }
+    u8* AllocateScratch(size_t bytes)
+    {
+        if(!active||!active->allocation)return new u8[bytes];
+        const u64 begin=ThreadCpuNs();
+        u8* const memory=new u8[bytes];
+        const u64 end=ThreadCpuNs();
+        active->allocation(active->user,bytes,begin&&end>=begin?end-begin:0);
+        return memory;
+    }
+}
 #endif
 
 namespace vuaot::bg
@@ -70,7 +97,11 @@ namespace vuaot::bg
 	};
 
 	CodeSink::CodeSink()
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		: base_(observe::AllocateScratch(kCapacity))
+#else
 		: base_(new u8[kCapacity])
+#endif
 		, rec_(std::make_unique<Recorder>(*this))
 	{
 	}

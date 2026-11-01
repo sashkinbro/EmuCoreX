@@ -3,6 +3,7 @@
 // Adapted for EmuCoreX oaknut from ARMSX2 aa52a1fdc7cd03fb02bd404ebaa9940944e7fc60.
 
 #include "VuAotRegion.h"
+#include "VuAotCompileObserve.h"
 
 #include "VuAotIR.h"
 
@@ -1485,6 +1486,9 @@ namespace vuaot
 				g_lowerMarks = &marks;
 			}
 			const LowerResult r = n.low->Emit(maps_[n.map]);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+            observe::NoteBody(n.pc,n.key.bytes,bodyStart,r.bytes);
+#endif
 			g_lowerMarks = nullptr;
 			pxAssertRel(r.ok, "vu-aot region: node no longer lowers with region homes");
 			const u8* tailStart = armGetCurrentCodePointer();

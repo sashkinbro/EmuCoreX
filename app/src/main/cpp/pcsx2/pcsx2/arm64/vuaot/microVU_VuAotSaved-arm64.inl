@@ -261,6 +261,9 @@ namespace saved
             auto job=Plan(mvu,state.savedPlans.front(),state);
             if(!job) { state.savedPlans.pop_front(); continue; }
             runtime.worker.Start();
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+            PrepareCompileObservation(mvu,state,job,true);
+#endif
             if(!runtime.worker.Submit(job)) break; // retain the unsubmitted root
             job->loadedPlan=std::make_shared<const wire::Record>(std::move(state.savedPlans.front()));
             job->loadedPlanEpoch=state.planEpoch;

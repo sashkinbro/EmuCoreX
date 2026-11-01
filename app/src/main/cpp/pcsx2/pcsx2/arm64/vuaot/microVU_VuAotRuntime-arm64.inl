@@ -20,6 +20,9 @@ namespace mvu_aot
 	{
 		using namespace vuaot;
 		struct BuildJob;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		struct CompileObservation;
+#endif
 		struct Node
 		{
 			PipeState key{}; // Bail records expose this exact 96-byte pipeline prefix.
@@ -67,6 +70,7 @@ namespace mvu_aot
 			bool accepted = false, body = false;
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 			u32 publishedCodegenModes = 0;
+			std::shared_ptr<CompileObservation> observation;
 #endif
 			bool dropAllowed = false, dropped = false;
 			bool viaJump = false, retier = false;
@@ -197,6 +201,14 @@ namespace mvu_aot
 #endif
 #endif
 		thread_local bool resolving = false;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        RootIdentity CanonicalRootIdentity(u32 pc,const void* key);
+        bool SameKey(const PipeState& a,const u8* raw,bool flagHack);
+        bool ImageMatches(const BuildJob& job,const microVU& mvu);
+        bool OwnerMatches(const BuildJob& job);
+        bool OwnerImageMatches(const BuildJob& job,const microVU& mvu);
+        #include "microVU_VuAotObserve-arm64.inl"
+#endif
 		__fi void ReadyStat(u64 Stats::*counter)
 		{
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
@@ -405,8 +417,15 @@ namespace mvu_aot
             vuaot::armAsm->Str(a64::w8, a64::MemOperand(a64::x24, env.offCycles));
             vuaot::armAsm->Ldp(a64::q26, a64::q25,
                 a64::MemOperand(a64::x25, offsetof(vuaot::mVU_Globals, minvals)));
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+            const u8* const observedBody=armGetCurrentCodePointer();
+#endif
             if (!tier.TryLower(job.trace, env, &job.error))
                 return false;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+            observe::NoteBody(job.trace.startPC,job.trace.entryState,observedBody,
+                static_cast<u32>(armGetCurrentCodePointer()-observedBody));
+#endif
             const auto& br = tier.Block();
             const auto link = [&](u32 pc) { vuaot::armEmitJmp(FetchExit(1, pc, br.end.bytes)); };
             switch (br.endKind)
@@ -449,7 +468,13 @@ namespace mvu_aot
         }
 		void BuildJob::Run()
 		{
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+            CompileObservationScope observedScope(observation.get());
+#endif
 			bg::CodeSink buffer;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+            if(observation)observation->base=buffer.Base();
+#endif
 			sink = &buffer;
 			building = this;
 			try
@@ -482,6 +507,9 @@ namespace mvu_aot
                     // Region analysis can register tentative nodes. Discard all
                     // of them before producing the independent framed body.
                     buffer.End();
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+                    ClearCompileBodies(observation.get());
+#endif
                     nodes.clear(); sites.clear(); ranges.clear(); read.fill(0);
                     buffer.Begin();
                     env.rootBlock = AddNode(1, trace.startPC, trace.entryState);
@@ -509,6 +537,9 @@ namespace mvu_aot
 				if (vuaot::armAsm)
 					buffer.End();
 			}
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+            if(observation){observation->accepted=accepted;observation->codeBytes=static_cast<u32>(code.size());}
+#endif
 			building = nullptr;
 			sink = nullptr; // The 16 MB temporary dies here, never in the program cache.
 		}
@@ -1071,6 +1102,11 @@ namespace mvu_aot
 		runtime.cursorProgram = nullptr;
 		runtime.cursorGeneration = 0;
 		runtime.worker.Stop();
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        for(auto& [owner,program]:runtime.programs)
+            if(program.pending&&program.pending->observation)
+            {MergeCompileObservation(*program.pending->observation);program.pending->observation.reset();}
+#endif
 		RestoreStaticBranches(); // before sidecars/save or any baseline owner can be freed
         sticky::state.active.store(EmuConfig.Cpu.Recompiler.EnableVUAot, std::memory_order_release);
         sticky::state.rebuildDue.store(false, std::memory_order_release);
@@ -1094,6 +1130,9 @@ namespace mvu_aot
 			block->x86ptrStart = static_cast<u8*>(entry);
 		++runtime.generation;
 		runtime.programs.clear();
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        ResetCompileObservation();
+#endif
 		runtime.readyBytes = runtime.readyJobs = 0;
 		runtime.readySerial = 0;
 		runtime.original.clear();
@@ -1296,6 +1335,10 @@ namespace mvu_aot
 		for (const auto& op : trace.ops)
 			if (op.tBit || op.dBit || op.mBit || op.badBranch || op.evilBranch || op.branch > 10)
 				return false;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        auto inlineObservation=MakeCompileObservation(mvu,trace.startPC,false,true);
+        CompileObservationScope observedScope(inlineObservation.get());
+#endif
 		std::array<u8, 0x4000> image;
 		std::memcpy(image.data(), mvu.regs().Micro, image.size());
 		const MvuBlockTrace captured = trace;
@@ -1303,6 +1346,9 @@ namespace mvu_aot
 		BodyTier tier(1, image.data());
 		tier.schedule = true;
 		bg::CodeSink sink;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        if(inlineObservation)inlineObservation->base=sink.Base();
+#endif
 		sink.Begin();
 		bool lowered = false;
 		try
@@ -1314,6 +1360,9 @@ namespace mvu_aot
 			// The ordinary second pass remains untouched on any decline.
 		}
 		const u32 bytes = sink.End();
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        if(inlineObservation){inlineObservation->codeBytes=bytes;if(lowered)observe::NoteBody(captured.startPC,captured.entryState,sink.Base(),bytes);}
+#endif
 		if (!lowered || !sink.failed.empty() ||
 			(tier.Block().endKind != BlockEnd::EBit && tier.Block().endKind != BlockEnd::Branch &&
 			 tier.Block().endKind != BlockEnd::CondBranch && tier.Block().endKind != BlockEnd::Jump) ||
@@ -1395,6 +1444,9 @@ namespace mvu_aot
 		}
 #endif
 		++runtime.stats.bodyBlocks;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        if(inlineObservation)inlineObservation->accepted=true;
+#endif
 		return true;
 	}
 	static bool TryAutomaticRoot(microVU& mvu, Program& program)
@@ -1439,12 +1491,19 @@ namespace mvu_aot
 		job->env = Environment(mvu);
 		job->cpu = EmuConfig.Cpu; job->fixes = EmuConfig.Gamefixes; job->speed = EmuConfig.Speedhacks;
 		if (HasReady(program, *job)) return true;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        PrepareCompileObservation(mvu,program,job,!forceSync);
+#endif
 		if (forceSync)
 		{
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 			++runtime.stats.automaticJobs;
 #endif
 			job->Run();
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+            // The Run-local scope destructor already merged synchronous data.
+            if(job->observation&&job->observation->merged)job->observation.reset();
+#endif
 			if (!Publish(mvu, job))
 			{
 				if (!job->accepted) program.NoteDeclined(job->trace);
@@ -1570,6 +1629,9 @@ namespace mvu_aot
 		for (auto& item : completed)
 		{
 			auto job = std::static_pointer_cast<BuildJob>(item);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+            if(job->observation){MergeCompileObservation(*job->observation);job->observation.reset();}
+#endif
 			auto it = runtime.programs.find(job->program);
 			if (it != runtime.programs.end())
 			{
@@ -1712,9 +1774,16 @@ namespace mvu_aot
 			ReadyStat(&Stats::readyDuplicates);
 			return baselineEntry;
 		}
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        PrepareCompileObservation(mvu,program,job,!forceSync);
+#endif
 		if (forceSync)
 		{
 			job->Run();
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+            // The Run-local scope destructor already merged synchronous data.
+            if(job->observation&&job->observation->merged)job->observation.reset();
+#endif
 			if (Publish(mvu, job))
 				return job->nodes[0]->entry;
 			if (!job->accepted) program.NoteDeclined(job->trace);
@@ -1817,6 +1886,21 @@ namespace mvu_aot
 	u64 InlineBodyEntryCount(u32 pc) { return inlineBodyEntries[(pc & 0x3ff8) >> 3]; }
 	u64 NativeRegionEntryCount(u32 pc) { return nativeRegionEntries[(pc & 0x3ff8) >> 3]; }
 	u64 CurrentOwnerForTest() { return reinterpret_cast<u64>(microVU1.prog.cur); }
+	void SetCompileObservationForTest(bool enabled){compileProbe.manual=true;ClearCompileObservation(enabled);}
+	vuaot::observe::Snapshot GetCompileObservationForTest(){return compileProbe.enabled?compileProbe.result:observe::Snapshot{};}
+    u64 RetainedCompileObservationBytesForTest()
+    {
+        u64 bytes=0;
+        const auto add=[&](const std::shared_ptr<BuildJob>& job){
+            if(const auto& r=job->observation)
+                bytes+=sizeof(CompileObservation)+r->known.capacity()*sizeof(CompileKnownNode)+
+                    r->result.nodes.capacity()*sizeof(observe::NodeSample);
+        };
+        // Only owner-handed-off containers: never inspect a running pending job.
+        for(const auto& [owner,program]:runtime.programs)
+        {for(const auto& job:program.jobs)add(job);for(const auto& job:program.ready)add(job);}
+        return bytes;
+    }
 	bool ReadDispatchCadenceForTest(u32& runs, u32& jumpRuns, u32& bucket)
 	{
 		const auto found = runtime.programs.find(microVU1.prog.cur);

@@ -3,6 +3,7 @@
 #include "common/Pcsx2Defs.h"
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 #include "VuAotPersist.h"
+#include "VuAotCompileObserve.h"
 #endif
 struct microVU;
 struct microProgram;
@@ -67,6 +68,9 @@ namespace mvu_aot
 	bool TestStaticLinkWords(bool restore);
 	bool TestCompileWarmRoot(u32 pc, const void* key);
 	bool ReadDispatchCadenceForTest(u32& runs, u32& jumpRuns, u32& bucket);
+	void SetCompileObservationForTest(bool enabled);
+	vuaot::observe::Snapshot GetCompileObservationForTest();
+	u64 RetainedCompileObservationBytesForTest();
 	void TestDirtyQuietSave();
 	bool QuietSaveDirtyForTest();
 	u32 TestFillQuietWorkerQueue();
