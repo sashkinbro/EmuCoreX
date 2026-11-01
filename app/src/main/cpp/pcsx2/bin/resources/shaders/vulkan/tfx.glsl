@@ -1650,7 +1650,13 @@ void ps_blend(inout vec4 Color, inout vec4 As_rgba)
 		#elif PS_BLEND_MIX == 2
 			Color.rgb = ((A - B) * C_clamped + D) + (124.0f/256.0f);
 		#elif PS_BLEND_MIX == 1
+			// Exact As128 identity has zero destination contribution. Rounding
+			// bias here would darken a carried identity on fixed-point blend units.
+#if PS_DST_FMT == FMT_32 && PS_BLEND_HW == 0 && PS_BLEND_A == 0 && PS_BLEND_B == 2 && PS_BLEND_C == 0 && PS_BLEND_D == 2 && !PS_COLCLIP && !PS_COLCLIP_HW && !PS_DITHER && !PS_FBMASK && !PS_SHUFFLE && !PS_ROUND_INV && !PS_PABE && !PS_A_MASKED
+			Color.rgb = C == 1.0f ? A : ((A - B) * C_clamped + D) - (124.0f/256.0f);
+#else
 			Color.rgb = ((A - B) * C_clamped + D) - (124.0f/256.0f);
+#endif
 		#else
 			Color.rgb = trunc((A - B) * C + D);
 		#endif

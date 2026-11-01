@@ -44,6 +44,7 @@
 #include "GS/GS.h"
 #include "GS/Renderers/Vulkan/GSDeviceVK.h"
 #include "GS/Renderers/OpenGL/GSDeviceOGL.h"
+extern "C" void EmuCoreXOracleBlendCarry(void (*check)(bool, const char*));
 #include "GS/Renderers/Vulkan/VKShaderCache.h"
 #include "GS/Renderers/Vulkan/VKSwapchainCreate.h"
 #include "GS/Renderers/HW/GSSpriteEdgeSnap.h"
@@ -12621,6 +12622,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         GifCopyTests();
     else if (std::strcmp(suite, "gs-depth-floor") == 0)
         GSRendererHW::TestDepthFloor(Check);
+    else if (std::strcmp(suite, "gs-blend-carry") == 0)
+        EmuCoreXOracleBlendCarry(Check);
     else if (std::strcmp(suite, "gs-gl-fetch") == 0)
         GSDeviceOGL::TestFramebufferFetch(Check);
     else if (std::strcmp(suite, "gs-restarts") == 0)

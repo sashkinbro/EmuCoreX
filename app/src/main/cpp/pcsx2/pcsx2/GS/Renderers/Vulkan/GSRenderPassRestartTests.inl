@@ -1,10 +1,13 @@
 // SPDX-FileCopyrightText: 2026 EmuCoreX Team
 // SPDX-License-Identifier: GPL-3.0+
 // Real restart regressions. Production restart functions remain the test subject.
+#include "GSBlendCarryDeviceTests.inl"
+#include "GSBlendCarryPixelTests.inl"
 void GSDeviceVK::TestRenderPassRestarts(void (*check)(bool, const char*))
 {
     check(m_tfx_preparation_device && !m_allocator, "GS restart fixture starts on an isolated preparation device");
     if (!m_tfx_preparation_device || m_allocator) return;
+    TestBlendCarryCapability(check);
     std::vector<u64> initial_keys;
     for (const auto& item : m_render_pass_cache) initial_keys.push_back(item.first);
     VkPipeline pipeline = VK_NULL_HANDLE;
@@ -298,4 +301,5 @@ void main(){color=texelFetch(source,ivec2(0),0)*params.factor;})");
     TestBlendConstantPixels(check);
     TestRoadModelParity(check);
     TestDepthSamplingPolicy(check);
+    TestBlendCarryPixels(check);
 }

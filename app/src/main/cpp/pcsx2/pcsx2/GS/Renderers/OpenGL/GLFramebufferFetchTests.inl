@@ -195,6 +195,18 @@ void main(){int i=gl_VertexID%3;vec2 p=i==0?vec2(-1.,-1.):i==1?vec2(3.,-1.):vec2
         else if (program) glDeleteProgram(program);
     }
     check(links, "GL actual TFX colour no-colour DepthAsRT direct-depth and dual-source variants compile and link");
+    bool endpointCompiled=true;
+    for(bool iip:{false,true})
+    {
+        PSSelector endpoint{};endpoint.tfx=4;endpoint.no_color1=true;endpoint.iip=iip;
+        endpoint.blend_mix=1;endpoint.blend_a=0;endpoint.blend_b=2;endpoint.blend_c=0;endpoint.blend_d=2;
+        // Full production main reaches ps_blend; a single output keeps this
+        // compiler-only guard proof legal even without physical GLES SRC1.
+        const GLuint fragment=Compile(GL_FRAGMENT_SHADER,device.GetPSSource(endpoint,GLFramebufferFetchPlan{}));
+        endpointCompiled&=fragment!=0;if(fragment)glDeleteShader(fragment);
+    }
+    check(endpointCompiled,"GL full production MIX1 exact-endpoint fragment variants compile with flat and interpolated color without unsupported dual GPU submission");
+
     const ScopedGuard deleteColor([&]() { if (colorProgram) glDeleteProgram(colorProgram); });
     if (!colorProgram) return;
 

@@ -862,6 +862,8 @@ public:
 	bool TestTFXPreparationResources() const;
 	void TestTextureUploadRing(void (*check)(bool, const char*));
 	void TestRenderPassRestarts(void (*check)(bool, const char*));
+	void TestBlendCarryCapability(void (*check)(bool, const char*));
+	void TestBlendCarryPixels(void (*check)(bool, const char*));
 	void TestDrawRoad(void (*check)(bool, const char*));
 	void TestRoadFamilies(void (*check)(bool, const char*));
 	void TestBlendConstant(void (*check)(bool, const char*));

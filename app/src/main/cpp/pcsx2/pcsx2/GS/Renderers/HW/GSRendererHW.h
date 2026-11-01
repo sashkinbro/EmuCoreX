@@ -5,6 +5,7 @@
 
 #include "GSTextureCache.h"
 #include "GS/Renderers/Common/GSFunctionMap.h"
+#include "GS/Renderers/Common/GSBlendCarry.h"
 #include "GS/Renderers/Common/GSRenderer.h"
 #include "GS/Renderers/Common/GSShaderEnums.h"
 #include "GS/Renderers/SW/GSTextureCacheSW.h"
@@ -219,6 +220,17 @@ private:
 	u32 EmulateChannelShuffle(GSTextureCache::Target* src, bool test_only, GSTextureCache::Target* rt = nullptr);
 	void EmulateBlending(int rt_alpha_min, int rt_alpha_max, DATEOptions& date_options, GSTextureCache::Target* rt,
 		bool can_scale_rt_alpha, bool& new_rt_alpha_scale);
+	__fi bool EmulateBlendingWithIdentity(int blend_alpha_min, int blend_alpha_max, DATEOptions& date_options,
+		GSTextureCache::Target* rt, bool can_scale_rt_alpha, bool& new_scale_rt_alpha);
+	__fi void CarryBlendBeforeSubmit(GSTextureCache::Target* rt, GSTextureCache::Target* ds, bool identity);
+	__fi void InvalidateBlendCarry();
+	__fi void SubmitHardwareDraw();
+	__fi void SubmitDrawPrims(GSTextureCache::Target* rt, GSTextureCache::Target* ds, bool identity);
+	GSBlendCarry::Donor m_blend_carry;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	void (*m_blend_carry_capture)(const GSHWDrawConfig&,void*) = nullptr;
+	void* m_blend_carry_capture_context = nullptr;
+#endif
 	void CleanupDraw(bool invalidate_temp_src);
 
 	void EmulateTextureSampler(const GSTextureCache::Target* rt, const GSTextureCache::Target* ds,
@@ -353,6 +365,9 @@ public:
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	static void TestDepthFloor(void (*check)(bool, const char*));
 	static void TestFeedbackBlendStages(void (*check)(bool, const char*));
+	static void TestBlendCarry(void (*check)(bool, const char*));
+	static bool PrepareBlendCarryGPU(GSTexture* target, const GSVertex* vertices, const u16* indices,
+		GSHWDrawConfig* legacy, GSHWDrawConfig* carried, bool interpolate);
 #endif
 
 	__fi static GSRendererHW* GetInstance() { return static_cast<GSRendererHW*>(g_gs_renderer.get()); }

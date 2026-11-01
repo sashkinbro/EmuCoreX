@@ -1136,7 +1136,13 @@ struct PSMain
 			else if (PS_BLEND_MIX == 2)
 				Color.rgb = ((A - B) * C_clamped + D) + (124.f/256.f);
 			else if (PS_BLEND_MIX == 1)
-				Color.rgb = ((A - B) * C_clamped + D) - (124.f/256.f);
+				{
+					// Preserve exact As128 identities without changing other blend factors.
+					if (PS_DST_FMT == FMT_32 && PS_BLEND_HW == 0 && PS_BLEND_A == 0 && PS_BLEND_B == 2 && PS_BLEND_C == 0 && PS_BLEND_D == 2 && !PS_COLCLIP && !PS_COLCLIP_HW && !PS_DITHER && !PS_FBMASK && !PS_SHUFFLE && !PS_ROUND_INV && !PS_PABE && !PS_A_MASKED && C == 1.0f)
+						Color.rgb = A;
+					else
+						Color.rgb = ((A - B) * C_clamped + D) - (124.f/256.f);
+				}
 			else
 				Color.rgb = trunc((A - B) * C + D);
 

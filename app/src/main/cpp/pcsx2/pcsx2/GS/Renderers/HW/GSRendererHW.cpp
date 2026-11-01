@@ -7,6 +7,7 @@
 #include "GS/Renderers/Common/GSDrawRoadConfig.h"
 #include "GS/Renderers/Common/GSFeedbackBarrierPlan.h"
 #include "GS/Renderers/Common/GSBlendConstantPolicy.h"
+#include "GS/Renderers/Common/GSPassScheduler.h"
 #include "GS/Renderers/HW/GSSpriteEdgeSnap.h"
 #include "GS/Renderers/HW/GSHwHack.h"
 #include "GS/Renderers/HW/GSTextureReplacements.h"
@@ -196,6 +197,85 @@ GSRendererHW::GSRendererHW()
 	ResetStates();
 }
 
+__fi void GSRendererHW::InvalidateBlendCarry() { m_blend_carry.valid = false; }
+__fi void GSRendererHW::CarryBlendBeforeSubmit(GSTextureCache::Target* rt, GSTextureCache::Target* ds, bool identity)
+{
+	if (m_channel_shuffle_width || !g_gs_device->Features().dual_source_blend || !m_conf.rt ||
+		m_conf.rt->GetFormat() != GSTexture::Format::Color || g_gs_device->GetColorClipTexture() ||
+		(GSConfig.CoalesceRenderPasses && GSPassScheduler::IsDeferrable(m_conf)))
+	{
+		InvalidateBlendCarry();
+		return;
+	}
+	const auto& alpha = m_context->ALPHA;
+	const u32 abcd = GSBlendCarry::PackAlpha(alpha.A, alpha.B, alpha.C, alpha.D);
+	if (identity)
+	{
+		if (GSBlendCarry::Elided(m_conf) && GSBlendCarry::Matches(m_blend_carry, m_conf, rt, ds, abcd))
+			GSBlendCarry::Adopt(m_blend_carry, m_conf);
+		else
+			InvalidateBlendCarry();
+	}
+	else if (GSBlendCarry::IsDonor(m_conf, abcd))
+		m_blend_carry = GSBlendCarry::Make(m_conf, rt, ds, abcd);
+	else
+		InvalidateBlendCarry();
+}
+
+__fi void GSRendererHW::SubmitHardwareDraw()
+{
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (m_blend_carry_capture)
+	{
+		m_blend_carry_capture(m_conf, m_blend_carry_capture_context);
+		return; // synthetic CPU profiles never reach an unsupported backend
+	}
+#endif
+	g_gs_device->RenderHW(m_conf);
+}
+
+__fi void GSRendererHW::SubmitDrawPrims(GSTextureCache::Target* rt, GSTextureCache::Target* ds, bool identity)
+{
+	CarryBlendBeforeSubmit(rt, ds, identity);
+	m_conf.road = GSDecideHWDrawRoad(m_conf, g_gs_device->Features());
+	if (!m_channel_shuffle_width)
+		SubmitHardwareDraw();
+	else
+	{
+		InvalidateBlendCarry();
+		m_last_rt = rt;
+	}
+}
+
+__fi bool GSRendererHW::EmulateBlendingWithIdentity(int blend_alpha_min, int blend_alpha_max, DATEOptions& date_options,
+	GSTextureCache::Target* rt, bool can_scale_rt_alpha, bool& new_scale_rt_alpha)
+{
+	const bool DATE = date_options.enabled;
+	bool identity = false;
+	if ((!IsOpaque() || m_context->ALPHA.IsBlack()) && rt && ((m_conf.colormask.wrgba & 0x7) || (m_texture_shuffle && !m_copy_16bit_to_target_shuffle && !m_same_group_texture_shuffle)))
+	{
+		EmulateBlending(blend_alpha_min, blend_alpha_max, date_options, rt, can_scale_rt_alpha, new_scale_rt_alpha);
+	}
+	else
+	{
+		m_conf.blend = {}; // No blending please
+		identity = rt && (m_conf.colormask.wrgba & 7) && PRIM->ABE && !m_context->ALPHA.IsBlack() &&
+			m_context->ALPHA.A == 0 && m_context->ALPHA.B == 1 && m_context->ALPHA.C == 0 && m_context->ALPHA.D == 1;
+
+		if (can_scale_rt_alpha && !new_scale_rt_alpha && m_conf.colormask.wa)
+		{
+			const bool afail_always_fb_alpha = m_cached_ctx.TEST.AFAIL == AFAIL_FB_ONLY || (m_cached_ctx.TEST.AFAIL == AFAIL_RGB_ONLY && GSLocalMemory::m_psm[m_cached_ctx.FRAME.PSM].trbpp != 32);
+			const bool always_passing_alpha = !m_cached_ctx.TEST.ATE || afail_always_fb_alpha || (m_cached_ctx.TEST.ATE && m_cached_ctx.TEST.ATST == ATST_ALWAYS);
+			const bool full_cover = rt->m_valid.rintersect(m_r).eq(rt->m_valid) && m_primitive_covers_without_gaps == NoGapsType::FullCover && !(DATE || !always_passing_alpha || !IsDepthAlwaysPassing());
+
+			// Restrict this to only when we're overwriting the whole target.
+			new_scale_rt_alpha = full_cover || rt->m_last_draw >= s_n;
+		}
+	}
+
+	return identity;
+}
+
 void GSRendererHW::SetTCOffset()
 {
 	m_userhacks_tcoffset_x = std::max<s32>(GSConfig.UserHacks_TCOffsetX, 0) / -1000.0f;
@@ -218,6 +298,7 @@ void GSRendererHW::Destroy()
 
 void GSRendererHW::PurgeTextureCache(bool sources, bool targets, bool hash_cache)
 {
+	InvalidateBlendCarry();
 	// Purges can precede GS device replacement while the renderer survives.
 	g_texture_cache->ReleaseClearPatterns();
 	g_texture_cache->RemoveAll(sources, targets, hash_cache);
@@ -245,6 +326,7 @@ float GSRendererHW::GetUpscaleMultiplier()
 
 void GSRendererHW::Reset(bool hardware_reset)
 {
+	InvalidateBlendCarry();
 	// Read back on CSR Reset, conditional downloading on render swap etc handled elsewhere.
 	if (!hardware_reset)
 		g_texture_cache->ReadbackAll();
@@ -277,6 +359,7 @@ void GSRendererHW::UpdateSettings(const Pcsx2Config::GSOptions& old_config)
 
 void GSRendererHW::VSync(u32 field, bool registers_written, bool idle_frame)
 {
+	InvalidateBlendCarry();
 	g_texture_cache->ProcessPendingDownloads();
 
 	if (GSConfig.LoadTextureReplacements)
@@ -2768,7 +2851,8 @@ void GSRendererHW::Draw()
 				m_last_rt->UpdateValidity(valid_area);
 
 				m_conf.road = GSDecideHWDrawRoad(m_conf, g_gs_device->Features());
-				g_gs_device->RenderHW(m_conf);
+				InvalidateBlendCarry();
+				SubmitHardwareDraw();
 
 				if (GSConfig.DumpGSData)
 				{
@@ -9105,24 +9189,8 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 	// AA1: Set alpha source to coverage 128 when there is no alpha blending.
 	m_conf.ps.fixed_one_a = IsCoverageAlpha();
 
-	if ((!IsOpaque() || m_context->ALPHA.IsBlack()) && rt && ((m_conf.colormask.wrgba & 0x7) || (m_texture_shuffle && !m_copy_16bit_to_target_shuffle && !m_same_group_texture_shuffle)))
-	{
-		EmulateBlending(blend_alpha_min, blend_alpha_max, date_options, rt, can_scale_rt_alpha, new_scale_rt_alpha);
-	}
-	else
-	{
-		m_conf.blend = {}; // No blending please
-
-		if (can_scale_rt_alpha && !new_scale_rt_alpha && m_conf.colormask.wa)
-		{
-			const bool afail_always_fb_alpha = m_cached_ctx.TEST.AFAIL == AFAIL_FB_ONLY || (m_cached_ctx.TEST.AFAIL == AFAIL_RGB_ONLY && GSLocalMemory::m_psm[m_cached_ctx.FRAME.PSM].trbpp != 32);
-			const bool always_passing_alpha = !m_cached_ctx.TEST.ATE || afail_always_fb_alpha || (m_cached_ctx.TEST.ATE && m_cached_ctx.TEST.ATST == ATST_ALWAYS);
-			const bool full_cover = rt->m_valid.rintersect(m_r).eq(rt->m_valid) && m_primitive_covers_without_gaps == NoGapsType::FullCover && !(DATE || !always_passing_alpha || !IsDepthAlwaysPassing());
-
-			// Restrict this to only when we're overwriting the whole target.
-			new_scale_rt_alpha = full_cover || rt->m_last_draw >= s_n;
-		}
-	}
+	const bool blend_identity = EmulateBlendingWithIdentity(blend_alpha_min, blend_alpha_max, date_options,
+		rt, can_scale_rt_alpha, new_scale_rt_alpha);
 
 	// Similar to IsRTWritten(), check if the rt will change.
 	const bool no_rt = !rt || !(m_conf.colormask.wrgba || m_channel_shuffle);
@@ -9414,11 +9482,7 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 		GSHWDrawConfig::DumpConfig(GetDrawDumpPath("%05d_hwconfig.txt", s_n), m_conf);
 	}
 
-	m_conf.road = GSDecideHWDrawRoad(m_conf, features);
-	if (!m_channel_shuffle_width)
-		g_gs_device->RenderHW(m_conf);
-	else
-		m_last_rt = rt;
+	SubmitDrawPrims(rt, ds, blend_identity);
 
 	CleanupDepthAsRTFeedback();
 }
@@ -10779,6 +10843,7 @@ void GSRendererHW::OffsetDraw(s32 fbp_offset, s32 zbp_offset, s32 xoffset, s32 y
 GSHWDrawConfig& GSRendererHW::BeginHLEHardwareDraw(
 	GSTexture* rt, GSTexture* ds, float rt_scale, GSTexture* tex, float tex_scale, const GSVector4i& unscaled_rect)
 {
+	InvalidateBlendCarry();
 	ResetStates();
 
 	// Bit gross, but really no other way to ensure there's nothing of the last draw left over.
@@ -10904,7 +10969,8 @@ void GSRendererHW::EndHLEHardwareDraw(bool force_copy_on_hazard /* = false */)
 	                       !GSDevice::IsDualSourceBlendFactor(config.blend.dst_factor));
 
 	config.road = GSDecideHWDrawRoad(config, g_gs_device->Features());
-	g_gs_device->RenderHW(m_conf);
+	InvalidateBlendCarry();
+	SubmitHardwareDraw();
 
 	if (copy)
 		g_gs_device->Recycle(copy);
@@ -10974,4 +11040,5 @@ void GSRendererHW::CleanupDepthAsRTFeedback()
 #include "GSDepthFloorTests.inl"
 #include "GSFeedbackDrawlistTargetTests.inl"
 #include "GSFeedbackBlendStageTests.inl"
+#include "GSBlendCarryRendererTests.inl"
 #endif
