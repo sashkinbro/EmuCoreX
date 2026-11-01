@@ -1183,6 +1183,28 @@ extern "C" void EmuCoreXOracleGSStripParse(const GIFPackedReg* packet,u32 count,
         else run.operator()<false,GSLimit24BitDepth::Disabled>();
     }
 }
+extern "C" void EmuCoreXOracleGSCarryingParse(u32 layout,const GIFPackedReg* packet,u32 count,
+    GSVertex* vertices,u64* xy,u64* meta,const GIFPackedLayout* offsets,u64 uvfog,
+    const GSVector4i* current,u32 latch,const s32* bounds,s32 ofx,s32 ofy,u32 depth)
+{
+    const GSStripKickKernel::Bounds b{bounds[0],bounds[1],bounds[2],bounds[3]};
+    const auto run=[&]<GSCarryingVertex::Layout L>(){
+        const GSCarryingVertex::BatchParser<L> parser{*offsets,uvfog,GSCarryingVertex::MakeCarry(L,*current,latch),
+            GSCarryingVertex::Consts{},static_cast<GSLimit24BitDepth>(depth)};
+        parser(packet,count,vertices,xy,meta,b,ofx,ofy);
+    };
+    using Layout=GSCarryingVertex::Layout;
+    switch(layout)
+    {
+        case 0:run.operator()<Layout::NopTriple>();break;
+        case 1:run.operator()<Layout::STQPair>();break;
+        case 2:run.operator()<Layout::UVPair>();break;
+        case 3:run.operator()<Layout::RGBAPair>();break;
+        case 4:run.operator()<Layout::UVTriple>();break;
+        default:pxFail("Invalid carrying parse oracle layout");break;
+    }
+}
+
 #endif
 
 extern "C" void EmuCoreXOracleGSStripKernelStats(u64* values)

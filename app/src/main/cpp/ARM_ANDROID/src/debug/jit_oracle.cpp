@@ -208,6 +208,7 @@ void CheckBits(bool pass, u32 actual, u32 expected, const char* name)
 #include "jit_oracle_gs_fused_trace.inl"
 #include "jit_oracle_gs_mirror_quad.inl"
 #include "jit_oracle_gs_carrying_layouts.inl"
+#include "jit_oracle_gs_carrying_quad.inl"
 #include "jit_oracle_gs_uploads.inl"
 #include "jit_oracle_gs_restarts.inl"
 #include "jit_oracle_gif_copy.inl"
@@ -12593,6 +12594,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         GSFusedTraceTests();
     else if (std::strcmp(suite, "gs-mirror-quad") == 0)
         GSMirrorQuadTests();
+    else if (std::strcmp(suite, "gs-carrying-quad") == 0)
+        GSCarryingQuadTests();
     else if (std::strcmp(suite, "gs-carrying-layouts") == 0)
         GSCarryingLayoutTests();
     else if (std::strcmp(suite, "gs-alpha-selectors") == 0)

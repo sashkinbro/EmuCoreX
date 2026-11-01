@@ -100,25 +100,72 @@ namespace GSCarryingVertex
         Consts constants;
         GSLimit24BitDepth depth;
         template<GSLimit24BitDepth D>
-        __forceinline_odr void Rows(const GIFPackedReg* r, u32 count, GSVertex* provisional,
-            u64* sideXY, u64* sideMeta, const GSStripKickKernel::Bounds& bounds, s32 ofx, s32 ofy) const
+        __forceinline_odr void DecodeRow(const GIFPackedReg* r,GSVertex& output) const
         {
-            for (u32 i=0; i<count; ++i,r+=off.stride)
+            GSVector4i m0,m1;Parse<L>(r,off,uvfog,carry,constants,m0,m1);
+            ClampDepth(m1,D);output.m[0]=m0;output.m[1]=m1;
+        }
+        template<GSLimit24BitDepth D,bool observe=false>
+        __forceinline_odr void Rows(const GIFPackedReg* r,u32 count,GSVertex* provisional,
+            u64* sideXY,u64* sideMeta,const GSStripKickKernel::Bounds& bounds,s32 ofx,s32 ofy) const
+        {
+            u32 i=0;
+            // These are the only carrying layouts with a production Rows
+            // consumer. STQ/UV pairs retain their existing sprite policy.
+            if constexpr(L==Layout::NopTriple||L==Layout::RGBAPair||L==Layout::UVTriple)
             {
-                GSVector4i m0,m1; Parse<L>(r,off,uvfog,carry,constants,m0,m1);
-                ClampDepth(m1,D); provisional[i].m[0]=m0;provisional[i].m[1]=m1;
-                const auto& xyz=r[off.off_xyz];
+                const auto mirror=GSStripKickKernel::MakeMirrorBounds(bounds,ofx,ofy);
+                for(const u32 quads=count&~3u;i<quads;i+=4)
+                {
+                    for(u32 j=0;j<4;++j)DecodeRow<D>(r+(i+j)*off.stride,provisional[i+j]);
+                    GSStripKickKernel::BuildMirrorQuad<observe>(vld1q_u32(r[(i+0)*off.stride+off.off_xyz].U32),
+                        vld1q_u32(r[(i+1)*off.stride+off.off_xyz].U32),vld1q_u32(r[(i+2)*off.stride+off.off_xyz].U32),
+                        vld1q_u32(r[(i+3)*off.stride+off.off_xyz].U32),mirror,sideXY+i,sideMeta+i);
+                }
+                if(i<count&&count>=4)
+                {
+                    const u32 back=count-4;
+                    GSStripKickKernel::BuildMirrorQuad<observe>(vld1q_u32(r[(back+0)*off.stride+off.off_xyz].U32),
+                        vld1q_u32(r[(back+1)*off.stride+off.off_xyz].U32),vld1q_u32(r[(back+2)*off.stride+off.off_xyz].U32),
+                        vld1q_u32(r[(back+3)*off.stride+off.off_xyz].U32),mirror,sideXY+back,sideMeta+back);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+                    if constexpr(observe)++GSStripKickKernel::MirrorStats[2];
+#endif
+                    for(;i<count;++i)DecodeRow<D>(r+i*off.stride,provisional[i]);
+                    return;
+                }
+            }
+            for(;i<count;++i)
+            {
+                const auto* row=r+i*off.stride;DecodeRow<D>(row,provisional[i]);
+                const auto& xyz=row[off.off_xyz];
                 const auto entry=GSStripKickKernel::MakeEntry(static_cast<s32>(xyz.XYZ2.X)-ofx,
                     static_cast<s32>(xyz.XYZ2.Y)-ofy,bounds);
                 sideXY[i]=entry.xy;sideMeta[i]=entry.meta|(static_cast<u64>(xyz.U32[3]&0x8000)<<45);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+                if constexpr(observe)++GSStripKickKernel::MirrorStats[1];
+#endif
             }
+        }
+        template<bool observe>
+        __forceinline_odr void Dispatch(const GIFPackedReg* r,u32 count,GSVertex* provisional,
+            u64* sideXY,u64* sideMeta,const GSStripKickKernel::Bounds& bounds,s32 ofx,s32 ofy) const
+        {
+            if(depth==GSLimit24BitDepth::PrioritizeUpper) Rows<GSLimit24BitDepth::PrioritizeUpper,observe>(r,count,provisional,sideXY,sideMeta,bounds,ofx,ofy);
+            else if(depth==GSLimit24BitDepth::PrioritizeLower) Rows<GSLimit24BitDepth::PrioritizeLower,observe>(r,count,provisional,sideXY,sideMeta,bounds,ofx,ofy);
+            else Rows<GSLimit24BitDepth::Disabled,observe>(r,count,provisional,sideXY,sideMeta,bounds,ofx,ofy);
         }
         __forceinline_odr void operator()(const GIFPackedReg* r,u32 count,GSVertex* provisional,
             u64* sideXY,u64* sideMeta,const GSStripKickKernel::Bounds& bounds,s32 ofx,s32 ofy) const
         {
-            if(depth==GSLimit24BitDepth::PrioritizeUpper) Rows<GSLimit24BitDepth::PrioritizeUpper>(r,count,provisional,sideXY,sideMeta,bounds,ofx,ofy);
-            else if(depth==GSLimit24BitDepth::PrioritizeLower) Rows<GSLimit24BitDepth::PrioritizeLower>(r,count,provisional,sideXY,sideMeta,bounds,ofx,ofy);
-            else Rows<GSLimit24BitDepth::Disabled>(r,count,provisional,sideXY,sideMeta,bounds,ofx,ofy);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+            if(GSStripKickKernel::MirrorObserve)
+            {
+                Dispatch<true>(r,count,provisional,sideXY,sideMeta,bounds,ofx,ofy);
+                return;
+            }
+#endif
+            Dispatch<false>(r,count,provisional,sideXY,sideMeta,bounds,ofx,ofy);
         }
     };
     template<bool fog> struct TripleBatchParser
