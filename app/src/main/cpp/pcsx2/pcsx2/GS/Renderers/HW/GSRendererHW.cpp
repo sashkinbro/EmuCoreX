@@ -11041,4 +11041,5 @@ void GSRendererHW::CleanupDepthAsRTFeedback()
 #include "GSFeedbackDrawlistTargetTests.inl"
 #include "GSFeedbackBlendStageTests.inl"
 #include "GSBlendCarryRendererTests.inl"
+#include "GSProvokingFallbackTests.inl"
 #endif

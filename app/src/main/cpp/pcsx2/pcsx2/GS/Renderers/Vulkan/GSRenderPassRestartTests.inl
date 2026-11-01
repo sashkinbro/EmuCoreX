@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: GPL-3.0+
 // Real restart regressions. Production restart functions remain the test subject.
 #include "GSBlendCarryDeviceTests.inl"
+#include "GSDriverSafetyTests.inl"
 #include "GSBlendCarryPixelTests.inl"
 void GSDeviceVK::TestRenderPassRestarts(void (*check)(bool, const char*))
 {
     check(m_tfx_preparation_device && !m_allocator, "GS restart fixture starts on an isolated preparation device");
     if (!m_tfx_preparation_device || m_allocator) return;
+    TestDriverSafety(check);
     TestBlendCarryCapability(check);
     std::vector<u64> initial_keys;
     for (const auto& item : m_render_pass_cache) initial_keys.push_back(item.first);

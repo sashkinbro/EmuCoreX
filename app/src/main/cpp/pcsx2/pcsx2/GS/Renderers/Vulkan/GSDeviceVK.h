@@ -304,6 +304,7 @@ private:
 	bool SelectDeviceFeatures();
 	bool CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer);
 	bool ProcessDeviceExtensions();
+	void FinalizeDriverCapabilities(bool depth_ready);
 
 	bool CreateAllocator();
 	bool CreateCommandBuffers();
@@ -863,6 +864,7 @@ public:
 	void TestTextureUploadRing(void (*check)(bool, const char*));
 	void TestRenderPassRestarts(void (*check)(bool, const char*));
 	void TestBlendCarryCapability(void (*check)(bool, const char*));
+	void TestDriverSafety(void (*check)(bool, const char*));
 	void TestBlendCarryPixels(void (*check)(bool, const char*));
 	void TestDrawRoad(void (*check)(bool, const char*));
 	void TestRoadFamilies(void (*check)(bool, const char*));

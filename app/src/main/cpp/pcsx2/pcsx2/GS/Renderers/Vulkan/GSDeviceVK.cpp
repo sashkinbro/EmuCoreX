@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2026 ARMSX2 Contributors
+// SPDX-FileCopyrightText: 2026 EmuCoreX Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "GS/GS.h"
@@ -903,6 +905,8 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 		m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state &=
 			(supported_dynamic_feedback_loop.attachmentFeedbackLoopDynamicState == VK_TRUE);
 	}
+
+	FinalizeDriverCapabilities(false);
 
 	if (m_optional_extensions.vk_ext_provoking_vertex)
 	{
@@ -3413,6 +3417,24 @@ bool GSDeviceVK::CreateDeviceAndSwapChain()
 	return true;
 }
 
+void GSDeviceVK::FinalizeDriverCapabilities(bool depth_ready)
+{
+	// Adapted from the exact GSGPUDriverProfile Vulkan rules. The provoking
+	// defect follows the raw proprietary ID, while Turnip allows resolved hints.
+	if (m_device_properties.vendorID == 0x5143 && m_optional_extensions.vk_khr_driver_properties &&
+		m_device_driver_properties.driverID == VK_DRIVER_ID_QUALCOMM_PROPRIETARY)
+		m_optional_extensions.vk_ext_provoking_vertex = false;
+
+	// Older/unknown Turnip can hang on discarding DATE draws using D32S8.
+	// Select plain D32 before texture/pass/pipeline consumers, preserving32bit Z.
+	if (depth_ready && m_road_facts.adreno && m_road_facts.driver == GSVulkanRoad::Driver::Turnip &&
+		(m_device_properties.driverVersion == 0 || m_device_properties.driverVersion < VK_MAKE_VERSION(26, 2, 0)))
+	{
+		m_features.stencil_buffer = false;
+		m_depth_format = VK_FORMAT_D32_SFLOAT;
+	}
+}
+
 bool GSDeviceVK::CheckFeatures()
 {
 	const VkPhysicalDeviceLimits& limits = m_device_properties.limits;
@@ -3477,6 +3499,7 @@ bool GSDeviceVK::CheckFeatures()
 		}
 		m_features.stencil_buffer = (m_depth_format != VK_FORMAT_D32_SFLOAT);
 	}
+	FinalizeDriverCapabilities(true);
 
 	// Fbfetch is useless if we don't have barriers enabled.
 	m_features.framebuffer_fetch &= m_features.texture_barrier;
