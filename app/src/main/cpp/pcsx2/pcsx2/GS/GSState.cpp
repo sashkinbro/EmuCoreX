@@ -1144,6 +1144,20 @@ extern "C" void EmuCoreXOracleGSStripOutlineStats(u64* values)
 {
     std::copy(std::begin(s_gsStripOutlineStats), std::end(s_gsStripOutlineStats), values);
 }
+extern "C" void EmuCoreXOracleSetGSLocalFmm(bool enabled,bool observe)
+{
+    GSStripKickKernel::LocalFmmEnabled=enabled;
+    GSStripKickKernel::LocalFmmObserve=observe;
+    GSStripKickKernel::LocalFmmMutation=0;
+    std::fill(std::begin(GSStripKickKernel::LocalFmmStats),std::end(GSStripKickKernel::LocalFmmStats),0);
+    GSStripKickKernel::MemberFmmChunks=0;
+}
+extern "C" void EmuCoreXOracleGSLocalFmmStats(u64* values)
+{
+    std::copy(std::begin(GSStripKickKernel::LocalFmmStats),std::end(GSStripKickKernel::LocalFmmStats),values);
+}
+extern "C" u64 EmuCoreXOracleGSMemberFmmChunks(){return GSStripKickKernel::MemberFmmChunks;}
+extern "C" void EmuCoreXOracleSetGSLocalFmmMutation(u32 value){GSStripKickKernel::LocalFmmMutation=value;}
 thread_local bool g_gsCarryingLayoutsEnabled = true;
 static thread_local bool s_gsCarryingLayoutsObserve = false;
 static thread_local u64 s_gsCarryingLayoutsStats[4] = {}; // handlers, vertices, kernel vertices, scalar descriptors
@@ -5380,9 +5394,9 @@ u32 GSState::KickPackedStripChunkParsed(const GIFPackedReg* RESTRICT r, u32 rema
 		if (s_gsStripKernelObserve)
 		{
 			if (s_gsStripKernelMutation == 1)
-				rect = Emit<prim, false, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM), s_gsStripKernelMutation);
+				rect = Emit<prim, false, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM), nullptr, s_gsStripKernelMutation);
 			else
-				rect = Emit<prim, true, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM), s_gsStripKernelMutation);
+				rect = Emit<prim, true, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM), nullptr, s_gsStripKernelMutation);
 		}
 		else
 			rect = Emit<prim, true, false>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM));

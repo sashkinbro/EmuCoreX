@@ -15,6 +15,13 @@ namespace GSStripKickKernel
     constexpr u64 kBandX=0x0fffffffull,kBandY=kBandX<<28,kOutcode=0xfull<<56,kAdc=1ull<<60;
     struct Bounds {s32 l,t,r,b;};
     struct Entry {u64 xy,meta;};
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+    // Native-only controls retain the old member path as a differential oracle.
+    inline thread_local bool LocalFmmEnabled=true,LocalFmmObserve=false;
+    inline thread_local u32 LocalFmmMutation=0;
+    inline thread_local u64 LocalFmmStats[3]={}; // local chunks, initialized copies, touched commits
+    inline thread_local u64 MemberFmmChunks=0;
+#endif
 
     __forceinline_odr bool InDomain(s32 x,s32 y)
     {
@@ -202,10 +209,10 @@ namespace GSStripKickKernel
 
     // The only state-machine pass. No GSState helper can observe provisional
     // writes, grow a buffer or flush in this bounded chunk.
-    template<u32 prim=GS_TRIANGLESTRIP,bool writeRing=true,bool observe=false,class Cursor>
+    template<u32 prim=GS_TRIANGLESTRIP,bool writeRing=true,bool observe=false,bool trackAcc=false,class Cursor>
     __forceinline_odr GSVector4i Emit(Cursor& cursor,GSVector4i* RESTRICT ring,
         const Entry* RESTRICT seed,const u64* RESTRICT sideXY,const u64* RESTRICT sideMeta,
-        u32 count,u32& accState,u32& scalarCulls,GSFusedVertexTrace::State& trace,u32 traceKey
+        u32 count,u32& accState,u32& scalarCulls,GSFusedVertexTrace::State& trace,u32 traceKey,bool* accTouched=nullptr
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
         ,u32 mutation=0
 #endif
@@ -272,6 +279,7 @@ namespace GSStripKickKernel
             indices+=3;itail+=3;tail=head+3;next=tail;
             if constexpr(strip)++head;else head=tail;
             trace.Triangle(vertices,tail-3,itail,traceKey);
+            if constexpr(trackAcc)if(trace.valid)*accTouched=true;
             const GSVector4i draw=NativeBBox(xy0,xy1,xy2).sra32<4>()+GSVector4i(0,0,1,1);
             if(accState)rect=rect.runion(draw);
             else {rect=draw;accState=(itail==3)?2:1;}
@@ -324,11 +332,51 @@ namespace GSStripKickKernel
         output.last0=GSVector4i(provisional[count-1].m[0]);
         output.last1=GSVector4i(provisional[count-1].m[1]);
         output.accState=output.scalarCulls=0;
-        output.rect=Emit<prim,writeRing,observe>(cursor,inv.ring,inv.seed,inv.sideXY,
-            inv.sideMeta,count,output.accState,output.scalarCulls,*inv.trace,inv.traceKey
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        if(!LocalFmmEnabled)
+        {
+            if(LocalFmmObserve)++MemberFmmChunks;
+            output.rect=Emit<prim,writeRing,observe>(cursor,inv.ring,inv.seed,inv.sideXY,
+                inv.sideMeta,count,output.accState,output.scalarCulls,*inv.trace,inv.traceKey,nullptr,inv.mutation);
+            return;
+        }
+        if(LocalFmmObserve)++LocalFmmStats[0];
+#endif
+        auto& owner=*inv.trace;
+        GSFusedVertexTrace::State local;
+        // Scalar metadata is initialized even when the cache is invalid. Its
+        // accumulator is not: preserve those stale bytes unless real work
+        // touches an initialized/reset accumulator during this chunk.
+        local.watermark=owner.watermark;local.indices=owner.indices;
+        local.vertexEnd=owner.vertexEnd;local.key=owner.key;local.valid=owner.valid;
+        if(local.valid)
+        {
+            local.acc=owner.acc;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+            if(LocalFmmObserve)++LocalFmmStats[1];
+#endif
+        }
+        else local.acc.Reset(false,false);
+        bool accTouched=false;
+        output.rect=Emit<prim,writeRing,observe,true>(cursor,inv.ring,inv.seed,inv.sideXY,
+            inv.sideMeta,count,output.accState,output.scalarCulls,local,inv.traceKey,&accTouched
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
             ,inv.mutation
 #endif
             );
+        if(accTouched)
+        {
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+            if(LocalFmmMutation!=1)
+#endif
+            {
+                owner.acc=local.acc;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+                if(LocalFmmObserve)++LocalFmmStats[2];
+#endif
+            }
+        }
+        owner.watermark=local.watermark;owner.indices=local.indices;
+        owner.vertexEnd=local.vertexEnd;owner.key=local.key;owner.valid=local.valid;
     }
 }
