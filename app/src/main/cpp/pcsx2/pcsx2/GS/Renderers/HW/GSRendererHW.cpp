@@ -5530,10 +5530,14 @@ void GSRendererHW::EmulateZbuffer(const GSTextureCache::Target* ds)
 	m_conf.cb_vs.max_depth = 0xFFFFFFFF;
 	m_conf.cb_ps.TA_MaxDepth_Af.z = 0.0f;
 	m_conf.ps.zclamp = false;
+	// At Z >= 2^23, a float32 ULP is at least one integer PS2 Z unit.
+	// Flooring the interpolated normalized value is therefore an identity;
+	// omit its fragment-depth output so fixed-function depth can stay active.
+	const bool zfloor_is_noop = static_cast<u32>(GSVector4i(m_vt.m_min.p).z) >= (1u << 23);
 
 	// Even when Z is read-only, Z floor must be enabled with ZTST_GREATER since otherwise there
 	// can be false passing if the incoming Z is not floored when the buffer value is floored.
-	m_conf.ps.zfloor = !flat_z &&
+	m_conf.ps.zfloor = !flat_z && !zfloor_is_noop &&
 		(m_cached_ctx.DepthWrite() || (m_cached_ctx.DepthRead() && m_cached_ctx.TEST.ZTST == ZTST_GREATER));
 
 	if (m_cached_ctx.DepthWrite() && large_z)
@@ -10983,3 +10987,7 @@ void GSRendererHW::CleanupDepthAsRTFeedback()
 		m_conf.ds_as_rt = nullptr;
 	}
 }
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#include "GSDepthFloorTests.inl"
+#endif

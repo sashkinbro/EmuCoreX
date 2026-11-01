@@ -46,6 +46,7 @@
 #include "GS/Renderers/Vulkan/VKShaderCache.h"
 #include "GS/Renderers/Vulkan/VKSwapchainCreate.h"
 #include "GS/Renderers/HW/GSSpriteEdgeSnap.h"
+#include "GS/Renderers/HW/GSRendererHW.h"
 #include "GameDatabase.h"
 #include "GS/Renderers/Common/GSPassScheduler.h"
 #include "common/FileSystem.h"
@@ -12580,6 +12581,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         IOPTests(false, false, false, true);
     else if (std::strcmp(suite, "gif-copy") == 0)
         GifCopyTests();
+    else if (std::strcmp(suite, "gs-depth-floor") == 0)
+        GSRendererHW::TestDepthFloor(Check);
     else if (std::strcmp(suite, "gs-restarts") == 0)
         GSRestartTests();
     else if (std::strcmp(suite, "gs-uploads") == 0)
