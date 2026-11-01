@@ -74,13 +74,18 @@ namespace saved
         out.regionNodes=out.nodes.size(); out.regionBytes=out.code.size(); out.regions=1;
         return true;
     }
-    void Save(microVU& mvu)
+    bool SaveProgram(microVU& mvu, microProgram& program, Program& state)
     {
-        if(!mVUProgCache::SidecarsEnabled(1)) return;
-        for(const auto& [program,state]:runtime.programs)
-        {
-            if((state.jobs.empty() && state.declined.empty()) || !program->contentKeyValid) continue;
-            wire::File file; file.id=Identity(mvu,*program);
+        if(!state.saveDirty || !mVUProgCache::SidecarsEnabled(1) || !program.contentKeyValid) return false;
+        const auto retainedPlan=[&](const std::shared_ptr<BuildJob>& job) {
+            return job && job->loadedPlan && job->loadedPlanEpoch==state.planEpoch;
+        };
+        if(state.jobs.empty() && state.declined.empty() && state.savedPlans.empty() &&
+            !retainedPlan(state.pending) && std::none_of(state.ready.begin(),state.ready.end(),retainedPlan)) return false;
+        // Immutable baseline episodes contain original private targets even
+        // while live callers and block managers point at native regions.
+        if(!mVUProgCache::SaveProgram(mvu,program)) return false;
+        wire::File file; file.id=Identity(mvu,program);
             file.tiers=state.tiers; file.settled=state.settled; file.jumpTargets=state.jumpTargets;
             file.declinedRoots=state.declined;
             for(const auto& job:state.jobs)
@@ -97,10 +102,48 @@ namespace saved
                 if(job->retier) file.records.clear();
                 file.records.push_back(std::move(record));
             }
-            auto snapshot=std::make_shared<wire::File>(std::move(file));
-            const auto hash=mVUProgCache::ProgramKey(program->contentKey);
-            mVUProgCache::QueueSidecar(1,hash,[snapshot] { return wire::Serialize(*snapshot); });
-        }
+        // A loaded root which has not published must not disappear from a
+        // newer snapshot merely because its compiler worker is busy/held.
+        std::vector<const wire::Record*> plans;
+        for(const auto& record:state.savedPlans) plans.push_back(&record);
+        const auto preserve=[&](const std::shared_ptr<BuildJob>& job) {
+            if(retainedPlan(job)) plans.push_back(job->loadedPlan.get());
+        };
+        preserve(state.pending);
+        for(const auto& job:state.ready) preserve(job);
+        // Physical ownership order is not file order: a held generation may
+        // be pending/ready while its roots remain in the unsubmitted queue.
+        // An already published native generation supersedes its source plan.
+        if(file.records.empty())
+            for(const auto* record:plans)
+                if(record->kind==wire::kGeneration) { file.records.push_back(*record); break; }
+        for(const auto* record:plans)
+            if(record->kind==wire::kRoot) file.records.push_back(*record);
+        auto snapshot=std::make_shared<const wire::File>(std::move(file));
+        const auto hash=mVUProgCache::ProgramKey(program.contentKey);
+        if(!mVUProgCache::QueueSidecar(1,hash,[snapshot] { return wire::Serialize(*snapshot); })) return false;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        ++runtime.stats.quietSaveQueues;
+#endif
+        state.saveDirty=false;
+        return true;
+    }
+    void Save(microVU& mvu)
+    {
+        for(auto& [program,state]:runtime.programs) SaveProgram(mvu,*program,state);
+    }
+    void MaybeSave(microVU& mvu, microProgram& owner, Program& state)
+    {
+        constexpr u32 quiet=live::kRetierCheckMask+1;
+        const u32 total=state.runs+state.jumpRuns;
+        if(!state.saveDirty || state.pending || !state.ready.empty() ||
+            total-state.publishRuns<quiet || total-state.saveAttemptRuns<quiet || oakHasBlock()) return;
+        // Failed payload/queue attempts remain dirty, but are bounded too.
+        state.saveAttemptRuns=total;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        ++runtime.stats.quietSaveAttempts;
+#endif
+        SaveProgram(mvu,owner,state);
     }
     std::shared_ptr<BuildJob> Plan(microVU& mvu, const wire::Record& record, const Program& state)
     {
@@ -208,16 +251,21 @@ namespace saved
             else state.savedPlans.push_back(record);
         }
         state.tiers=std::max(state.tiers,file.tiers);
+        state.saveDirty=false; // these imported records already exist on disk
         return installed;
     }
     void StartPlan(microVU& mvu, Program& state)
     {
         while(!state.pending && !state.savedPlans.empty())
         {
-            auto record=std::move(state.savedPlans.front()); state.savedPlans.pop_front();
-            auto job=Plan(mvu,record,state); if(!job) continue;
+            auto job=Plan(mvu,state.savedPlans.front(),state);
+            if(!job) { state.savedPlans.pop_front(); continue; }
             runtime.worker.Start();
-            if(runtime.worker.Submit(job)) { state.pending=job; ++runtime.stats.savedPlanJobs; }
+            if(!runtime.worker.Submit(job)) break; // retain the unsubmitted root
+            job->loadedPlan=std::make_shared<const wire::Record>(std::move(state.savedPlans.front()));
+            job->loadedPlanEpoch=state.planEpoch;
+            state.savedPlans.pop_front();
+            state.pending=job; ++runtime.stats.savedPlanJobs;
         }
     }
 }

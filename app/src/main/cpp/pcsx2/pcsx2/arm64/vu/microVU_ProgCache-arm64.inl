@@ -982,13 +982,26 @@ bool ReadSidecar(u32 vu_index, const XXH128_hash_t& hash, std::vector<u8>& out)
 	return true;
 }
 
-void QueueSidecar(u32 vu_index, const XXH128_hash_t& hash, std::function<std::vector<u8>()> build)
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+static std::atomic<bool> s_rejectSidecarQueueForTest{false};
+void TestRejectSidecarQueue(bool reject) { s_rejectSidecarQueueForTest.store(reject,std::memory_order_release); }
+u64 TestSidecarGeneration(u32 vu_index)
+{
+	State& s=g_state[vu_index&1]; std::lock_guard<std::mutex> lock(s.mu);
+	return s.pack?s.pack->sidecarGeneration:0;
+}
+#endif
+bool QueueSidecar(u32 vu_index, const XXH128_hash_t& hash, std::function<std::vector<u8>()> build)
 {
 	State& s = g_state[vu_index & 1];
 	std::lock_guard<std::mutex> lock(s.mu);
 	if (!s.initialized || !s.enabled || !s.pack)
-		return;
+		return false;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (s_rejectSidecarQueueForTest.load(std::memory_order_acquire)) return false;
+#endif
 	s.pack->builders[hash] = std::move(build);
+	return true;
 }
 
 void FlushSidecars(u32 vu_index)
@@ -1175,11 +1188,11 @@ ClearResult OnVuAotSettingChanged(bool wasOn, bool isOn, bool programCacheStillO
 	return ClearVuAot(!programCacheStillOn);
 }
 
-void SaveProgram(microVU& mVU, const microProgram& prog)
+bool SaveProgram(microVU& mVU, const microProgram& prog)
 {
 	State& s = g_state[mVU.index & 1];
 	if (!s.initialized || !s.enabled || !prog.contentKeyValid)
-		return;
+		return false;
 	std::shared_ptr<Pack> p;
 	const u64 shape = mVUPersist::LogShape(prog);
 	{
@@ -1187,17 +1200,18 @@ void SaveProgram(microVU& mVU, const microProgram& prog)
 		s.st.savesAttempted++;
 		p = s.pack;
 		if (!p || !shape)
-			return; // (no persist log: recording off, or the program is not persistable)
+			return false; // (no persist log: recording off, or the program is not persistable)
 		auto it = p->table.find(ProgramKey(prog.contentKey));
 		if (it != p->table.end() && it->second.program && it->second.shape == shape)
-			return; // (the stored image already holds every block)
+			return true; // (the stored image already holds every block)
 	}
 
 	std::vector<u8> image;
 	if (!mVUPersist::SerializeProgram(mVU, prog, image))
-		return;
+		return false;
 
 	std::lock_guard<std::mutex> lock(s.mu);
+	if (!s.enabled || s.pack != p) return false;
 	Entry& e = p->table[ProgramKey(prog.contentKey)];
 	if (e.program)
 		p->ramBytes -= e.program->size();
@@ -1206,6 +1220,7 @@ void SaveProgram(microVU& mVU, const microProgram& prog)
 	e.shape = shape;
 	e.programDirty = true;
 	s.st.payloadWrites++;
+	return true;
 }
 
 void SaveAllPrograms(microVU& mVU)

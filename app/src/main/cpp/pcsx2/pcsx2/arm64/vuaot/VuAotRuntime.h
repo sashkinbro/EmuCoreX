@@ -42,6 +42,7 @@ namespace mvu_aot
 		u64 readyDeferred = 0, readyPublished = 0, readyStale = 0, readyEvicted = 0, readyDuplicates = 0;
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 		u64 automaticJobs = 0;
+		u64 quietSaveAttempts = 0, quietSaveQueues = 0;
 #endif
 	};
 	// Read on the VU owner, or with that owner quiescent.
@@ -63,6 +64,11 @@ namespace mvu_aot
 	u64 CurrentOwnerForTest();
 	u32 BoundStaticLinksForTest();
 	bool TestStaticLinkWords(bool restore);
+	void TestDirtyQuietSave();
+	bool QuietSaveDirtyForTest();
+	u32 TestFillQuietWorkerQueue();
+	void TestClearQuietWorkerQueue();
+	u32 SavedPlanCountForTest();
 	u64 BailCount();
     void CountEntries(bool on);
     void SetTierUpRuns(u32 runs);

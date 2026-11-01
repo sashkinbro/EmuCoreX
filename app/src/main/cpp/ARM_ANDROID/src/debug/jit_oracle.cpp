@@ -2266,6 +2266,9 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vuaot_existing_child.inl"
 #include "jit_oracle_vuaot_internal_vi.inl"
 #include "jit_oracle_vuaot_existing_child_cold.inl"
+#include "jit_oracle_vuaot_quiet_cache.inl"
+#include "jit_oracle_vuaot_quiet_generation.inl"
+#include "jit_oracle_vuaot_quiet_generation_cold.inl"
 #include "jit_oracle_vuaot_ready_jobs.inl"
 #include "jit_oracle_vif_pair_copy.inl"
 #include "jit_oracle_vuaot_division.inl"
@@ -12452,6 +12455,16 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         RunVuAotSavedTests();
     else if (std::strcmp(suite, "vu-aot-division") == 0)
         RunVuAotDivisionTests();
+    else if (std::strcmp(suite, "vu-aot-quiet-generation-cold-write") == 0)
+        RunVuAotQuietGenerationTests(true);
+    else if (std::strcmp(suite, "vu-aot-quiet-generation-cold-read") == 0)
+        RunVuAotQuietGenerationColdReadTests();
+    else if (std::strcmp(suite, "vu-aot-quiet-generation") == 0)
+        RunVuAotQuietGenerationTests();
+    else if (std::strcmp(suite, "vu-aot-quiet-cache-write") == 0)
+        RunVuAotQuietCacheTests(true);
+    else if (std::strcmp(suite, "vu-aot-quiet-cache-read") == 0)
+        RunVuAotQuietCacheTests(false);
     else if (std::strcmp(suite, "vu-aot-clamp-reuse") == 0)
         RunVuAotClampReuseTests();
     else if (std::strcmp(suite, "vu-aot-compile-roots") == 0)

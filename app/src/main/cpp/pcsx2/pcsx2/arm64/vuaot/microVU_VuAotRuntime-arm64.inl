@@ -67,6 +67,8 @@ namespace mvu_aot
 			bool accepted = false, body = false;
 			bool dropAllowed = false, dropped = false;
 			bool viaJump = false, retier = false;
+			std::shared_ptr<const vuaot::persist::Record> loadedPlan;
+			u32 loadedPlanEpoch = 0;
 			std::map<u32, std::vector<u32>> jumpTargets;
 			bg::CodeSink* sink = nullptr;
 			void Run() override;
@@ -100,6 +102,8 @@ namespace mvu_aot
 			std::unordered_set<microBlock*> queuedRoots, coveredRoots;
 			std::set<RootIdentity> queuedRootKeys, coveredRootKeys;
 			bool rootsSeeded = false;
+			bool saveDirty = false;
+			u32 publishRuns = 0, saveAttemptRuns = 0, planEpoch = 0;
 			std::vector<std::shared_ptr<BuildJob>> jobs;
 			std::unordered_set<void*> entries;
 			std::shared_ptr<BuildJob> pending;
@@ -119,7 +123,13 @@ namespace mvu_aot
                 root.pc = trace.startPC;
                 std::memcpy(root.key.data(), trace.entryState, 96);
                 declined.push_back(root);
+				MarkSavedDirty();
             }
+			void MarkSavedDirty()
+			{
+				saveDirty = true;
+				publishRuns = runs + jumpRuns;
+			}
 		};
 		struct StaticBranch
 		{
@@ -298,6 +308,7 @@ namespace mvu_aot
 			for (auto it = state.jumpTargets.begin(); it != state.jumpTargets.end();)
 				it = it->second.empty() ? state.jumpTargets.erase(it) : std::next(it);
 			runtime.stats.targetsRecorded += added;
+			if (added) state.MarkSavedDirty();
 			return added;
 		}
 
@@ -977,6 +988,8 @@ namespace mvu_aot
                     {
                         runtime.stats.retiers++;
                         program.declined.clear();
+						++program.planEpoch;
+						program.savedPlans.clear();
                     }
 					else if (job->viaJump)
 						runtime.stats.jumpTierUps++;
@@ -989,6 +1002,7 @@ namespace mvu_aot
                 Perf::vu1.Register(base + job->code.size(),
                     static_cast<size_t>(mvu.prog.x86ptr - base) - job->code.size(), "vu-aot-bridge");
 				program.jobs.push_back(job);
+				program.MarkSavedDirty();
 				for (const auto& node : job->nodes)
 				{
 					program.coveredRoots.insert(node->baselineBlock);
@@ -1507,6 +1521,7 @@ namespace mvu_aot
 			++runtime.stats.dispatches;
 		}
 		LogStats();
+		saved::MaybeSave(mvu, *mvu.prog.cur, program);
 		// A normal lookup already returns the latest patched entry. Only a job
 		// published during this call needs a search through its new node keys.
 		if (changed)
@@ -1540,7 +1555,10 @@ namespace mvu_aot
 				if (retier)
 					program.emptyChecks = 0;
 				else if (++program.emptyChecks >= live::kSettleChecks)
+				{
 					program.settled = true;
+					program.MarkSavedDirty();
+				}
 			}
 		}
 		if (!retier)
@@ -1700,6 +1718,39 @@ namespace mvu_aot
 	u64 InlineBodyEntryCount(u32 pc) { return inlineBodyEntries[(pc & 0x3ff8) >> 3]; }
 	u64 NativeRegionEntryCount(u32 pc) { return nativeRegionEntries[(pc & 0x3ff8) >> 3]; }
 	u64 CurrentOwnerForTest() { return reinterpret_cast<u64>(microVU1.prog.cur); }
+	void TestDirtyQuietSave()
+	{
+		const auto it=runtime.programs.find(microVU1.prog.cur);
+		if(it!=runtime.programs.end()) it->second.MarkSavedDirty();
+	}
+	bool QuietSaveDirtyForTest()
+	{
+		const auto it=runtime.programs.find(microVU1.prog.cur);
+		return it!=runtime.programs.end() && it->second.saveDirty;
+	}
+	namespace
+	{
+		struct QuietQueueFiller final : bg::Job { void Run() override {} };
+		std::shared_ptr<QuietQueueFiller> quietQueueFiller;
+	}
+	u32 TestFillQuietWorkerQueue()
+	{
+		runtime.worker.Hold(true); runtime.worker.Start();
+		quietQueueFiller=std::make_shared<QuietQueueFiller>();
+		u32 count=0;
+		while(count<=bg::Worker::kMaxQueued && runtime.worker.Submit(quietQueueFiller)) ++count;
+		return count;
+	}
+	void TestClearQuietWorkerQueue()
+	{
+		runtime.worker.RemoveQueued([](const bg::Job& job) { return &job==quietQueueFiller.get(); });
+		quietQueueFiller.reset();
+	}
+	u32 SavedPlanCountForTest()
+	{
+		const auto it=runtime.programs.find(microVU1.prog.cur);
+		return it==runtime.programs.end()?0:static_cast<u32>(it->second.savedPlans.size());
+	}
 	u32 BoundStaticLinksForTest()
 	{
 		return static_cast<u32>(std::count_if(runtime.staticBranches.begin(), runtime.staticBranches.end(),

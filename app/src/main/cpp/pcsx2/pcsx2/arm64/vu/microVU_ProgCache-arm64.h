@@ -89,7 +89,7 @@ namespace mVUProgCache
 	// Stores one program's serialized block graph in the table, unless the
 	// stored image already holds every block (mVUPersist::LogShape). A program
 	// with no persist log (recording off, or non-persistable) stores nothing.
-	void SaveProgram(microVU& mVU, const microProgram& prog);
+	bool SaveProgram(microVU& mVU, const microProgram& prog);
 
 	// Promote a stored program to a live one: hydrates the block graph through
 	// mVUPersist::HydrateProgram and returns the new program (registered in
@@ -111,7 +111,11 @@ namespace mVUProgCache
 	// Queues a sidecar: `build` runs on the writer thread at its next flush (or on the reader's thread, if
 	// ReadSidecar asks first) and returns the bytes to store, or nothing to keep what is stored. A newer
 	// request for a hash replaces an older one still queued. The caller's thread never touches the disk.
-	void QueueSidecar(u32 vu_index, const XXH128_hash_t& hash, std::function<std::vector<u8>()> build);
+	bool QueueSidecar(u32 vu_index, const XXH128_hash_t& hash, std::function<std::vector<u8>()> build);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	void TestRejectSidecarQueue(bool reject);
+	u64 TestSidecarGeneration(u32 vu_index);
+#endif
 	// Builds every queued sidecar and writes everything that changed to disk now, and waits for it.
 	void FlushSidecars(u32 vu_index);
 
