@@ -2262,6 +2262,7 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vuaot_compile_roots.inl"
 #include "jit_oracle_vuaot_compile_branch.inl"
 #include "jit_oracle_vuaot_static_link_safety.inl"
+#include "jit_oracle_vuaot_conditional_fall.inl"
 #include "jit_oracle_vuaot_compile_branch_cold.inl"
 #include "jit_oracle_vuaot_existing_child.inl"
 #include "jit_oracle_vuaot_internal_vi.inl"
@@ -12485,6 +12486,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         RunVuAotCompileBranchColdTests(false);
     else if (std::strcmp(suite, "vu-aot-compile-branch-boundaries") == 0)
         RunVuAotCompileBranchBoundaryTests(mvu_aot::InlineBodyEntryCount);
+    else if (std::strcmp(suite, "vu-aot-conditional-fall") == 0)
+        RunVuAotConditionalFallTests();
     else if (std::strcmp(suite, "vu-aot-static-link-safety") == 0)
         RunVuAotStaticLinkSafetyTests();
     else if (std::strcmp(suite, "vu-aot-internal-vi-taken") == 0)

@@ -1052,11 +1052,20 @@ void condBranch(mV, microFlagCycles& mFC, oak::Cond JMPcc)
 		incPC2(-1);
 		if (bBlock) // Branch non-taken has already been compiled
 		{
-			recBeginOaknutEmit();
-			const void* const fallTarget = mVU.index == 1 && EmuConfig.Cpu.Recompiler.EnableVUAot ?
-				mvu_aot::CanonicalStaticTarget(bBlock->x86ptrStart) : bBlock->x86ptrStart;
-			oakEmitCondBranch(oak::invert(JMPcc), fallTarget);
-			recEndOaknutEmit();
+			if (mVU.index == 1 && EmuConfig.Cpu.Recompiler.EnableVUAot)
+			{
+				// Keep the conditional local and give the child the same
+				// patchable private B26 tail as every other static edge.
+				u8* const skipFall = mVUBranchCondPatchpoint_emit_oaknut();
+				mVUBranchLinkBlock_emit_oaknut(mVU, bBlock->x86ptrStart);
+				mVUBranchPatchCondToHere_emit_oaknut(skipFall, JMPcc);
+			}
+			else
+			{
+				recBeginOaknutEmit();
+				oakEmitCondBranch(oak::invert(JMPcc), bBlock->x86ptrStart);
+				recEndOaknutEmit();
+			}
 			incPC(-3); // Go back to branch opcode (to get branch imm addr)
 			normBranchCompile(mVU, branchAddr(mVU));
 		}
