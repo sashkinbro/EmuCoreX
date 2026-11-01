@@ -1300,9 +1300,9 @@ void GSState::KickPackedBatch(const GIFPackedReg* RESTRICT r, u32 size)
 #endif
 	for (const GIFPackedReg* end = r + size; r < end;)
 	{
-		if constexpr (prim == GS_TRIANGLESTRIP)
+		if constexpr (prim == GS_TRIANGLESTRIP || prim == GS_TRIANGLELIST)
 		{
-			const u32 consumed = KickPackedStripChunk<xyzf2>(r, static_cast<u32>((end - r) / 3), c, uvfog, depth, m0, m1);
+			const u32 consumed = KickPackedStripChunk<prim, xyzf2>(r, static_cast<u32>((end - r) / 3), c, uvfog, depth, m0, m1);
 			if (consumed)
 			{
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
@@ -5319,29 +5319,30 @@ void GSState::PublishNativeMirror(u32 xy_tail,u32 count,const GSVector4i& cull,
 #endif
 }
 
-template <bool xyzf2>
+template <u32 prim, bool xyzf2>
 u32 GSState::KickPackedStripChunk(const GIFPackedReg* RESTRICT r, u32 remaining,
     VertexKickCursor& c, u64 uvfog, GSLimit24BitDepth depth, GSVector4i& last0, GSVector4i& last1)
 {
 #if defined(ARCH_ARM64)
-    return KickPackedStripChunkParsed(r, remaining, c, GSCarryingVertex::TripleBatchParser<xyzf2>{uvfog, depth}, last0, last1);
+    return KickPackedStripChunkParsed<prim>(r, remaining, c, GSCarryingVertex::TripleBatchParser<xyzf2>{uvfog, depth}, last0, last1);
 #else
     return 0;
 #endif
 }
 
-template <class Parser>
+template <u32 prim, class Parser>
 u32 GSState::KickPackedStripChunkParsed(const GIFPackedReg* RESTRICT r, u32 remaining,
     VertexKickCursor& c, const Parser& parser, GSVector4i& last0, GSVector4i& last1)
 {
 #if defined(ARCH_ARM64)
 	using namespace GSStripKickKernel;
+	static_assert(prim == GS_TRIANGLESTRIP || prim == GS_TRIANGLELIST);
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	if (!s_gsStripKernelEnabled) return 0;
 #endif
 	if (remaining < kMinVertices || !m_nativeres || PRIM->AA1 || m_scissor_invalid ||
 		(m_context->XYOFFSET.U64 & ~0x0000ffff0000ffffull)) return 0;
-	constexpr u32 vertexLimit = MaxVerticesForPrim(GS_TRIANGLESTRIP);
+	constexpr u32 vertexLimit = MaxVerticesForPrim(prim);
 	if (c.tail >= c.maxcount || c.tail >= vertexLimit) return 0;
 	const u32 indexLimit = (c.maxcount + 3) * 6;
 	if (c.itail >= indexLimit) return 0;
@@ -5379,12 +5380,12 @@ u32 GSState::KickPackedStripChunkParsed(const GIFPackedReg* RESTRICT r, u32 rema
 		if (s_gsStripKernelObserve)
 		{
 			if (s_gsStripKernelMutation == 1)
-				rect = Emit<false, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM));
+				rect = Emit<prim, false, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM), s_gsStripKernelMutation);
 			else
-				rect = Emit<true, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM));
+				rect = Emit<prim, true, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM), s_gsStripKernelMutation);
 		}
 		else
-			rect = Emit<true, false>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM));
+			rect = Emit<prim, true, false>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM));
 	}
 	else
 #endif
@@ -5392,7 +5393,7 @@ u32 GSState::KickPackedStripChunkParsed(const GIFPackedReg* RESTRICT r, u32 rema
 		const ChunkInvariants<Parser> inv{parser, bounds, ofx, ofy, seed, m_vertex.xy,
 			m_strip_side_xy, m_strip_side_meta, &m_fused_trace, GSFusedVertexTrace::Key(*PRIM)
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
-			, s_gsStripOutlineObserve ? s_gsStripOutlineStats : nullptr
+			, s_gsStripOutlineObserve ? s_gsStripOutlineStats : nullptr, s_gsStripKernelMutation
 #endif
 		};
 		ChunkOutput output;
@@ -5400,13 +5401,13 @@ u32 GSState::KickPackedStripChunkParsed(const GIFPackedReg* RESTRICT r, u32 rema
 		if (s_gsStripKernelObserve)
 		{
 			if (s_gsStripKernelMutation == 1)
-				RunChunk<false, true>(r, count, c, inv, output);
+				RunChunk<prim, false, true>(r, count, c, inv, output);
 			else
-				RunChunk<true, true>(r, count, c, inv, output);
+				RunChunk<prim, true, true>(r, count, c, inv, output);
 		}
 		else
 #endif
-			RunChunk<true, false>(r, count, c, inv, output);
+			RunChunk<prim, true, false>(r, count, c, inv, output);
 		last0 = output.last0; last1 = output.last1;
 		rect = output.rect; accState = output.accState; scalarCulls = output.scalarCulls;
 	}
@@ -6420,7 +6421,7 @@ void GSState::GIFPackedRegHandlerCarrying(const GIFPackedReg* RESTRICT r, u32 si
 				if constexpr (prim == GS_TRIANGLESTRIP)
 				{
 					const BatchParser<layout> parser{off, uvfog, carry, constants, depth};
-					const u32 consumed = KickPackedStripChunkParsed(record, count - done, c, parser, m0, m1);
+					const u32 consumed = KickPackedStripChunkParsed<prim>(record, count - done, c, parser, m0, m1);
 					if (consumed)
 					{
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)

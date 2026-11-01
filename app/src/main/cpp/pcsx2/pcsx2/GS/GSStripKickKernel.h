@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 EmuCoreX Team
 // SPDX-License-Identifier: GPL-3.0+
 // Adapted from GSVertexKickKernel.h at cb78946d6ed0678b82fa3e0409c10124265ec18d.
-// Local native-grid strip kernel. Buffer ownership, flushing and FMM stay in GSState.
+// Local native-grid triangle kernel. Buffer ownership and flushing stay in GSState.
 #pragma once
 
 #include "GS/Renderers/Common/GSVertex.h"
@@ -202,11 +202,17 @@ namespace GSStripKickKernel
 
     // The only state-machine pass. No GSState helper can observe provisional
     // writes, grow a buffer or flush in this bounded chunk.
-    template<bool writeRing=true,bool observe=false,class Cursor>
+    template<u32 prim=GS_TRIANGLESTRIP,bool writeRing=true,bool observe=false,class Cursor>
     __forceinline_odr GSVector4i Emit(Cursor& cursor,GSVector4i* RESTRICT ring,
         const Entry* RESTRICT seed,const u64* RESTRICT sideXY,const u64* RESTRICT sideMeta,
-        u32 count,u32& accState,u32& scalarCulls,GSFusedVertexTrace::State& trace,u32 traceKey)
+        u32 count,u32& accState,u32& scalarCulls,GSFusedVertexTrace::State& trace,u32 traceKey
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        ,u32 mutation=0
+#endif
+        )
     {
+        static_assert(prim==GS_TRIANGLESTRIP||prim==GS_TRIANGLELIST);
+        constexpr bool strip=prim==GS_TRIANGLESTRIP;
         GSVertex* RESTRICT vertices=cursor.vb;
         u32 head=cursor.head,tail=cursor.tail,next=cursor.next,itail=cursor.itail;
         const u32 xyTail=cursor.xy_tail;
@@ -221,17 +227,50 @@ namespace GSStripKickKernel
             xy2=xy1;meta2=meta1;xy1=xy0;meta1=meta0;xy0=sideXY[i];meta0=sideMeta[i];
             vertices[tail]=*provisional++;
             if(++tail-head<3)continue;
-            if(meta0&kAdc){++head;continue;}
+            if(meta0&kAdc)
+            {
+                if constexpr(strip)++head;
+                else
+                {
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+                    if constexpr(observe)
+                    {
+                        if(mutation==3)++head; // wrong strip-style list rewind
+                        else tail=head;
+                    }
+                    else
+#endif
+                        tail=head;
+                }
+                continue;
+            }
             if constexpr(observe)++scalarCulls;
-            if(Reject(xy0,meta0,xy1,meta1,xy2,meta2)) {++head;continue;}
-            if(next<head)
+            if(Reject(xy0,meta0,xy1,meta1,xy2,meta2))
+            {
+                if constexpr(strip)++head;
+                else
+                {
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+                    if constexpr(observe)
+                    {
+                        if(mutation==3)++head; // wrong strip-style list rewind
+                        else tail=head;
+                    }
+                    else
+#endif
+                        tail=head;
+                }
+                continue;
+            }
+            if constexpr(strip) if(next<head)
             {
                 vertices[next]=vertices[head];vertices[next+1]=vertices[head+1];vertices[next+2]=vertices[head+2];
                 trace.Rewind(next);
                 head=next;
             }
             indices[0]=static_cast<u16>(head);indices[1]=static_cast<u16>(head+1);indices[2]=static_cast<u16>(head+2);
-            indices+=3;itail+=3;tail=head+3;next=tail;++head;
+            indices+=3;itail+=3;tail=head+3;next=tail;
+            if constexpr(strip)++head;else head=tail;
             trace.Triangle(vertices,tail-3,itail,traceKey);
             const GSVector4i draw=NativeBBox(xy0,xy1,xy2).sra32<4>()+GSVector4i(0,0,1,1);
             if(accState)rect=rect.runion(draw);
@@ -258,6 +297,7 @@ namespace GSStripKickKernel
         u32 traceKey;
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
         u64* outlinedWork = nullptr;
+        u32 mutation = 0;
 #endif
     };
     struct ChunkOutput
@@ -267,7 +307,7 @@ namespace GSStripKickKernel
     };
     // Keep both passes together, but prevent LTO from fusing them into every
     // handler and its legacy seam kick. Quad and parse helpers stay inline here.
-    template<bool writeRing=true,bool observe=false,class Parser,class Cursor>
+    template<u32 prim=GS_TRIANGLESTRIP,bool writeRing=true,bool observe=false,class Parser,class Cursor>
     __noinline void RunChunk(const GIFPackedReg* RESTRICT packet,u32 count,
         Cursor& cursor,const ChunkInvariants<Parser>& inv,ChunkOutput& output)
     {
@@ -284,7 +324,11 @@ namespace GSStripKickKernel
         output.last0=GSVector4i(provisional[count-1].m[0]);
         output.last1=GSVector4i(provisional[count-1].m[1]);
         output.accState=output.scalarCulls=0;
-        output.rect=Emit<writeRing,observe>(cursor,inv.ring,inv.seed,inv.sideXY,
-            inv.sideMeta,count,output.accState,output.scalarCulls,*inv.trace,inv.traceKey);
+        output.rect=Emit<prim,writeRing,observe>(cursor,inv.ring,inv.seed,inv.sideXY,
+            inv.sideMeta,count,output.accState,output.scalarCulls,*inv.trace,inv.traceKey
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+            ,inv.mutation
+#endif
+            );
     }
 }
