@@ -1173,6 +1173,7 @@ perf_and_return:
 	{
 		mVUPersist::EndEpisode(mVU, thisPtr, oakGetCurrentCodePointer());
 		mVU.prog.x86ptr = oakEndBlock();
+		mvu_aot::FinishBaselineCompile(mVU);
 	}
 	if (compiledBlock)
 		compile_scope.Finish(compiledBlock->guest_size, compiledBlock->host_size, thisPtr, compiledHostEnd);

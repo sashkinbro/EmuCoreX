@@ -5,6 +5,8 @@
 #include "VuAotPersist.h"
 #endif
 struct microVU;
+struct microProgram;
+struct microBlock;
 namespace vuaot
 {
 	struct MvuBlockTrace;
@@ -16,6 +18,13 @@ namespace mvu_aot
 	void ObserveImage(microVU& mvu);
 	void BeforeProgram(microVU& mvu);
 	void Remember(microVU& mvu, const vuaot::MvuBlockTrace& trace);
+	// Baseline control links keep immutable private targets while recording.
+	void* CanonicalStaticTarget(const void* target);
+	// Internal tails preserve active branch-delay VI backup labels.
+	void* PrivateStaticTarget(microVU& mvu, u32 pc, const void* state);
+	void RememberStaticBranch(microVU& mvu, microProgram* owner, void* site, const void* privateTarget);
+	void FinishBaselineCompile(microVU& mvu);
+	void RememberHydratedBlock(microVU& mvu, microProgram* owner, microBlock* block, u32 pc, const void* state);
 	// Owner-only framed body hook; never publishes into an active compiler.
 	bool CompileBody(microVU& mvu, const vuaot::MvuBlockTrace& trace);
 	void* Dispatch(microVU& mvu, u32 pc, void* baselineEntry);
@@ -31,6 +40,9 @@ namespace mvu_aot
 		u64 savedRecords = 0, savedPlanJobs = 0;
 		u64 singleDeclines = 0, timingDeclines = 0, unsupportedDeclines = 0, publishRejects = 0;
 		u64 readyDeferred = 0, readyPublished = 0, readyStale = 0, readyEvicted = 0, readyDuplicates = 0;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		u64 automaticJobs = 0;
+#endif
 	};
 	// Read on the VU owner, or with that owner quiescent.
 	Stats GetStats();
@@ -47,6 +59,10 @@ namespace mvu_aot
 	u64 EntryCount();
 	u64 NativeEndCount();
 	u64 InlineBodyEntryCount(u32 pc);
+	u64 NativeRegionEntryCount(u32 pc);
+	u64 CurrentOwnerForTest();
+	u32 BoundStaticLinksForTest();
+	bool TestStaticLinkWords(bool restore);
 	u64 BailCount();
     void CountEntries(bool on);
     void SetTierUpRuns(u32 runs);

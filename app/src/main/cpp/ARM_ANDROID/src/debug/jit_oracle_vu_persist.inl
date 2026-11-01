@@ -8,7 +8,7 @@ extern "C" void EmuCoreXOracleVULocalFlagRings(u32 index, u32* words, bool seed)
 // between TestHydrate and Execute would silently turn this into a compile test.
 Snapshot RunPersistedVU(u32 index, const std::vector<u32>& program, u32 pc,
     u32 budget, bool reset, std::array<u32, 12>& rings, u32 entryPC = UINT32_MAX,
-    const vuaot::PipeState* pipeline = nullptr, u32 viBackup = 0)
+    const vuaot::PipeState* pipeline = nullptr, u32 viBackup = 0, u32 ownerPC = UINT32_MAX)
 {
     const FPControlRegisterBackup callerFPCR(EmuConfig.Cpu.FPUFPCR);
     VURegs& vu = index ? VU1 : VU0;
@@ -41,6 +41,9 @@ Snapshot RunPersistedVU(u32 index, const std::vector<u32>& program, u32 pc,
     EmuCoreXOracleVULocalFlagRings(index, rings.data(), true);
     OpcodeFamilies::SetFamilyMask(index ? OpcodeFamilies::CORE_VU1 : OpcodeFamilies::CORE_VU0, 0);
     cpu->SetStartPC(entryPC);
+    // A resumed TPC can differ from the existing owner's start-PC partition.
+    // Explicit test-only override; ordinary callers preserve external policy.
+    if (ownerPC != UINT32_MAX) vu.start_pc = ownerPC;
     if (pipeline) mvu_aot::SetPipelineForTest(pipeline->bytes, viBackup);
     const bool fallback = (vu.flags & VUFLAG_INTERPRETER) != 0;
     std::vector<u8> gif;

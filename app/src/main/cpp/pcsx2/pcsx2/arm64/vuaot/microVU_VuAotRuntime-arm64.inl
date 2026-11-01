@@ -8,6 +8,7 @@
 #include "arm64/vuaot/VuAotLive.h"
 #include "common/ScopedGuard.h"
 #include <atomic>
+#include <set>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -76,6 +77,13 @@ namespace mvu_aot
 			MvuBlockTrace trace;
 			microBlock* block = nullptr;
 		};
+		struct AutomaticRoot
+		{
+			microBlock* block = nullptr;
+			u32 pc = 0;
+			PipeState key{};
+		};
+		using RootIdentity = std::pair<u32, std::array<u8, 96>>;
 		struct Program
 		{
 			u32 runs = 0;
@@ -87,6 +95,11 @@ namespace mvu_aot
 			std::deque<vuaot::persist::Record> savedPlans;
 			std::map<u32, std::vector<u32>> jumpTargets;
 			std::vector<Remembered> traces;
+			std::unordered_map<microBlock*, size_t> traceIndex;
+			std::deque<AutomaticRoot> automaticRoots;
+			std::unordered_set<microBlock*> queuedRoots, coveredRoots;
+			std::set<RootIdentity> queuedRootKeys, coveredRootKeys;
+			bool rootsSeeded = false;
 			std::vector<std::shared_ptr<BuildJob>> jobs;
 			std::unordered_set<void*> entries;
 			std::shared_ptr<BuildJob> pending;
@@ -108,11 +121,31 @@ namespace mvu_aot
                 declined.push_back(root);
             }
 		};
+		struct StaticBranch
+		{
+			microProgram* owner = nullptr;
+			u32* site = nullptr;
+			void* privateTarget = nullptr;
+			void* liveTarget = nullptr;
+			u32 originalWord = 0;
+			u64 generation = 0;
+		};
+		struct NativeBinding
+		{
+			void* native = nullptr;
+			void* baseline = nullptr;
+			BuildJob* job = nullptr; // retained by Program.jobs through Reset
+		};
 		struct Runtime
 		{
 			bg::Worker worker;
 			std::unordered_map<microProgram*, Program> programs;
 			std::unordered_map<microBlock*, void*> original;
+			std::vector<StaticBranch> staticBranches, pendingStaticBranches;
+			std::unordered_map<void*, size_t> staticSiteIndex;
+			std::unordered_map<void*, std::vector<size_t>> inboundBranches;
+			std::unordered_map<const void*, NativeBinding> privateForNative;
+			std::unordered_map<void*, NativeBinding> nativeForPrivate;
 			u64 generation = 1;
 			u64 jumpMisses = 0;
 			u64 readyBytes = 0, readySerial = 0;
@@ -134,6 +167,7 @@ namespace mvu_aot
 		u64 entryCount = 0;
 		u64 nativeEndCount = 0;
 		std::array<u64, 0x800> inlineBodyEntries{};
+		std::array<u64, 0x800> nativeRegionEntries{};
 		bool countEntries = false;
         bool manualEntryCount = false;
 #if defined(__ANDROID__) && !defined(NDEBUG)
@@ -150,6 +184,41 @@ namespace mvu_aot
 #else
 			(void)counter;
 #endif
+		}
+		RootIdentity CanonicalRootIdentity(u32 pc, const void* key)
+		{
+			microRegInfo state;
+			std::memcpy(&state, key, sizeof(state));
+			// Internal edges may carry an active branch-delay backup even
+			// when VI's ordinary latency is zero. Only external entry lookup
+			// may discard a stale backup label; root identity preserves it.
+			state.flagInfo = mVUcanonicalFlagInfo(state);
+			RootIdentity identity;
+			identity.first = pc;
+			std::memcpy(identity.second.data(), &state, sizeof(state));
+			return identity;
+		}
+		void QueueAutomaticRoot(Program& program, microBlock* block, u32 pc, const void* key)
+		{
+			const auto identity = CanonicalRootIdentity(pc, key);
+			if (!block || program.coveredRoots.count(block) || program.coveredRootKeys.count(identity) ||
+				!program.queuedRoots.insert(block).second || !program.queuedRootKeys.insert(identity).second)
+				return;
+			AutomaticRoot root;
+			root.block = block; root.pc = pc;
+			std::memcpy(root.key.bytes, identity.second.data(), sizeof(root.key.bytes));
+			program.automaticRoots.push_back(root);
+		}
+		void SeedAutomaticRoots(Program& program)
+		{
+			if (program.rootsSeeded) return;
+			program.rootsSeeded = true;
+			for (size_t i = 0; i < program.traces.size(); ++i)
+			{
+				const auto& remembered = program.traces[i];
+				program.traceIndex[remembered.block] = i;
+				QueueAutomaticRoot(program, remembered.block, remembered.trace.startPC, remembered.trace.entryState);
+			}
 		}
         void LogStats()
         {
@@ -473,10 +542,21 @@ namespace mvu_aot
 		{
 			microRegInfo state;
 			std::memcpy(&state, key.bytes, 96);
-			mVUblockFetch(mvu, pc, reinterpret_cast<uptr>(&state));
-			microRegInfo canonical;
-			microRegInfo* search = mVUcanonicalizeSearchState(&state, canonical);
-			microBlock* block = mvu.prog.cur->block[pc >> 3]->search(mvu, search);
+			state.flagInfo = mVUcanonicalFlagInfo(state);
+			// These are internal region/static/budget edges. Do not use the
+			// external-entry getter: its stale-VI normalization would discard
+			// an active delay-slot backup required by an immediate IBcc.
+			pxAssert((pc & 7) == 0 && pc < mvu.microMemSize);
+			pc &= mvu.microMemSize - 8;
+			auto*& manager = mvu.prog.cur->block[pc >> 3];
+			if (!manager) manager = new microBlockManager();
+			microBlock* block = manager->search(mvu, &state);
+			if (!block)
+			{
+				mVUcompile(mvu, pc, reinterpret_cast<uptr>(&state));
+				block = manager->search(mvu, &state);
+			}
+			pxAssert(block);
 			if (outBlock)
 				*outBlock = block;
 			auto it = runtime.original.find(block);
@@ -523,27 +603,102 @@ namespace mvu_aot
 			}
 			return true;
 		}
-		bool OwnerImageMatches(const BuildJob& job, const microVU& mvu)
+		bool OwnerImageMatches(const microProgram* owner, const microVU& mvu)
 		{
-			if (!job.program || !job.program->ranges) return false;
+			if (!owner || !owner->ranges) return false;
 			// A body may leave through a cached baseline child it never read.
 			// Every already compiled owner range must therefore describe the
 			// live image before Baseline can reuse its static or budget targets.
 			// Unlike a required-read snapshot conflict, another live overlay is
 			// temporary: keep the accepted job until these ranges agree again.
-			for (const auto& range : *job.program->ranges)
+			for (const auto& range : *owner->ranges)
 			{
 				if (range.start < 0 || range.end <= range.start) continue;
 				const u32 first = std::min(static_cast<u32>(range.start), 0x4000u);
 				const u32 last = std::min(static_cast<u32>(range.end), 0x4000u);
-				if (std::memcmp(reinterpret_cast<const u8*>(job.program->data) + first,
+				if (std::memcmp(reinterpret_cast<const u8*>(owner->data) + first,
 					mvu.regs().Micro + first, last - first)) return false;
 			}
 			return true;
 		}
+		bool OwnerImageMatches(const BuildJob& job, const microVU& mvu) { return OwnerImageMatches(job.program, mvu); }
 		bool Valid(const BuildJob& job, microVU& mvu)
 		{
 			return ValidRuntime(job, mvu) && OwnerMatches(job) && ImageMatches(job, mvu) && OwnerImageMatches(job, mvu);
+		}
+		bool StaticBranchWord(const StaticBranch& link, const void* target, u32& word)
+		{
+			const s64 delta = reinterpret_cast<intptr_t>(target) - reinterpret_cast<intptr_t>(link.site);
+			if ((delta & 3) || delta < -(s64(1) << 27) || delta >= (s64(1) << 27)) return false;
+			word = 0x14000000u | (static_cast<u32>(delta / 4) & 0x03ffffffu);
+			return true;
+		}
+		bool PatchStaticBranch(StaticBranch& link, const void* target)
+		{
+			if (link.generation != runtime.generation) return false;
+			u32 expected, replacement, current;
+			if (!StaticBranchWord(link, link.liveTarget, expected) || !StaticBranchWord(link, target, replacement))
+				return false;
+			std::memcpy(&current, link.site, sizeof(current));
+			if (current != expected || (current & 0xfc000000u) != 0x14000000u) return false;
+			if (current != replacement)
+			{
+				std::memcpy(link.site, &replacement, sizeof(replacement));
+				HostSys::FlushInstructionCache(link.site, sizeof(replacement));
+			}
+			link.liveTarget = const_cast<void*>(target);
+			return true;
+		}
+		void FinishStaticBranches(microVU& mvu)
+		{
+			if (oakHasBlock() || mvu.index != 1) return;
+			auto pending = std::move(runtime.pendingStaticBranches);
+			runtime.pendingStaticBranches.clear();
+			for (const auto& link : pending)
+			{
+				if (link.generation != runtime.generation || runtime.staticSiteIndex.count(link.site)) continue;
+				const size_t index = runtime.staticBranches.size();
+				runtime.staticSiteIndex.emplace(link.site, index);
+				runtime.staticBranches.push_back(link);
+				runtime.inboundBranches[link.privateTarget].push_back(index);
+				const auto found = runtime.nativeForPrivate.find(link.privateTarget);
+				if (found != runtime.nativeForPrivate.end() && found->second.job->program == link.owner &&
+					Valid(*found->second.job, mvu))
+					PatchStaticBranch(runtime.staticBranches[index], found->second.native);
+			}
+		}
+		void BindStaticBranches(microVU& mvu, const std::shared_ptr<BuildJob>& job)
+		{
+			pxAssert(!oakHasBlock());
+			FinishStaticBranches(mvu);
+			for (const auto& node : job->nodes)
+			{
+				NativeBinding binding{node->entry, node->baseline, job.get()};
+				runtime.privateForNative[node->entry] = binding;
+				runtime.nativeForPrivate[node->baseline] = binding;
+				const auto incoming = runtime.inboundBranches.find(node->baseline);
+				if (incoming == runtime.inboundBranches.end()) continue;
+				for (size_t index : incoming->second)
+					if (runtime.staticBranches[index].owner == job->program)
+						PatchStaticBranch(runtime.staticBranches[index], node->entry);
+			}
+		}
+		void RestoreStaticBranches()
+		{
+			for (auto& link : runtime.staticBranches)
+			{
+				u32 expected, current;
+				if (link.generation != runtime.generation || !StaticBranchWord(link, link.liveTarget, expected)) continue;
+				std::memcpy(&current, link.site, sizeof(current));
+				if (current == expected && current != link.originalWord)
+				{
+					std::memcpy(link.site, &link.originalWord, sizeof(link.originalWord));
+					HostSys::FlushInstructionCache(link.site, sizeof(link.originalWord));
+				}
+			}
+			runtime.staticBranches.clear(); runtime.pendingStaticBranches.clear();
+			runtime.staticSiteIndex.clear(); runtime.inboundBranches.clear();
+			runtime.privateForNative.clear(); runtime.nativeForPrivate.clear();
 		}
         void RelinkCachedEntries(microVU& mvu, microProgram* target,
             const std::unordered_map<void*, void*>& replacements, std::vector<u32> slots)
@@ -747,6 +902,18 @@ namespace mvu_aot
 			{
 				n->entry = oakGetCurrentCodePointer();
 				EntryAbi(mvu);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+				if (!job->body && (forceSync || countEntries))
+				{
+					// This wrapper is rebuilt by Publish for native imports too;
+					// no counter address is persisted in the private region code.
+					// Baseline status/PQ homes are already captured by EntryAbi.
+					oakMoveAddressToReg(oak::util::X9, &nativeRegionEntries[(n->pc & 0x3ff8) >> 3]);
+					oakAsm->LDR(oak::util::X10, oak::util::X9, oak::POffset<15, 3>(0));
+					oakAsm->ADD(oak::util::X10, oak::util::X10, 1);
+					oakAsm->STR(oak::util::X10, oak::util::X9, oak::POffset<15, 3>(0));
+				}
+#endif
 				oakEmitJmp(base + n->codeOffset);
 			}
 			mvu.prog.x86ptr = oakEndBlock();
@@ -781,11 +948,10 @@ namespace mvu_aot
                 std::vector<u32> replacedSlots;
 				for (auto& n : job->nodes)
 				{
-					microRegInfo key;
-					std::memcpy(&key, n->key.bytes, 96);
-					microRegInfo storage;
-					auto* canonical = mVUcanonicalizeSearchState(&key, storage);
-					auto* block = job->program->block[n->pc >> 3]->search(mvu, canonical);
+					// Use the exact internal-state block selected while resolving
+					// private baselines, including active delay-slot VI backups.
+					auto* block = n->baselineBlock;
+					pxAssert(block);
 					runtime.original.emplace(block, n->baseline);
                     replacements[block->x86ptrStart] = n->entry;
                     replacedSlots.push_back(n->pc >> 3);
@@ -823,6 +989,13 @@ namespace mvu_aot
                 Perf::vu1.Register(base + job->code.size(),
                     static_cast<size_t>(mvu.prog.x86ptr - base) - job->code.size(), "vu-aot-bridge");
 				program.jobs.push_back(job);
+				for (const auto& node : job->nodes)
+				{
+					program.coveredRoots.insert(node->baselineBlock);
+					program.coveredRootKeys.insert(CanonicalRootIdentity(node->pc, node->key.bytes));
+				}
+				BindStaticBranches(mvu, job);
+				SeedAutomaticRoots(program);
 				if (job->body) ++runtime.stats.bodyBlocks;
 				regionCount.fetch_add(1, std::memory_order_relaxed);
 			}
@@ -866,6 +1039,7 @@ namespace mvu_aot
 		if (mvu.index != 1)
 			return;
 		runtime.worker.Stop();
+		RestoreStaticBranches(); // before sidecars/save or any baseline owner can be freed
         sticky::state.active.store(EmuConfig.Cpu.Recompiler.EnableVUAot, std::memory_order_release);
         sticky::state.rebuildDue.store(false, std::memory_order_release);
         sticky::state.dropLive.store(false, std::memory_order_release);
@@ -935,13 +1109,44 @@ namespace mvu_aot
                         sticky::Trip(live::TripCause::Compile);
                 }
 		auto& p = runtime.programs[mvu.prog.cur];
-		for (auto& r : p.traces)
-			if (r.block == mvu.prog.IRinfo.pBlock)
-			{
-				r.trace = trace;
-				return;
-			}
-		p.traces.push_back({trace, mvu.prog.IRinfo.pBlock});
+		microBlock* const block = mvu.prog.IRinfo.pBlock;
+		const auto previous = p.traceIndex.find(block);
+		if (previous != p.traceIndex.end()) p.traces[previous->second].trace = trace;
+		else
+		{
+			p.traceIndex[block] = p.traces.size();
+			p.traces.push_back({trace, block});
+		}
+		if (p.rootsSeeded) QueueAutomaticRoot(p, block, trace.startPC, trace.entryState);
+	}
+	void* CanonicalStaticTarget(const void* target)
+	{
+		const auto found = runtime.privateForNative.find(target);
+		return found == runtime.privateForNative.end() ? const_cast<void*>(target) : found->second.baseline;
+	}
+	void* PrivateStaticTarget(microVU& mvu, u32 pc, const void* state)
+	{
+		PipeState key;
+		std::memcpy(key.bytes, state, sizeof(key.bytes));
+		return Baseline(mvu, pc, key);
+	}
+	void RememberStaticBranch(microVU& mvu, microProgram* owner, void* site, const void* privateTarget)
+	{
+		if (mvu.index != 1 || !EmuConfig.Cpu.Recompiler.EnableVUAot || !owner || !site || !privateTarget) return;
+		StaticBranch link;
+		link.owner = owner; link.site = static_cast<u32*>(site);
+		link.privateTarget = link.liveTarget = CanonicalStaticTarget(privateTarget);
+		link.generation = runtime.generation;
+		std::memcpy(&link.originalWord, site, sizeof(link.originalWord));
+		u32 expected;
+		if (!StaticBranchWord(link, link.privateTarget, expected) || link.originalWord != expected) return;
+		runtime.pendingStaticBranches.push_back(link);
+	}
+	void FinishBaselineCompile(microVU& mvu) { FinishStaticBranches(mvu); }
+	void RememberHydratedBlock(microVU& mvu, microProgram* owner, microBlock* block, u32 pc, const void* state)
+	{
+		if (mvu.index == 1 && EmuConfig.Cpu.Recompiler.EnableVUAot)
+			QueueAutomaticRoot(runtime.programs[owner], block, pc, state);
 	}
 	static void RemoveReady(Program& program, size_t index)
 	{
@@ -1160,6 +1365,82 @@ namespace mvu_aot
 		++runtime.stats.bodyBlocks;
 		return true;
 	}
+	static bool TryAutomaticRoot(microVU& mvu, Program& program)
+	{
+		if (!program.rootsSeeded || program.jobs.empty() || program.pending || program.automaticRoots.empty())
+			return false;
+		const AutomaticRoot root = program.automaticRoots.front();
+		program.automaticRoots.pop_front();
+		if (program.coveredRoots.count(root.block) ||
+			program.coveredRootKeys.count(CanonicalRootIdentity(root.pc, root.key.bytes)) ||
+			program.IsDeclined(root.pc, root.key.bytes)) return true;
+		if (!OwnerImageMatches(mvu.prog.cur, mvu))
+		{
+			program.automaticRoots.push_front(root); // an overlay may return later
+			return true;
+		}
+		MvuBlockTrace trace;
+		const auto known = program.traceIndex.find(root.block);
+		if (known != program.traceIndex.end() && known->second < program.traces.size())
+			trace = program.traces[known->second].trace;
+		else
+		{
+			// Hydrated blocks have no compiler callback. Reconstruct only the
+			// one offered root, as saved-plan replay already does, never scan all
+			// micro memory or compile a replacement baseline block here.
+			const auto env = Environment(mvu);
+			PipeConfig cfg;
+			cfg.vuIndex = 1; cfg.flagHack = env.flagHack;
+			cfg.ibitHack = env.ibitHack; cfg.xgkickHack = env.xgkickHack;
+			PipeAnalyzer(mvu.regs().Micro, cfg).Analyze(root.pc, root.key).ToTrace(trace, 1);
+		}
+		for (const auto& op : trace.ops)
+			if (op.tBit || op.dBit || op.mBit || op.badBranch || op.evilBranch) return true;
+		std::memcpy(trace.entryState, root.key.bytes, sizeof(root.key.bytes));
+		auto job = std::make_shared<BuildJob>();
+		job->trace = std::move(trace); // independent of Remember vector growth during Publish
+		job->program = mvu.prog.cur;
+		job->generation = runtime.generation;
+		job->dropAllowed = sticky::Allowed();
+		job->jumpTargets = program.jumpTargets;
+		std::memcpy(job->micro.data(), mvu.regs().Micro, job->micro.size());
+		job->env = Environment(mvu);
+		job->cpu = EmuConfig.Cpu; job->fixes = EmuConfig.Gamefixes; job->speed = EmuConfig.Speedhacks;
+		if (HasReady(program, *job)) return true;
+		if (forceSync)
+		{
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+			++runtime.stats.automaticJobs;
+#endif
+			job->Run();
+			if (!Publish(mvu, job))
+			{
+				if (!job->accepted) program.NoteDeclined(job->trace);
+				NoteDecline(*job);
+			}
+		}
+		else
+		{
+			runtime.worker.Start();
+			if (runtime.worker.Submit(job))
+			{
+				program.pending = job;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+				++runtime.stats.automaticJobs;
+#endif
+			}
+			else program.automaticRoots.push_front(root);
+		}
+		return true;
+	}
+	static void* RefetchPublishedEntry(Program& program, u32 pc, const microRegInfo& key, void* fallback)
+	{
+		for (auto job = program.jobs.rbegin(); job != program.jobs.rend(); ++job)
+			for (const auto& node : (*job)->nodes)
+				if (node->pc == pc && SameKey(node->key, reinterpret_cast<const u8*>(&key), (*job)->env.flagHack))
+					return node->entry;
+		return fallback;
+	}
 	static void* DispatchState(microVU& mvu, u32 pc, const void* state, void* baselineEntry, bool viaJump)
 	{
 		// Baseline resolution during publication can compile another node and
@@ -1264,6 +1545,9 @@ namespace mvu_aot
 		}
 		if (!retier)
 		{
+			const size_t priorJobs = program.jobs.size();
+			if (TryAutomaticRoot(mvu, program))
+				return program.jobs.size() != priorJobs ? RefetchPublishedEntry(program, pc, entryKey, baselineEntry) : baselineEntry;
 			if (program.entries.count(baselineEntry))
 				return baselineEntry;
 			const bool hot = viaJump ? (program.jumpRuns >= jumpTierUpRuns &&
@@ -1414,6 +1698,39 @@ namespace mvu_aot
 	u64 EntryCount() { return entryCount; }
 	u64 NativeEndCount() { return nativeEndCount; }
 	u64 InlineBodyEntryCount(u32 pc) { return inlineBodyEntries[(pc & 0x3ff8) >> 3]; }
+	u64 NativeRegionEntryCount(u32 pc) { return nativeRegionEntries[(pc & 0x3ff8) >> 3]; }
+	u64 CurrentOwnerForTest() { return reinterpret_cast<u64>(microVU1.prog.cur); }
+	u32 BoundStaticLinksForTest()
+	{
+		return static_cast<u32>(std::count_if(runtime.staticBranches.begin(), runtime.staticBranches.end(),
+			[](const StaticBranch& link) { return link.liveTarget != link.privateTarget; }));
+	}
+	bool TestStaticLinkWords(bool restore)
+	{
+		if (oakHasBlock() || !BoundStaticLinksForTest()) return false;
+		const auto links = runtime.staticBranches;
+		for (const auto& link : links)
+		{
+			u32 original, expected, actual;
+			if (link.generation != runtime.generation || !StaticBranchWord(link, link.privateTarget, original) ||
+				original != link.originalWord || !StaticBranchWord(link, link.liveTarget, expected)) return false;
+			std::memcpy(&actual, link.site, sizeof(actual));
+			if (actual != expected) return false;
+		}
+		if (restore)
+		{
+			RestoreStaticBranches(); // same routine used before Reset releases its owners
+			for (const auto& link : links)
+			{
+				u32 actual; std::memcpy(&actual, link.site, sizeof(actual));
+				if (actual != link.originalWord) return false;
+			}
+			if (!runtime.staticBranches.empty() || !runtime.pendingStaticBranches.empty() ||
+				!runtime.staticSiteIndex.empty() || !runtime.inboundBranches.empty() ||
+				!runtime.privateForNative.empty() || !runtime.nativeForPrivate.empty()) return false;
+		}
+		return true;
+	}
 	u64 BailCount()
 	{
 		u64 count = 0;

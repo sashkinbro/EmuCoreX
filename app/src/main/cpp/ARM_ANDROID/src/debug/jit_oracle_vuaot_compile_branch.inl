@@ -200,9 +200,15 @@ void RunVuAotCompileBranchBoundaryTests(u64 (*inlineEntries)(u32), bool actualPQ
         const auto compiled = RunPersistedVU(1, code, 0x80, 128, false, rings, 0x80, &late);
         Compare(expectedLate, compiled, "late branch-tail compilation preserves complete architecture");
         const auto entered = inlineEntries(0xc0);
+        const auto enteredRegion = mvu_aot::NativeRegionEntryCount(0xc0);
         const auto compiledBlocks = mVUPersist::GetBlockCompileCount(1);
         rings = {};
         const auto actual = RunPersistedVU(1, code, 0x80, 128, false, rings, 0x80, &late);
+        if (inlineEntries(0xc0) == entered || mVUPersist::GetBlockCompileCount(1) != compiledBlocks)
+            std::printf("AOT_BRANCH_BOUNDARY_DIAG opcode=%x input=%x inline=%llu region=%llu compiles=%llu\n", c.opcode, c.input,
+                static_cast<unsigned long long>(inlineEntries(0xc0) - entered),
+                static_cast<unsigned long long>(mvu_aot::NativeRegionEntryCount(0xc0) - enteredRegion),
+                static_cast<unsigned long long>(mVUPersist::GetBlockCompileCount(1) - compiledBlocks));
         Check(inlineEntries(0xc0) > entered && mVUPersist::GetBlockCompileCount(1) == compiledBlocks,
             "the actual directly reached conditional or indirect child executes its inline native body");
         Compare(expectedLate, actual, "late branch-tail native execution preserves complete architecture");

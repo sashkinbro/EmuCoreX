@@ -84,7 +84,6 @@ void RunVuAotReadyBodyExitTests()
     put(0xa0, NOP_L, NOP_U | 0x08000000u); // runtime T boundary rejects RegionTier, BodyTier accepts root
     put(0xa8, NOP_L, (15u << 21) | (2u << 16) | (1u << 11) | (4u << 6) | 0x2au);
     put(0xb0, NOP_L, NOP_U | 0x40000000u);
-    std::array<u8, 96> fallbackKey{};
     for (u32 mode : {0u, 1u, 2u})
     {
         mvu_aot::HoldWorker(false); mvu_aot::TestHoldReadyPublication(false);
@@ -122,13 +121,11 @@ void RunVuAotReadyBodyExitTests()
             "known unread static-child live conflict defers publication while matching unread snapshot and unknown words allow it");
         const auto entries = mvu_aot::EntryCount();
         const auto actual = RunPersistedVU(1, code, 0x80, 128, false, rings);
-        if (mode == 0 && publicationTraces.size() == 1)
-            std::memcpy(fallbackKey.data(), publicationTraces.front().entryState, fallbackKey.size());
-        Check(publicationTraces.size() == 1 && publicationTraces.front().startPC == targetPC &&
-            publicationTraces.front().cycles == 4 &&
-            std::memcmp(fallbackKey.data(), publicationTraces.front().entryState, fallbackKey.size()) == 0 &&
-            mVUPersist::GetBlockCompileCount(1) == publicationCompiles + 1 && mvu_aot::PendingCount() == 0,
-            "all compatibility modes compile exactly the same one private baseline exit variant during publication without a new worker job");
+        // Internal edges now store the same flag-normalized private key that
+        // publication searches. No redundant fallback variant is required.
+        Check(publicationTraces.empty() && mVUPersist::GetBlockCompileCount(1) == publicationCompiles &&
+            mvu_aot::PendingCount() == 0 && mvu_aot::GetStats().automaticJobs == before.automaticJobs,
+            "all compatibility modes reuse the cached private exit with zero baseline compile or worker job");
         Check(mvu_aot::EntryCount() > entries && mvu_aot::ReadyCountForTest() == 0 &&
             mvu_aot::GetStats().bodyBlocks > before.bodyBlocks,
             "compatible restored child executes the retained actual native branch body with worker held");
@@ -139,7 +136,8 @@ void RunVuAotReadyBodyExitTests()
         const auto repeated = RunPersistedVU(1, code, 0x80, 128, false, rings);
         Check(mvu_aot::EntryCount() > steadyEntries && mvu_aot::PendingCount() == 0 &&
             mvu_aot::ReadyCountForTest() == 0 && mVUPersist::GetBlockCompileCount(1) == steadyCompiles &&
-            publicationTraces.size() == 1 && expected.regs.cycle == repeated.regs.cycle && expectedRings == rings,
+            publicationTraces.empty() && mvu_aot::GetStats().automaticJobs == before.automaticJobs &&
+            expected.regs.cycle == repeated.regs.cycle && expectedRings == rings,
             "repeated native branch body adds no baseline compile or worker job and preserves cycles and rings");
         Compare(expected, repeated, "repeated retained branch body preserves complete architecture");
     }

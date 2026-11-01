@@ -803,6 +803,38 @@ namespace mVUPersist
             }
         }
 
+		void RecordStaticBlockBranches(u8* chunkEnd)
+		{
+			if (mvu->index != 1 || !EmuConfig.Cpu.Recompiler.EnableVUAot || !log) return;
+			// Intra-episode branches need no relocation for ordinary hydration,
+			// but their exact block-entry identity is needed to rebuild AOT
+			// inbound links. Decode once at snapshot time, never at dispatch.
+			for (u8* at = chunkBase; at + 4 <= chunkEnd; at += 4)
+			{
+				u32 word; std::memcpy(&word, at, sizeof(word));
+				if ((word & 0xfc000000u) != 0x14000000u) continue; // B only, never BL/helpers
+				const s64 disp = static_cast<s64>((word & 0x03ffffffu) ^ 0x02000000u) - 0x02000000;
+				const void* target = reinterpret_cast<const void*>(reinterpret_cast<intptr_t>(at) + disp * 4);
+				u32 index = 0;
+				const auto known = log->blockByEntry.find(target);
+				bool found = known != log->blockByEntry.end();
+				if (found) index = known->second;
+				else
+					for (size_t i = 0; i < episodeBlocks.size(); ++i)
+						if (target == chunkBase + episodeBlocks[i].entryOffset)
+						{
+							index = ProvisionalIndex(i); found = true; break;
+						}
+				if (!found) continue; // internal labels, dispatcher stubs and external helpers
+				const u32 offset = OffsetOf(at);
+				fixups.erase(std::remove_if(fixups.begin(), fixups.end(), [offset](const PersistFixup& f) {
+					return f.codeOffset == offset && f.form == kFormRel26;
+				}), fixups.end());
+				PersistFixup f{};
+				f.codeOffset = offset; f.form = kFormRel26; f.target = kTargetBlockEntry; f.index = index;
+				fixups.push_back(f);
+			}
+		}
 		void End(u8* chunkEnd)
 		{
 			pxAssert(active);
@@ -812,6 +844,7 @@ namespace mVUPersist
 			if (episodeBlocks.empty() && fixups.empty())
 				return; // nothing emitted (pure lookup episode / hydration)
 
+			if (!failed) RecordStaticBlockBranches(chunkEnd);
 			if (!failed) Audit(chunkEnd);
 			if (failed || episodeBlocks.empty() || !log)
 			{
@@ -1567,6 +1600,19 @@ namespace mVUPersist
 			rec.live = final_block[i];
 			log->blockByEntry.emplace(final_block[i]->x86ptrStart, static_cast<u32>(i));
 			log->blocks.push_back(rec);
+		}
+		if (vu == 1 && EmuConfig.Cpu.Recompiler.EnableVUAot)
+		{
+			for (const auto& rec : log->blocks)
+				mvu_aot::RememberHydratedBlock(mVU, prog, rec.live, rec.startPC, &rec.pState);
+			for (const auto& chunk : log->chunks)
+				for (const auto& fixup : chunk.fixups)
+					if (fixup.form == kFormRel26 && fixup.target == kTargetBlockEntry && fixup.index < log->blocks.size())
+					{
+						u8* const site = const_cast<u8*>(chunk.liveBase) + fixup.codeOffset;
+						mvu_aot::RememberStaticBranch(mVU, prog, site, log->blocks[fixup.index].live->x86ptrStart);
+					}
+			mvu_aot::FinishBaselineCompile(mVU);
 		}
 
 

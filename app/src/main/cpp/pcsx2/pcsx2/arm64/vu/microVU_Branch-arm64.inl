@@ -93,8 +93,10 @@ static __fi void mVUBranchEmitJmp_oaknut(const void* fn)
 	recEndOaknutEmit();
 }
 
-static __fi void mVUBranchLinkBlock_emit_oaknut(const void* target)
+static __fi void mVUBranchLinkBlock_emit_oaknut(microVU& mVU, const void* target)
 {
+	const bool aot = mVU.index == 1 && EmuConfig.Cpu.Recompiler.EnableVUAot;
+	if (aot) target = mvu_aot::CanonicalStaticTarget(target);
 	// A compiled block target is known at compile time and the VU code cache
 	// fits in the +/-128 MiB range of a direct B, so link with one branch
 	// instead of materializing the full pointer and branching through it.
@@ -107,11 +109,30 @@ static __fi void mVUBranchLinkBlock_emit_oaknut(const void* target)
 		oakAsm->NOP();
 		oakEmitJmpPtr(site, target, false);
 		recEndOaknutEmit();
+		if (aot) mvu_aot::RememberStaticBranch(mVU, mVU.prog.cur, site, target);
 	}
 	else
 	{
 		mVUBranchEmitJmp_oaknut(target);
 	}
+}
+
+static void mVUBranchCompilePrivateChild(microVU& mVU, u32 pc, uptr state)
+{
+	if (mVU.index != 1 || !EmuConfig.Cpu.Recompiler.EnableVUAot)
+	{
+		mVUcompile(mVU, pc, state);
+		return;
+	}
+	microProgram* const owner = mVU.prog.cur;
+	recBeginOaknutEmit();
+	u8* const site = oakGetCurrentCodePointer();
+	oakAsm->NOP(); // final B26 is recorded only after its child exists
+	recEndOaknutEmit();
+	void* const child = mVUcompile(mVU, pc, state);
+	void* const target = mvu_aot::CanonicalStaticTarget(child);
+	oakEmitJmpPtr(site, target, false);
+	mvu_aot::RememberStaticBranch(mVU, owner, site, target);
 }
 
 static __fi void mVUBranchEmitBrT1_oaknut()
@@ -744,12 +765,18 @@ void normBranchCompile(microVU& mVU, u32 branchPC)
 
 	u32 branchPC_8 = branchPC >> 3; // branchPC / 8
 	blockCreate(branchPC_8);
-	pBlock = mVUblocks[branchPC_8]->search(mVU, (microRegInfo*)&mVUregs);
+	microRegInfo canonical;
+	microRegInfo* state = &mVUregs;
+	if (mVU.index == 1 && EmuConfig.Cpu.Recompiler.EnableVUAot && state->flagInfo != mVUcanonicalFlagInfo(*state))
+	{
+		canonical = *state; canonical.flagInfo = mVUcanonicalFlagInfo(*state); state = &canonical;
+	}
+	pBlock = mVUblocks[branchPC_8]->search(mVU, state);
 	if (pBlock) {
-		mVUBranchLinkBlock_emit_oaknut(pBlock->x86ptrStart);
+		mVUBranchLinkBlock_emit_oaknut(mVU, pBlock->x86ptrStart);
     }
 	else {
-        mVUcompile(mVU, branchPC, (uptr)&mVUregs);
+        mVUBranchCompilePrivateChild(mVU, branchPC, reinterpret_cast<uptr>(state));
     }
 }
 
@@ -1014,13 +1041,21 @@ void condBranch(mV, microFlagCycles& mFC, oak::Cond JMPcc)
 
         int iPCHalf = iPC >> 1; // iPC / 2
 		blockCreate(iPCHalf);
-		bBlock = mVUblocks[iPCHalf]->search(mVU, (microRegInfo*)&mVUregs);
+		microRegInfo canonical;
+		microRegInfo* fallState = &mVUregs;
+		if (mVU.index == 1 && EmuConfig.Cpu.Recompiler.EnableVUAot && fallState->flagInfo != mVUcanonicalFlagInfo(*fallState))
+		{
+			canonical = *fallState; canonical.flagInfo = mVUcanonicalFlagInfo(*fallState); fallState = &canonical;
+		}
+		bBlock = mVUblocks[iPCHalf]->search(mVU, fallState);
 
 		incPC2(-1);
 		if (bBlock) // Branch non-taken has already been compiled
 		{
 			recBeginOaknutEmit();
-			oakEmitCondBranch(oak::invert(JMPcc), bBlock->x86ptrStart);
+			const void* const fallTarget = mVU.index == 1 && EmuConfig.Cpu.Recompiler.EnableVUAot ?
+				mvu_aot::CanonicalStaticTarget(bBlock->x86ptrStart) : bBlock->x86ptrStart;
+			oakEmitCondBranch(oak::invert(JMPcc), fallTarget);
 			recEndOaknutEmit();
 			incPC(-3); // Go back to branch opcode (to get branch imm addr)
 			normBranchCompile(mVU, branchAddr(mVU));
@@ -1040,13 +1075,18 @@ void condBranch(mV, microFlagCycles& mFC, oak::Cond JMPcc)
 			memcpy(&regBackup, &mVUregs, sizeof(microRegInfo));
 
 			incPC2(1); // Get PC for branch not-taken
-			mVUcompile(mVU, xPC, (uptr)&mVUregs);
+			mVUBranchCompilePrivateChild(mVU, xPC, reinterpret_cast<uptr>(fallState));
 
 			iPC = bPC;
 			incPC(-3); // Go back to branch opcode (to get branch imm addr)
-			uptr jumpAddr = (uptr)mVUblockFetch(mVU, branchAddr(mVU), (uptr)&regBackup);
+			const bool aot = mVU.index == 1 && EmuConfig.Cpu.Recompiler.EnableVUAot;
+			uptr jumpAddr = aot ? reinterpret_cast<uptr>(mvu_aot::PrivateStaticTarget(mVU, branchAddr(mVU), &regBackup)) :
+				(uptr)mVUblockFetch(mVU, branchAddr(mVU), (uptr)&regBackup);
 //			*ajmp = (jumpAddr - ((uptr)ajmp + 4));
-			oakEmitJmpPtr(ajmp, reinterpret_cast<void*>(jumpAddr), false);
+			const void* const takenTarget = aot ? mvu_aot::CanonicalStaticTarget(reinterpret_cast<void*>(jumpAddr)) :
+				reinterpret_cast<void*>(jumpAddr);
+			oakEmitJmpPtr(ajmp, takenTarget, false);
+			if (aot) mvu_aot::RememberStaticBranch(mVU, mVU.prog.cur, ajmp, takenTarget);
 		}
 	}
 }
