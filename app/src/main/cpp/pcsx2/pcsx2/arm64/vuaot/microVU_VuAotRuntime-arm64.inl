@@ -133,6 +133,7 @@ namespace mvu_aot
 		bool relinkJumpCachesForTest = true;
 		u64 entryCount = 0;
 		u64 nativeEndCount = 0;
+		std::array<u64, 0x800> inlineBodyEntries{};
 		bool countEntries = false;
         bool manualEntryCount = false;
 #if defined(__ANDROID__) && !defined(NDEBUG)
@@ -1052,10 +1053,11 @@ namespace mvu_aot
 		if (trace.ops.back().pc < trace.startPC || trace.ops.back().pc + 8 >= mvu.microMemSize)
 			return false; // preserve the baseline second pass's wrapped-range bookkeeping
 
-		// First close the direct-child coverage hole for plain program ends.
-		// Runtime T/D/M boundaries and branch tails retain baseline framing.
+		// Native arithmetic precedes the ordinary branch/conditional/JR tail.
+		// Keep runtime boundaries on the baseline path; its second-pass
+		// framing still owns conditions, flag/PQ remapping and jump caches.
 		for (const auto& op : trace.ops)
-			if (op.tBit || op.dBit || op.mBit || op.badBranch || op.evilBranch || op.branch)
+			if (op.tBit || op.dBit || op.mBit || op.badBranch || op.evilBranch || op.branch > 10)
 				return false;
 		std::array<u8, 0x4000> image;
 		std::memcpy(image.data(), mvu.regs().Micro, image.size());
@@ -1075,7 +1077,9 @@ namespace mvu_aot
 			// The ordinary second pass remains untouched on any decline.
 		}
 		const u32 bytes = sink.End();
-		if (!lowered || !sink.failed.empty() || tier.Block().endKind != BlockEnd::EBit ||
+		if (!lowered || !sink.failed.empty() ||
+			(tier.Block().endKind != BlockEnd::EBit && tier.Block().endKind != BlockEnd::Branch &&
+			 tier.Block().endKind != BlockEnd::CondBranch && tier.Block().endKind != BlockEnd::Jump) ||
 			tier.Block().eBitOnBranch)
 			return false;
 		// Inline bodies are part of the baseline persistence episode. Accept
@@ -1131,9 +1135,21 @@ namespace mvu_aot
 			}
 		}
 		if (hasCalls) oakAsm->l(afterCalls);
-		ExitAbi();
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 		if (forceSync || countEntries)
+		{
+			// Lowering owns X9/X10 here. Count before restoring the baseline
+			// ABI so none of its VI/status/PQ homes can be overwritten. The
+			// ordinary recorder persists this module-data address for ASLR.
+			oakMoveAddressToReg(oak::util::X9, &inlineBodyEntries[(captured.startPC & 0x3ff8) >> 3]);
+			oakAsm->LDR(oak::util::X10, oak::util::X9, oak::POffset<15, 3>(0));
+			oakAsm->ADD(oak::util::X10, oak::util::X10, 1);
+			oakAsm->STR(oak::util::X10, oak::util::X9, oak::POffset<15, 3>(0));
+		}
+#endif
+		ExitAbi();
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if ((forceSync || countEntries) && tier.Block().endKind == BlockEnd::EBit)
 		{
 			oakMoveAddressToReg(oak::util::X9, &nativeEndCount);
 			oakAsm->LDR(oak::util::X10, oak::util::X9, oak::POffset<15, 3>(0));
@@ -1397,6 +1413,7 @@ namespace mvu_aot
 	u64 RegionCount() { return regionCount.load(std::memory_order_relaxed); }
 	u64 EntryCount() { return entryCount; }
 	u64 NativeEndCount() { return nativeEndCount; }
+	u64 InlineBodyEntryCount(u32 pc) { return inlineBodyEntries[(pc & 0x3ff8) >> 3]; }
 	u64 BailCount()
 	{
 		u64 count = 0;

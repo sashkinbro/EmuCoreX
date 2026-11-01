@@ -46,6 +46,7 @@ namespace mvu_aot
 	u64 RegionCount();
 	u64 EntryCount();
 	u64 NativeEndCount();
+	u64 InlineBodyEntryCount(u32 pc);
 	u64 BailCount();
     void CountEntries(bool on);
     void SetTierUpRuns(u32 runs);

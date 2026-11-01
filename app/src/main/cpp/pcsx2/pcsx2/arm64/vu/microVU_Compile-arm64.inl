@@ -972,20 +972,12 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 	mVUbranch = 0;
 	u32 x = 0;
 	u32 profiler_last_pc = mVUstartPC;
+	bool nativeBody = false;
 	if (isVU1 && mvu_aot::Enabled())
 	{
 		vuaot::MvuBlockTrace trace;
 		mVUbuildBlockTrace(mVU, startPC, trace);
-		if (mvu_aot::CompileBody(mVU, trace))
-		{
-			// The body hook leaves the same memory/flag/PQ homes as the
-			// ordinary second pass. Keep this core's exact E-bit framing.
-			iPC = ((trace.ops.back().pc + 8) >> 2) & mVU.progMemMask;
-			setCode();
-			mVUsetupRange(mVU, xPC, false);
-			mVUendProgram(mVU, &mFC, 1);
-			goto perf_and_return;
-		}
+		nativeBody = mvu_aot::CompileBody(mVU, trace);
 	}
 
 	for (; x < endCount; ++x)
@@ -1007,17 +999,21 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 			handleBadOp(mVU, x);
 			x = 0xffff;
 		} // handleBadOp currently just prints a warning
-		if (mVUup.mBit)
+		if (nativeBody)
 		{
-			mVUBranchOrVuFlags_emit_oaknut(mVU, VUFLAG_MFLAGSET);
+			// Arithmetic and delayed helpers are already emitted. Walk the
+			// first-pass metadata at the same upper-word PC as the baseline;
+			// its range, flag/PQ shuffle and branch/end framing still own tails.
+			incPC(1);
 		}
-
-		if (isVU1 && mVUlow.kickcycles && CHECK_XGKICKHACK)
+		else
 		{
-			mVU_XGKICK_SYNC_oaknut(mVU, false);
+			if (mVUup.mBit)
+				mVUBranchOrVuFlags_emit_oaknut(mVU, VUFLAG_MFLAGSET);
+			if (isVU1 && mVUlow.kickcycles && CHECK_XGKICKHACK)
+				mVU_XGKICK_SYNC_oaknut(mVU, false);
+			mVUexecuteInstruction(mVU);
 		}
-
-		mVUexecuteInstruction(mVU);
 		profiler_scope.End();
 
 		if (!mVUinfo.isBdelay && !mVUlow.branch) //T/D Bit on branch is handled after the branch, branch delay slots are executed.
@@ -1062,7 +1058,7 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 			}
 		}
 
-		if (mVUinfo.doXGKICK)
+		if (mVUinfo.doXGKICK && !nativeBody)
 		{
 			JitProfiler::OpcodeRangeScope control_scope;
 			if (JitProfiler::IsActive())

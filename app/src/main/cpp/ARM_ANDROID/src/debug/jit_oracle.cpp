@@ -2255,6 +2255,8 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vuaot_saved.inl"
 #include "jit_oracle_vuaot_clamp_reuse.inl"
 #include "jit_oracle_vuaot_compile_roots.inl"
+#include "jit_oracle_vuaot_compile_branch.inl"
+#include "jit_oracle_vuaot_compile_branch_cold.inl"
 #include "jit_oracle_vuaot_ready_jobs.inl"
 #include "jit_oracle_vif_pair_copy.inl"
 #include "jit_oracle_vuaot_division.inl"
@@ -12437,6 +12439,20 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         RunVuAotCompileRootsColdTests(true);
     else if (std::strcmp(suite, "vu-aot-compile-roots-read") == 0)
         RunVuAotCompileRootsColdTests(false);
+    else if (std::strcmp(suite, "vu-aot-compile-branch-pq") == 0)
+        RunVuAotCompileBranchBoundaryTests(mvu_aot::InlineBodyEntryCount, true);
+    else if (std::strcmp(suite, "vu-aot-compile-branch-pq-write") == 0)
+        RunVuAotCompileBranchColdTests(true, true);
+    else if (std::strcmp(suite, "vu-aot-compile-branch-pq-read") == 0)
+        RunVuAotCompileBranchColdTests(false, true);
+    else if (std::strcmp(suite, "vu-aot-compile-branch-write") == 0)
+        RunVuAotCompileBranchColdTests(true);
+    else if (std::strcmp(suite, "vu-aot-compile-branch-read") == 0)
+        RunVuAotCompileBranchColdTests(false);
+    else if (std::strcmp(suite, "vu-aot-compile-branch-boundaries") == 0)
+        RunVuAotCompileBranchBoundaryTests(mvu_aot::InlineBodyEntryCount);
+    else if (std::strcmp(suite, "vu-aot-compile-branch") == 0)
+        RunVuAotCompileBranchTests();
     else if (std::strcmp(suite, "vu-aot-ready-jobs") == 0)
         RunVuAotReadyJobsTests();
     else if (std::strcmp(suite, "vif-pair-copy") == 0)
