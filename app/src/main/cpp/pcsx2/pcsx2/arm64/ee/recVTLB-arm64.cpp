@@ -839,6 +839,25 @@ int vtlb_DynGenReadNonQuad(u32 bits, bool sign, bool xmm, int addr_reg, vtlb_Rea
 // TLB lookup is performed in const, with the assumption that the COP0/TLB will clear the
 // recompiler if the TLB is changed.
 //
+#if defined(ARCH_ARM64) && defined(__ANDROID__)
+int vtlb_DynGenRead64ForUnalignedStore(int address_register, int shift_register)
+{
+	pxAssert(CHECK_FASTMEM && !vtlb_IsFaultingPC(GetCurrentGuestPC()));
+	pxAssert(address_register != EE_HOST_RAX && shift_register != EE_HOST_RAX &&
+		shift_register != address_register && x86regs[shift_register].inuse);
+	_freeX86reg(EE_HOST_RAX);
+	const u8* const code_start = oakGetCurrentCodePointer();
+	recBeginOaknutEmit();
+	vtlbFastmemReadU64_emit_oaknut(oakXRegister(EE_HOST_RAX), oakXRegister(address_register));
+	recEndOaknutEmit();
+	pxAssert(oakGetCurrentCodePointer() - code_start == 4);
+	vtlb_AddLoadStoreInfoUnaligned64(reinterpret_cast<uptr>(code_start), GetCurrentGuestPC(),
+		GetAllocatedGPRBitmask(), GetAllocatedXMMBitmask(),
+		static_cast<u8>(address_register), static_cast<u8>(shift_register));
+	return EE_HOST_RAX;
+}
+#endif
+
 int vtlb_DynGenReadNonQuad_Const(u32 bits, bool sign, bool xmm, u32 addr_const, vtlb_ReadRegAllocCallback dest_reg_alloc)
 {
     int x86_dest_reg;
@@ -1400,7 +1419,7 @@ void vtlb_DynV2P()
 static void DynBackpatchLoadStoreImpl(uptr code_address, u32 code_size, u32 guest_pc, u32 guest_addr,
 	u32 gpr_bitmask, u32 fpr_bitmask, u8 address_register, u8 data_register,
 	u8 size_in_bits, bool is_signed, bool is_load, bool is_xmm, bool ir_fastmem_load,
-	bool ir_delay_slot = false)
+	bool ir_delay_slot = false, u8 merge_shift_register = 0xff)
 {
 	static constexpr u32 GPR_SIZE = 8;
 	static constexpr u32 XMM_SIZE = 16;
@@ -1466,6 +1485,16 @@ static void DynBackpatchLoadStoreImpl(uptr code_address, u32 code_size, u32 gues
 	if (is_load)
 	{
 		recBeginOaknutEmit();
+		oak::Label merge_read_done;
+		if (merge_shift_register != 0xff)
+		{
+			pxAssert(size_in_bits == 64 && !is_xmm && data_register == EE_HOST_RAX &&
+				merge_shift_register != data_register && merge_shift_register != address_register);
+			// Full-width SDL/SDR never reads MMIO on the helper path. The
+			// old value is irrelevant at shift zero, including the first fault.
+			oakAsm->MOV(oakXRegister(data_register), 0);
+			oakAsm->CBZ(oakWRegister(merge_shift_register), merge_read_done);
+		}
 		vtlbWriteGuestPC_emit_oaknut(guest_pc);
 		if (ir_fastmem_load)
 		{
@@ -1476,6 +1505,8 @@ static void DynBackpatchLoadStoreImpl(uptr code_address, u32 code_size, u32 gues
 		}
 		DynGen_PrepRegs_emit_oaknut(address_register, -1, size_in_bits, is_xmm, ir_fastmem_load);
 		DynGen_HandlerTest_emit_oaknut([size_in_bits, is_signed]() {DynGen_DirectRead_emit_oaknut(size_in_bits, is_signed); },  0, size_in_bits, is_signed && size_in_bits <= 32);
+		if (merge_shift_register != 0xff)
+			oakAsm->l(merge_read_done);
 		recEndOaknutEmit();
 
 		if (size_in_bits == 128)
@@ -1557,6 +1588,14 @@ void vtlb_DynBackpatchLoadStore(uptr code_address, u32 code_size, u32 guest_pc, 
 }
 
 #if defined(ARCH_ARM64) && defined(__ANDROID__)
+void vtlb_DynBackpatchUnaligned64(uptr code_address, u32 guest_pc, u32 guest_addr,
+	u32 gpr_bitmask, u32 fpr_bitmask, u8 address_register, u8 shift_register)
+{
+	DynBackpatchLoadStoreImpl(code_address, 4, guest_pc, guest_addr, gpr_bitmask,
+		fpr_bitmask, address_register, EE_HOST_RAX, 64, false, true, false,
+		false, false, shift_register);
+}
+
 void vtlb_DynBackpatchLoad32Ir(uptr code_address, u32 guest_pc, u32 guest_addr, bool delay_slot)
 {
 	constexpr u32 IR_LIVE_Q2_Q7 = 0xFC;

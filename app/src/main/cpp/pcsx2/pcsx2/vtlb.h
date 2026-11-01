@@ -53,6 +53,12 @@ extern void vtlb_DynBackpatchLoadStore(uptr code_address, u32 code_size, u32 gue
 // four-byte scalar load using W0 for both the effective address and result.
 extern void vtlb_AddLoadStoreInfoIr32(uptr code_address, u32 guest_pc, bool delay_slot);
 extern void vtlb_DynBackpatchLoad32Ir(uptr code_address, u32 guest_pc, u32 guest_addr, bool delay_slot);
+// SDL/SDR merge reads may skip the cold handler when their owned shift is zero.
+extern void vtlb_AddLoadStoreInfoUnaligned64(uptr code_address, u32 guest_pc, u32 gpr_bitmask,
+	u32 fpr_bitmask, u8 address_register, u8 shift_register);
+extern void vtlb_DynBackpatchUnaligned64(uptr code_address, u32 guest_pc, u32 guest_addr,
+	u32 gpr_bitmask, u32 fpr_bitmask, u8 address_register, u8 shift_register);
+extern int vtlb_DynGenRead64ForUnalignedStore(int address_register, int shift_register);
 #endif
 extern bool vtlb_IsFaultingPC(u32 guest_pc);
 

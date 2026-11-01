@@ -1076,6 +1076,60 @@ static void sdlrhelper_emit_oaknut(oak::XReg maskamt, oak::XReg amt, oak::XReg v
 	oakAsm->ORR(rt, rt, OAK_XSCRATCH);
 }
 
+#if defined(ARCH_ARM64) && defined(__ANDROID__)
+template <bool Left>
+static void recSDLR_fastmem_emit_oaknut()
+{
+	// These owned temporaries survive a first-fault helper under the local
+	// AAPCS ABI. Unlike an untracked scratch, the shift is part of its site.
+	const int shift_reg = _allocX86reg(X86TYPE_TEMP, 0, MODE_CALLEESAVED);
+	const int source_reg = _allocX86reg(X86TYPE_TEMP, 0, MODE_CALLEESAVED);
+	const oak::WReg addr = oakWRegister(EE_HOST_RCX);
+	const oak::WReg shift_w = oakWRegister(shift_reg);
+	const oak::XReg shift_x = oakXRegister(shift_reg);
+	const oak::XReg source = oakXRegister(source_reg);
+	const oak::XReg old = oakXRegister(EE_HOST_RAX);
+	recBeginOaknutEmit();
+	recMoveGPRtoOakW(addr, _Rs_);
+	oakAddSignedImm(addr, addr, _Imm_, oak::util::W4);
+	recMoveGPRtoOakX(source, _Rt_);
+	if constexpr (Left)
+	{
+		oakAsm->MVN(shift_w, addr);
+		oakAsm->UBFIZ(shift_w, shift_w, 3, 3);
+	}
+	else
+		oakAsm->UBFIZ(shift_w, addr, 3, 3);
+	oakAsm->AND(addr, addr, oak::BitImm32(~0x07u));
+	recEndOaknutEmit();
+
+	vtlb_DynGenRead64ForUnalignedStore(EE_HOST_RCX, shift_reg);
+
+	recBeginOaknutEmit();
+	oakAsm->MOV(OAK_XSCRATCH, UINT64_C(0xffffffffffffffff));
+	if constexpr (Left)
+	{
+		oakAsm->LSR(OAK_XSCRATCH, OAK_XSCRATCH, shift_x);
+		oakAsm->LSR(source, source, shift_x);
+	}
+	else
+	{
+		oakAsm->LSL(OAK_XSCRATCH, OAK_XSCRATCH, shift_x);
+		oakAsm->LSL(source, source, shift_x);
+	}
+	oakAsm->BIC(old, old, OAK_XSCRATCH);
+	oakAsm->ORR(source, source, old);
+	// The unallocated address register can be clobbered by the read thunk.
+	recMoveGPRtoOakW(addr, _Rs_);
+	oakAddSignedImm(addr, addr, _Imm_, oak::util::W4);
+	oakAsm->AND(addr, addr, oak::BitImm32(~0x07u));
+	recEndOaknutEmit();
+	vtlb_DynGenWrite(64, false, EE_HOST_RCX, source_reg);
+	_freeX86reg(source_reg);
+	_freeX86reg(shift_reg);
+}
+#endif
+
 static void recSDL_emit_oaknut()
 {
 #ifdef REC_STORES
@@ -1115,8 +1169,21 @@ static void recSDL_emit_oaknut()
 		_freeX86reg(EE_HOST_RCX);
 		_freeX86reg(EE_HOST_RDX);
 
+#if defined(ARCH_ARM64) && defined(__ANDROID__)
+		if (CHECK_FASTMEM && !vtlb_IsFaultingPC(recLoadStoreGuestPC()))
+		{
+			recSDLR_fastmem_emit_oaknut<true>();
+			return;
+		}
+#endif
+
 		const int temp1 = _allocX86reg(X86TYPE_TEMP, 0, MODE_CALLEESAVED);
 		const int temp2 = _allocX86reg(X86TYPE_TEMP, 0, MODE_CALLEESAVED);
+
+		// Full-width stores also need dirty register writeback; the alignment
+		// branch must not skip the flush while its tracker state is discarded.
+		if (!CHECK_FASTMEM || vtlb_IsFaultingPC(recLoadStoreGuestPC()))
+			iFlushCall(FLUSH_FULLVTLB);
 
 		recBeginOaknutEmit();
 
@@ -1136,11 +1203,6 @@ static void recSDL_emit_oaknut()
 		oakAsm->NOP();
 
 		recEndOaknutEmit();
-
-		// If we're not using fastmem, we need to flush early. Because the first read
-		// (which would flush) happens inside a branch.
-		if (!CHECK_FASTMEM || vtlb_IsFaultingPC(recLoadStoreGuestPC()))
-			iFlushCall(FLUSH_FULLVTLB);
 
 		recBeginOaknutEmit();
 		oakAsm->ADD(temp1_w, temp1_w, 1);
@@ -1222,8 +1284,21 @@ static void recSDR_emit_oaknut()
 		_freeX86reg(EE_HOST_RCX);
 		_freeX86reg(EE_HOST_RDX);
 
+#if defined(ARCH_ARM64) && defined(__ANDROID__)
+		if (CHECK_FASTMEM && !vtlb_IsFaultingPC(recLoadStoreGuestPC()))
+		{
+			recSDLR_fastmem_emit_oaknut<false>();
+			return;
+		}
+#endif
+
 		const int temp1 = _allocX86reg(X86TYPE_TEMP, 0, MODE_CALLEESAVED);
 		const int temp2 = _allocX86reg(X86TYPE_TEMP, 0, MODE_CALLEESAVED);
+
+		// Full-width stores also need dirty register writeback; the alignment
+		// branch must not skip the flush while its tracker state is discarded.
+		if (!CHECK_FASTMEM || vtlb_IsFaultingPC(recLoadStoreGuestPC()))
+			iFlushCall(FLUSH_FULLVTLB);
 
 		recBeginOaknutEmit();
 
@@ -1242,11 +1317,6 @@ static void recSDR_emit_oaknut()
 		oakAsm->NOP();
 
 		recEndOaknutEmit();
-
-		// If we're not using fastmem, we need to flush early. Because the first read
-		// (which would flush) happens inside a branch.
-		if (!CHECK_FASTMEM || vtlb_IsFaultingPC(recLoadStoreGuestPC()))
-			iFlushCall(FLUSH_FULLVTLB);
 
 		vtlb_DynGenReadNonQuad(64, false, false, EE_HOST_RCX, RETURN_READ_IN_RAX);
 

@@ -60,6 +60,7 @@ enum class LoadstoreBackpatchOrigin : u8
 {
 	Legacy,
 	EeIrLoad32,
+	EeUnalignedStoreMerge64,
 };
 
 struct LoadstoreBackpatchInfo
@@ -76,6 +77,7 @@ struct LoadstoreBackpatchInfo
 	bool is_fpr;
 	LoadstoreBackpatchOrigin origin = LoadstoreBackpatchOrigin::Legacy;
 	bool ir_delay_slot = false;
+	u8 merge_shift_register = 0xff;
 };
 
 static constexpr size_t FASTMEM_AREA_SIZE = 0x100000000ULL;
@@ -1222,7 +1224,7 @@ void vtlb_ClearLoadStoreInfo()
 static void vtlb_AddLoadStoreInfoImpl(uptr code_address, u32 code_size, u32 guest_pc,
 	u32 gpr_bitmask, u32 fpr_bitmask, u8 address_register, u8 data_register,
 	u8 size_in_bits, bool is_signed, bool is_load, bool is_fpr, LoadstoreBackpatchOrigin origin,
-	bool ir_delay_slot = false)
+	bool ir_delay_slot = false, u8 merge_shift_register = 0xff)
 {
 	pxAssert(code_size < std::numeric_limits<u8>::max());
 
@@ -1231,7 +1233,8 @@ static void vtlb_AddLoadStoreInfoImpl(uptr code_address, u32 code_size, u32 gues
 		s_fastmem_backpatch_info.erase(iter);
 
 	LoadstoreBackpatchInfo info{guest_pc, gpr_bitmask, fpr_bitmask, static_cast<u8>(code_size),
-		address_register, data_register, size_in_bits, is_signed, is_load, is_fpr, origin, ir_delay_slot};
+		address_register, data_register, size_in_bits, is_signed, is_load, is_fpr, origin, ir_delay_slot,
+		merge_shift_register};
 	s_fastmem_backpatch_info.emplace(code_address, info);
 }
 
@@ -1245,6 +1248,17 @@ void vtlb_AddLoadStoreInfo(uptr code_address, u32 code_size, u32 guest_pc, u32 g
 }
 
 #if defined(ARCH_ARM64) && defined(__ANDROID__)
+void vtlb_AddLoadStoreInfoUnaligned64(uptr code_address, u32 guest_pc, u32 gpr_bitmask,
+	u32 fpr_bitmask, u8 address_register, u8 shift_register)
+{
+	pxAssert((code_address & 3) == 0 && shift_register < 32 &&
+		(gpr_bitmask & (1u << shift_register)) && address_register != 0 &&
+		shift_register != 0 && shift_register != address_register);
+	vtlb_AddLoadStoreInfoImpl(code_address, 4, guest_pc, gpr_bitmask, fpr_bitmask,
+		address_register, 0, 64, false, true, false,
+		LoadstoreBackpatchOrigin::EeUnalignedStoreMerge64, false, shift_register);
+}
+
 void vtlb_AddLoadStoreInfoIr32(uptr code_address, u32 guest_pc, bool delay_slot)
 {
 	constexpr u32 IR_LIVE_Q2_Q7 = 0xFC;
@@ -1275,7 +1289,16 @@ bool vtlb_BackpatchLoadStore(uptr code_address, uptr fault_address)
 	const LoadstoreBackpatchInfo info = iter->second;
 	s_fastmem_backpatch_info.erase(iter);
 	const u32 guest_addr = static_cast<u32>(fault_address - fastmem_start);
-	if (info.origin == LoadstoreBackpatchOrigin::EeIrLoad32)
+	if (info.origin == LoadstoreBackpatchOrigin::EeUnalignedStoreMerge64)
+	{
+#if defined(ARCH_ARM64) && defined(__ANDROID__)
+		vtlb_DynBackpatchUnaligned64(code_address, info.guest_pc, guest_addr,
+			info.gpr_bitmask, info.fpr_bitmask, info.address_register, info.merge_shift_register);
+#else
+		pxFail("EE unaligned merge backpatch metadata on unsupported platform");
+#endif
+	}
+	else if (info.origin == LoadstoreBackpatchOrigin::EeIrLoad32)
 	{
 #if defined(ARCH_ARM64) && defined(__ANDROID__)
 		vtlb_DynBackpatchLoad32Ir(code_address, info.guest_pc, guest_addr, info.ir_delay_slot);
