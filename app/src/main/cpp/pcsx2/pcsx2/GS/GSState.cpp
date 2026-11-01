@@ -1314,7 +1314,7 @@ void GSState::KickPackedBatch(const GIFPackedReg* RESTRICT r, u32 size)
 #endif
 	for (const GIFPackedReg* end = r + size; r < end;)
 	{
-		if constexpr (prim == GS_TRIANGLESTRIP || prim == GS_TRIANGLELIST)
+		if constexpr (prim == GS_TRIANGLESTRIP || prim == GS_TRIANGLELIST || prim == GS_SPRITE)
 		{
 			const u32 consumed = KickPackedStripChunk<prim, xyzf2>(r, static_cast<u32>((end - r) / 3), c, uvfog, depth, m0, m1);
 			if (consumed)
@@ -5350,7 +5350,7 @@ u32 GSState::KickPackedStripChunkParsed(const GIFPackedReg* RESTRICT r, u32 rema
 {
 #if defined(ARCH_ARM64)
 	using namespace GSStripKickKernel;
-	static_assert(prim == GS_TRIANGLESTRIP || prim == GS_TRIANGLELIST);
+	static_assert(prim == GS_TRIANGLESTRIP || prim == GS_TRIANGLELIST || prim == GS_SPRITE);
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	if (!s_gsStripKernelEnabled) return 0;
 #endif
@@ -5361,7 +5361,7 @@ u32 GSState::KickPackedStripChunkParsed(const GIFPackedReg* RESTRICT r, u32 rema
 	const u32 indexLimit = (c.maxcount + 3) * 6;
 	if (c.itail >= indexLimit) return 0;
 	const u32 count = std::min({remaining, kChunkVertices, c.maxcount - c.tail - 1,
-		vertexLimit - c.tail - 1, (indexLimit - c.itail) / 3});
+		vertexLimit - c.tail - 1, (indexLimit - c.itail) / (prim == GS_SPRITE ? 2u : 3u)});
 	if (count < kMinVertices) return 0;
 	const GSVector4i cull = m_context->scissor.cull;
 	if (!ScissorInDomain(cull)) return 0;
@@ -5380,6 +5380,7 @@ u32 GSState::KickPackedStripChunkParsed(const GIFPackedReg* RESTRICT r, u32 rema
 	const s32 ofx = m_xyof.x, ofy = m_xyof.y;
 	// Current offsets must also be the proved, duplicated native lanes.
 	if (m_xyof.z != ofx || m_xyof.w != ofy || ofx < 0 || ofx > 65535 || ofy < 0 || ofy > 65535) return 0;
+	const bool spriteQFix = prim == GS_SPRITE && !m_env.PRIM.FST;
 	u32 accState = 0, scalarCulls = 0;
 	GSVector4i rect;
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
@@ -5394,12 +5395,12 @@ u32 GSState::KickPackedStripChunkParsed(const GIFPackedReg* RESTRICT r, u32 rema
 		if (s_gsStripKernelObserve)
 		{
 			if (s_gsStripKernelMutation == 1)
-				rect = Emit<prim, false, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM), nullptr, s_gsStripKernelMutation);
+				rect = Emit<prim, false, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM), nullptr, s_gsStripKernelMutation, spriteQFix);
 			else
-				rect = Emit<prim, true, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM), nullptr, s_gsStripKernelMutation);
+				rect = Emit<prim, true, true>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM), nullptr, s_gsStripKernelMutation, spriteQFix);
 		}
 		else
-			rect = Emit<prim, true, false>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM));
+			rect = Emit<prim, true, false>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM), nullptr, 0, spriteQFix);
 	}
 	else
 #endif
@@ -5409,7 +5410,7 @@ u32 GSState::KickPackedStripChunkParsed(const GIFPackedReg* RESTRICT r, u32 rema
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 			, s_gsStripOutlineObserve ? s_gsStripOutlineStats : nullptr, s_gsStripKernelMutation
 #endif
-		};
+			, spriteQFix};
 		ChunkOutput output;
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 		if (s_gsStripKernelObserve)
@@ -6432,7 +6433,7 @@ void GSState::GIFPackedRegHandlerCarrying(const GIFPackedReg* RESTRICT r, u32 si
 			{
 				const GIFPackedReg* record = r + done * off.stride;
 #if defined(ARCH_ARM64)
-				if constexpr (prim == GS_TRIANGLESTRIP)
+				if constexpr (prim == GS_TRIANGLESTRIP || prim == GS_SPRITE)
 				{
 					const BatchParser<layout> parser{off, uvfog, carry, constants, depth};
 					const u32 consumed = KickPackedStripChunkParsed<prim>(record, count - done, c, parser, m0, m1);

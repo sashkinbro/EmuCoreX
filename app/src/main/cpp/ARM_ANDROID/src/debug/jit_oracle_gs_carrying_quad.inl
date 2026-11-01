@@ -134,14 +134,17 @@ namespace GSCarryingQuadOracle
         // AutoFlush and a pre-first-XYZ descriptor prefix must never use Rows.
         GSConfig.UserHacks_AutoFlush=GSHWAutoFlushLevel::Enabled;GSConfig.AutoFlushSW=true;
         EmuCoreXOracleSetGSCarryingLayouts(true,true);state->Prepare(prim,true,false,false,true);state->SetTraceFlags(true,false,true,false);state->SeedCarryingLayout();
-        EmuCoreXOracleSetGSMirrorObserve(true);state->SubmitCarrying(ProductionPacket(family,1,129,0),0,3);
-        u64 excluded[3]{};EmuCoreXOracleGSMirrorStats(excluded);exact&=excluded[0]==0&&excluded[1]==0&&EmuCoreXOracleGSCarryingStagedVertices()>0;
+        EmuCoreXOracleSetGSStripKernel(true,true,0);EmuCoreXOracleSetGSMirrorObserve(true);state->SubmitCarrying(ProductionPacket(family,1,129,0),0,3);
+        u64 excluded[3]{},excludedKernel[4]{};EmuCoreXOracleGSMirrorStats(excluded);EmuCoreXOracleGSStripKernelStats(excludedKernel);
+        exact&=excluded[0]==0&&excluded[1]==0&&excludedKernel[0]==0&&EmuCoreXOracleGSCarryingStagedVertices()>0;
         GSConfig.UserHacks_AutoFlush=GSHWAutoFlushLevel::Disabled;GSConfig.AutoFlushSW=false;
         const auto packet=ProductionPacket(family,1,17,0);const auto regs=Descriptors(family,1);const auto firstXYZ=std::find_if(regs.begin(),regs.end(),[](u8 x){return x==GIF_REG_XYZ2||x==GIF_REG_XYZF2;});
         const u32 xyz=static_cast<u32>(firstXYZ-regs.begin());std::vector<GIFPackedReg> prefix(packet.begin(),packet.begin()+1+xyz);
-        state->Prepare(prim,true,false,false,true);state->SeedCarryingLayout();EmuCoreXOracleSetGSMirrorObserve(true);state->SubmitCarrying(prefix,0,3);
-        EmuCoreXOracleGSMirrorStats(excluded);exact&=excluded[0]==0&&excluded[1]==0&&state->ParserReg(3)==xyz;
-        exact&=handlers>0&&(rowsConsumer?kernelVertices>0:kernelVertices==0);
+        state->Prepare(prim,true,false,false,true);state->SeedCarryingLayout();EmuCoreXOracleSetGSStripKernel(true,true,0);
+        EmuCoreXOracleSetGSMirrorObserve(true);state->SubmitCarrying(prefix,0,3);
+        EmuCoreXOracleGSMirrorStats(excluded);EmuCoreXOracleGSStripKernelStats(excludedKernel);
+        exact&=excluded[0]==0&&excluded[1]==0&&excludedKernel[0]==0&&state->ParserReg(3)==xyz;
+        exact&=handlers>0&&kernelVertices>0;
         std::printf("GS_CARRY_CLASSIFIED family=%u prim=%u handlers=%llu kernelVertices=%llu\n",family,prim,
             static_cast<unsigned long long>(handlers),static_cast<unsigned long long>(kernelVertices));
         return exact;
@@ -157,8 +160,8 @@ void GSCarryingQuadTests()
         "carrying quad RGBA pair uses latched Q with exact bounded vertices/meta/state",
         "carrying quad UV triple carries ST and uses latched Q with exact colour fog bounded vertices/meta/state"};
     constexpr const char* workNames[]={"carrying quad NOP triple actually vectorizes mirror work and eliminates scalar Rows metadata",
-        "carrying STQ sprite pair preserves scalar helper and zero classified kernel/quad work",
-        "carrying UV sprite pair preserves scalar helper and zero classified kernel/quad work",
+        "carrying STQ sprite pair executes classified kernel with scalar mirror metadata and zero quad work",
+        "carrying UV sprite pair executes classified kernel with scalar mirror metadata and zero quad work",
         "carrying quad RGBA pair actually vectorizes mirror work and eliminates scalar Rows metadata",
         "carrying quad UV triple actually vectorizes mirror work and eliminates scalar Rows metadata"};
     for(u32 family=0;family<5;++family)
@@ -168,7 +171,7 @@ void GSCarryingQuadTests()
         Check(byteExact&&stateExact,controls[family]);
         const bool rowsConsumer=family==0||family==3||family==4;
         Check(raw.quads==raw.expectedQuads&&raw.scalar==raw.expectedSmall&&raw.tail==raw.expectedTail&&
-            (rowsConsumer?productionQuads>0:productionQuads==0)&&productionScalar==0,workNames[family]);
+            (rowsConsumer?productionQuads>0:productionQuads==0)&&(rowsConsumer?productionScalar==0:productionScalar>0),workNames[family]);
         std::printf("GS_CARRY_CONTROL family=%u raw=%u classified=%u\n",family,byteExact,stateExact);
         std::printf("GS_CARRY_QUAD family=%u cases=%llu vertices=%llu rawQuads=%llu/%llu scalar=%llu/%llu tail=%llu/%llu productionQuads=%llu productionScalar=%llu\n",family,
             static_cast<unsigned long long>(raw.cases),static_cast<unsigned long long>(raw.vertices),static_cast<unsigned long long>(raw.quads),static_cast<unsigned long long>(raw.expectedQuads),

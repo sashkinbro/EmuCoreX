@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 EmuCoreX Team
 // SPDX-License-Identifier: GPL-3.0+
 // Adapted from GSVertexKickKernel.h at cb78946d6ed0678b82fa3e0409c10124265ec18d.
-// Local native-grid triangle kernel. Buffer ownership and flushing stay in GSState.
+// Local native-grid triangle/sprite kernel. Buffer ownership and flushing stay in GSState.
 #pragma once
 
 #include "GS/Renderers/Common/GSVertex.h"
@@ -53,6 +53,12 @@ namespace GSStripKickKernel
         return ((meta0&meta1&meta2&kOutcode)!=0)||
             ((difference&kBandX)==0)||((difference&kBandY)==0)||
             xy0==xy1||xy0==xy2||xy1==xy2;
+    }
+    __forceinline_odr u32 RejectPair(u64 meta0,u64 meta1)
+    {
+        const u64 difference=meta0^meta1;
+        return ((meta0&meta1&kOutcode)!=0)||
+            ((difference&kBandX)==0)||((difference&kBandY)==0);
     }
     __forceinline_odr GSVector4i XY(u64 packed)
     {
@@ -216,10 +222,11 @@ namespace GSStripKickKernel
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
         ,u32 mutation=0
 #endif
-        )
+        ,bool spriteQFix=false)
     {
-        static_assert(prim==GS_TRIANGLESTRIP||prim==GS_TRIANGLELIST);
-        constexpr bool strip=prim==GS_TRIANGLESTRIP;
+        static_assert(prim==GS_TRIANGLESTRIP||prim==GS_TRIANGLELIST||prim==GS_SPRITE);
+        constexpr bool strip=prim==GS_TRIANGLESTRIP,sprite=prim==GS_SPRITE;
+        constexpr u32 n=sprite?2u:3u;
         GSVertex* RESTRICT vertices=cursor.vb;
         u32 head=cursor.head,tail=cursor.tail,next=cursor.next,itail=cursor.itail;
         const u32 xyTail=cursor.xy_tail;
@@ -233,7 +240,7 @@ namespace GSStripKickKernel
         {
             xy2=xy1;meta2=meta1;xy1=xy0;meta1=meta0;xy0=sideXY[i];meta0=sideMeta[i];
             vertices[tail]=*provisional++;
-            if(++tail-head<3)continue;
+            if(++tail-head<n)continue;
             if(meta0&kAdc)
             {
                 if constexpr(strip)++head;
@@ -252,7 +259,7 @@ namespace GSStripKickKernel
                 continue;
             }
             if constexpr(observe)++scalarCulls;
-            if(Reject(xy0,meta0,xy1,meta1,xy2,meta2))
+            if(sprite?RejectPair(meta0,meta1):Reject(xy0,meta0,xy1,meta1,xy2,meta2))
             {
                 if constexpr(strip)++head;
                 else
@@ -275,14 +282,29 @@ namespace GSStripKickKernel
                 trace.Rewind(next);
                 head=next;
             }
-            indices[0]=static_cast<u16>(head);indices[1]=static_cast<u16>(head+1);indices[2]=static_cast<u16>(head+2);
-            indices+=3;itail+=3;tail=head+3;next=tail;
+            indices[0]=static_cast<u16>(head);indices[1]=static_cast<u16>(head+1);
+            if constexpr(!sprite)indices[2]=static_cast<u16>(head+2);
+            if constexpr(sprite)
+            {
+                // The accepted pair owns the second corner's Q under the
+                // live environment FST rule; current/last parses stay raw.
+                bool fixQ=spriteQFix;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+                if constexpr(observe)if(mutation==4)fixQ=false;
+#endif
+                if(fixQ)vertices[head].RGBAQ.Q=vertices[head+1].RGBAQ.Q;
+            }
+            indices+=n;itail+=n;tail=head+n;next=tail;
             if constexpr(strip)++head;else head=tail;
-            trace.Triangle(vertices,tail-3,itail,traceKey);
-            if constexpr(trackAcc)if(trace.valid)*accTouched=true;
-            const GSVector4i draw=NativeBBox(xy0,xy1,xy2).sra32<4>()+GSVector4i(0,0,1,1);
+            if constexpr(sprite)trace.valid=false;
+            else
+            {
+                trace.Triangle(vertices,tail-3,itail,traceKey);
+                if constexpr(trackAcc)if(trace.valid)*accTouched=true;
+            }
+            const GSVector4i draw=NativeBBox(xy0,xy1,sprite?xy1:xy2).sra32<4>()+GSVector4i(0,0,1,1);
             if(accState)rect=rect.runion(draw);
-            else {rect=draw;accState=(itail==3)?2:1;}
+            else {rect=draw;accState=(itail==n)?2:1;}
         }
         if constexpr(writeRing)
             for(u32 i=count-4;i<count;++i)ring[(xyTail+i)&3]=XY(sideXY[i]);
@@ -307,6 +329,7 @@ namespace GSStripKickKernel
         u64* outlinedWork = nullptr;
         u32 mutation = 0;
 #endif
+        bool spriteQFix = false;
     };
     struct ChunkOutput
     {
@@ -332,6 +355,19 @@ namespace GSStripKickKernel
         output.last0=GSVector4i(provisional[count-1].m[0]);
         output.last1=GSVector4i(provisional[count-1].m[1]);
         output.accState=output.scalarCulls=0;
+        if constexpr(prim==GS_SPRITE)
+        {
+            // Sprite accepts only invalidate the triangle cache. Neither
+            // initialized nor stale accumulator bytes belong to this path.
+            output.rect=Emit<prim,writeRing,observe>(cursor,inv.ring,inv.seed,inv.sideXY,
+                inv.sideMeta,count,output.accState,output.scalarCulls,*inv.trace,inv.traceKey,nullptr
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+                ,inv.mutation
+#endif
+                ,inv.spriteQFix);
+        }
+        else
+        {
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
         if(!LocalFmmEnabled)
         {
@@ -378,5 +414,6 @@ namespace GSStripKickKernel
         }
         owner.watermark=local.watermark;owner.indices=local.indices;
         owner.vertexEnd=local.vertexEnd;owner.key=local.key;owner.valid=local.valid;
+        }
     }
 }

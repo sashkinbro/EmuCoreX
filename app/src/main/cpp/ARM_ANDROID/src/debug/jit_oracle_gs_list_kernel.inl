@@ -140,7 +140,7 @@ namespace GSListKernelOracle
                 }
                 Configure(mode);state->Submit(packet,0);const auto actual=GSNativeMirrorOracle::Capture(*state);
                 if(!mode)expected=actual;else exact&=actual==expected;
-                if(mode==2){u64 stats[4]{};EmuCoreXOracleGSStripKernelStats(stats);exact&=stats[0]==0;}
+                if(mode==2){u64 stats[4]{};EmuCoreXOracleGSStripKernelStats(stats);exact&=variant==6?stats[0]>0:stats[0]==0;}
                 GSConfig.UserHacks_AutoFlush=GSHWAutoFlushLevel::Disabled;GSConfig.AutoFlushSW=false;
             }
         }
@@ -201,7 +201,7 @@ void GSListKernelTests()
     Check(GSNativeMirrorOracle::Raster(),"native list triangle cull retains independently proved strict-interior native samples");
     Work work[2]{};u64 cases=0;Check(Matrix(work,cases),"native list staged direct and candidate paths preserve complete protected-packet state and FMM at every boundary");
     Check(Flush(),"native list preserves actual65532vertex Flush growth retained state current registers FMM and draws");
-    Check(Fallback(),"native list unsupported scale AA1 clip offset autoflush fan and sprite stay exact without list kernel work");
+    Check(Fallback(),"native list unsupported controls stay exact while the newly supported sprite topology executes its own kernel");
     Check(Seams(),"native list mixed strip context scissor and XYOFFSET transitions preserve every complete intermediate state");
     bool both=true,one=true;
     for(u32 i=0;i<2;++i)

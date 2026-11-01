@@ -216,6 +216,7 @@ void CheckBits(bool pass, u32 actual, u32 expected, const char* name)
 #include "jit_oracle_gs_strip_outline.inl"
 #include "jit_oracle_gs_list_kernel.inl"
 #include "jit_oracle_gs_local_fmm.inl"
+#include "jit_oracle_gs_sprite_kernel.inl"
 #include "jit_oracle_gs_uploads.inl"
 #include "jit_oracle_gs_restarts.inl"
 #include "jit_oracle_gif_copy.inl"
@@ -12640,6 +12641,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         GSFusedTraceTests();
     else if (std::strcmp(suite, "gs-local-fmm") == 0)
         GSLocalFmmTests();
+    else if (std::strcmp(suite, "gs-sprite-kernel") == 0)
+        GSSpriteKernelTests();
     else if (std::strcmp(suite, "gs-list-kernel") == 0)
         GSListKernelTests();
     else if (std::strcmp(suite, "gs-strip-outline") == 0)
