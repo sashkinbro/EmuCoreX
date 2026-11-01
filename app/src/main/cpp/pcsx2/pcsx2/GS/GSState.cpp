@@ -154,6 +154,7 @@ std::string GSState::GetDrawDumpPath(const char* format, ...)
 void GSState::Reset(bool hardware_reset)
 {
 	Flush(GSFlushReason::RESET);
+    InvalidateNativeMirror();
 
 	// FIXME: bios logo not shown cut in half after reset, missing graphics in GoW after first FMV
 	memset(&m_path, 0, sizeof(m_path));
@@ -1110,6 +1111,21 @@ static __fi GSVector4i GSPackSTQRGBA(const GIFPackedReg* RESTRICT r)
 static thread_local bool s_gsPackedBatchEnabled = true;
 static thread_local bool s_gsPackedBatchObserve = false;
 static thread_local u64 s_gsPackedBatchStats[3] = {};
+// Native single-kick mirror RED observation; fast rejection is added only
+// after the independent native baseline has demonstrated the missing path.
+static thread_local bool s_gsNativeMirrorEnabled = true;
+static thread_local bool s_gsNativeMirrorObserve = false;
+static thread_local u32 s_gsNativeMirrorMutation = 0;
+static thread_local u64 s_gsNativeMirrorStats[8] = {}; // fast, reject, legacy, build, refresh, batch, invalidation, fallback
+extern "C" void EmuCoreXOracleSetGSNativeMirror(bool enabled,bool observe,u32 mutation)
+{
+    s_gsNativeMirrorEnabled=enabled;s_gsNativeMirrorObserve=observe;s_gsNativeMirrorMutation=mutation;
+    std::fill(std::begin(s_gsNativeMirrorStats),std::end(s_gsNativeMirrorStats),0);
+}
+extern "C" void EmuCoreXOracleGSNativeMirrorStats(u64* values)
+{
+    std::copy(std::begin(s_gsNativeMirrorStats),std::end(s_gsNativeMirrorStats),values);
+}
 static thread_local bool s_gsStripKernelEnabled = true;
 static thread_local bool s_gsStripKernelObserve = false;
 static thread_local u32 s_gsStripKernelMutation = 0;
@@ -2402,6 +2418,7 @@ u32 GSState::CalcMask(int exp, int max_exp)
 
 void GSState::FlushPrim()
 {
+    InvalidateNativeMirror();
 	if (m_index.tail > 0)
 	{
 		GL_REG("FlushPrim ctxt %d", PRIM->CTXT);
@@ -3796,6 +3813,7 @@ void GSState::UpdateScissor()
 
 void GSState::UpdateVertexKick()
 {
+    InvalidateNativeMirror();
 	const u32 prim = PRIM->PRIM;
 
 	m_fpGIFPackedRegHandlers[GIF_REG_XYZF2] = m_fpGIFPackedRegHandlerXYZ[prim][0];
@@ -5170,6 +5188,123 @@ static constexpr u32 MaxVerticesForPrim(u32 prim)
 	}
 }
 
+void GSState::InvalidateNativeMirror()
+{
+    m_vertex.native_mirror.valid_mask=0;
+    m_vertex.native_mirror.bounds_valid=false;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+    if(s_gsNativeMirrorObserve)++s_gsNativeMirrorStats[6];
+#endif
+}
+
+bool GSState::RefreshNativeMirrorBounds(const GSVector4i& cull)
+{
+    auto& cache=m_vertex.native_mirror;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+    // Deliberately stale bounds are an oracle-only fault injection.
+    if(s_gsNativeMirrorMutation==1&&cache.bounds_valid)return true;
+#endif
+    if(!GSStripKickKernel::ScissorInDomain(cull))
+    {
+        InvalidateNativeMirror();return false;
+    }
+    cache.cull_source=cull;cache.bounds=GSStripKickKernel::BandedBounds(cull);cache.bounds_valid=true;
+    for(u32 i=0;i<4;++i)if(cache.valid_mask&(1u<<i))
+    {
+        const u64 xy=cache.ring[i].xy;
+        // These are already offset-subtracted window coordinates. A new
+        // XYOFFSET must not be applied to vertices kicked before its write.
+        cache.ring[i]=GSStripKickKernel::MakeEntry(static_cast<s32>(static_cast<u32>(xy)),
+            static_cast<s32>(static_cast<u32>(xy>>32)),cache.bounds);
+    }
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+    if(s_gsNativeMirrorObserve)++s_gsNativeMirrorStats[4];
+#endif
+    return true;
+}
+
+bool GSState::RepairNativeMirror(u32 xy_tail)
+{
+    auto& cache=m_vertex.native_mirror;
+    for(u32 j=1;j<=3;++j)
+    {
+        const u32 slot=(xy_tail-j)&3,bit=1u<<slot;
+        if(cache.valid_mask&bit)continue;
+        const GSVector4i xy=m_vertex.xy[slot];
+        if(xy.x!=xy.z||xy.y!=xy.w||!GSStripKickKernel::InDomain(xy.x,xy.y))return false;
+        cache.ring[slot]=GSStripKickKernel::MakeEntry(xy.x,xy.y,cache.bounds);cache.valid_mask|=bit;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        if(s_gsNativeMirrorObserve)++s_gsNativeMirrorStats[3];
+#endif
+    }
+    return true;
+}
+
+template<u32 prim>
+__fi bool GSState::RecordNativeMirror(u32 slot,u32 xraw,u32 yraw)
+{
+    auto& cache=m_vertex.native_mirror;const u32 bit=1u<<slot;
+#if defined(ARCH_ARM64)
+    if constexpr(prim==GS_TRIANGLESTRIP||prim==GS_TRIANGLELIST)
+    {
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+        if(!s_gsNativeMirrorEnabled){cache.valid_mask&=~bit;return false;}
+#endif
+        const s32 ofx=m_xyof.x,ofy=m_xyof.y;
+        if(m_nativeres&&!PRIM->AA1&&!m_scissor_invalid&&
+            !(m_context->XYOFFSET.U64&~0x0000ffff0000ffffull)&&
+            m_xyof.z==ofx&&m_xyof.w==ofy&&ofx>=0&&ofx<=65535&&ofy>=0&&ofy<=65535)
+        {
+            const GSVector4i cull=m_context->scissor.cull;
+            if((cache.bounds_valid&&cache.cull_source.eq(cull))||RefreshNativeMirrorBounds(cull))
+            {
+                cache.ring[slot]=GSStripKickKernel::MakeEntry(static_cast<s32>(xraw)-ofx,static_cast<s32>(yraw)-ofy,cache.bounds);
+                cache.valid_mask|=bit;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+                if(s_gsNativeMirrorObserve)++s_gsNativeMirrorStats[3];
+#endif
+                return true;
+            }
+        }
+    }
+#endif
+    cache.valid_mask&=~bit;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+    if(s_gsNativeMirrorObserve)++s_gsNativeMirrorStats[7];
+#endif
+    return false;
+}
+
+__fi bool GSState::TryNativeMirror(u32 xy_tail,u32& reject)
+{
+    auto& cache=m_vertex.native_mirror;
+    const u32 needed=15u^(1u<<(xy_tail&3));
+    if((cache.valid_mask&needed)!=needed&&!RepairNativeMirror(xy_tail))return false;
+    const auto& a=cache.ring[(xy_tail-1)&3];const auto& b=cache.ring[(xy_tail-2)&3];const auto& c=cache.ring[(xy_tail-3)&3];
+    reject=GSStripKickKernel::Reject(a.xy,a.meta,b.xy,b.meta,c.xy,c.meta);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+    if(s_gsNativeMirrorObserve){++s_gsNativeMirrorStats[0];s_gsNativeMirrorStats[1]+=reject!=0;}
+#endif
+    return true;
+}
+
+void GSState::PublishNativeMirror(u32 xy_tail,u32 count,const GSVector4i& cull,
+    const GSStripKickKernel::Bounds& bounds,const u64* xy,const u64* meta)
+{
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+    if(!s_gsNativeMirrorEnabled){InvalidateNativeMirror();return;}
+    if(s_gsNativeMirrorMutation==2)return; // omitted publication must be observable
+#endif
+    auto& cache=m_vertex.native_mirror;
+    cache.cull_source=cull;cache.bounds=bounds;cache.bounds_valid=true;
+    for(u32 j=count-4;j<count;++j)
+        cache.ring[(xy_tail-count+j)&3]={xy[j],meta[j]&~GSStripKickKernel::kAdc};
+    cache.valid_mask=15;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+    if(s_gsNativeMirrorObserve)++s_gsNativeMirrorStats[5];
+#endif
+}
+
 template <bool xyzf2>
 u32 GSState::KickPackedStripChunk(const GIFPackedReg* RESTRICT r, u32 remaining,
     VertexKickCursor& c, u64 uvfog, GSLimit24BitDepth depth, GSVector4i& last0, GSVector4i& last1)
@@ -5235,6 +5370,7 @@ u32 GSState::KickPackedStripChunkParsed(const GIFPackedReg* RESTRICT r, u32 rema
 	else
 #endif
 		rect = Emit<true, false>(c, m_vertex.xy, seed, m_strip_side_xy, m_strip_side_meta, count, accState, scalarCulls, m_fused_trace, GSFusedVertexTrace::Key(*PRIM));
+	PublishNativeMirror(c.xy_tail,count,cull,bounds,m_strip_side_xy,m_strip_side_meta);
 	if (accState)
 	{
 		// No helper observes the environment inside the chunk. Capture it only
@@ -5650,6 +5786,8 @@ __forceinline void GSState::VertexKick(u32 skip)
 	// by 16 and incorrectly rejects almost every primitive. (AI-assisted)
 	const GSVector4i xy = new_v1.upl16().xyxy().sub32(m_xyof);
 	m_vertex.xy[xy_tail & 3] = xy;
+    const u32 raw_xy=new_v1.U32[0];
+    const bool native_mirror_ready=RecordNativeMirror<prim>(xy_tail&3,raw_xy&65535u,raw_xy>>16);
 
 	// Backup head for triangle fans so we can read it later, otherwise it'll get lost after the 4th vertex.
 	if (prim == GS_TRIANGLEFAN && tail == head)
@@ -5668,6 +5806,13 @@ __forceinline void GSState::VertexKick(u32 skip)
 	skip |= static_cast<u32>(m_scissor_invalid);
 
 	GSVector4i bbox;
+    bool native_mirror_handled=false;
+    if(skip==0&&native_mirror_ready)
+    {
+        u32 native_reject=0;
+        native_mirror_handled=TryNativeMirror(xy_tail,native_reject);
+        if(native_mirror_handled)skip|=native_reject;
+    }
 	if (skip == 0)
 	{
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
@@ -5712,8 +5857,14 @@ __forceinline void GSState::VertexKick(u32 skip)
 			}
 		}
 
-		skip |= static_cast<u32>(GSVertexIsRejected<static_cast<GS_PRIM_CLASS>(primclass)>(
-			bbox, m_context->scissor.cull, v0, v1, v2));
+        if(!native_mirror_handled)
+        {
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+            if(s_gsNativeMirrorObserve)++s_gsNativeMirrorStats[2];
+#endif
+		    skip |= static_cast<u32>(GSVertexIsRejected<static_cast<GS_PRIM_CLASS>(primclass)>(
+			    bbox,m_context->scissor.cull,v0,v1,v2));
+        }
 	}
 
 	if (skip != 0)
@@ -5902,6 +6053,8 @@ __forceinline void GSState::VertexKickDirect(u32 skip, const GSVector4i& new_v0,
 	// by 16 and incorrectly rejects almost every primitive. (AI-assisted)
 	const GSVector4i xy = new_v1.upl16().xyxy().sub32(m_xyof);
 	m_vertex.xy[xy_tail & 3] = xy;
+    const u32 raw_xy=new_v1.U32[0];
+    const bool native_mirror_ready=RecordNativeMirror<prim>(xy_tail&3,raw_xy&65535u,raw_xy>>16);
 
 	// Backup head for triangle fans so we can read it later, otherwise it'll get lost after the 4th vertex.
 	if (prim == GS_TRIANGLEFAN && tail == head)
@@ -5920,6 +6073,13 @@ __forceinline void GSState::VertexKickDirect(u32 skip, const GSVector4i& new_v0,
 	skip |= static_cast<u32>(m_scissor_invalid);
 
 	GSVector4i bbox;
+    bool native_mirror_handled=false;
+    if(skip==0&&native_mirror_ready)
+    {
+        u32 native_reject=0;
+        native_mirror_handled=TryNativeMirror(xy_tail,native_reject);
+        if(native_mirror_handled)skip|=native_reject;
+    }
 	if (skip == 0)
 	{
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
@@ -5964,8 +6124,14 @@ __forceinline void GSState::VertexKickDirect(u32 skip, const GSVector4i& new_v0,
 			}
 		}
 
-		skip |= static_cast<u32>(GSVertexIsRejected<static_cast<GS_PRIM_CLASS>(primclass)>(
-			bbox, m_context->scissor.cull, v0, v1, v2));
+        if(!native_mirror_handled)
+        {
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+            if(s_gsNativeMirrorObserve)++s_gsNativeMirrorStats[2];
+#endif
+		    skip |= static_cast<u32>(GSVertexIsRejected<static_cast<GS_PRIM_CLASS>(primclass)>(
+			    bbox,m_context->scissor.cull,v0,v1,v2));
+        }
 	}
 
 	if (skip != 0)

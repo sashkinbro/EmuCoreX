@@ -158,6 +158,16 @@ protected:
 		u32 xy_tail;
 		GSVector4i xy[4];
 		GSVector4i xyhead;
+        // Derived native cull data belongs to this ring's buffer owner. It is
+        // never serialized; bounds changes retain the stored window positions.
+        struct
+        {
+            GSStripKickKernel::Entry ring[4];
+            GSVector4i cull_source;
+            GSStripKickKernel::Bounds bounds;
+            u32 valid_mask;
+            bool bounds_valid;
+        } native_mirror;
 	} m_vertex = {};
 
 	struct
@@ -181,6 +191,13 @@ protected:
 
 	void UpdateVertexKick();
 
+    void InvalidateNativeMirror();
+    bool RefreshNativeMirrorBounds(const GSVector4i& cull);
+    bool RepairNativeMirror(u32 xy_tail);
+    template<u32 prim> __fi bool RecordNativeMirror(u32 slot,u32 xraw,u32 yraw);
+    __fi bool TryNativeMirror(u32 xy_tail,u32& reject);
+    void PublishNativeMirror(u32 xy_tail,u32 count,const GSVector4i& cull,
+        const GSStripKickKernel::Bounds& bounds,const u64* xy,const u64* meta);
 	void GrowVertexBuffer();
 	bool IsAutoFlushDraw(u32 prim, int& tex_layer);
 	template<u32 prim> void HandleAutoFlush();
