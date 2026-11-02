@@ -1,7 +1,7 @@
 #include "common/AndroidLogging.h"
 #include "emucorex/android_runtime.h"
 #include "emucorex/upstream_vm_bridge.h"
-#include "pcsx2/GS/Renderers/Vulkan/VKShaderCache.h"
+#include <GS/Renderers/Vulkan/VKShaderCache.h>
 
 #include "common/Error.h"
 #include "common/Console.h"
@@ -23,10 +23,10 @@
 #include "pcsx2/Host.h"
 #include "pcsx2/VMManager.h"
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
-#include "pcsx2/GS/GS.h"
-#include "pcsx2/GS/Renderers/Vulkan/GSDeviceVK.h"
-#include "pcsx2/GS/Renderers/Vulkan/VKLoader.h"
-#include "pcsx2/GS/Renderers/Vulkan/VKShaderCache.h"
+#include <GS/GS.h>
+#include <GS/Renderers/Vulkan/GSDeviceVK.h>
+#include <GS/Renderers/Vulkan/VKLoader.h>
+#include <GS/Renderers/Vulkan/VKShaderCache.h>
 #endif
 
 #include <SDL3/SDL_main.h>

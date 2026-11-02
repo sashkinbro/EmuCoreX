@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "GameDatabase.h"
-#include "GS/GS.h"
+#include <GS/GS.h>
 #include "Host.h"
 #include "IconsFontAwesome.h"
 #include "vtlb.h"

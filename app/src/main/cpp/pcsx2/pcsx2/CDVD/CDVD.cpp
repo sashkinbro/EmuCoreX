@@ -7,7 +7,7 @@
 #include "CDVD/CDVD_internal.h"
 #include "CDVD/IsoReader.h"
 #include "CDVD/IsoFileFormats.h"
-#include "GS.h"
+#include <GS.h>
 #include "SIO/Sio.h"
 #include "Elfheader.h"
 #include "ps2/BiosTools.h"

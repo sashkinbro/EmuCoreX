@@ -6,7 +6,7 @@
 #include "Host.h"
 #include "Input/InputManager.h"
 #include "ImGui/ImGuiManager.h"
-#include "GS/GS.h"
+#include <GS/GS.h>
 #include "common/SettingsInterface.h"
 #include <algorithm>
 #include <array>

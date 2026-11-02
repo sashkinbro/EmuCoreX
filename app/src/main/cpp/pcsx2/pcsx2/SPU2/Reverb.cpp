@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "SPU2/defs.h"
-#include "GS/GSVector.h"
+#include <GS/GSVector.h>
 
 #include "common/Console.h"
 

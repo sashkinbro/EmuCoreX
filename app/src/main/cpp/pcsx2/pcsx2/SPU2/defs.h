@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "GS/MultiISA.h"
+#include <GS/MultiISA.h>
 
 #include <algorithm>
 #include <array>

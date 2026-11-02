@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "GS.h"
+#include <GS.h>
 #include "Gif_Unit.h"
 #include "MTGS.h"
 #include "MTVU.h"

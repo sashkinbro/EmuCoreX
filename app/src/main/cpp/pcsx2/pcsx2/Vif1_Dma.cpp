@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Common.h"
-#include "GS.h"
+#include <GS.h>
 #include "Gif_Unit.h"
 #include "MTVU.h"
 #include "VUmicro.h"

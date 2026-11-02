@@ -11,8 +11,8 @@
 #include "IopThread/IopBridge.h"
 #include "IopThread/SharedWord.h"
 
-#include "GS.h"
-#include "GS/GS.h"
+#include <GS.h>
+#include <GS/GS.h>
 #include "MTGS.h"
 #include "PerformanceMetrics.h"
 #include "Patch.h"

@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "GS/Renderers/Common/GSDevice.h"
-#include "GS/Renderers/Common/GSTexture.h"
-#include "GS/GSUtil.h"
+#include <GS/Renderers/Common/GSDevice.h>
+#include <GS/Renderers/Common/GSTexture.h>
+#include <GS/GSUtil.h>
 #include "Achievements.h"
 #include "GameList.h"
 #include "Host.h"

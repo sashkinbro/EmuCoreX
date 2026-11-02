@@ -3,7 +3,7 @@
 
 #include "Common.h"
 #include "VUops.h"
-#include "GS.h"
+#include <GS.h>
 #include "Gif_Unit.h"
 #include "MTVU.h"
 

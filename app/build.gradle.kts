@@ -86,7 +86,8 @@ android {
                     "-DANDROID_STL=c++_static",
                     "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY",
                     "-DEMUCOREX_ANDROID_HOST_PAGE_SIZE=0x1000",
-                    "-DEMUCOREX_NATIVE_LIBRARY_NAME=emucore_4k"
+                    "-DEMUCOREX_GS_FAMILY=MALI",
+                    "-DEMUCOREX_NATIVE_LIBRARY_NAME=emucore_mali_4k"
                 )
                 arguments("-DDISCORD_SDK_DIR=${discordSdkDirectory?.invariantSeparatorsPath.orEmpty()}")
             }
@@ -166,9 +167,17 @@ android {
         getByName("main") {
             assets.srcDir("src/main/cpp/PCSX2/bin")
             java.srcDir("src/main/cpp/PCSX2/3rdparty/SDL3/android-project/app/src/main/java")
-            // Populated only by tools/build_universal_page_release.ps1.
-            jniLibs.srcDir(file("build/generated/page-size-jni-libs"))
             discordSdkDirectory?.let(jniLibs::srcDir)
+        }
+        getByName("debug") {
+            listOf("emucore_adreno_4k", "emucore_mali_16k", "emucore_adreno_16k").forEach { core ->
+                jniLibs.srcDir(layout.buildDirectory.dir("generated/native-variants/debug/$core/jniLibs").get().asFile)
+            }
+        }
+        getByName("release") {
+            listOf("emucore_adreno_4k", "emucore_mali_16k", "emucore_adreno_16k").forEach { core ->
+                jniLibs.srcDir(layout.buildDirectory.dir("generated/native-variants/release/$core/jniLibs").get().asFile)
+            }
         }
     }
     packaging {
@@ -219,11 +228,9 @@ tasks.matching { it.name == "preBuild" }.configureEach {
     dependsOn(verifyBundledPatches)
 }
 
-// PCSX2 bakes the host page size into its fastmem implementation, so Android
-// needs two native cores. AGP builds the normal 4 KiB core above; these tasks
-// build the 16 KiB core in an isolated CMake tree and expose it as generated
-// jniLibs before every APK/AAB packaging task. This keeps Android Studio's
-// standard Build/Generate Signed Bundle or APK flow fully universal.
+// PCSX2 bakes page size and renderer-family policy into the native core. AGP
+// builds the Debug/Release Mali 4 KiB core; isolated variant-specific CMake
+// trees build the other renderer/page-size combinations for APK/AAB packaging.
 val androidSdkPath = localProperty("sdk.dir")
     ?: providers.environmentVariable("ANDROID_SDK_ROOT").orNull
     ?: providers.environmentVariable("ANDROID_HOME").orNull
@@ -239,82 +246,126 @@ val cmakeExecutable = androidSdkDirectory.resolve(
 val ninjaExecutable = androidSdkDirectory.resolve(
     "cmake/$emucorexCmakeVersion/bin/ninja$hostExecutableSuffix"
 )
-val secondary16kBuildDirectory = layout.buildDirectory.dir("native-secondary/16k/arm64-v8a")
-val secondary16kObjectDirectory = layout.buildDirectory.dir("native-secondary/16k/obj/arm64-v8a")
-val secondary16kCore = secondary16kObjectDirectory.map { it.file("libemucore_16k.so") }
-val generated16kJniDirectory = layout.buildDirectory.dir("generated/page-size-jni-libs/arm64-v8a")
+data class NativeCoreVariantTasks(
+    val build: org.gradle.api.tasks.TaskProvider<Exec>,
+    val stage: org.gradle.api.tasks.TaskProvider<Copy>
+)
 
-val configureEmucore16k by tasks.registering(Exec::class) {
-    group = "build"
-    description = "Configures the secondary 16 KiB Android emulator core."
-    inputs.files(fileTree("src/main/cpp") {
-        include("**/CMakeLists.txt", "**/*.cmake")
-    })
-    inputs.property("cmakeVersion", emucorexCmakeVersion)
-    inputs.property("ndkVersion", emucorexNdkVersion)
-    inputs.property("androidSdkPath", androidSdkDirectory.absolutePath)
-    outputs.file(secondary16kBuildDirectory.map { it.file("CMakeCache.txt") })
+fun registerNativeCoreVariant(
+    family: String,
+    pageSize: String,
+    buildType: String,
+    selfTests: Boolean
+): NativeCoreVariantTasks {
+    val familyKey = family.lowercase()
+    val pageKey = if (pageSize == "0x1000") "4k" else "16k"
+    val libraryName = "emucore_${familyKey}_$pageKey"
+    val suffix = "${family.lowercase().replaceFirstChar { it.titlecase() }}${pageKey.replaceFirstChar { it.titlecase() }}${buildType.replaceFirstChar { it.titlecase() }}"
+    val variantBuildDirectory = layout.buildDirectory.dir("native-variants/$buildType/$libraryName/arm64-v8a")
+    val variantObjectDirectory = layout.buildDirectory.dir("native-variants/$buildType/$libraryName/obj/arm64-v8a")
+    val variantCore = variantObjectDirectory.map { it.file("lib$libraryName.so") }
+    val stagedJniDirectory = layout.buildDirectory.dir("generated/native-variants/$buildType/$libraryName/jniLibs/arm64-v8a")
 
-    doFirst {
-        check(cmakeExecutable.isFile) { "CMake was not found: $cmakeExecutable" }
-        check(ninjaExecutable.isFile) { "Ninja was not found: $ninjaExecutable" }
-        check(androidNdkDirectory.isDirectory) { "Android NDK was not found: $androidNdkDirectory" }
+    val configure = tasks.register("configureEmucore$suffix", Exec::class) {
+        group = "build"
+        description = "Configures $libraryName for $buildType."
+        inputs.files(fileTree("src/main/cpp") {
+            include("**/CMakeLists.txt", "**/*.cmake", "**/*.cpp", "**/*.cc", "**/*.cxx", "**/*.h", "**/*.hpp",
+                "**/*.inl", "**/*.inc", "**/*.c", "**/*.S", "**/*.s")
+        })
+        inputs.property("cmakeVersion", emucorexCmakeVersion)
+        inputs.property("ndkVersion", emucorexNdkVersion)
+        inputs.property("androidSdkPath", androidSdkDirectory.absolutePath)
+        inputs.property("family", family)
+        inputs.property("pageSize", pageSize)
+        inputs.property("buildType", buildType)
+        inputs.property("selfTests", selfTests)
+        outputs.file(variantBuildDirectory.map { it.file("CMakeCache.txt") })
+
+        doFirst {
+            check(cmakeExecutable.isFile) { "CMake was not found: $cmakeExecutable" }
+            check(ninjaExecutable.isFile) { "Ninja was not found: $ninjaExecutable" }
+            check(androidNdkDirectory.isDirectory) { "Android NDK was not found: $androidNdkDirectory" }
+        }
+
+        commandLine(
+            cmakeExecutable.absolutePath,
+            "-S", file("src/main/cpp").absolutePath,
+            "-B", variantBuildDirectory.get().asFile.absolutePath,
+            "-G", "Ninja",
+            "-DCMAKE_SYSTEM_NAME=Android",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DCMAKE_SYSTEM_VERSION=29",
+            "-DANDROID_PLATFORM=android-29",
+            "-DANDROID_ABI=arm64-v8a",
+            "-DCMAKE_ANDROID_ARCH_ABI=arm64-v8a",
+            "-DANDROID_NDK=${androidNdkDirectory.absolutePath}",
+            "-DCMAKE_ANDROID_NDK=${androidNdkDirectory.absolutePath}",
+            "-DCMAKE_TOOLCHAIN_FILE=${androidNdkDirectory.resolve("build/cmake/android.toolchain.cmake").absolutePath}",
+            "-DCMAKE_MAKE_PROGRAM=${ninjaExecutable.absolutePath}",
+            "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=${variantObjectDirectory.get().asFile.absolutePath}",
+            "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=${variantObjectDirectory.get().asFile.absolutePath}",
+            "-DANDROID=true",
+            "-DCMAKE_BUILD_TYPE=$buildType",
+            "-DCMAKE_C_FLAGS_DEBUG=-O2 -g1",
+            "-DCMAKE_CXX_FLAGS_DEBUG=-O2 -g1",
+            "-DANDROID_STL=c++_static",
+            "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY",
+            "-DEMUCOREX_ANDROID_HOST_PAGE_SIZE=$pageSize",
+            "-DEMUCOREX_GS_FAMILY=$family",
+            "-DEMUCOREX_NATIVE_LIBRARY_NAME=$libraryName",
+            "-DEMUCOREX_ENABLE_NATIVE_SELF_TESTS=${if (selfTests) "ON" else "OFF"}",
+            "-DEMUCOREX_ENABLE_GS_ORACLE=${if (selfTests) "ON" else "OFF"}",
+            "-DEMUCOREX_ENABLE_EXPERIMENTAL_IR=OFF",
+            "-DDISCORD_SDK_DIR=${discordSdkDirectory?.invariantSeparatorsPath.orEmpty()}"
+        )
     }
 
-    commandLine(
-        cmakeExecutable.absolutePath,
-        "-S", file("src/main/cpp").absolutePath,
-        "-B", secondary16kBuildDirectory.get().asFile.absolutePath,
-        "-G", "Ninja",
-        "-DCMAKE_SYSTEM_NAME=Android",
-        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-        "-DCMAKE_SYSTEM_VERSION=29",
-        "-DANDROID_PLATFORM=android-29",
-        "-DANDROID_ABI=arm64-v8a",
-        "-DCMAKE_ANDROID_ARCH_ABI=arm64-v8a",
-        "-DANDROID_NDK=${androidNdkDirectory.absolutePath}",
-        "-DCMAKE_ANDROID_NDK=${androidNdkDirectory.absolutePath}",
-        "-DCMAKE_TOOLCHAIN_FILE=${androidNdkDirectory.resolve("build/cmake/android.toolchain.cmake").absolutePath}",
-        "-DCMAKE_MAKE_PROGRAM=${ninjaExecutable.absolutePath}",
-        "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=${secondary16kObjectDirectory.get().asFile.absolutePath}",
-        "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=${secondary16kObjectDirectory.get().asFile.absolutePath}",
-        "-DANDROID=true",
-        "-DCMAKE_BUILD_TYPE=Release",
-        "-DANDROID_STL=c++_static",
-        "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY",
-        "-DEMUCOREX_ANDROID_HOST_PAGE_SIZE=0x4000",
-        "-DEMUCOREX_NATIVE_LIBRARY_NAME=emucore_16k"
-    )
-}
-
-val buildEmucore16k by tasks.registering(Exec::class) {
-    group = "build"
-    description = "Builds the secondary 16 KiB Android emulator core."
-    dependsOn(configureEmucore16k)
-    outputs.file(secondary16kCore)
-    outputs.upToDateWhen { false }
-    commandLine(
-        cmakeExecutable.absolutePath,
-        "--build", secondary16kBuildDirectory.get().asFile.absolutePath,
-        "--target", "emucore"
-    )
-    doLast {
-        check(secondary16kCore.get().asFile.isFile) {
-            "The 16 KiB emulator core was not produced: ${secondary16kCore.get().asFile}"
+    val build = tasks.register("buildEmucore$suffix", Exec::class) {
+        group = "build"
+        description = "Builds $libraryName for $buildType."
+        dependsOn(configure)
+        inputs.files(fileTree("src/main/cpp") {
+            include("**/CMakeLists.txt", "**/*.cmake", "**/*.cpp", "**/*.cc", "**/*.cxx", "**/*.h", "**/*.hpp",
+                "**/*.inl", "**/*.inc", "**/*.c", "**/*.S", "**/*.s")
+        })
+        inputs.property("family", family)
+        inputs.property("pageSize", pageSize)
+        inputs.property("buildType", buildType)
+        inputs.property("selfTests", selfTests)
+        outputs.file(variantCore)
+        // Keep invoking Ninja so generated shader inputs outside the tracked C++ file set
+        // (GLSL/HLSL and bake-tool resources) still participate in Ninja's own dependency checks.
+        outputs.upToDateWhen { false }
+        commandLine(cmakeExecutable.absolutePath, "--build", variantBuildDirectory.get().asFile.absolutePath,
+            "--target", "emucore")
+        doLast {
+            check(variantCore.get().asFile.isFile) { "Native core was not produced: ${variantCore.get().asFile}" }
         }
     }
+
+    val stage = tasks.register("stageEmucore$suffix", Copy::class) {
+        group = "build"
+        description = "Stages $libraryName into the $buildType APK/AAB JNI inputs."
+        dependsOn(build)
+        from(variantCore)
+        into(stagedJniDirectory)
+    }
+    return NativeCoreVariantTasks(build, stage)
 }
 
-val stageEmucore16k by tasks.registering(Copy::class) {
-    group = "build"
-    description = "Stages the 16 KiB core for standard APK and AAB packaging."
-    dependsOn(buildEmucore16k)
-    from(secondary16kCore)
-    into(generated16kJniDirectory)
-}
+val debugAdreno4k = registerNativeCoreVariant("ADRENO", "0x1000", "Debug", selfTests = true)
+val debugMali16k = registerNativeCoreVariant("MALI", "0x4000", "Debug", selfTests = true)
+val debugAdreno16k = registerNativeCoreVariant("ADRENO", "0x4000", "Debug", selfTests = true)
+val releaseAdreno4k = registerNativeCoreVariant("ADRENO", "0x1000", "Release", selfTests = false)
+val releaseMali16k = registerNativeCoreVariant("MALI", "0x4000", "Release", selfTests = false)
+val releaseAdreno16k = registerNativeCoreVariant("ADRENO", "0x4000", "Release", selfTests = false)
 
+tasks.matching { it.name == "mergeDebugJniLibFolders" }.configureEach {
+    dependsOn(debugAdreno4k.stage, debugMali16k.stage, debugAdreno16k.stage)
+}
 tasks.matching { it.name == "mergeReleaseJniLibFolders" }.configureEach {
-    dependsOn(stageEmucore16k)
+    dependsOn(releaseAdreno4k.stage, releaseMali16k.stage, releaseAdreno16k.stage)
 }
 
 dependencies {

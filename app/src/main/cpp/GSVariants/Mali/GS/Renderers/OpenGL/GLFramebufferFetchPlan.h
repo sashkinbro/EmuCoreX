@@ -1,0 +1,45 @@
+// SPDX-FileCopyrightText: 2026 EmuCoreX Team
+// SPDX-License-Identifier: GPL-3.0+
+#pragma once
+#include "GS/Renderers/Common/GSFramebufferFetchPolicy.h"
+
+enum class GLDepthFetch : unsigned char { Sampler, EXT, ARM };
+struct GLFramebufferFetchCaps
+{
+    GSFramebufferFetchBackend preferred = GSFramebufferFetchBackend::None;
+    bool ext = false, arm_depth = false, arm_mrt = false, adreno = false;
+};
+struct GLFramebufferFetchPlan
+{
+    unsigned char key = 0;
+    constexpr GSFramebufferFetchBackend Color() const { return static_cast<GSFramebufferFetchBackend>(key & 3); }
+    constexpr GLDepthFetch Depth() const { return static_cast<GLDepthFetch>((key >> 2) & 3); }
+    constexpr bool operator==(const GLFramebufferFetchPlan&) const = default;
+};
+
+// Draw facts, not extension advertisement, decide whether a builtin is legal.
+constexpr GLFramebufferFetchPlan DecideGLFramebufferFetchPlan(const GLFramebufferFetchCaps& caps,
+    bool reads_color, bool reads_depth, bool depth_as_rt, bool color0_unorm, bool mrt)
+{
+    auto color = GSFramebufferFetchBackend::None;
+    auto depth = GLDepthFetch::Sampler;
+    if (reads_color)
+    {
+        if (caps.preferred == GSFramebufferFetchBackend::ARM)
+        {
+            if (color0_unorm && (!mrt || caps.arm_mrt)) color = GSFramebufferFetchBackend::ARM;
+            // Mobile's EXT arm is deliberately not a fallback from an
+            // ineligible ARM draw: that is precisely its broken driver path.
+        }
+        else if (caps.preferred == GSFramebufferFetchBackend::EXT)
+            color = GSFramebufferFetchBackend::EXT;
+    }
+    if (reads_depth && caps.preferred != GSFramebufferFetchBackend::None)
+    {
+        if (!depth_as_rt && caps.arm_depth) depth = GLDepthFetch::ARM;
+        else if (depth_as_rt && caps.ext && caps.preferred == GSFramebufferFetchBackend::EXT &&
+            !(caps.adreno && color == GSFramebufferFetchBackend::EXT))
+            depth = GLDepthFetch::EXT;
+    }
+    return {static_cast<unsigned char>(static_cast<unsigned>(color) | (static_cast<unsigned>(depth) << 2))};
+}

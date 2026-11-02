@@ -7,7 +7,7 @@
 
 #include "R5900.h"
 #include "R5900OpcodeTables.h"
-#include "GS.h"
+#include <GS.h>
 #include "ps2/BiosTools.h"
 #include "DebugTools/DebugInterface.h"
 #include "DebugTools/Breakpoints.h"

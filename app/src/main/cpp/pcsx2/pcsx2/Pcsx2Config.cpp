@@ -9,7 +9,7 @@
 #include "common/StringUtil.h"
 #include "common/SmallString.h"
 #include "Config.h"
-#include "GS.h"
+#include <GS.h>
 #include "CDVD/CDVDcommon.h"
 #include "Host.h"
 #include "Host/AudioStream.h"

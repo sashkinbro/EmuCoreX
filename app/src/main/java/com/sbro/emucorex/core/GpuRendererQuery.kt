@@ -8,6 +8,12 @@ import android.opengl.EGLSurface
 import android.opengl.GLES20
 
 internal object GpuRendererQuery {
+    // DeviceGpuInfoProvider.preload() may run while NativeApp selects its
+    // library. EGL_DEFAULT_DISPLAY is process-wide, and eglTerminate() from
+    // either probe can invalidate the other's context, so serialize the full
+    // initialize/query/cleanup lifecycle. This deliberately does not cache a
+    // renderer result across calls or process state changes.
+    @Synchronized
     fun query(): String? {
         var display: EGLDisplay = EGL14.EGL_NO_DISPLAY
         var context: EGLContext = EGL14.EGL_NO_CONTEXT

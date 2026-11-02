@@ -5,7 +5,7 @@
 
 // The full suite of hardware APIs:
 #include "Counters.h"
-#include "GS.h"
+#include <GS.h>
 #include "Hw.h"
 #include "IPU/IPU.h"
 #include "SPR.h"

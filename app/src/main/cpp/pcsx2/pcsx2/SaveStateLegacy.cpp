@@ -27,7 +27,7 @@
 #include "Config.h"
 #include "Host.h"
 #include "Counters.h"
-#include "GS.h"
+#include <GS.h>
 #include "Gif.h"
 #include "Gif_Unit.h"
 #include "IPU/IPU.h"

@@ -25,8 +25,8 @@ BIOS
 #include "DEV9/DEV9.h"
 #include "IopHw.h"
 #include "IopThread/IopBridge.h"
-#include "GS/Renderers/Common/GSFunctionMap.h"
-#include "GS.h"
+#include <GS/Renderers/Common/GSFunctionMap.h>
+#include <GS.h>
 #include "Host.h"
 #include "MTVU.h"
 #include "SPU2/spu2.h"

@@ -3,8 +3,8 @@
 
 #include "fmt/format.h"
 #include "Host.h"
-#include "GS/Renderers/Common/GSDevice.h"
-#include "GS/Renderers/Common/GSTexture.h"
+#include <GS/Renderers/Common/GSDevice.h>
+#include <GS/Renderers/Common/GSTexture.h>
 #include "ImGui/FullscreenUI.h"
 #include "ImGui/ImGuiAnimated.h"
 #include "ImGui/ImGuiFullscreen.h"

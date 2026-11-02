@@ -12,8 +12,13 @@ option(EMUCOREX_ENABLE_EXPERIMENTAL_IR "Opt in to slower shared IR research path
 if(EMUCOREX_ENABLE_GS_ORACLE AND (NOT CMAKE_BUILD_TYPE STREQUAL "Debug" OR NOT EMUCOREX_ENABLE_NATIVE_SELF_TESTS))
 	message(FATAL_ERROR "GS oracle requires CMAKE_BUILD_TYPE=Debug and EMUCOREX_ENABLE_NATIVE_SELF_TESTS=ON")
 endif()
+if(EMUCOREX_ENABLE_NATIVE_SELF_TESTS AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+	message(FATAL_ERROR "EMUCOREX_ENABLE_NATIVE_SELF_TESTS is debug-only and requires CMAKE_BUILD_TYPE=Debug")
+endif()
 set(EMUCOREX_ANDROID_HOST_PAGE_SIZE "0x1000" CACHE STRING "Android runtime page size expected by the PCSX2 core")
 set(EMUCOREX_NATIVE_LIBRARY_NAME "emucore_4k" CACHE STRING "Output name of the Android emulator core library")
+set(EMUCOREX_GS_FAMILY "MALI" CACHE STRING "Complete Android GS source family (MALI or ADRENO)")
+set_property(CACHE EMUCOREX_GS_FAMILY PROPERTY STRINGS MALI ADRENO)
 set(EMUCOREX_PCSX2_THIRD_PARTY_DIR "${PCSX2_UPSTREAM_DIR}/3rdparty" CACHE PATH "PCSX2 third-party dependency root")
 set(EMUCOREX_OAKNUT_INCLUDE_DIR "${CMAKE_CURRENT_LIST_DIR}/third_party/oaknut/include" CACHE PATH "Oaknut include directory")
 
@@ -33,6 +38,11 @@ endif()
 
 if(NOT EMUCOREX_NATIVE_LIBRARY_NAME MATCHES "^[A-Za-z0-9_]+$")
 	message(FATAL_ERROR "EMUCOREX_NATIVE_LIBRARY_NAME contains unsupported characters")
+endif()
+
+string(TOUPPER "${EMUCOREX_GS_FAMILY}" EMUCOREX_GS_FAMILY)
+if(NOT EMUCOREX_GS_FAMILY STREQUAL "MALI" AND NOT EMUCOREX_GS_FAMILY STREQUAL "ADRENO")
+	message(FATAL_ERROR "EMUCOREX_GS_FAMILY must be MALI or ADRENO, got '${EMUCOREX_GS_FAMILY}'")
 endif()
 
 # RetroAchievements is compiled from the tracked Android overlay below. These
@@ -243,6 +253,16 @@ if(EMUCOREX_LINK_UPSTREAM_PCSX2)
 	set_property(TARGET common PROPERTY CXX_STANDARD 20)
 	set_property(TARGET common PROPERTY CXX_STANDARD_REQUIRED ON)
 	add_subdirectory("${PCSX2_UPSTREAM_DIR}/pcsx2" "${CMAKE_CURRENT_BINARY_DIR}/upstream/pcsx2")
+	# emucore bridge/oracle TUs include GS headers directly, so give them the
+	# same physical GS fork selected by the PCSX2 source lists.
+	if(EMUCOREX_GS_FAMILY STREQUAL "ADRENO")
+		set(EMUCOREX_ANDROID_GS_VARIANT_ROOT "${EMUCOREX_CPP_DIR}/GSVariants/Adreno")
+	else()
+		set(EMUCOREX_ANDROID_GS_VARIANT_ROOT "${EMUCOREX_CPP_DIR}/GSVariants/Mali")
+	endif()
+	if(NOT EXISTS "${EMUCOREX_ANDROID_GS_VARIANT_ROOT}/GS/GS.cpp")
+		message(FATAL_ERROR "Incomplete Android ${EMUCOREX_GS_FAMILY} GS fork: ${EMUCOREX_ANDROID_GS_VARIANT_ROOT}/GS")
+	endif()
 	target_link_libraries(PCSX2_FLAGS INTERFACE JPEG::JPEG)
 	if(EMUCOREX_HAVE_LIBRASHADER)
 		target_link_libraries(PCSX2_FLAGS INTERFACE librashader)
@@ -261,6 +281,9 @@ if(EMUCOREX_LINK_UPSTREAM_PCSX2)
 	target_include_directories(PCSX2 BEFORE PRIVATE
 		"${PCSX2_UPSTREAM_DIR}/3rdparty/include"
 	)
+	if(TARGET PCSX2_LTO)
+		emucorex_remove_target_sources(PCSX2_LTO "Achievements.cpp")
+	endif()
 	emucorex_remove_target_sources(PCSX2
 		"Achievements.cpp"
 		"Host/SDLAudioStream.cpp"
@@ -331,6 +354,7 @@ add_library(emucore SHARED
 	src/runtime/upstream_vm_bridge.cpp
 )
 
+target_include_directories(emucore BEFORE PRIVATE "${EMUCOREX_ANDROID_GS_VARIANT_ROOT}")
 set_target_properties(emucore PROPERTIES OUTPUT_NAME "${EMUCOREX_NATIVE_LIBRARY_NAME}")
 # A 16 KiB ELF alignment is valid on both 4 KiB and 16 KiB Android systems.
 # The PCSX2 fastmem page size remains a separate compile-time choice above.

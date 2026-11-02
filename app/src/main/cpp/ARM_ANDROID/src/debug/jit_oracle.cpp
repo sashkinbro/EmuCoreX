@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 #include "Common.h"
-#include "GS/GSUtil.h"
+#include <GS/GSUtil.h>
 #include "arm64/vuaot/VuAotPipe.h"
 #include "arm64/vuaot/VuAotLower.h"
 #include "arm64/vuaot/VuAotIR.h"
@@ -36,21 +36,21 @@
 #include "VUmicro.h"
 #include "MTVU.h"
 #include "Hardware.h"
-#include "GS.h"
+#include <GS.h>
 #include "cpuinfo.h"
 #include "Gif_Unit.h"
 #include "Vif_Dma.h"
-#include "GS/GSState.h"
-#include "GS/GS.h"
-#include "GS/Renderers/Vulkan/GSDeviceVK.h"
-#include "GS/Renderers/OpenGL/GSDeviceOGL.h"
+#include <GS/GSState.h>
+#include <GS/GS.h>
+#include <GS/Renderers/Vulkan/GSDeviceVK.h>
+#include <GS/Renderers/OpenGL/GSDeviceOGL.h>
 extern "C" void EmuCoreXOracleBlendCarry(void (*check)(bool, const char*));
-#include "GS/Renderers/Vulkan/VKShaderCache.h"
-#include "GS/Renderers/Vulkan/VKSwapchainCreate.h"
-#include "GS/Renderers/HW/GSSpriteEdgeSnap.h"
-#include "GS/Renderers/HW/GSRendererHW.h"
+#include <GS/Renderers/Vulkan/VKShaderCache.h>
+#include <GS/Renderers/Vulkan/VKSwapchainCreate.h>
+#include <GS/Renderers/HW/GSSpriteEdgeSnap.h>
+#include <GS/Renderers/HW/GSRendererHW.h>
 #include "GameDatabase.h"
-#include "GS/Renderers/Common/GSPassScheduler.h"
+#include <GS/Renderers/Common/GSPassScheduler.h>
 #include "common/FileSystem.h"
 #include "common/ScopedGuard.h"
 #include "common/Threading.h"

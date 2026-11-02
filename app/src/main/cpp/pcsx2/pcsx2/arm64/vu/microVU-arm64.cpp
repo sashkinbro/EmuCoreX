@@ -31,7 +31,7 @@
 #include "common/Perf.h"
 #include "common/StringUtil.h"
 #include "arm64/OaknutHelpers-arm64.h"
-#include "GS/GSXXH.h"
+#include <GS/GSXXH.h>
 #include "VUmicro.h"
 #include "OpcodeFamilies.h"
 

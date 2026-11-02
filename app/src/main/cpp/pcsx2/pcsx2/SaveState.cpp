@@ -11,8 +11,8 @@
 #include "DebugTools/Breakpoints.h"
 #include "DebugTools/SymbolImporter.h"
 #include "Elfheader.h"
-#include "GS.h"
-#include "GS/GS.h"
+#include <GS.h>
+#include <GS/GS.h>
 #include "Host.h"
 #include "IopThread/IopThreadVm.h"
 #include "MTGS.h"

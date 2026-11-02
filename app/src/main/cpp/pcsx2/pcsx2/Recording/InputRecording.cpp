@@ -31,7 +31,7 @@ bool SaveStateBase::InputRecordingFreeze()
 #include "DebugTools/Debug.h"
 #include "GameDatabase.h"
 #include "fmt/format.h"
-#include "GS.h"
+#include <GS.h>
 #include "Host.h"
 
 InputRecording g_InputRecording;

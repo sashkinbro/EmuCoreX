@@ -7,7 +7,7 @@
 #include "R5900OpcodeTables.h"
 #include "Debug.h"
 #include "VU.h"
-#include "GS.h" // Required for gsNonMirroredRead()
+#include <GS.h> // Required for gsNonMirroredRead()
 #include "Counters.h"
 
 #include "Host.h"

@@ -1,0 +1,10218 @@
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2026 ARMSX2 Contributors
+// SPDX-FileCopyrightText: 2026 EmuCoreX Team
+// SPDX-License-Identifier: GPL-3.0+
+
+#include "GS/GS.h"
+#include "GS/GSXXH.h"
+#include "GS/GSGL.h"
+#include "GS/GSPerfMon.h"
+#include "GS/GSShaderCompileIndicator.h"
+#include "GS/GSUtil.h"
+#include "GS/Renderers/Vulkan/GSDeviceVK.h"
+#include "GS/Renderers/Common/GSDrawRoadConfig.h"
+#include "GS/Renderers/Common/GSBlendConstantPolicy.h"
+#include "GS/Renderers/Vulkan/GSLsfg.h"
+#include "GS/Renderers/Vulkan/VKBuilders.h"
+#include "GS/Renderers/Vulkan/VKLoader.h"
+#include "GS/Renderers/Vulkan/VKShaderCache.h"
+#include "GS/Renderers/Vulkan/VKSwapChain.h"
+#include "GS/Renderers/Common/GSDevice.h"
+#include "GS/Renderers/Common/GSGPUProfile.h"
+
+#include "core/runtime/BuildVersion.h"
+#include "platform/host/Host.h"
+#include "ShaderCacheVersion.h"
+
+#include "common/Console.h"
+#include "common/BitUtils.h"
+#include "common/Error.h"
+#include "common/FileSystem.h"
+
+#include "common/HostSys.h"
+#include "common/Path.h"
+#include "common/ScopedGuard.h"
+
+#include "ImGui/ImGuiManager.h"
+
+#include "imgui.h"
+
+#ifdef ARMSX2_HAS_LIBRASHADER
+// librashader only declares its Vulkan entry points when the consumer opts in, and it
+// needs the Vulkan types already in scope — GSDeviceVK.h pulls those in above. Defined
+// by CMake only when the Rust toolchain actually produced the library.
+#define LIBRA_RUNTIME_VULKAN
+#include "librashader.h"
+#endif
+
+#include <algorithm>
+#include <bit>
+#include <chrono>
+#include <cstring>
+#include <deque>
+#include <limits>
+#include <mutex>
+#include <sstream>
+#include <thread>
+#include <unordered_set>
+#include <utility>
+
+#if defined(__ANDROID__)
+#include "common/AndroidLogging.h"
+#include <sys/resource.h>
+#include <sys/system_properties.h>
+
+// Implemented by android_crash_diagnostics.cpp. Weak so other platforms and the
+// standalone native tools do not need to link the Android runtime.
+extern "C" void EmuCoreXRecordTFXCompileSelector(u32 vs, u64 ps_hi, u64 ps_lo) __attribute__((weak));
+extern "C" void EmuCoreXClearTFXCompileSelector() __attribute__((weak));
+#endif
+
+// Tweakables
+enum : u32
+{
+	MAX_DRAW_CALLS_PER_FRAME = 8192,
+	MAX_COMBINED_IMAGE_SAMPLER_DESCRIPTORS_PER_FRAME = 2 * MAX_DRAW_CALLS_PER_FRAME,
+	MAX_SAMPLED_IMAGE_DESCRIPTORS_PER_FRAME =
+		MAX_DRAW_CALLS_PER_FRAME, // assume at least half our draws aren't going to be shuffle/blending
+	MAX_STORAGE_IMAGE_DESCRIPTORS_PER_FRAME = 4, // Currently used by CAS only
+	MAX_INPUT_ATTACHMENT_IMAGE_DESCRIPTORS_PER_FRAME = MAX_DRAW_CALLS_PER_FRAME,
+	MAX_DESCRIPTOR_SETS_PER_FRAME = MAX_DRAW_CALLS_PER_FRAME * 2,
+
+	VERTEX_BUFFER_SIZE = 32 * 1024 * 1024,
+	INDEX_BUFFER_SIZE = 16 * 1024 * 1024,
+	VERTEX_UNIFORM_BUFFER_SIZE = 8 * 1024 * 1024,
+	FRAGMENT_UNIFORM_BUFFER_SIZE = 8 * 1024 * 1024,
+	TEXTURE_BUFFER_SIZE = 64 * 1024 * 1024,
+
+	// The vertex ring starts at VERTEX_BUFFER_SIZE and doubles, up to this, only when a frame's
+	// vertices would otherwise make the GS thread wait for the GPU (GSStreamRingGrowth.h). A title
+	// whose frames fit never pays for more.
+	VERTEX_BUFFER_MAX_SIZE = 64 * 1024 * 1024,
+	// Preserve the initial footprint; grow only when in-flight uploads exhaust it.
+	TEXTURE_BUFFER_MAX_SIZE = 128 * 1024 * 1024,
+
+	// How many persistent TFX UBO sets can be alive at once: the current one plus one retiring per
+	// vertex-ring growth, since each growth rebinds the ring by handle.
+	MAX_TFX_UBO_DESCRIPTOR_SETS = 2,
+};
+
+namespace
+{
+// MaliSX2 support is identified from Vulkan's driverInfo, which distinguishes the custom
+// renderer from stock ARM drivers that report the same vendor and device properties.
+bool IsMaliSX2DriverInfo(std::string_view driver_info)
+{
+	constexpr std::string_view marker = "malisx2";
+	if (driver_info.size() < marker.size())
+		return false;
+
+	for (size_t start = 0; start <= driver_info.size() - marker.size(); start++)
+	{
+		bool matches = true;
+		for (size_t i = 0; i < marker.size(); i++)
+		{
+			char value = driver_info[start + i];
+			if (value >= 'A' && value <= 'Z')
+				value = static_cast<char>(value - 'A' + 'a');
+			matches &= (value == marker[i]);
+		}
+		if (matches)
+			return true;
+	}
+
+	return false;
+}
+
+bool ShouldEnableMaliSX2ROAA(std::string_view driver_info, bool extension_enabled, bool feature_supported)
+{
+	return IsMaliSX2DriverInfo(driver_info) && extension_enabled && feature_supported;
+}
+
+bool ShouldUseMaliSX2PushDescriptors(std::string_view driver_info, bool extension_enabled,
+	u32 available_count, u32 required_count)
+{
+	return IsMaliSX2DriverInfo(driver_info) && extension_enabled && available_count >= required_count;
+}
+} // namespace
+
+static const char* GetVulkanVendorHint(u32 vendor_id)
+{
+	switch (vendor_id)
+	{
+		case 0x13B5u:
+			return "ARM Mali";
+		case 0x5143u:
+			return "Qualcomm Adreno";
+		case 0x1010u:
+			return "Imagination PowerVR";
+		case 0x144Du:
+			return "Samsung Xclipse";
+		case 0x18D1u:
+			return "Google Tensor";
+		default:
+			return "";
+	}
+}
+
+
+#ifdef ENABLE_OGL_DEBUG
+static u32 s_debug_scope_depth = 0;
+#endif
+
+static bool IsDATEModePrimIDInit(u32 flag)
+{
+	return flag == 1 || flag == 2;
+}
+
+static constexpr GSDevice::DepthFeedbackSupport GetVKDepthFeedbackSupport(bool texture_barrier,
+	GSDepthFeedbackMode mode)
+{
+	switch (mode)
+	{
+		case GSDepthFeedbackMode::DepthAsRT:
+			return GSDevice::DepthFeedbackSupport::DepthAsRT;
+		case GSDepthFeedbackMode::Auto:
+		case GSDepthFeedbackMode::Depth:
+			return texture_barrier ? GSDevice::DepthFeedbackSupport::Depth :
+				GSDevice::DepthFeedbackSupport::None;
+		case GSDepthFeedbackMode::None:
+		default:
+			return GSDevice::DepthFeedbackSupport::None;
+	}
+}
+
+void GSDeviceVK::ResolveDepthSamplingFeatures()
+{
+	// Ordering a color feedback loop does not validate barrier-free reads of
+	// Adreno's live depth attachment. Require the renderer's explicit depth
+	// hazard handling; HLE draws use their existing depth-copy fallback.
+	m_features.test_and_sample_depth = m_features.texture_barrier && !m_road_facts.adreno;
+}
+
+static VkAttachmentLoadOp GetLoadOpForTexture(GSTextureVK* tex)
+{
+	if (!tex)
+		return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+
+	switch (tex->GetState())
+	{
+		case GSTextureVK::State::Cleared:
+		{
+			tex->SetState(GSTexture::State::Dirty);
+			return VK_ATTACHMENT_LOAD_OP_CLEAR;
+		}
+		case GSTextureVK::State::Invalidated:
+			tex->SetState(GSTexture::State::Dirty);
+			return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		case GSTextureVK::State::Dirty:
+		default:
+			return VK_ATTACHMENT_LOAD_OP_LOAD;
+	}
+}
+
+static constexpr VkClearValue s_present_clear_color = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+
+// We need to synchronize instance creation because of adapter enumeration from the UI thread.
+static std::mutex s_instance_mutex;
+
+// Surface support requires swapchain separately. The shaders use gl_VertexIndex
+// and an explicit BaseVertex constant, so shader draw parameters are unnecessary.
+static constexpr std::array<const char*, 0> s_required_device_extensions = {};
+
+GSDeviceVK::GSDeviceVK()
+{
+#ifdef ENABLE_OGL_DEBUG
+	s_debug_scope_depth = 0;
+#endif
+
+	std::memset(&m_pipeline_selector, 0, sizeof(m_pipeline_selector));
+}
+
+GSDeviceVK::~GSDeviceVK() = default;
+
+bool GSDeviceVK::IsMaliSX2() const
+{
+	return IsMaliSX2DriverInfo(m_device_driver_properties.driverInfo);
+}
+
+VkInstance GSDeviceVK::CreateVulkanInstance(const WindowInfo& wi, OptionalExtensions* oe, bool enable_debug_utils,
+	bool enable_validation_layer)
+{
+#ifdef EMUCOREX_DISABLE_GS_DIAGNOSTICS
+	enable_debug_utils = false;
+	enable_validation_layer = false;
+#endif
+	ExtensionList enabled_extensions;
+	if (!SelectInstanceExtensions(&enabled_extensions, wi, oe, enable_debug_utils))
+		return VK_NULL_HANDLE;
+
+	VkApplicationInfo app_info = {};
+	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+	app_info.pNext = nullptr;
+	app_info.pApplicationName = "PCSX2";
+	app_info.applicationVersion = VK_MAKE_VERSION(
+		BuildVersion::GitTagHi, BuildVersion::GitTagMid, BuildVersion::GitTagLo);
+	app_info.pEngineName = "PCSX2";
+	app_info.engineVersion = VK_MAKE_VERSION(
+		BuildVersion::GitTagHi, BuildVersion::GitTagMid, BuildVersion::GitTagLo);
+	app_info.apiVersion = VK_API_VERSION_1_1;
+
+	VkInstanceCreateInfo instance_create_info = {};
+	instance_create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+	instance_create_info.pNext = nullptr;
+	instance_create_info.flags = 0;
+	instance_create_info.pApplicationInfo = &app_info;
+	instance_create_info.enabledExtensionCount = static_cast<uint32_t>(enabled_extensions.size());
+	instance_create_info.ppEnabledExtensionNames = enabled_extensions.data();
+	instance_create_info.enabledLayerCount = 0;
+	instance_create_info.ppEnabledLayerNames = nullptr;
+
+	// Enable debug layer on debug builds
+	if (enable_validation_layer)
+	{
+		static const char* layer_names[] = {"VK_LAYER_KHRONOS_validation"};
+		instance_create_info.enabledLayerCount = 1;
+		instance_create_info.ppEnabledLayerNames = layer_names;
+	}
+
+	VkInstance instance;
+	VkResult res = vkCreateInstance(&instance_create_info, nullptr, &instance);
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vkCreateInstance failed: ");
+		return nullptr;
+	}
+
+#ifdef __ANDROID__
+	// The Android Vulkan loader loads the ICD while creating the instance, so
+	// this is the first moment the custom driver load outcome is final.
+	Vulkan::CheckCustomDriverLoadStatus();
+#endif
+
+	return instance;
+}
+
+bool GSDeviceVK::SelectInstanceExtensions(ExtensionList* extension_list, const WindowInfo& wi, OptionalExtensions* oe,
+	bool enable_debug_utils)
+{
+	u32 extension_count = 0;
+	VkResult res = vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr);
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vkEnumerateInstanceExtensionProperties failed: ");
+		return false;
+	}
+
+	if (extension_count == 0)
+	{
+		Console.Error("VK: No extensions supported by instance.");
+		return false;
+	}
+
+	// A buggy custom driver (e.g. a corrupt Turnip build) can return garbage
+	// here; allocating blindly would OOM, and proceeding with uninitialized
+	// names crashes inside the driver on vkCreateInstance. Fail cleanly so we
+	// fall back instead. Real drivers expose dozens of instance extensions.
+	if (extension_count > 1024)
+	{
+		Console.Error("VK: Implausible instance extension count %u, rejecting driver.", extension_count);
+		return false;
+	}
+
+	std::vector<VkExtensionProperties> available_extension_list(extension_count);
+	res = vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, available_extension_list.data());
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vkEnumerateInstanceExtensionProperties (2) failed: ");
+		return false;
+	}
+
+	auto SupportsExtension = [&available_extension_list, extension_list](const char* name, bool required) {
+		if (std::find_if(available_extension_list.begin(), available_extension_list.end(),
+				[name](const VkExtensionProperties& properties) { return !strcmp(name, properties.extensionName); }) !=
+			available_extension_list.end())
+		{
+			DevCon.WriteLn("VK: Enabling extension: %s", name);
+			extension_list->push_back(name);
+			return true;
+		}
+
+		if (required)
+			Console.Error("VK: Missing required extension %s.", name);
+
+		return false;
+	};
+
+	// Android surfaces can arrive after the VM/GS has already started. Keep the surface
+	// extensions enabled even when the initial render window is surfaceless.
+#if defined(VK_USE_PLATFORM_ANDROID_KHR)
+	const bool wants_surface_extensions = true;
+#else
+	const bool wants_surface_extensions = (wi.type != WindowInfo::Type::Surfaceless);
+#endif
+
+	// Common extensions
+	if (wants_surface_extensions && !SupportsExtension(VK_KHR_SURFACE_EXTENSION_NAME, true))
+		return false;
+
+#if defined(VK_USE_PLATFORM_WIN32_KHR)
+	if (wi.type == WindowInfo::Type::Win32 && !SupportsExtension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME, true))
+		return false;
+#endif
+#if defined(VK_USE_PLATFORM_XLIB_KHR)
+	if (wi.type == WindowInfo::Type::X11 && !SupportsExtension(VK_KHR_XLIB_SURFACE_EXTENSION_NAME, true))
+		return false;
+#endif
+#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
+	if (wi.type == WindowInfo::Type::Wayland && !SupportsExtension(VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME, true))
+		return false;
+#endif
+#if defined(VK_USE_PLATFORM_METAL_EXT)
+	if (wi.type == WindowInfo::Type::MacOS && !SupportsExtension(VK_EXT_METAL_SURFACE_EXTENSION_NAME, true))
+		return false;
+#endif
+#if defined(VK_USE_PLATFORM_ANDROID_KHR)
+	if (!SupportsExtension(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME, true))
+		return false;
+#endif
+
+	// VK_EXT_debug_utils
+	if (enable_debug_utils && !SupportsExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME, false))
+		Console.Warning("VK: Debug report requested, but extension is not available.");
+
+	oe->vk_swapchain_maintenance1 = wants_surface_extensions;
+	if (wants_surface_extensions)
+	{
+		oe->vk_swapchain_maintenance1 = true;
+		// VK_EXT_swapchain_maintenance1 requires VK_EXT_surface_maintenance1.
+		// VK_KHR_swapchain_maintenance1 might require VK_KHR_surface_maintenance1 (It does on Nvidia).
+		// If either VK_KHR_surface_maintenance1 is supported, or VK_EXT_swapchain_maintenance1 is unsupported, don't try VK_EXT_swapchain_maintenance1.
+		oe->vk_swapchain_maintenance1_is_khr = SupportsExtension(VK_KHR_SURFACE_MAINTENANCE_1_EXTENSION_NAME, false) ||
+			!SupportsExtension(VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME, false);
+	}
+	else
+		oe->vk_swapchain_maintenance1 = false;
+
+	// Needed for exclusive fullscreen control.
+	SupportsExtension(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME, false);
+
+	return true;
+}
+
+GSDeviceVK::GPUList GSDeviceVK::EnumerateGPUs(VkInstance instance)
+{
+	GPUList gpus;
+
+	u32 gpu_count = 0;
+	VkResult res = vkEnumeratePhysicalDevices(instance, &gpu_count, nullptr);
+#ifdef __ANDROID__
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX", "Vulkan device enumeration: result=%d count=%u", res, gpu_count);
+#endif
+	if ((res != VK_SUCCESS && res != VK_INCOMPLETE) || gpu_count == 0)
+	{
+		LOG_VULKAN_ERROR(res, "vkEnumeratePhysicalDevices (1) failed: ");
+		return gpus;
+	}
+
+	std::vector<VkPhysicalDevice> physical_devices(gpu_count);
+	res = vkEnumeratePhysicalDevices(instance, &gpu_count, physical_devices.data());
+	if (res == VK_INCOMPLETE)
+	{
+		Console.Warning("VK: First vkEnumeratePhysicalDevices() call returned %zu devices, but second returned %u",
+			physical_devices.size(), gpu_count);
+	}
+	else if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vkEnumeratePhysicalDevices (2) failed: ");
+		return gpus;
+	}
+
+	// Maybe we lost a GPU?
+	if (gpu_count < physical_devices.size())
+		physical_devices.resize(gpu_count);
+
+	gpus.reserve(physical_devices.size());
+	for (VkPhysicalDevice device : physical_devices)
+	{
+		VkPhysicalDeviceProperties props = {};
+		vkGetPhysicalDeviceProperties(device, &props);
+#ifdef __ANDROID__
+		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX", "Vulkan device candidate: name=%s api=%u.%u.%u", props.deviceName,
+			VK_API_VERSION_MAJOR(props.apiVersion), VK_API_VERSION_MINOR(props.apiVersion), VK_API_VERSION_PATCH(props.apiVersion));
+#endif
+
+		// Skip GPUs which don't support Vulkan 1.1, since we won't be able to create a device with them anyway.
+		if (VK_API_VERSION_VARIANT(props.apiVersion) == 0 && VK_API_VERSION_MAJOR(props.apiVersion) <= 1 &&
+			VK_API_VERSION_MINOR(props.apiVersion) < 1)
+		{
+			Console.Warning(fmt::format("VK: Ignoring GPU '{}' because it only claims support for Vulkan {}.{}.{}",
+				props.deviceName, VK_API_VERSION_MAJOR(props.apiVersion), VK_API_VERSION_MINOR(props.apiVersion),
+				VK_API_VERSION_PATCH(props.apiVersion)));
+			continue;
+		}
+
+		// Query the extension list to ensure that we don't include GPUs that are missing the extensions we require.
+		u32 extension_count = 0;
+		res = vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_count, nullptr);
+		if (res != VK_SUCCESS)
+		{
+			Console.Warning(fmt::format("VK: Ignoring GPU '{}' because vkEnumerateInstanceExtensionProperties() failed: ",
+				props.deviceName, Vulkan::VkResultToString(res)));
+			continue;
+		}
+
+		std::vector<VkExtensionProperties> available_extension_list(extension_count);
+		if (extension_count > 0)
+		{
+			res = vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_count, available_extension_list.data());
+			pxAssert(res == VK_SUCCESS);
+		}
+		bool has_missing_extension = false;
+		for (const char* required_extension_name : s_required_device_extensions)
+		{
+			if (std::find_if(available_extension_list.begin(), available_extension_list.end(), [required_extension_name](const VkExtensionProperties& ext) {
+					return (std::strcmp(required_extension_name, ext.extensionName) == 0);
+				}) == available_extension_list.end())
+			{
+				Console.Warning(fmt::format("VK: Ignoring GPU '{}' because is is missing required extension {}",
+					props.deviceName, required_extension_name));
+#ifdef __ANDROID__
+				__android_log_print(ANDROID_LOG_WARN, "EmuCoreX", "Vulkan device rejected: name=%s missing=%s", props.deviceName, required_extension_name);
+#endif
+				has_missing_extension = true;
+			}
+		}
+		if (has_missing_extension)
+			continue;
+
+		GSAdapterInfo ai;
+		ai.name = props.deviceName;
+		ai.max_texture_size = std::min(props.limits.maxFramebufferWidth, props.limits.maxImageDimension2D);
+		ai.max_upscale_multiplier = GSGetMaxUpscaleMultiplier(ai.max_texture_size);
+
+		// handle duplicate adapter names
+		if (std::any_of(
+				gpus.begin(), gpus.end(), [&ai](const auto& other) { return (ai.name == other.second.name); }))
+		{
+			std::string original_adapter_name = std::move(ai.name);
+
+			u32 current_extra = 2;
+			do
+			{
+				ai.name = fmt::format("{} ({})", original_adapter_name, current_extra);
+				current_extra++;
+			} while (std::any_of(
+				gpus.begin(), gpus.end(), [&ai](const auto& other) { return (ai.name == other.second.name); }));
+		}
+
+		gpus.emplace_back(device, std::move(ai));
+	}
+
+	return gpus;
+}
+
+GSDeviceVK::GPUList GSDeviceVK::EnumerateGPUs()
+{
+	std::unique_lock lock(s_instance_mutex);
+
+	// Device shouldn't be torn down since we have the lock.
+	GPUList gpus;
+	if (g_gs_device && Vulkan::IsVulkanLibraryLoaded())
+	{
+		gpus = EnumerateGPUs(GSDeviceVK::GetInstance()->GetVulkanInstance());
+	}
+	else
+	{
+		if (Vulkan::LoadVulkanLibrary(nullptr))
+		{
+			OptionalExtensions oe = {};
+			const VkInstance instance = CreateVulkanInstance(WindowInfo(), &oe, false, false);
+			if (instance != VK_NULL_HANDLE)
+			{
+				if (Vulkan::LoadVulkanInstanceFunctions(instance))
+					gpus = EnumerateGPUs(instance);
+
+				vkDestroyInstance(instance, nullptr);
+			}
+
+			Vulkan::UnloadVulkanLibrary();
+		}
+	}
+
+	return gpus;
+}
+
+bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enable_surface)
+{
+	u32 extension_count = 0;
+	VkResult res = vkEnumerateDeviceExtensionProperties(m_physical_device, nullptr, &extension_count, nullptr);
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vkEnumerateDeviceExtensionProperties failed: ");
+		return false;
+	}
+
+	if (extension_count == 0)
+	{
+		Console.Error("VK: No extensions supported by device.");
+		return false;
+	}
+
+	std::vector<VkExtensionProperties> available_extension_list(extension_count);
+	res = vkEnumerateDeviceExtensionProperties(
+		m_physical_device, nullptr, &extension_count, available_extension_list.data());
+	pxAssert(res == VK_SUCCESS);
+
+	auto SupportsExtension = [&available_extension_list, extension_list](const char* name, bool required) {
+		if (std::find_if(available_extension_list.begin(), available_extension_list.end(),
+				[name](const VkExtensionProperties& properties) { return !strcmp(name, properties.extensionName); }) !=
+			available_extension_list.end())
+		{
+			if (std::none_of(extension_list->begin(), extension_list->end(),
+					[name](const char* existing_name) { return (std::strcmp(existing_name, name) == 0); }))
+			{
+				DevCon.WriteLn("VK: Enabling extension: %s", name);
+				extension_list->push_back(name);
+			}
+
+			return true;
+		}
+
+		if (required)
+			Console.Error("VK: Missing required extension %s.", name);
+
+		return false;
+	};
+
+	// Always request the swap chain extension when the driver supports it: on Android the
+	// SurfaceView can attach after device creation (its callback races VM startup) and
+	// device extensions cannot be enabled later. A pre-existing surface makes it required.
+	SupportsExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME, enable_surface);
+
+	// Required extensions.
+	for (const char* extension_name : s_required_device_extensions)
+	{
+		if (!SupportsExtension(extension_name, true))
+			return false;
+	}
+
+	m_optional_extensions.vk_ext_provoking_vertex = SupportsExtension(VK_EXT_PROVOKING_VERTEX_EXTENSION_NAME, false);
+	m_optional_extensions.vk_ext_memory_budget = SupportsExtension(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME, false);
+	m_optional_extensions.vk_ext_calibrated_timestamps =
+		SupportsExtension(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, false);
+	// ROAA has EXT and ARM spellings with the same feature structure. Enable whichever
+	// advertised alias is available, query its feature, then gate actual use on driverInfo
+	// after physical-device properties have been queried.
+	m_optional_extensions.vk_ext_rasterization_order_attachment_access =
+		SupportsExtension(VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, false) ||
+		SupportsExtension(VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, false);
+	m_optional_extensions.vk_ext_attachment_feedback_loop_layout =
+		SupportsExtension(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME, false);
+	m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state =
+		SupportsExtension(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_EXTENSION_NAME, false);
+	m_optional_extensions.vk_ext_line_rasterization = SupportsExtension(VK_EXT_LINE_RASTERIZATION_EXTENSION_NAME, false);
+	m_optional_extensions.vk_khr_push_descriptor =
+		SupportsExtension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME, false);
+	// VK_KHR_driver_properties is core in Vulkan 1.2 and may no longer be advertised as an
+	// extension. Keep querying VkPhysicalDeviceDriverProperties so Turnip/PanVK never inherit
+	// proprietary-driver workarounds.
+	m_optional_extensions.vk_khr_driver_properties =
+		(m_device_properties.apiVersion >= VK_API_VERSION_1_2) ||
+		SupportsExtension(VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME, false);
+
+	if (m_optional_extensions.vk_swapchain_maintenance1)
+	{
+		const bool khr_swapchain_maintenance1 = SupportsExtension(VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME, false);
+		// vk_swapchain_maintenance1_is_khr will be set if we havn't enabled VK_EXT_surface_maintenance1
+		// This will happen if either the VK_EXT_surface_maintenance1 was unsupported, or we instead found the KHR version.
+		// As the EXT version depends on the surface maintenance1 extension, we need to check that aswell.
+		m_optional_extensions.vk_swapchain_maintenance1 = khr_swapchain_maintenance1 ? khr_swapchain_maintenance1 :
+			(!m_optional_extensions.vk_swapchain_maintenance1_is_khr && SupportsExtension(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME, false));
+
+		m_optional_extensions.vk_swapchain_maintenance1_is_khr = khr_swapchain_maintenance1;
+	}
+
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
+	// glslang generates debug info instructions before phi nodes at the beginning of blocks when non-semantic debug info
+	// is enabled, triggering errors by spirv-val. Gate it by an environment variable if you want source debugging until
+	// this is fixed.
+	if (const char* val = std::getenv("USE_NON_SEMANTIC_DEBUG_INFO"); val && StringUtil::FromChars<bool>(val).value_or(false))
+	{
+		m_optional_extensions.vk_khr_shader_non_semantic_info =
+			SupportsExtension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME, false);
+	}
+
+#endif
+
+#ifdef _WIN32
+	m_optional_extensions.vk_ext_full_screen_exclusive =
+		enable_surface && SupportsExtension(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME, false);
+#endif
+
+	m_optional_extensions.vk_ext_fragment_shader_interlock = SupportsExtension(VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME, false);
+
+	return true;
+}
+
+bool GSDeviceVK::SelectDeviceFeatures()
+{
+	VkPhysicalDeviceFeatures available_features;
+	vkGetPhysicalDeviceFeatures(m_physical_device, &available_features);
+
+	// Enable the features we use.
+	m_device_features.dualSrcBlend = available_features.dualSrcBlend;
+	m_device_features.largePoints = available_features.largePoints;
+	m_device_features.wideLines = available_features.wideLines;
+	m_device_features.fragmentStoresAndAtomics = available_features.fragmentStoresAndAtomics;
+	m_device_features.textureCompressionBC = available_features.textureCompressionBC;
+	m_device_features.textureCompressionASTC_LDR = available_features.textureCompressionASTC_LDR;
+	m_device_features.samplerAnisotropy = available_features.samplerAnisotropy;
+	m_device_features.geometryShader = available_features.geometryShader;
+	m_device_features.fragmentStoresAndAtomics = available_features.fragmentStoresAndAtomics;
+	m_device_features.pipelineStatisticsQuery = available_features.pipelineStatisticsQuery;
+
+	return true;
+}
+
+bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer)
+{
+	vkGetPhysicalDeviceProperties(m_physical_device, &m_device_properties);
+	m_name = m_device_properties.deviceName;
+
+	SetRuntimeGPUProfile(
+		GpuProfileDetector::Detect(GetVulkanVendorHint(m_device_properties.vendorID), m_name));
+	SetMediaTekSoC(GpuProfileDetector::DetectMediaTekSoC());
+	Console.WriteLn("VK: GPU profile '%s' (device: %s, vendor: 0x%04x%s).",
+		GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()), m_name.c_str(),
+		m_device_properties.vendorID, IsMediaTekSoC() ? ", MediaTek SoC" : "");
+
+	u32 queue_family_count;
+	vkGetPhysicalDeviceQueueFamilyProperties(m_physical_device, &queue_family_count, nullptr);
+	if (queue_family_count == 0)
+	{
+		Console.Error("No queue families found on specified vulkan physical device.");
+		return false;
+	}
+
+	std::vector<VkQueueFamilyProperties> queue_family_properties(queue_family_count);
+	vkGetPhysicalDeviceQueueFamilyProperties(m_physical_device, &queue_family_count, queue_family_properties.data());
+	DevCon.WriteLn("%u vulkan queue families", queue_family_count);
+
+	// Find graphics and present queues.
+	m_graphics_queue_family_index = queue_family_count;
+	m_present_queue_family_index = queue_family_count;
+	m_spin_queue_family_index = queue_family_count;
+	u32 spin_queue_index = 0;
+	for (uint32_t i = 0; i < queue_family_count; i++)
+	{
+		VkBool32 graphics_supported = queue_family_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT;
+		if (graphics_supported)
+		{
+			m_graphics_queue_family_index = i;
+			// Quit now, no need for a present queue.
+			if (!surface)
+			{
+				// The surface can still arrive after device creation (the Android SurfaceView
+				// callback races VM startup). Queues can only be fixed at device creation, so
+				// assume the graphics queue can present, as Android drivers expose a single
+				// universal queue family. If that assumption is wrong, swap chain creation
+				// fails later with the usual logged error.
+				m_present_queue_family_index = i;
+				break;
+			}
+		}
+
+		if (surface)
+		{
+			VkBool32 present_supported;
+			VkResult res = vkGetPhysicalDeviceSurfaceSupportKHR(m_physical_device, i, surface, &present_supported);
+			if (res != VK_SUCCESS)
+			{
+				LOG_VULKAN_ERROR(res, "vkGetPhysicalDeviceSurfaceSupportKHR failed: ");
+				return false;
+			}
+
+			if (present_supported)
+			{
+				m_present_queue_family_index = i;
+			}
+
+			// Prefer one queue family index that does both graphics and present.
+			if (graphics_supported && present_supported)
+			{
+				break;
+			}
+		}
+	}
+	for (uint32_t i = 0; i < queue_family_count; i++)
+	{
+		// Pick a queue for spinning
+		if (!(queue_family_properties[i].queueFlags & VK_QUEUE_COMPUTE_BIT))
+			continue; // We need compute
+		if (queue_family_properties[i].timestampValidBits == 0)
+			continue; // We need timing
+		const bool queue_is_used = i == m_graphics_queue_family_index || i == m_present_queue_family_index;
+		if (queue_is_used && m_spin_queue_family_index != queue_family_count)
+			continue; // Found a non-graphics queue to use
+		spin_queue_index = 0;
+		m_spin_queue_family_index = i;
+		if (queue_is_used && queue_family_properties[i].queueCount > 1)
+			spin_queue_index = 1;
+		if (!(queue_family_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT))
+			break; // Async compute queue, definitely pick this one
+	}
+	if (m_graphics_queue_family_index == queue_family_count)
+	{
+		Console.Error("VK: Failed to find an acceptable graphics queue.");
+		return false;
+	}
+	if (surface != VK_NULL_HANDLE && m_present_queue_family_index == queue_family_count)
+	{
+		Console.Error("VK: Failed to find an acceptable present queue.");
+		return false;
+	}
+
+	VkDeviceCreateInfo device_info = {};
+	device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+	device_info.pNext = nullptr;
+	device_info.flags = 0;
+	device_info.queueCreateInfoCount = 0;
+
+	static constexpr float queue_priorities[] = {1.0f, 0.0f}; // Low priority for the spin queue
+	std::array<VkDeviceQueueCreateInfo, 3> queue_infos;
+	VkDeviceQueueCreateInfo& graphics_queue_info = queue_infos[device_info.queueCreateInfoCount++];
+	graphics_queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+	graphics_queue_info.pNext = nullptr;
+	graphics_queue_info.flags = 0;
+	graphics_queue_info.queueFamilyIndex = m_graphics_queue_family_index;
+	graphics_queue_info.queueCount = 1;
+	graphics_queue_info.pQueuePriorities = queue_priorities;
+
+	if (surface != VK_NULL_HANDLE && m_graphics_queue_family_index != m_present_queue_family_index)
+	{
+		VkDeviceQueueCreateInfo& present_queue_info = queue_infos[device_info.queueCreateInfoCount++];
+		present_queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		present_queue_info.pNext = nullptr;
+		present_queue_info.flags = 0;
+		present_queue_info.queueFamilyIndex = m_present_queue_family_index;
+		present_queue_info.queueCount = 1;
+		present_queue_info.pQueuePriorities = queue_priorities;
+	}
+
+	if (m_spin_queue_family_index == m_graphics_queue_family_index)
+	{
+		if (spin_queue_index != 0)
+			graphics_queue_info.queueCount = 2;
+	}
+	else if (m_spin_queue_family_index == m_present_queue_family_index)
+	{
+		if (spin_queue_index != 0)
+			queue_infos[1].queueCount = 2; // present queue
+	}
+	else if (m_spin_queue_family_index != queue_family_count)
+	{
+		VkDeviceQueueCreateInfo& spin_queue_info = queue_infos[device_info.queueCreateInfoCount++];
+		spin_queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		spin_queue_info.pNext = nullptr;
+		spin_queue_info.flags = 0;
+		spin_queue_info.queueFamilyIndex = m_spin_queue_family_index;
+		spin_queue_info.queueCount = 1;
+		spin_queue_info.pQueuePriorities = queue_priorities + 1;
+	}
+
+	device_info.pQueueCreateInfos = queue_infos.data();
+
+	ExtensionList enabled_extensions;
+	if (!SelectDeviceExtensions(&enabled_extensions, surface != VK_NULL_HANDLE))
+		return false;
+
+#if defined(__ANDROID__)
+	// Frame generation only supports Adreno 7xx and newer.
+	GSLsfg::NoteRendererCapability(true,
+		IsAdrenoGPUProfile() ? GpuProfileDetector::ParseAdrenoGeneration(m_name) : 0);
+#endif
+
+
+	device_info.enabledExtensionCount = static_cast<uint32_t>(enabled_extensions.size());
+	device_info.ppEnabledExtensionNames = enabled_extensions.data();
+
+	// Check for required features before creating.
+	if (!SelectDeviceFeatures())
+		return false;
+	if (!ProcessDeviceExtensions())
+		return false;
+
+	device_info.pEnabledFeatures = &m_device_features;
+
+	// Enable debug layer on debug builds
+	if (enable_validation_layer)
+	{
+		static const char* layer_names[] = {"VK_LAYER_LUNARG_standard_validation"};
+		device_info.enabledLayerCount = 1;
+		device_info.ppEnabledLayerNames = layer_names;
+	}
+
+	// provoking vertex
+	VkPhysicalDeviceProvokingVertexFeaturesEXT provoking_vertex_feature = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROVOKING_VERTEX_FEATURES_EXT};
+	VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT rasterization_order_access_feature = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_FEATURES_EXT};
+	VkPhysicalDeviceLineRasterizationFeaturesEXT line_rasterization_feature = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_FEATURES_EXT};
+	VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT attachment_feedback_loop_feature = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_FEATURES_EXT};
+	VkPhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT dynamic_feedback_loop_feature = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_FEATURES_EXT};
+	// VK_EXT_swapchain_maintenance1 types/enums are aliases of VK_KHR_swapchain_maintenance1 types/enums.
+	VkPhysicalDeviceSwapchainMaintenance1FeaturesKHR swapchain_maintenance1_feature = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_KHR};
+	VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT fragment_shader_interlock_ext_feature = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT};
+
+	// Do not disable optional fast paths for an entire vendor. Query the extension features before
+	// requesting them so drivers which only advertise an extension stay on the safe fallback rather
+	// than making logical-device creation fail.
+	if (m_optional_extensions.vk_ext_provoking_vertex ||
+		m_optional_extensions.vk_ext_rasterization_order_attachment_access ||
+		m_optional_extensions.vk_ext_attachment_feedback_loop_layout ||
+		m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state)
+	{
+		VkPhysicalDeviceFeatures2 supported_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+		VkPhysicalDeviceProvokingVertexFeaturesEXT supported_provoking_vertex = {
+			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROVOKING_VERTEX_FEATURES_EXT};
+		VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT supported_rasterization_order_access = {
+			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_FEATURES_EXT};
+		VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT supported_attachment_feedback_loop = {
+			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_FEATURES_EXT};
+		VkPhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT supported_dynamic_feedback_loop = {
+			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_FEATURES_EXT};
+		if (m_optional_extensions.vk_ext_provoking_vertex)
+			Vulkan::AddPointerToChain(&supported_features, &supported_provoking_vertex);
+		if (m_optional_extensions.vk_ext_rasterization_order_attachment_access)
+			Vulkan::AddPointerToChain(&supported_features, &supported_rasterization_order_access);
+		if (m_optional_extensions.vk_ext_attachment_feedback_loop_layout)
+			Vulkan::AddPointerToChain(&supported_features, &supported_attachment_feedback_loop);
+		if (m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state)
+			Vulkan::AddPointerToChain(&supported_features, &supported_dynamic_feedback_loop);
+		vkGetPhysicalDeviceFeatures2(m_physical_device, &supported_features);
+		m_optional_extensions.vk_ext_provoking_vertex &=
+			(supported_provoking_vertex.provokingVertexLast == VK_TRUE);
+		m_optional_extensions.vk_ext_rasterization_order_attachment_access &=
+			(supported_rasterization_order_access.rasterizationOrderColorAttachmentAccess == VK_TRUE);
+		m_optional_extensions.vk_ext_attachment_feedback_loop_layout &=
+			(supported_attachment_feedback_loop.attachmentFeedbackLoopLayout == VK_TRUE);
+		m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state &=
+			(supported_dynamic_feedback_loop.attachmentFeedbackLoopDynamicState == VK_TRUE);
+	}
+
+	FinalizeDriverCapabilities(false);
+
+	if (m_optional_extensions.vk_ext_provoking_vertex)
+	{
+		provoking_vertex_feature.provokingVertexLast = VK_TRUE;
+		Vulkan::AddPointerToChain(&device_info, &provoking_vertex_feature);
+	}
+	if (m_optional_extensions.vk_ext_line_rasterization)
+	{
+		line_rasterization_feature.bresenhamLines = VK_TRUE;
+		Vulkan::AddPointerToChain(&device_info, &line_rasterization_feature);
+	}
+	if (m_optional_extensions.vk_ext_rasterization_order_attachment_access)
+	{
+		rasterization_order_access_feature.rasterizationOrderColorAttachmentAccess = VK_TRUE;
+		Vulkan::AddPointerToChain(&device_info, &rasterization_order_access_feature);
+	}
+	if (m_optional_extensions.vk_ext_attachment_feedback_loop_layout)
+	{
+		attachment_feedback_loop_feature.attachmentFeedbackLoopLayout = VK_TRUE;
+		Vulkan::AddPointerToChain(&device_info, &attachment_feedback_loop_feature);
+	}
+	if (m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state)
+	{
+		dynamic_feedback_loop_feature.attachmentFeedbackLoopDynamicState = VK_TRUE;
+		Vulkan::AddPointerToChain(&device_info, &dynamic_feedback_loop_feature);
+	}
+	if (m_optional_extensions.vk_swapchain_maintenance1)
+	{
+		swapchain_maintenance1_feature.swapchainMaintenance1 = VK_TRUE;
+		Vulkan::AddPointerToChain(&device_info, &swapchain_maintenance1_feature);
+	}
+	if (m_optional_extensions.vk_ext_fragment_shader_interlock)
+	{
+		fragment_shader_interlock_ext_feature.fragmentShaderPixelInterlock = VK_TRUE;
+		Vulkan::AddPointerToChain(&device_info, &fragment_shader_interlock_ext_feature);
+	}
+
+	VkResult res = vkCreateDevice(m_physical_device, &device_info, nullptr, &m_device);
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vkCreateDevice failed: ");
+		return false;
+	}
+
+	// With the device created, we can fill the remaining entry points.
+	if (!Vulkan::LoadVulkanDeviceFunctions(m_device))
+		return false;
+	if (!vkCmdSetAttachmentFeedbackLoopEnableEXT)
+		m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state = false;
+	if (!vkCmdPushDescriptorSetKHR)
+		m_use_push_descriptors = false;
+
+	// Grab the graphics and present queues.
+	vkGetDeviceQueue(m_device, m_graphics_queue_family_index, 0, &m_graphics_queue);
+	if (m_present_queue_family_index != queue_family_count)
+	{
+		// Also fetched when the device was created before a surface existed (see the
+		// queue-family search above), so a late-arriving surface can present.
+		vkGetDeviceQueue(m_device, m_present_queue_family_index, 0, &m_present_queue);
+	}
+	m_spinning_supported = m_spin_queue_family_index != queue_family_count &&
+	                       queue_family_properties[m_graphics_queue_family_index].timestampValidBits > 0 &&
+	                       m_device_properties.limits.timestampPeriod > 0;
+	m_spin_queue_is_graphics_queue =
+		m_spin_queue_family_index == m_graphics_queue_family_index && spin_queue_index == 0;
+
+	m_gpu_timing_supported = (m_device_properties.limits.timestampComputeAndGraphics != 0 &&
+							  queue_family_properties[m_graphics_queue_family_index].timestampValidBits > 0 &&
+							  m_device_properties.limits.timestampPeriod > 0);
+	DevCon.WriteLn("GPU timing is %s (TS=%u TS valid bits=%u, TS period=%f)",
+		m_gpu_timing_supported ? "supported" : "not supported",
+		static_cast<u32>(m_device_properties.limits.timestampComputeAndGraphics),
+		queue_family_properties[m_graphics_queue_family_index].timestampValidBits,
+		m_device_properties.limits.timestampPeriod);
+
+	m_gpu_pipeline_statistics_supported = (m_device_features.pipelineStatisticsQuery != 0);
+	DevCon.WriteLn("GPU pipeline statistics is %s", m_gpu_pipeline_statistics_supported ? "supported" : "not supported");
+
+
+	if (m_spinning_supported)
+	{
+		vkGetDeviceQueue(m_device, m_spin_queue_family_index, spin_queue_index, &m_spin_queue);
+
+		m_spin_timestamp_scale = m_device_properties.limits.timestampPeriod;
+		if (m_optional_extensions.vk_ext_calibrated_timestamps)
+		{
+#ifdef _WIN32
+			LARGE_INTEGER Freq;
+			QueryPerformanceFrequency(&Freq);
+			m_queryperfcounter_to_ns = 1000000000.0 / static_cast<double>(Freq.QuadPart);
+#endif
+			CalibrateSpinTimestamp();
+		}
+	}
+
+	return true;
+}
+
+bool GSDeviceVK::ProcessDeviceExtensions()
+{
+	// advanced feature checks
+	VkPhysicalDeviceFeatures2 features2 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+	VkPhysicalDeviceProvokingVertexFeaturesEXT provoking_vertex_features = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROVOKING_VERTEX_FEATURES_EXT};
+	VkPhysicalDeviceLineRasterizationFeaturesEXT line_rasterization_feature = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_FEATURES_EXT};
+	VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT rasterization_order_access_feature = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_FEATURES_EXT};
+	// VK_EXT_swapchain_maintenance1 types/enums are aliases of VK_KHR_swapchain_maintenance1 types/enums.
+	VkPhysicalDeviceSwapchainMaintenance1FeaturesKHR swapchain_maintenance1_feature = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_KHR, nullptr, VK_FALSE};
+	VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT attachment_feedback_loop_feature = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_FEATURES_EXT};
+	VkPhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT dynamic_feedback_loop_feature = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_FEATURES_EXT};
+	VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT fragment_shader_interlock_ext_feature = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT };
+
+	// add in optional feature structs
+	if (m_optional_extensions.vk_ext_provoking_vertex)
+		Vulkan::AddPointerToChain(&features2, &provoking_vertex_features);
+	if (m_optional_extensions.vk_ext_line_rasterization)
+		Vulkan::AddPointerToChain(&features2, &line_rasterization_feature);
+	if (m_optional_extensions.vk_ext_rasterization_order_attachment_access)
+		Vulkan::AddPointerToChain(&features2, &rasterization_order_access_feature);
+	if (m_optional_extensions.vk_ext_attachment_feedback_loop_layout)
+		Vulkan::AddPointerToChain(&features2, &attachment_feedback_loop_feature);
+	if (m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state)
+		Vulkan::AddPointerToChain(&features2, &dynamic_feedback_loop_feature);
+	if (m_optional_extensions.vk_swapchain_maintenance1)
+		Vulkan::AddPointerToChain(&features2, &swapchain_maintenance1_feature);
+	if (m_optional_extensions.vk_ext_fragment_shader_interlock)
+		Vulkan::AddPointerToChain(&features2, &fragment_shader_interlock_ext_feature);
+
+	// query
+	vkGetPhysicalDeviceFeatures2(m_physical_device, &features2);
+
+	// confirm we actually support it
+	m_optional_extensions.vk_ext_provoking_vertex &= (provoking_vertex_features.provokingVertexLast == VK_TRUE);
+	m_optional_extensions.vk_ext_rasterization_order_attachment_access &=
+		(rasterization_order_access_feature.rasterizationOrderColorAttachmentAccess == VK_TRUE);
+	m_optional_extensions.vk_ext_attachment_feedback_loop_layout &=
+		(attachment_feedback_loop_feature.attachmentFeedbackLoopLayout == VK_TRUE);
+	m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state &=
+		(dynamic_feedback_loop_feature.attachmentFeedbackLoopDynamicState == VK_TRUE);
+	m_optional_extensions.vk_ext_fragment_shader_interlock &=
+		(fragment_shader_interlock_ext_feature.fragmentShaderPixelInterlock == VK_TRUE);
+
+	VkPhysicalDeviceProperties2 properties2 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
+
+	if (m_optional_extensions.vk_khr_driver_properties)
+	{
+		m_device_driver_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
+		Vulkan::AddPointerToChain(&properties2, &m_device_driver_properties);
+	}
+
+	VkPhysicalDevicePushDescriptorPropertiesKHR push_descriptor_properties = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PUSH_DESCRIPTOR_PROPERTIES_KHR};
+	if (m_optional_extensions.vk_khr_push_descriptor)
+		Vulkan::AddPointerToChain(&properties2, &push_descriptor_properties);
+
+	// query
+	vkGetPhysicalDeviceProperties2(m_physical_device, &properties2);
+	m_max_push_descriptors = push_descriptor_properties.maxPushDescriptors;
+	m_road_platform_hints.clear();
+#if defined(__ANDROID__)
+	for (const char* property : {"ro.soc.manufacturer", "ro.soc.model", "ro.soc.platform", "ro.board.platform",
+		"ro.hardware", "ro.hardware.chipname", "ro.chipname", "ro.product.board", "ro.product.manufacturer",
+		"ro.product.model", "ro.vendor.product.manufacturer", "ro.vendor.product.model", "ro.mediatek.platform",
+		"ro.vendor.mediatek.platform", "ro.product.cpu.abi", "ro.vendor.product.cpu.abilist"})
+	{
+		char value[PROP_VALUE_MAX]{};
+		if (__system_property_get(property, value) > 0) { m_road_platform_hints += value; m_road_platform_hints += ' '; }
+	}
+#endif
+	m_road_facts = GSVulkanRoad::ResolveFacts(GetRoadIdentity(),
+		m_optional_extensions.vk_ext_rasterization_order_attachment_access, push_descriptor_properties.maxPushDescriptors);
+	const auto device_road = GSVulkanRoad::ResolveSelection(m_road_facts,
+		GetRoadCapabilities(push_descriptor_properties.maxPushDescriptors));
+	if (device_road.avoid_layout)
+		m_optional_extensions.vk_ext_attachment_feedback_loop_layout = false;
+	m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state &=
+		m_road_facts.measured_layout && m_optional_extensions.vk_ext_attachment_feedback_loop_layout;
+
+
+	m_use_push_descriptors = device_road.push_descriptors;
+
+	if (m_use_push_descriptors && push_descriptor_properties.maxPushDescriptors < NUM_TFX_TEXTURES)
+	{
+		Console.Warning("VK: maxPushDescriptors (%u) below required (%u) - using descriptor-set fallback.",
+			push_descriptor_properties.maxPushDescriptors, NUM_TFX_TEXTURES);
+		m_use_push_descriptors = false;
+	}
+	if (!m_use_push_descriptors)
+		Console.Warning("VK: Using non-push-descriptor texture binding fallback.");
+	const char* const driver_info = m_optional_extensions.vk_khr_driver_properties ?
+		m_device_driver_properties.driverInfo : "unavailable";
+	Console.WriteLn("VK: Vulkan driverInfo='%s' MaliSX2=%s ROAA=%s pushDescriptors=%s (%u/%u)",
+		driver_info, IsMaliSX2DriverInfo(driver_info) ? "yes" : "no",
+		m_optional_extensions.vk_ext_rasterization_order_attachment_access ? "supported" : "unavailable",
+		m_use_push_descriptors ? "enabled" : "disabled",
+		push_descriptor_properties.maxPushDescriptors, NUM_TFX_TEXTURES);
+
+	if (m_optional_extensions.vk_ext_line_rasterization && !line_rasterization_feature.bresenhamLines)
+	{
+		Console.Warning("VK: bresenhamLines is not supported.");
+		m_optional_extensions.vk_ext_line_rasterization = false;
+	}
+
+	// VK_EXT_calibrated_timestamps checking
+	if (m_optional_extensions.vk_ext_calibrated_timestamps)
+	{
+		u32 count = 0;
+		vkGetPhysicalDeviceCalibrateableTimeDomainsEXT(m_physical_device, &count, nullptr);
+		std::unique_ptr<VkTimeDomainEXT[]> time_domains = std::make_unique<VkTimeDomainEXT[]>(count);
+		vkGetPhysicalDeviceCalibrateableTimeDomainsEXT(m_physical_device, &count, time_domains.get());
+		const VkTimeDomainEXT* begin = &time_domains[0];
+		const VkTimeDomainEXT* end = &time_domains[count];
+		if (std::find(begin, end, VK_TIME_DOMAIN_DEVICE_EXT) == end)
+			m_optional_extensions.vk_ext_calibrated_timestamps = false;
+		VkTimeDomainEXT preferred_types[] = {
+#ifdef _WIN32
+			VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_EXT,
+#else
+#ifdef CLOCK_MONOTONIC_RAW
+			VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_EXT,
+#endif
+			VK_TIME_DOMAIN_CLOCK_MONOTONIC_EXT,
+#endif
+		};
+		m_calibrated_timestamp_type = VK_TIME_DOMAIN_DEVICE_EXT;
+		for (VkTimeDomainEXT type : preferred_types)
+		{
+			if (std::find(begin, end, type) != end)
+			{
+				m_calibrated_timestamp_type = type;
+				break;
+			}
+		}
+		if (m_calibrated_timestamp_type == VK_TIME_DOMAIN_DEVICE_EXT)
+			m_optional_extensions.vk_ext_calibrated_timestamps = false;
+	}
+
+	m_optional_extensions.vk_swapchain_maintenance1 &= 
+		(swapchain_maintenance1_feature.swapchainMaintenance1 == VK_TRUE);
+
+	if (GSConfig.UseDebugDevice)
+	{
+		Console.WriteLn(
+			"VK_EXT_provoking_vertex is %s", m_optional_extensions.vk_ext_provoking_vertex ? "supported" : "NOT supported");
+		Console.WriteLn(
+			"VK_EXT_memory_budget is %s", m_optional_extensions.vk_ext_memory_budget ? "supported" : "NOT supported");
+		Console.WriteLn("VK_EXT_calibrated_timestamps is %s",
+			m_optional_extensions.vk_ext_calibrated_timestamps ? "supported" : "NOT supported");
+		Console.WriteLn("VK_EXT_rasterization_order_attachment_access is %s",
+			m_optional_extensions.vk_ext_rasterization_order_attachment_access ? "supported" : "NOT supported");
+		Console.WriteLn("VK_%s_swapchain_maintenance1 is %s",
+			m_optional_extensions.vk_swapchain_maintenance1_is_khr ? "KHR" : "EXT",
+			m_optional_extensions.vk_swapchain_maintenance1 ? "supported" : "NOT supported");
+		Console.WriteLn("VK_EXT_full_screen_exclusive is %s",
+			m_optional_extensions.vk_ext_full_screen_exclusive ? "supported" : "NOT supported");
+		Console.WriteLn("VK_KHR_driver_properties is %s",
+			m_optional_extensions.vk_khr_driver_properties ? "supported" : "NOT supported");
+		Console.WriteLn("VK_EXT_attachment_feedback_loop_layout is %s",
+			m_optional_extensions.vk_ext_attachment_feedback_loop_layout ? "supported" : "NOT supported");
+	}
+
+	return true;
+}
+
+bool GSDeviceVK::CreateAllocator()
+{
+	VmaAllocatorCreateInfo ci = {};
+	ci.vulkanApiVersion = VK_API_VERSION_1_1;
+	ci.flags = VMA_ALLOCATOR_CREATE_EXTERNALLY_SYNCHRONIZED_BIT;
+	ci.physicalDevice = m_physical_device;
+	ci.device = m_device;
+	ci.instance = m_instance;
+
+	if (m_optional_extensions.vk_ext_memory_budget)
+		ci.flags |= VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
+
+	// Limit usage of the DEVICE_LOCAL upload heap when we're using a debug device.
+	// On NVIDIA drivers, it results in frequently running out of device memory when trying to
+	// play back captures in RenderDoc, making life very painful. Re-BAR GPUs should be fine.
+	constexpr VkDeviceSize UPLOAD_HEAP_SIZE_THRESHOLD = 512 * 1024 * 1024;
+	constexpr VkMemoryPropertyFlags UPLOAD_HEAP_PROPERTIES =
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+	std::array<VkDeviceSize, VK_MAX_MEMORY_HEAPS> heap_size_limits;
+	if (GSConfig.UseDebugDevice)
+	{
+		VkPhysicalDeviceMemoryProperties memory_properties;
+		vkGetPhysicalDeviceMemoryProperties(m_physical_device, &memory_properties);
+
+		bool has_upload_heap = false;
+		heap_size_limits.fill(VK_WHOLE_SIZE);
+		for (u32 i = 0; i < memory_properties.memoryTypeCount; i++)
+		{
+			// Look for any memory types which are upload-like.
+			const VkMemoryType& type = memory_properties.memoryTypes[i];
+			if ((type.propertyFlags & UPLOAD_HEAP_PROPERTIES) != UPLOAD_HEAP_PROPERTIES)
+				continue;
+
+			const VkMemoryHeap& heap = memory_properties.memoryHeaps[type.heapIndex];
+			if (heap.size >= UPLOAD_HEAP_SIZE_THRESHOLD)
+				continue;
+
+			if (heap_size_limits[type.heapIndex] == VK_WHOLE_SIZE)
+			{
+				Console.Warning("VK: Disabling allocation from upload heap #%u (%.2f MB) due to debug device.",
+					type.heapIndex, static_cast<float>(heap.size) / 1048576.0f);
+				heap_size_limits[type.heapIndex] = 0;
+				has_upload_heap = true;
+			}
+		}
+
+		if (has_upload_heap)
+			ci.pHeapSizeLimit = heap_size_limits.data();
+	}
+
+	VkResult res = vmaCreateAllocator(&ci, &m_allocator);
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vmaCreateAllocator failed: ");
+		return false;
+	}
+
+	return true;
+}
+
+bool GSDeviceVK::CreateCommandBuffers()
+{
+	VkResult res;
+
+	uint32_t frame_index = 0;
+	for (FrameResources& resources : m_frame_resources)
+	{
+		resources.needs_fence_wait = false;
+
+		VkCommandPoolCreateInfo pool_info = {
+			VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO, nullptr, 0, m_graphics_queue_family_index};
+		res = vkCreateCommandPool(m_device, &pool_info, nullptr, &resources.command_pool);
+		if (res != VK_SUCCESS)
+		{
+			LOG_VULKAN_ERROR(res, "vkCreateCommandPool failed: ");
+			return false;
+		}
+		Vulkan::SetObjectName(m_device, resources.command_pool, "Frame Command Pool %u", frame_index);
+
+		VkCommandBufferAllocateInfo buffer_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, nullptr,
+			resources.command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+			static_cast<u32>(resources.command_buffers.size())};
+
+		res = vkAllocateCommandBuffers(m_device, &buffer_info, resources.command_buffers.data());
+		if (res != VK_SUCCESS)
+		{
+			LOG_VULKAN_ERROR(res, "vkAllocateCommandBuffers failed: ");
+			return false;
+		}
+		for (u32 i = 0; i < resources.command_buffers.size(); i++)
+		{
+			Vulkan::SetObjectName(m_device, resources.command_buffers[i], "Frame %u %sCommand Buffer", frame_index,
+				(i == 0) ? "Init" : "");
+		}
+
+		VkFenceCreateInfo fence_info = {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, VK_FENCE_CREATE_SIGNALED_BIT};
+
+		res = vkCreateFence(m_device, &fence_info, nullptr, &resources.fence);
+		if (res != VK_SUCCESS)
+		{
+			LOG_VULKAN_ERROR(res, "vkCreateFence failed: ");
+			return false;
+		}
+		Vulkan::SetObjectName(m_device, resources.fence, "Frame Fence %u", frame_index);
+
+		if (!m_use_push_descriptors)
+		{
+			resources.descriptor_pool = CreateFrameDescriptorPool();
+			if (resources.descriptor_pool == VK_NULL_HANDLE)
+				return false;
+			Vulkan::SetObjectName(m_device, resources.descriptor_pool, "Frame Texture Descriptor Pool %u", frame_index);
+		}
+
+		++frame_index;
+	}
+
+	ActivateCommandBuffer(0);
+	return true;
+}
+
+bool GSDeviceVK::CreateGlobalDescriptorPool()
+{
+#ifdef __ANDROID__
+	static constexpr const VkDescriptorPoolSize pool_sizes[] = {
+		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 32},
+		{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 32},
+		{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 16384},
+		{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 8192},
+		{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 4096},
+		{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 256},
+	};
+	u32 max_sets = 32768;
+#else
+	static constexpr const VkDescriptorPoolSize pool_sizes[] = {
+		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 130},
+		{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 130},
+		{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 65536},
+		{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 32768},
+		{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 16384},
+		{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1024},
+	};
+	u32 max_sets = 131072;
+#endif
+
+	VkDescriptorPoolCreateInfo pool_create_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, nullptr,
+		VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+		max_sets, // Expanded pool limit for mobile fallback rendering
+		static_cast<u32>(std::size(pool_sizes)), pool_sizes};
+
+	VkResult res = vkCreateDescriptorPool(m_device, &pool_create_info, nullptr, &m_global_descriptor_pool);
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vkCreateDescriptorPool failed: ");
+		return false;
+	}
+	Vulkan::SetObjectName(m_device, m_global_descriptor_pool, "Global Descriptor Pool");
+
+	if (m_gpu_timing_supported)
+	{
+		const VkQueryPoolCreateInfo query_create_info = {
+			VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO, nullptr, 0, VK_QUERY_TYPE_TIMESTAMP, NUM_COMMAND_BUFFERS * 4, 0};
+		res = vkCreateQueryPool(m_device, &query_create_info, nullptr, &m_timestamp_query_pool);
+		if (res != VK_SUCCESS)
+		{
+			LOG_VULKAN_ERROR(res, "vkCreateQueryPool (timestamp) failed: ");
+			m_timestamp_query_pool = VK_NULL_HANDLE;
+			m_gpu_timing_supported = false;
+			m_gpu_timing_enabled = false;
+			// Timing is optional. Some drivers advertise timestamps but reject the
+			// pool. Present/readback spinning also needs this pool, so disable both.
+			m_spinning_supported = false;
+			m_spin_timer = 0;
+			if (res != VK_ERROR_FEATURE_NOT_PRESENT)
+				return false;
+		}
+	}
+
+	if (m_gpu_pipeline_statistics_supported)
+	{
+		const VkQueryPoolCreateInfo query_create_info = {
+			VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO, nullptr, 0, VK_QUERY_TYPE_PIPELINE_STATISTICS, NUM_COMMAND_BUFFERS,
+			VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT | VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT };
+		res = vkCreateQueryPool(m_device, &query_create_info, nullptr, &m_pipeline_statistics_query_pool);
+		if (res != VK_SUCCESS)
+		{
+			LOG_VULKAN_ERROR(res, "vkCreateQueryPool (pipeline statistics) failed: ");
+			m_pipeline_statistics_query_pool = VK_NULL_HANDLE;
+			m_gpu_pipeline_statistics_supported = false;
+			m_gpu_pipeline_statistics_enabled = false;
+			if (res != VK_ERROR_FEATURE_NOT_PRESENT)
+				return false;
+		}
+	}
+
+	return true;
+}
+
+VkRenderPass GSDeviceVK::GetRenderPass(VkFormat color_format, VkFormat depth_format, VkAttachmentLoadOp color_load_op,
+	VkAttachmentStoreOp color_store_op, VkAttachmentLoadOp depth_load_op, VkAttachmentStoreOp depth_store_op,
+	VkAttachmentLoadOp stencil_load_op, VkAttachmentStoreOp stencil_store_op, bool color_feedback_loop,
+	bool depth_sampling)
+{
+	RenderPassCacheKey key = {};
+	key.color_format = color_format;
+	key.depth_format = depth_format;
+	key.color_load_op = color_load_op;
+	key.color_store_op = color_store_op;
+	key.depth_load_op = depth_load_op;
+	key.depth_store_op = depth_store_op;
+	key.stencil_load_op = stencil_load_op;
+	key.stencil_store_op = stencil_store_op;
+	key.color_feedback_loop = color_feedback_loop;
+	key.depth_sampling = depth_sampling;
+
+	auto it = m_render_pass_cache.find(key.key);
+	if (it != m_render_pass_cache.end())
+		return it->second;
+
+	return CreateCachedRenderPass(key);
+}
+
+VkRenderPass GSDeviceVK::GetRenderPassForRestarting(VkRenderPass pass)
+{
+	for (const auto& it : m_render_pass_cache)
+	{
+		if (it.second != pass)
+			continue;
+
+		RenderPassCacheKey modified_key;
+		modified_key.key = it.first;
+		// A restart continues the existing pass. DONT_CARE would discard the
+		// contents already drawn, just as repeating CLEAR would overwrite them.
+		modified_key.color_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+		modified_key.depth_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+		modified_key.stencil_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+
+		if (modified_key.key == it.first)
+			return pass;
+
+		auto fit = m_render_pass_cache.find(modified_key.key);
+		if (fit != m_render_pass_cache.end())
+			return fit->second;
+
+		return CreateCachedRenderPass(modified_key);
+	}
+
+	return pass;
+}
+
+VkCommandBuffer GSDeviceVK::GetCurrentInitCommandBuffer()
+{
+	FrameResources& res = m_frame_resources[m_current_frame];
+	VkCommandBuffer buf = res.command_buffers[0];
+	if (res.init_buffer_used)
+		return buf;
+
+	VkCommandBufferBeginInfo bi{
+		VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, nullptr, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, nullptr};
+	vkBeginCommandBuffer(buf, &bi);
+	res.init_buffer_used = true;
+	return buf;
+}
+
+VkDescriptorSet GSDeviceVK::AllocatePersistentDescriptorSet(VkDescriptorSetLayout set_layout)
+{
+	VkDescriptorSetAllocateInfo allocate_info = {
+		VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, nullptr, m_global_descriptor_pool, 1, &set_layout};
+
+	VkDescriptorSet descriptor_set;
+	VkResult res = vkAllocateDescriptorSets(m_device, &allocate_info, &descriptor_set);
+	if (res != VK_SUCCESS)
+		return VK_NULL_HANDLE;
+
+	return descriptor_set;
+}
+
+void GSDeviceVK::FreePersistentDescriptorSet(VkDescriptorSet set)
+{
+	vkFreeDescriptorSets(m_device, m_global_descriptor_pool, 1, &set);
+}
+
+VkDescriptorPool GSDeviceVK::CreateFrameDescriptorPool()
+{
+	static constexpr u32 MAX_FRAME_TEXTURE_SETS = 8192;
+	static constexpr u32 MAX_FRAME_DESCRIPTOR_SETS = MAX_FRAME_TEXTURE_SETS * 2;
+	const VkDescriptorPoolSize frame_pool_sizes[] = {
+		{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_FRAME_TEXTURE_SETS * 2},
+		{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, MAX_FRAME_TEXTURE_SETS * 4},
+		{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, MAX_FRAME_TEXTURE_SETS * 2},
+		{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, MAX_FRAME_TEXTURE_SETS * 2},
+	};
+	const VkDescriptorPoolCreateInfo frame_pool_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+		nullptr, 0, MAX_FRAME_DESCRIPTOR_SETS, static_cast<u32>(std::size(frame_pool_sizes)), frame_pool_sizes};
+	VkDescriptorPool pool = VK_NULL_HANDLE;
+	const VkResult res = vkCreateDescriptorPool(m_device, &frame_pool_info, nullptr, &pool);
+	if (res != VK_SUCCESS)
+		LOG_VULKAN_ERROR(res, "vkCreateDescriptorPool (frame) failed: ");
+	return pool;
+}
+
+VkDescriptorSet GSDeviceVK::AllocateFrameDescriptorSet(VkDescriptorSetLayout set_layout)
+{
+	auto& resources = m_frame_resources[m_current_frame];
+	for (;;)
+	{
+		const VkDescriptorPool pool = resources.active_descriptor_pool == 0 ? resources.descriptor_pool :
+			resources.extra_descriptor_pools[resources.active_descriptor_pool - 1];
+		const VkDescriptorSetAllocateInfo allocate_info = {
+			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, nullptr, pool, 1, &set_layout};
+		VkDescriptorSet descriptor_set;
+		const VkResult res = vkAllocateDescriptorSets(m_device, &allocate_info, &descriptor_set);
+		if (res == VK_SUCCESS)
+			return descriptor_set;
+		if (res != VK_ERROR_OUT_OF_POOL_MEMORY && res != VK_ERROR_FRAGMENTED_POOL)
+		{
+			LOG_VULKAN_ERROR(res, "vkAllocateDescriptorSets (frame) failed: ");
+			return VK_NULL_HANDLE;
+		}
+		if (resources.active_descriptor_pool == resources.extra_descriptor_pools.size())
+		{
+			const VkDescriptorPool extra_pool = CreateFrameDescriptorPool();
+			if (extra_pool == VK_NULL_HANDLE)
+				return VK_NULL_HANDLE;
+			resources.extra_descriptor_pools.push_back(extra_pool);
+		}
+		++resources.active_descriptor_pool;
+	}
+}
+
+void GSDeviceVK::WaitForFenceCounter(u64 fence_counter)
+{
+	if (m_completed_fence_counter >= fence_counter)
+		return;
+
+	// Find the first command buffer which covers this counter value.
+	u32 index = (m_current_frame + 1) % NUM_COMMAND_BUFFERS;
+	while (index != m_current_frame)
+	{
+		if (m_frame_resources[index].fence_counter >= fence_counter)
+			break;
+
+		index = (index + 1) % NUM_COMMAND_BUFFERS;
+	}
+
+	pxAssert(index != m_current_frame);
+	WaitForCommandBufferCompletion(index);
+}
+
+void GSDeviceVK::WaitForGPUIdle()
+{
+	vkDeviceWaitIdle(m_device);
+}
+
+float GSDeviceVK::GetAndResetAccumulatedGPUTime()
+{
+	const float time = m_accumulated_gpu_time;
+	m_accumulated_gpu_time = 0.0f;
+	return time;
+}
+
+bool GSDeviceVK::SetGPUTimingEnabled(bool enabled)
+{
+	m_gpu_timing_enabled = enabled && m_gpu_timing_supported;
+	return (enabled == m_gpu_timing_enabled);
+}
+
+GPUPipelineStatistics GSDeviceVK::GetAndResetAccumulatedGPUPipelineStatistics()
+{
+	GPUPipelineStatistics stats = m_accumulated_gpu_pipeline_statistics;
+	m_accumulated_gpu_pipeline_statistics = {};
+	return stats;
+}
+
+bool GSDeviceVK::SetGPUPipelineStatisticsEnabled(bool enabled)
+{
+	m_gpu_pipeline_statistics_enabled = enabled && m_gpu_pipeline_statistics_supported;
+	return (enabled == m_gpu_pipeline_statistics_enabled);
+}
+
+void GSDeviceVK::ScanForCommandBufferCompletion()
+{
+	for (u32 check_index = (m_current_frame + 1) % NUM_COMMAND_BUFFERS; check_index != m_current_frame;
+	     check_index = (check_index + 1) % NUM_COMMAND_BUFFERS)
+	{
+		FrameResources& resources = m_frame_resources[check_index];
+		if (resources.fence_counter <= m_completed_fence_counter)
+			continue; // Already completed
+		if (vkGetFenceStatus(m_device, resources.fence) != VK_SUCCESS)
+			break; // Fence not signaled, later fences won't be either
+		CommandBufferCompleted(check_index);
+		m_completed_fence_counter = resources.fence_counter;
+	}
+	for (SpinResources& resources : m_spin_resources)
+	{
+		if (!resources.in_progress)
+			continue;
+		if (vkGetFenceStatus(m_device, resources.fence) != VK_SUCCESS)
+			continue;
+		SpinCommandCompleted(&resources - &m_spin_resources[0]);
+	}
+}
+
+void GSDeviceVK::WaitForCommandBufferCompletion(u32 index)
+{
+	// Wait for this command buffer to be completed.
+	const VkResult res = vkWaitForFences(m_device, 1, &m_frame_resources[index].fence, VK_TRUE, UINT64_MAX);
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vkWaitForFences failed: ");
+		m_last_submit_failed = true;
+		return;
+	}
+
+	// Clean up any resources for command buffers between the last known completed buffer and this
+	// now-completed command buffer. If we use >2 buffers, this may be more than one buffer.
+	const u64 now_completed_counter = m_frame_resources[index].fence_counter;
+	u32 cleanup_index = (m_current_frame + 1) % NUM_COMMAND_BUFFERS;
+	while (cleanup_index != m_current_frame)
+	{
+		FrameResources& resources = m_frame_resources[cleanup_index];
+		if (resources.fence_counter > now_completed_counter)
+			break;
+
+		if (resources.fence_counter > m_completed_fence_counter)
+			CommandBufferCompleted(cleanup_index);
+
+		cleanup_index = (cleanup_index + 1) % NUM_COMMAND_BUFFERS;
+	}
+
+	m_completed_fence_counter = now_completed_counter;
+}
+
+void GSDeviceVK::SubmitCommandBuffer(VKSwapChain* present_swap_chain)
+{
+	FrameResources& resources = m_frame_resources[m_current_frame];
+
+	// This counter describes the command buffer being submitted, not the lifetime of
+	// the renderer. Present submissions come through this function directly rather
+	// than ExecuteCommandBuffer(), so resetting it there allowed the count to leak
+	// across frames. The 4000-draw safety kick would then split an otherwise small
+	// frame at a deterministic but arbitrary draw, which caused one-frame texture
+	// corruption on strict mobile Vulkan drivers.
+	m_draws_in_command_buffer = 0;
+
+	// End the current command buffer.
+	VkResult res;
+	if (resources.init_buffer_used)
+	{
+		res = vkEndCommandBuffer(resources.command_buffers[0]);
+		if (res != VK_SUCCESS)
+		{
+			LOG_VULKAN_ERROR(res, "vkEndCommandBuffer failed: ");
+			pxFailRel("Failed to end command buffer");
+		}
+	}
+
+	bool wants_timestamp = m_gpu_timing_enabled || m_spin_timer;
+	if (wants_timestamp && resources.timestamp_written)
+	{
+		vkCmdWriteTimestamp(m_current_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, m_timestamp_query_pool,
+			m_current_frame * 2 + 1);
+	}
+
+	if (resources.pipeline_statistics_query == QueryState::Querying)
+	{
+		// Didn't end query in BeginPresent() so end it here.
+		resources.pipeline_statistics_query = QueryState::Ready;
+		vkCmdEndQuery(m_current_command_buffer, m_pipeline_statistics_query_pool, m_current_frame);
+	}
+
+	res = vkEndCommandBuffer(resources.command_buffers[1]);
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vkEndCommandBuffer failed: ");
+		pxFailRel("Failed to end command buffer");
+	}
+
+	// This command buffer now has commands, so can't be re-used without waiting.
+	resources.needs_fence_wait = true;
+
+	u32 spin_cycles = 0;
+	const bool spin_enabled = m_spin_timer;
+	if (spin_enabled)
+	{
+		ScanForCommandBufferCompletion();
+		auto draw = m_spin_manager.DrawSubmitted(m_command_buffer_render_passes);
+		u32 constant_offset =
+			400000 * m_spin_manager.SpinsPerUnitTime(); // 400us, just to be safe since going over gets really bad
+		if (m_optional_extensions.vk_ext_calibrated_timestamps)
+			constant_offset /=
+				2; // Safety factor isn't as important here, going over just hurts this one submission a bit
+		u32 minimum_spin = 200000 * m_spin_manager.SpinsPerUnitTime();
+		u32 maximum_spin = std::max<u32>(1024, 16000000 * m_spin_manager.SpinsPerUnitTime()); // 16ms
+		if (draw.recommended_spin > minimum_spin + constant_offset)
+			spin_cycles = std::min(draw.recommended_spin - constant_offset, maximum_spin);
+		resources.spin_id = draw.id;
+	}
+	else
+	{
+		spin_cycles = 0;
+	}
+	m_command_buffer_render_passes = 0;
+
+	if (present_swap_chain != VK_NULL_HANDLE && m_spinning_supported)
+	{
+		m_spin_manager.NextFrame();
+		if (m_spin_timer)
+			m_spin_timer--;
+		// Calibrate a max of once per frame
+		m_wants_new_timestamp_calibration = m_optional_extensions.vk_ext_calibrated_timestamps;
+	}
+
+	if (spin_cycles != 0)
+	{
+		WaitForSpinCompletion(m_current_frame);
+	}
+
+	if (spin_enabled && m_optional_extensions.vk_ext_calibrated_timestamps)
+		resources.submit_timestamp = GetCPUTimestamp();
+
+	uint32_t wait_bits = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	VkSemaphore semas[2];
+	VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+	submit_info.commandBufferCount = resources.init_buffer_used ? 2u : 1u;
+	submit_info.pCommandBuffers =
+		resources.init_buffer_used ? resources.command_buffers.data() : &resources.command_buffers[1];
+
+	if (present_swap_chain)
+	{
+		submit_info.pWaitSemaphores = present_swap_chain->GetImageAvailableSemaphorePtr();
+		submit_info.waitSemaphoreCount = 1;
+		submit_info.pWaitDstStageMask = &wait_bits;
+
+		if (spin_cycles != 0)
+		{
+			semas[0] = present_swap_chain->GetRenderingFinishedSemaphore();
+			semas[1] = m_spin_resources[m_current_frame].semaphore;
+			submit_info.signalSemaphoreCount = 2;
+			submit_info.pSignalSemaphores = semas;
+		}
+		else
+		{
+			submit_info.pSignalSemaphores = present_swap_chain->GetRenderingFinishedSemaphorePtr();
+			submit_info.signalSemaphoreCount = 1;
+		}
+	}
+	else if (spin_cycles != 0)
+	{
+		submit_info.signalSemaphoreCount = 1;
+		submit_info.pSignalSemaphores = &m_spin_resources[m_current_frame].semaphore;
+	}
+
+	// The last point at which the CPU's writes into the six stream rings can still be made visible
+	// to the GPU: nothing recorded into a command buffer executes until it is submitted, so every
+	// draw, copy and descriptor read of a ring in this submission reads memory that is cleaned
+	// here first. On a coherent ring each of these six calls returns on a compare.
+	FlushStreamRingWrites();
+
+	res = vkQueueSubmit(m_graphics_queue, 1, &submit_info, resources.fence);
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vkQueueSubmit failed: ");
+		m_last_submit_failed = true;
+		return;
+	}
+
+	if (spin_cycles != 0)
+		SubmitSpinCommand(m_current_frame, spin_cycles);
+
+	if (present_swap_chain)
+	{
+		const bool has_new_frame = std::exchange(m_present_has_new_frame, false);
+		if (GSLsfg::IsActive() &&
+			GSLsfg::PresentWithGeneration(m_present_queue, present_swap_chain,
+				present_swap_chain->GetRenderingFinishedSemaphore(), has_new_frame))
+		{
+			present_swap_chain->AcquireNextImage();
+			return;
+		}
+
+		const VkPresentInfoKHR present_info = {VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, nullptr, 1,
+			present_swap_chain->GetRenderingFinishedSemaphorePtr(), 1, present_swap_chain->GetSwapChainPtr(),
+			present_swap_chain->GetCurrentImageIndexPtr(), nullptr};
+
+		present_swap_chain->ResetImageAcquireResult();
+
+		res = vkQueuePresentKHR(m_present_queue, &present_info);
+		if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
+		{
+			// VK_ERROR_OUT_OF_DATE_KHR is not fatal, just means we need to recreate our swap chain.
+			if (res == VK_ERROR_OUT_OF_DATE_KHR)
+			{
+				// Defer until next frame, otherwise resizing would invalidate swapchain before next present.
+				m_resize_requested = true;
+			}
+			else
+			{
+				LOG_VULKAN_ERROR(res, "vkQueuePresentKHR failed: ");
+			}
+
+			return;
+		}
+
+		// Grab the next image as soon as possible, that way we spend less time blocked on the next
+		// submission. Don't care if it fails, we'll deal with that at the presentation call site.
+		// Credit to dxvk for the idea.
+		present_swap_chain->AcquireNextImage();
+	}
+}
+
+void GSDeviceVK::CommandBufferCompleted(u32 index)
+{
+	FrameResources& resources = m_frame_resources[index];
+
+	for (auto& it : resources.cleanup_resources)
+		it();
+	resources.cleanup_resources.clear();
+
+	bool wants_timestamps = m_gpu_timing_enabled || resources.spin_id >= 0;
+
+	if (wants_timestamps && resources.timestamp_written)
+	{
+		std::array<u64, 2> timestamps;
+		VkResult res =
+			vkGetQueryPoolResults(m_device, m_timestamp_query_pool, index * 2, static_cast<u32>(timestamps.size()),
+				sizeof(u64) * timestamps.size(), timestamps.data(), sizeof(u64), VK_QUERY_RESULT_64_BIT);
+		if (res == VK_SUCCESS)
+		{
+			// if we didn't write the timestamp at the start of the cmdbuffer (just enabled timing), the first TS will be zero
+			if (timestamps[0] > 0 && m_gpu_timing_enabled)
+			{
+				const double ns_diff =
+					(timestamps[1] - timestamps[0]) * static_cast<double>(m_device_properties.limits.timestampPeriod);
+				m_accumulated_gpu_time += ns_diff / 1000000.0;
+			}
+			if (resources.spin_id >= 0)
+			{
+				if (m_optional_extensions.vk_ext_calibrated_timestamps && timestamps[1] > 0)
+				{
+					u64 end = timestamps[1] * m_spin_timestamp_scale + m_spin_timestamp_offset;
+					m_spin_manager.DrawCompleted(resources.spin_id, resources.submit_timestamp, end);
+				}
+				else if (!m_optional_extensions.vk_ext_calibrated_timestamps && timestamps[0] > 0)
+				{
+					u64 begin = timestamps[0] * m_spin_timestamp_scale;
+					u64 end = timestamps[1] * m_spin_timestamp_scale;
+					m_spin_manager.DrawCompleted(resources.spin_id, begin, end);
+				}
+			}
+		}
+		else
+		{
+			LOG_VULKAN_ERROR(res, "vkGetQueryPoolResults failed: ");
+		}
+	}
+}
+
+void GSDeviceVK::MoveToNextCommandBuffer()
+{
+	ActivateCommandBuffer((m_current_frame + 1) % NUM_COMMAND_BUFFERS);
+	InvalidateCachedState();
+	SetInitialState(m_current_command_buffer);
+}
+
+void GSDeviceVK::ActivateCommandBuffer(u32 index)
+{
+	FrameResources& resources = m_frame_resources[index];
+
+	// Wait for the GPU to finish with all resources for this command buffer.
+	if (resources.fence_counter > m_completed_fence_counter)
+		WaitForCommandBufferCompletion(index);
+
+	// Reset fence to unsignaled before starting.
+	VkResult res = vkResetFences(m_device, 1, &resources.fence);
+	if (res != VK_SUCCESS)
+		LOG_VULKAN_ERROR(res, "vkResetFences failed: ");
+
+	// Reset command pools to beginning since we can re-use the memory now
+	res = vkResetCommandPool(m_device, resources.command_pool, 0);
+	if (res != VK_SUCCESS)
+		LOG_VULKAN_ERROR(res, "vkResetCommandPool failed: ");
+
+	if (resources.descriptor_pool != VK_NULL_HANDLE)
+	{
+		resources.texture_descriptor_cache.clear();
+		resources.active_descriptor_pool = 0;
+		for (VkDescriptorPool pool : resources.extra_descriptor_pools)
+		{
+			res = vkResetDescriptorPool(m_device, pool, 0);
+			if (res != VK_SUCCESS)
+				LOG_VULKAN_ERROR(res, "vkResetDescriptorPool failed: ");
+		}
+		res = vkResetDescriptorPool(m_device, resources.descriptor_pool, 0);
+		if (res != VK_SUCCESS)
+			LOG_VULKAN_ERROR(res, "vkResetDescriptorPool failed: ");
+	}
+
+	// Enable commands to be recorded to the two buffers again.
+	VkCommandBufferBeginInfo begin_info = {
+		VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, nullptr, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, nullptr};
+	res = vkBeginCommandBuffer(resources.command_buffers[1], &begin_info);
+	if (res != VK_SUCCESS)
+		LOG_VULKAN_ERROR(res, "vkBeginCommandBuffer failed: ");
+
+	bool wants_timestamp = m_gpu_timing_enabled || m_spin_timer;
+	if (wants_timestamp)
+	{
+		vkCmdResetQueryPool(resources.command_buffers[1], m_timestamp_query_pool, index * 2, 2);
+		vkCmdWriteTimestamp(
+			resources.command_buffers[1], VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, m_timestamp_query_pool, index * 2);
+	}
+
+	if (resources.pipeline_statistics_query == QueryState::Ready)
+	{
+		// Collect the pipeline statistics from the last time this cmdbuffer was used.
+		resources.pipeline_statistics_query = QueryState::None;
+		GPUPipelineStatistics stats{};
+		VkResult res =
+			vkGetQueryPoolResults(m_device, m_pipeline_statistics_query_pool, index, 1,
+				sizeof(stats), &stats, sizeof(u64), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+		if (res == VK_SUCCESS)
+		{
+			m_accumulated_gpu_pipeline_statistics.vs_invocations += stats.vs_invocations;
+			m_accumulated_gpu_pipeline_statistics.ps_invocations += stats.ps_invocations;
+		}
+		else
+		{
+			LOG_VULKAN_ERROR(res, "vkGetQueryPoolResults failed: ");
+		}
+	}
+
+	if (m_gpu_pipeline_statistics_enabled)
+	{
+		pxAssert(resources.pipeline_statistics_query == QueryState::None);
+		resources.pipeline_statistics_query = QueryState::Querying;
+		vkCmdResetQueryPool(resources.command_buffers[1], m_pipeline_statistics_query_pool, index, 1);
+		vkCmdBeginQuery(resources.command_buffers[1], m_pipeline_statistics_query_pool, index, 0);
+	}
+
+	resources.fence_counter = m_next_fence_counter++;
+	resources.init_buffer_used = false;
+	resources.timestamp_written = wants_timestamp;
+
+	m_current_frame = index;
+	m_current_command_buffer = resources.command_buffers[1];
+
+	// using the lower 32 bits of the fence index should be sufficient here, I hope...
+	vmaSetCurrentFrameIndex(m_allocator, static_cast<u32>(m_next_fence_counter));
+}
+
+void GSDeviceVK::ExecuteCommandBuffer(WaitType wait_for_completion)
+{
+	if (m_last_submit_failed)
+		return;
+
+	const u32 current_frame = m_current_frame;
+	SubmitCommandBuffer(nullptr);
+	MoveToNextCommandBuffer();
+
+	if (wait_for_completion != WaitType::None)
+	{
+		// Calibrate while we wait
+		if (m_wants_new_timestamp_calibration)
+			CalibrateSpinTimestamp();
+		if (wait_for_completion == WaitType::Spin)
+		{
+			while (vkGetFenceStatus(m_device, m_frame_resources[current_frame].fence) == VK_NOT_READY)
+				ShortSpin();
+		}
+		WaitForCommandBufferCompletion(current_frame);
+	}
+}
+
+void GSDeviceVK::DeferBufferDestruction(VkBuffer object, VmaAllocation allocation)
+{
+	// A null/stale entry queued here runs later inside DestroyResources; the Adreno driver
+	// faults inside vkDestroyBuffer instead of ignoring it, so never let one through.
+	// Capture the allocator by value: the lambda runs at fence completion or shutdown,
+	// when m_allocator may already be gone, and dereferencing `this` then would feed
+	// the driver a dead allocator.
+	if (object == VK_NULL_HANDLE || m_allocator == VK_NULL_HANDLE)
+		return;
+	FrameResources& resources = m_frame_resources[m_current_frame];
+	VmaAllocator allocator = m_allocator;
+	resources.cleanup_resources.push_back(
+		[allocator, object, allocation]() { vmaDestroyBuffer(allocator, object, allocation); });
+}
+
+void GSDeviceVK::DeferFramebufferDestruction(VkFramebuffer object)
+{
+	// Same hazard as buffers: Adreno faults on vkDestroyFramebuffer with a dead device,
+	// so drop the entry when the device is already gone (its objects die with it) and
+	// otherwise pin the live device handle in the lambda.
+	if (object == VK_NULL_HANDLE || m_device == VK_NULL_HANDLE)
+		return;
+	FrameResources& resources = m_frame_resources[m_current_frame];
+	VkDevice device = m_device;
+	resources.cleanup_resources.push_back([device, object]() { vkDestroyFramebuffer(device, object, nullptr); });
+}
+
+void GSDeviceVK::DeferImageDestruction(VkImage object, VmaAllocation allocation)
+{
+	if (object == VK_NULL_HANDLE || m_allocator == VK_NULL_HANDLE)
+		return;
+	FrameResources& resources = m_frame_resources[m_current_frame];
+	VmaAllocator allocator = m_allocator;
+	resources.cleanup_resources.push_back(
+		[allocator, object, allocation]() { vmaDestroyImage(allocator, object, allocation); });
+}
+
+void GSDeviceVK::DeferImageViewDestruction(VkImageView object)
+{
+	if (object == VK_NULL_HANDLE || m_device == VK_NULL_HANDLE)
+		return;
+	FrameResources& resources = m_frame_resources[m_current_frame];
+	VkDevice device = m_device;
+	resources.cleanup_resources.push_back([device, object]() { vkDestroyImageView(device, object, nullptr); });
+}
+
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
+VKAPI_ATTR VkBool32 VKAPI_CALL DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+	VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+	void* pUserData)
+{
+	if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+	{
+		Console.Error("VK: debug report: (%s) %s",
+			pCallbackData->pMessageIdName ? pCallbackData->pMessageIdName : "", pCallbackData->pMessage);
+	}
+	else if (severity & (VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT))
+	{
+		Console.Warning("VK: debug report: (%s) %s",
+			pCallbackData->pMessageIdName ? pCallbackData->pMessageIdName : "", pCallbackData->pMessage);
+	}
+	else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
+	{
+		Console.WriteLn("VK: debug report: (%s) %s",
+			pCallbackData->pMessageIdName ? pCallbackData->pMessageIdName : "", pCallbackData->pMessage);
+	}
+	else
+	{
+		DevCon.WriteLn("VK: debug report: (%s) %s",
+			pCallbackData->pMessageIdName ? pCallbackData->pMessageIdName : "", pCallbackData->pMessage);
+	}
+
+	return VK_FALSE;
+}
+
+bool GSDeviceVK::EnableDebugUtils()
+{
+	// Already enabled?
+	if (m_debug_messenger_callback != VK_NULL_HANDLE)
+		return true;
+
+	// Check for presence of the functions before calling
+	if (!vkCreateDebugUtilsMessengerEXT || !vkDestroyDebugUtilsMessengerEXT || !vkSubmitDebugUtilsMessageEXT)
+	{
+		return false;
+	}
+
+	VkDebugUtilsMessengerCreateInfoEXT messenger_info = {VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+		nullptr, 0,
+		VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT,
+		VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT,
+		DebugMessengerCallback, nullptr};
+
+	const VkResult res =
+		vkCreateDebugUtilsMessengerEXT(m_instance, &messenger_info, nullptr, &m_debug_messenger_callback);
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vkCreateDebugUtilsMessengerEXT failed: ");
+		return false;
+	}
+
+	return true;
+}
+
+void GSDeviceVK::DisableDebugUtils()
+{
+	if (m_debug_messenger_callback != VK_NULL_HANDLE)
+	{
+		vkDestroyDebugUtilsMessengerEXT(m_instance, m_debug_messenger_callback, nullptr);
+		m_debug_messenger_callback = VK_NULL_HANDLE;
+	}
+}
+
+#endif
+
+VkRenderPass GSDeviceVK::CreateCachedRenderPass(RenderPassCacheKey key)
+{
+	VkAttachmentReference color_reference;
+	VkAttachmentReference* color_reference_ptr = nullptr;
+	VkAttachmentReference depth_reference;
+	VkAttachmentReference* depth_reference_ptr = nullptr;
+	std::array<VkAttachmentReference, 2> input_reference;
+	u32 num_subpass_inputs = 0;
+	std::array<VkSubpassDependency, 3> subpass_dependency;
+	u32 num_subpass_dependencies = 0;
+	std::array<VkAttachmentDescription, 2> attachments;
+	u32 num_attachments = 0;
+	if (key.color_format != VK_FORMAT_UNDEFINED)
+	{
+		// On tile-based mobile GPUs every TFX draw reports feedback-capable attachments (see
+		// UpdateHWPipelineSelector), so keep the colour attachment in GENERAL for the whole frame.
+		// Switching between feedback and non-feedback passes flushes and reloads the tile buffer on
+		// every transition, which costs hundreds of render pass restarts per frame in games that
+		// alternate between the two.
+		const VkImageLayout layout =
+			key.color_feedback_loop ? (UseFeedbackLoopLayout() ? VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT :
+																 VK_IMAGE_LAYOUT_GENERAL) :
+									  (IsMobileGPUProfile() ? VK_IMAGE_LAYOUT_GENERAL :
+															  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		attachments[num_attachments] = {0, static_cast<VkFormat>(key.color_format), VK_SAMPLE_COUNT_1_BIT,
+			static_cast<VkAttachmentLoadOp>(key.color_load_op), static_cast<VkAttachmentStoreOp>(key.color_store_op),
+			VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, layout, layout};
+		color_reference.attachment = num_attachments;
+		color_reference.layout = layout;
+		color_reference_ptr = &color_reference;
+
+		if (key.color_feedback_loop)
+		{
+			if (!UseFeedbackLoopLayout())
+			{
+				input_reference[num_subpass_inputs].attachment = num_attachments;
+				input_reference[num_subpass_inputs].layout = layout;
+				num_subpass_inputs++;
+			}
+
+			if (!m_features.framebuffer_fetch)
+			{
+				// don't need the framebuffer-local dependency when we have rasterization order attachment access
+				subpass_dependency[num_subpass_dependencies].srcSubpass = 0;
+				subpass_dependency[num_subpass_dependencies].dstSubpass = 0;
+				subpass_dependency[num_subpass_dependencies].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+				subpass_dependency[num_subpass_dependencies].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+				subpass_dependency[num_subpass_dependencies].srcAccessMask =
+					VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+				subpass_dependency[num_subpass_dependencies].dstAccessMask =
+					UseFeedbackLoopLayout() ? VK_ACCESS_SHADER_READ_BIT : VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+				subpass_dependency[num_subpass_dependencies].dependencyFlags =
+					UseFeedbackLoopLayout() ? (VK_DEPENDENCY_BY_REGION_BIT | VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT) :
+											  VK_DEPENDENCY_BY_REGION_BIT;
+				num_subpass_dependencies++;
+			}
+		}
+
+		num_attachments++;
+	}
+	if (key.depth_format != VK_FORMAT_UNDEFINED)
+	{
+		// Same as colour above: keep the depth attachment feedback-capable for the whole frame on
+		// tile-based mobile GPUs, so depth feedback draws do not restart the render pass.
+		const VkImageLayout layout =
+			key.depth_sampling ?
+				((m_features.depth_feedback != DepthFeedbackSupport::None && UseFeedbackLoopLayout()) ?
+					VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT :
+					VK_IMAGE_LAYOUT_GENERAL) :
+				(IsMobileGPUProfile() ? VK_IMAGE_LAYOUT_GENERAL :
+										VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+		attachments[num_attachments] = {0, static_cast<VkFormat>(key.depth_format), VK_SAMPLE_COUNT_1_BIT,
+			static_cast<VkAttachmentLoadOp>(key.depth_load_op), static_cast<VkAttachmentStoreOp>(key.depth_store_op),
+			static_cast<VkAttachmentLoadOp>(key.stencil_load_op),
+			static_cast<VkAttachmentStoreOp>(key.stencil_store_op), layout, layout};
+		depth_reference.attachment = num_attachments;
+		depth_reference.layout = layout;
+		depth_reference_ptr = &depth_reference;
+
+		if (key.depth_sampling)
+		{
+			if (!UseFeedbackLoopLayout())
+			{
+				input_reference[num_subpass_inputs].attachment = num_attachments;
+				input_reference[num_subpass_inputs].layout = layout;
+				num_subpass_inputs++;
+			}
+
+			// Color ROAA does not order depth/stencil accesses. Keep the depth self-dependency so
+			// explicit barriers inside the render pass remain valid and visible to the shader.
+			subpass_dependency[num_subpass_dependencies].srcSubpass = 0;
+			subpass_dependency[num_subpass_dependencies].dstSubpass = 0;
+			subpass_dependency[num_subpass_dependencies].srcStageMask =
+				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+			subpass_dependency[num_subpass_dependencies].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			subpass_dependency[num_subpass_dependencies].srcAccessMask =
+				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			subpass_dependency[num_subpass_dependencies].dstAccessMask =
+				UseFeedbackLoopLayout() ? VK_ACCESS_SHADER_READ_BIT : VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+			subpass_dependency[num_subpass_dependencies].dependencyFlags =
+				UseFeedbackLoopLayout() ? (VK_DEPENDENCY_BY_REGION_BIT | VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT) :
+										  VK_DEPENDENCY_BY_REGION_BIT;
+			num_subpass_dependencies++;
+		}
+
+		num_attachments++;
+	}
+
+	// Consecutive passes can retain the same attachment layout, in which case
+	// no transition barrier supplies availability for the next LOAD/input read.
+	// Keep this dependency framebuffer-local instead of flushing every ARM
+	// attachment at pass end (9877eba5 and320f7e9a ordering contracts).
+	if (num_attachments > 0)
+	{
+		VkSubpassDependency& dep = subpass_dependency[num_subpass_dependencies++];
+		dep = {};
+		dep.srcSubpass = VK_SUBPASS_EXTERNAL;
+		dep.dstSubpass = 0;
+		if (color_reference_ptr)
+		{
+			dep.srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			dep.srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		}
+		if (depth_reference_ptr)
+		{
+			dep.srcStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+			dep.srcAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		}
+		dep.dstStageMask = dep.srcStageMask;
+		dep.dstAccessMask = dep.srcAccessMask;
+		if (num_subpass_inputs > 0)
+		{
+			dep.dstStageMask |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			dep.dstAccessMask |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+		}
+		if ((key.color_feedback_loop || key.depth_sampling) && UseFeedbackLoopLayout())
+		{
+			dep.dstStageMask |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			dep.dstAccessMask |= VK_ACCESS_SHADER_READ_BIT;
+		}
+		dep.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+	}
+
+	VkSubpassDescriptionFlags subpass_flags = 0;
+	if (UsesRasterizationOrderAttachmentAccessForFeedback() ||
+		(m_features.declared_loop_overlap_needs_raster_order && m_optional_extensions.vk_ext_rasterization_order_attachment_access))
+	{
+		if (key.color_feedback_loop)
+			subpass_flags |= VK_SUBPASS_DESCRIPTION_RASTERIZATION_ORDER_ATTACHMENT_COLOR_ACCESS_BIT_EXT;
+	}
+	const VkSubpassDescription subpass = {subpass_flags, VK_PIPELINE_BIND_POINT_GRAPHICS, num_subpass_inputs,
+		num_subpass_inputs ? input_reference.data() : nullptr, color_reference_ptr ? 1u : 0u,
+		color_reference_ptr ? color_reference_ptr : nullptr, nullptr, depth_reference_ptr, 0, nullptr};
+	const VkRenderPassCreateInfo pass_info = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, nullptr, 0u, num_attachments,
+		attachments.data(), 1u, &subpass, num_subpass_dependencies, num_subpass_dependencies ? subpass_dependency.data() : nullptr};
+
+	VkRenderPass pass;
+	const VkResult res = vkCreateRenderPass(m_device, &pass_info, nullptr, &pass);
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vkCreateRenderPass failed: ");
+		return VK_NULL_HANDLE;
+	}
+
+	m_render_pass_cache.emplace(key.key, pass);
+	return pass;
+}
+
+static constexpr std::string_view SPIN_SHADER = R"(
+#version 460 core
+
+layout(std430, set=0, binding=0) buffer SpinBuffer { uint spin[]; };
+layout(push_constant) uniform constants { uint cycles; };
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+void main()
+{
+	uint value = spin[0];
+	// The compiler doesn't know, but spin[0] == 0, so this loop won't actually go anywhere
+	for (uint i = 0; i < cycles; i++)
+		value = spin[value];
+	// Store the result back to the buffer so the compiler can't optimize it away
+	spin[0] = value;
+}
+)";
+
+bool GSDeviceVK::InitSpinResources()
+{
+	if (!m_spinning_supported)
+		return true;
+
+	// TODO: Move to safe destroy functions, use scoped guard.
+
+	VkResult res;
+#define CHECKED_CREATE(create_fn, create_struct, output_struct) \
+	do \
+	{ \
+		if ((res = create_fn(m_device, create_struct, nullptr, output_struct)) != VK_SUCCESS) \
+		{ \
+			LOG_VULKAN_ERROR(res, #create_fn " failed: "); \
+			return false; \
+		} \
+	} while (0)
+
+	VkDescriptorSetLayoutBinding set_layout_binding = {};
+	set_layout_binding.binding = 0;
+	set_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	set_layout_binding.descriptorCount = 1;
+	set_layout_binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	VkDescriptorSetLayoutCreateInfo desc_set_layout_create = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+	desc_set_layout_create.bindingCount = 1;
+	desc_set_layout_create.pBindings = &set_layout_binding;
+	CHECKED_CREATE(vkCreateDescriptorSetLayout, &desc_set_layout_create, &m_spin_descriptor_set_layout);
+
+	const VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(u32)};
+	VkPipelineLayoutCreateInfo pl_layout_create = {VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+	pl_layout_create.setLayoutCount = 1;
+	pl_layout_create.pSetLayouts = &m_spin_descriptor_set_layout;
+	pl_layout_create.pushConstantRangeCount = 1;
+	pl_layout_create.pPushConstantRanges = &push_constant_range;
+	CHECKED_CREATE(vkCreatePipelineLayout, &pl_layout_create, &m_spin_pipeline_layout);
+
+	VkShaderModule shader_module = g_vulkan_shader_cache->GetComputeShader(SPIN_SHADER);
+	if (shader_module == VK_NULL_HANDLE)
+		return false;
+
+	Vulkan::SetObjectName(m_device, shader_module, "Spin Shader");
+
+	VkComputePipelineCreateInfo pl_create = {VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+	pl_create.layout = m_spin_pipeline_layout;
+	pl_create.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	pl_create.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+	pl_create.stage.pName = "main";
+	pl_create.stage.module = shader_module;
+	res = vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1, &pl_create, nullptr, &m_spin_pipeline);
+	vkDestroyShaderModule(m_device, shader_module, nullptr);
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vkCreateComputePipelines failed: ");
+		return false;
+	}
+	Vulkan::SetObjectName(m_device, m_spin_pipeline, "Spin Pipeline");
+
+	VmaAllocationCreateInfo buf_vma_create = {};
+	buf_vma_create.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+	VkBufferCreateInfo buf_create = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+	buf_create.size = 4;
+	buf_create.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	if ((res = vmaCreateBuffer(m_allocator, &buf_create, &buf_vma_create, &m_spin_buffer, &m_spin_buffer_allocation,
+			 nullptr)) != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vmaCreateBuffer failed: ");
+		return false;
+	}
+	Vulkan::SetObjectName(m_device, m_spin_buffer, "Spin Buffer");
+
+	VkDescriptorSetAllocateInfo desc_set_allocate = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+	desc_set_allocate.descriptorPool = m_global_descriptor_pool;
+	desc_set_allocate.descriptorSetCount = 1;
+	desc_set_allocate.pSetLayouts = &m_spin_descriptor_set_layout;
+	if ((res = vkAllocateDescriptorSets(m_device, &desc_set_allocate, &m_spin_descriptor_set)) != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vkAllocateDescriptorSets failed: ");
+		return false;
+	}
+	const VkDescriptorBufferInfo desc_buffer_info = {m_spin_buffer, 0, VK_WHOLE_SIZE};
+	VkWriteDescriptorSet desc_set_write = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+	desc_set_write.dstSet = m_spin_descriptor_set;
+	desc_set_write.dstBinding = 0;
+	desc_set_write.descriptorCount = 1;
+	desc_set_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	desc_set_write.pBufferInfo = &desc_buffer_info;
+	vkUpdateDescriptorSets(m_device, 1, &desc_set_write, 0, nullptr);
+
+	for (SpinResources& resources : m_spin_resources)
+	{
+		u32 index = &resources - &m_spin_resources[0];
+		VkCommandPoolCreateInfo pool_info = {VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+		pool_info.queueFamilyIndex = m_spin_queue_family_index;
+		CHECKED_CREATE(vkCreateCommandPool, &pool_info, &resources.command_pool);
+		Vulkan::SetObjectName(m_device, resources.command_pool, "Spin Command Pool %u", index);
+
+		VkCommandBufferAllocateInfo buffer_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+		buffer_info.commandPool = resources.command_pool;
+		buffer_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		buffer_info.commandBufferCount = 1;
+		res = vkAllocateCommandBuffers(m_device, &buffer_info, &resources.command_buffer);
+		if (res != VK_SUCCESS)
+		{
+			LOG_VULKAN_ERROR(res, "vkAllocateCommandBuffers failed: ");
+			return false;
+		}
+		Vulkan::SetObjectName(m_device, resources.command_buffer, "Spin Command Buffer %u", index);
+
+		VkFenceCreateInfo fence_info = {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+		fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+		CHECKED_CREATE(vkCreateFence, &fence_info, &resources.fence);
+		Vulkan::SetObjectName(m_device, resources.fence, "Spin Fence %u", index);
+
+		if (!m_spin_queue_is_graphics_queue)
+		{
+			VkSemaphoreCreateInfo sem_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+			CHECKED_CREATE(vkCreateSemaphore, &sem_info, &resources.semaphore);
+			Vulkan::SetObjectName(m_device, resources.semaphore, "Draw to Spin Semaphore %u", index);
+		}
+	}
+
+#undef CHECKED_CREATE
+	return true;
+}
+
+void GSDeviceVK::DestroySpinResources()
+{
+#define CHECKED_DESTROY(destructor, obj) \
+	do \
+	{ \
+		if (obj != VK_NULL_HANDLE) \
+		{ \
+			destructor(m_device, obj, nullptr); \
+			obj = VK_NULL_HANDLE; \
+		} \
+	} while (0)
+
+	if (m_spin_buffer)
+	{
+		vmaDestroyBuffer(m_allocator, m_spin_buffer, m_spin_buffer_allocation);
+		m_spin_buffer = VK_NULL_HANDLE;
+		m_spin_buffer_allocation = VK_NULL_HANDLE;
+	}
+	CHECKED_DESTROY(vkDestroyPipeline, m_spin_pipeline);
+	CHECKED_DESTROY(vkDestroyPipelineLayout, m_spin_pipeline_layout);
+	CHECKED_DESTROY(vkDestroyDescriptorSetLayout, m_spin_descriptor_set_layout);
+	if (m_spin_descriptor_set != VK_NULL_HANDLE)
+	{
+		vkFreeDescriptorSets(m_device, m_global_descriptor_pool, 1, &m_spin_descriptor_set);
+		m_spin_descriptor_set = VK_NULL_HANDLE;
+	}
+	for (SpinResources& resources : m_spin_resources)
+	{
+		CHECKED_DESTROY(vkDestroySemaphore, resources.semaphore);
+		CHECKED_DESTROY(vkDestroyFence, resources.fence);
+		if (resources.command_buffer != VK_NULL_HANDLE)
+		{
+			vkFreeCommandBuffers(m_device, resources.command_pool, 1, &resources.command_buffer);
+			resources.command_buffer = VK_NULL_HANDLE;
+		}
+		CHECKED_DESTROY(vkDestroyCommandPool, resources.command_pool);
+	}
+#undef CHECKED_DESTROY
+}
+
+void GSDeviceVK::WaitForSpinCompletion(u32 index)
+{
+	SpinResources& resources = m_spin_resources[index];
+	if (!resources.in_progress)
+		return;
+
+	const VkResult res = vkWaitForFences(m_device, 1, &resources.fence, VK_TRUE, UINT64_MAX);
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vkWaitForFences failed: ");
+		m_last_submit_failed = true;
+		return;
+	}
+	SpinCommandCompleted(index);
+}
+
+void GSDeviceVK::SpinCommandCompleted(u32 index)
+{
+	SpinResources& resources = m_spin_resources[index];
+	resources.in_progress = false;
+	const u32 timestamp_base = (index + NUM_COMMAND_BUFFERS) * 2;
+	std::array<u64, 2> timestamps;
+	const VkResult res =
+		vkGetQueryPoolResults(m_device, m_timestamp_query_pool, timestamp_base, static_cast<u32>(timestamps.size()),
+			sizeof(timestamps), timestamps.data(), sizeof(u64), VK_QUERY_RESULT_64_BIT);
+	if (res == VK_SUCCESS)
+	{
+		u64 begin, end;
+		if (m_optional_extensions.vk_ext_calibrated_timestamps)
+		{
+			begin = timestamps[0] * m_spin_timestamp_scale + m_spin_timestamp_offset;
+			end = timestamps[1] * m_spin_timestamp_scale + m_spin_timestamp_offset;
+		}
+		else
+		{
+			begin = timestamps[0] * m_spin_timestamp_scale;
+			end = timestamps[1] * m_spin_timestamp_scale;
+		}
+		m_spin_manager.SpinCompleted(resources.cycles, begin, end);
+	}
+	else
+	{
+		LOG_VULKAN_ERROR(res, "vkGetQueryPoolResults failed: ");
+	}
+}
+
+void GSDeviceVK::SubmitSpinCommand(u32 index, u32 cycles)
+{
+	SpinResources& resources = m_spin_resources[index];
+	VkResult res;
+
+	// Reset fence to unsignaled before starting.
+	if ((res = vkResetFences(m_device, 1, &resources.fence)) != VK_SUCCESS)
+		LOG_VULKAN_ERROR(res, "vkResetFences failed: ");
+
+	// Reset command pools to beginning since we can re-use the memory now
+	if ((res = vkResetCommandPool(m_device, resources.command_pool, 0)) != VK_SUCCESS)
+		LOG_VULKAN_ERROR(res, "vkResetCommandPool failed: ");
+
+	// Enable commands to be recorded to the two buffers again.
+	VkCommandBufferBeginInfo begin_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+	begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	if ((res = vkBeginCommandBuffer(resources.command_buffer, &begin_info)) != VK_SUCCESS)
+		LOG_VULKAN_ERROR(res, "vkBeginCommandBuffer failed: ");
+
+	if (!m_spin_buffer_initialized)
+	{
+		m_spin_buffer_initialized = true;
+		vkCmdFillBuffer(resources.command_buffer, m_spin_buffer, 0, VK_WHOLE_SIZE, 0);
+		VkBufferMemoryBarrier barrier = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
+		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		barrier.srcQueueFamilyIndex = m_spin_queue_family_index;
+		barrier.dstQueueFamilyIndex = m_spin_queue_family_index;
+		barrier.buffer = m_spin_buffer;
+		barrier.offset = 0;
+		barrier.size = VK_WHOLE_SIZE;
+		vkCmdPipelineBarrier(resources.command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 1, &barrier, 0, nullptr);
+	}
+
+	if (m_spin_queue_is_graphics_queue)
+		vkCmdPipelineBarrier(resources.command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
+
+	const u32 timestamp_base = (index + NUM_COMMAND_BUFFERS) * 2;
+	vkCmdResetQueryPool(resources.command_buffer, m_timestamp_query_pool, timestamp_base, 2);
+	vkCmdWriteTimestamp(
+		resources.command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, m_timestamp_query_pool, timestamp_base);
+	vkCmdPushConstants(
+		resources.command_buffer, m_spin_pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(u32), &cycles);
+	vkCmdBindPipeline(resources.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_spin_pipeline);
+	vkCmdBindDescriptorSets(resources.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_spin_pipeline_layout, 0, 1,
+		&m_spin_descriptor_set, 0, nullptr);
+	vkCmdDispatch(resources.command_buffer, 1, 1, 1);
+	vkCmdWriteTimestamp(
+		resources.command_buffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, m_timestamp_query_pool, timestamp_base + 1);
+
+	if ((res = vkEndCommandBuffer(resources.command_buffer)) != VK_SUCCESS)
+		LOG_VULKAN_ERROR(res, "vkEndCommandBuffer failed: ");
+
+	VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+	submit_info.commandBufferCount = 1;
+	submit_info.pCommandBuffers = &resources.command_buffer;
+	VkPipelineStageFlags sema_waits[] = {VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT};
+	if (!m_spin_queue_is_graphics_queue)
+	{
+		submit_info.waitSemaphoreCount = 1;
+		submit_info.pWaitSemaphores = &resources.semaphore;
+		submit_info.pWaitDstStageMask = sema_waits;
+	}
+	vkQueueSubmit(m_spin_queue, 1, &submit_info, resources.fence);
+	resources.in_progress = true;
+	resources.cycles = cycles;
+}
+
+void GSDeviceVK::CalibrateSpinTimestamp()
+{
+	if (!m_optional_extensions.vk_ext_calibrated_timestamps)
+		return;
+	VkCalibratedTimestampInfoEXT infos[2] = {
+		{VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_EXT, nullptr, VK_TIME_DOMAIN_DEVICE_EXT},
+		{VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_EXT, nullptr, m_calibrated_timestamp_type},
+	};
+	u64 timestamps[2];
+	u64 maxDeviation;
+	constexpr u64 MAX_MAX_DEVIATION = 100000; // 100us
+	for (int i = 0; i < 4; i++) // 4 tries to get under MAX_MAX_DEVIATION
+	{
+		const VkResult res = vkGetCalibratedTimestampsEXT(m_device, std::size(infos), infos, timestamps, &maxDeviation);
+		if (res != VK_SUCCESS)
+		{
+			LOG_VULKAN_ERROR(res, "vkGetCalibratedTimestampsEXT failed: ");
+			return;
+		}
+		if (maxDeviation < MAX_MAX_DEVIATION)
+			break;
+	}
+	if (maxDeviation >= MAX_MAX_DEVIATION)
+		Console.Warning("vkGetCalibratedTimestampsEXT returned high max deviation of %lluus", maxDeviation / 1000);
+	const double gpu_time = timestamps[0] * m_spin_timestamp_scale;
+#ifdef _WIN32
+	const double cpu_time = timestamps[1] * m_queryperfcounter_to_ns;
+#else
+	const double cpu_time = timestamps[1];
+#endif
+	m_spin_timestamp_offset = cpu_time - gpu_time;
+}
+
+u64 GSDeviceVK::GetCPUTimestamp()
+{
+#ifdef _WIN32
+	LARGE_INTEGER value = {};
+	QueryPerformanceCounter(&value);
+	return static_cast<u64>(static_cast<double>(value.QuadPart) * m_queryperfcounter_to_ns);
+#else
+#ifdef CLOCK_MONOTONIC_RAW
+	const bool use_raw = m_calibrated_timestamp_type == VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_EXT;
+	const clockid_t clock = use_raw ? CLOCK_MONOTONIC_RAW : CLOCK_MONOTONIC;
+#else
+	const clockid_t clock = CLOCK_MONOTONIC;
+#endif
+	timespec ts = {};
+	clock_gettime(clock, &ts);
+	return static_cast<u64>(ts.tv_sec) * 1000000000 + ts.tv_nsec;
+#endif
+}
+
+bool GSDeviceVK::AllocatePreinitializedGPUBuffer(u32 size, VkBuffer* gpu_buffer, VmaAllocation* gpu_allocation,
+	VkBufferUsageFlags gpu_usage, const std::function<void(void*)>& fill_callback)
+{
+	// Try to place the fixed index buffer in GPU local memory.
+	// Use the staging buffer to copy into it.
+
+	const VkBufferCreateInfo cpu_bci = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, nullptr, 0, size,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_SHARING_MODE_EXCLUSIVE};
+	const VmaAllocationCreateInfo cpu_aci = {VMA_ALLOCATION_CREATE_MAPPED_BIT, VMA_MEMORY_USAGE_CPU_ONLY, 0, 0};
+	VkBuffer cpu_buffer;
+	VmaAllocation cpu_allocation;
+	VmaAllocationInfo cpu_ai;
+	VkResult res = vmaCreateBuffer(m_allocator, &cpu_bci, &cpu_aci, &cpu_buffer, &cpu_allocation, &cpu_ai);
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vmaCreateBuffer() for CPU expand buffer failed: ");
+		return false;
+	}
+
+	const VkBufferCreateInfo gpu_bci = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, nullptr, 0, size,
+		VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_SHARING_MODE_EXCLUSIVE};
+	const VmaAllocationCreateInfo gpu_aci = {0, VMA_MEMORY_USAGE_GPU_ONLY, 0, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT};
+	VmaAllocationInfo ai;
+	res = vmaCreateBuffer(m_allocator, &gpu_bci, &gpu_aci, gpu_buffer, gpu_allocation, &ai);
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vmaCreateBuffer() for expand buffer failed: ");
+		vmaDestroyBuffer(m_allocator, cpu_buffer, cpu_allocation);
+		return false;
+	}
+
+	const VkBufferCopy buf_copy = {0u, 0u, size};
+	fill_callback(cpu_ai.pMappedData);
+	vmaFlushAllocation(m_allocator, cpu_allocation, 0, size);
+	const VkCommandBuffer cmdbuf = GetCurrentInitCommandBuffer();
+	vkCmdCopyBuffer(cmdbuf, cpu_buffer, *gpu_buffer, 1, &buf_copy);
+
+	// The init buffer is submitted ahead of the draw buffer in the same vkQueueSubmit, which orders
+	// nothing on its own: the first draw that binds this index buffer could read it before the copy
+	// lands. Synchronization validation reports it on the first frame.
+	const VkBufferMemoryBarrier barrier = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER, nullptr,
+		VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_INDEX_READ_BIT, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+		*gpu_buffer, 0, size};
+	vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, nullptr,
+		1, &barrier, 0, nullptr);
+	DeferBufferDestruction(cpu_buffer, cpu_allocation);
+	return true;
+}
+
+
+std::vector<GSAdapterInfo> GSDeviceVK::GetAdapterInfo()
+{
+	GPUList gpus = EnumerateGPUs();
+	std::vector<GSAdapterInfo> ret;
+	ret.reserve(gpus.size());
+	for (auto& [physical_device, ai] : gpus)
+		ret.push_back(std::move(ai));
+	return ret;
+}
+
+bool GSDeviceVK::IsSuitableDefaultRenderer()
+{
+	GPUList gpus = EnumerateGPUs();
+	if (gpus.empty())
+	{
+		// No adapters, not gonna be able to use VK.
+		return false;
+	}
+
+	// Check the first GPU, should be enough.
+	const std::string& name = gpus.front().second.name;
+	INFO_LOG("Using Vulkan GPU '{}' for automatic renderer check.", name);
+
+	// Any software rendering (LLVMpipe, SwiftShader).
+	if (StringUtil::StartsWithNoCase(name, "llvmpipe") || StringUtil::StartsWithNoCase(name, "SwiftShader"))
+	{
+		Console.WriteLn(Color_StrongOrange, "Not using Vulkan for software renderer.");
+		return false;
+	}
+
+	// For Intel, OpenGL usually ends up faster on Linux, because of fbfetch.
+	// Plus, the Ivy Bridge and Haswell drivers are incomplete.
+	if (StringUtil::StartsWithNoCase(name, "Intel"))
+	{
+		Console.WriteLn(Color_StrongOrange, "Not using Vulkan for Intel GPU.");
+		return false;
+	}
+
+	Console.WriteLn(Color_StrongGreen, "Allowing Vulkan as default renderer.");
+	return true;
+}
+
+RenderAPI GSDeviceVK::GetRenderAPI() const
+{
+	return RenderAPI::Vulkan;
+}
+
+bool GSDeviceVK::HasSurface() const
+{
+	return static_cast<bool>(m_swap_chain);
+}
+
+bool GSDeviceVK::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
+{
+	if (!GSDevice::Create(vsync_mode, allow_present_throttle))
+		return false;
+
+	if (!CreateDeviceAndSwapChain())
+		return false;
+
+	if (!CheckFeatures())
+	{
+		Host::ReportErrorAsync("GS", TRANSLATE_SV("GSDeviceVK", "Your GPU does not support the required Vulkan features."));
+		return false;
+	}
+
+	if (!CreateNullTexture())
+	{
+		Host::ReportErrorAsync("GS", "Failed to create dummy texture");
+		return false;
+	}
+
+	if ((m_null_framebuffer = GSTextureVK::CreateNullFramebuffer(m_max_framebuffer_width, m_max_framebuffer_height)) == VK_NULL_HANDLE)
+	{
+		Host::ReportErrorAsync("GS", "Failed to create dummy framebuffer");
+		return false;
+	}
+
+	{
+		std::optional<std::string> shader = ReadShaderSource("shaders/vulkan/tfx.glsl");
+		if (!shader.has_value())
+		{
+			Host::ReportErrorAsync("GS", "Failed to read shaders/vulkan/tfx.glsl.");
+			return false;
+		}
+
+		m_tfx_source = std::move(*shader);
+	}
+
+	if (!CreatePipelineLayouts())
+	{
+		Host::ReportErrorAsync("GS", "Failed to create pipeline layouts");
+		return false;
+	}
+
+	if (!CreateRenderPasses())
+	{
+		Host::ReportErrorAsync("GS", "Failed to create render passes");
+		return false;
+	}
+
+	if (!CreateBuffers())
+		return false;
+
+	if (!CompileConvertPipelines() || !CompilePresentPipelines() || !CompileInterlacePipelines() ||
+		!CompileMergePipelines() || !CompilePostProcessingPipelines() || !InitSpinResources())
+	{
+		Host::ReportErrorAsync("GS", "Failed to compile utility pipelines");
+		return false;
+	}
+
+	if (!CreatePersistentDescriptorSets())
+	{
+		Host::ReportErrorAsync("GS", "Failed to create persistent descriptor sets");
+		return false;
+	}
+
+	if (!CompileCASPipelines())
+		return false;
+
+	if (!CompileImGuiPipeline())
+		return false;
+
+#ifdef __ANDROID__
+	if (IsDevicePowerVR())
+	{
+		// PowerVR's Vulkan compiler aborts inside vkCreateGraphicsPipelines while the
+		// background TFX warmup compiles its 168 selectors (Pixel 10 / DXT). Compile
+		// pipelines on demand from the GS thread instead of precompiling them.
+		Console.WriteLn("VK: PowerVR detected, skipping background TFX warmup.");
+	}
+	else if (GSConfig.DisableAsyncTFXCompile)
+	{
+		WarmupCommonTFXPipelines();
+	}
+	else
+	{
+		StartAsyncTFXCompilation();
+	}
+#endif
+
+	InitializeState();
+	return true;
+}
+
+void GSDeviceVK::Destroy()
+{
+	std::unique_lock lock(s_instance_mutex);
+
+	// Workers touch m_device and the shader cache, so they must be gone before teardown.
+	StopAsyncTFXCompilation();
+
+	GSDevice::Destroy();
+
+	// Free the filter chain before the device goes away — it owns Vulkan objects created
+	// against m_device, so tearing the device down first would leak/UB them.
+	DestroyShaderChain();
+	GSLsfg::Shutdown();
+
+	EndRenderPass();
+	if (GetCurrentCommandBuffer() != VK_NULL_HANDLE)
+		ExecuteCommandBuffer(false);
+
+	// Always idle the GPU while the device is alive, not just when a command buffer is
+	// recording. Deferred destroys below (vmaDestroyBuffer etc.) require all submitted work
+	// referencing those buffers to be complete; Adreno faults inside vkDestroyBuffer when
+	// that invariant is violated (Vitals shutdown crash via DestroyResources).
+	if (m_device != VK_NULL_HANDLE)
+		WaitForGPUIdle();
+
+	m_swap_chain.reset();
+
+	if (m_device != VK_NULL_HANDLE)
+	{
+		DestroySpinResources();
+		DestroyResources();
+	}
+
+	VKShaderCache::Destroy();
+
+	if (m_device != VK_NULL_HANDLE)
+	{
+		vkDestroyDevice(m_device, nullptr);
+		m_device = VK_NULL_HANDLE;
+	}
+
+	if (m_debug_messenger_callback != VK_NULL_HANDLE)
+		DisableDebugUtils();
+
+	if (m_instance != VK_NULL_HANDLE)
+	{
+		vkDestroyInstance(m_instance, nullptr);
+		m_instance = VK_NULL_HANDLE;
+	}
+
+	Vulkan::UnloadVulkanLibrary();
+}
+
+bool GSDeviceVK::UpdateWindow()
+{
+	// The pipelined LSFG path may retain the previous real swapchain image for one frame.
+	// Drain it while the old swapchain is still valid; destroying the surface first would leave
+	// the pending presentation holding a dead VkSwapchainKHR.
+	GSLsfg::Shutdown();
+	DestroySurface();
+
+	if (!AcquireWindow(false))
+	{
+		return false;
+	}
+
+	if (m_window_info.type == WindowInfo::Type::Surfaceless)
+	{
+		return true;
+	}
+
+	// make sure previous frames are presented
+	ExecuteCommandBuffer(false);
+	WaitForGPUIdle();
+
+	// recreate surface in existing swap chain if it already exists
+	if (m_swap_chain)
+	{
+		if (m_swap_chain->RecreateSurface(m_window_info))
+		{
+			m_window_info = m_swap_chain->GetWindowInfo();
+			return true;
+		}
+
+		m_swap_chain.reset();
+	}
+
+	VkSurfaceKHR surface = VKSwapChain::CreateVulkanSurface(m_instance, m_physical_device, &m_window_info);
+	if (surface == VK_NULL_HANDLE)
+	{
+		Console.Error("VK: Failed to create new surface for swap chain");
+		return false;
+	}
+
+	VkPresentModeKHR present_mode;
+	if (!VKSwapChain::SelectPresentMode(surface, &m_vsync_mode, &present_mode) ||
+		!(m_swap_chain = VKSwapChain::Create(m_window_info, surface, present_mode,
+			  Pcsx2Config::GSOptions::TriStateToOptionalBoolean(GSConfig.ExclusiveFullscreenControl))))
+	{
+		Console.Error("VK: Failed to create swap chain");
+		VKSwapChain::DestroyVulkanSurface(m_instance, &m_window_info, surface);
+		return false;
+	}
+
+	m_window_info = m_swap_chain->GetWindowInfo();
+	RenderBlankFrame();
+	InvalidateCachedState();
+	SetInitialState(m_current_command_buffer);
+	return true;
+}
+
+void GSDeviceVK::ResizeWindow(u32 new_window_width, u32 new_window_height, float new_window_scale)
+{
+	m_resize_requested = false;
+
+	if (!m_swap_chain || (m_swap_chain->GetWidth() == new_window_width &&
+							 m_swap_chain->GetHeight() == new_window_height))
+	{
+		// skip unnecessary resizes
+		m_window_info.surface_scale = new_window_scale;
+		return;
+	}
+
+	// make sure previous frames are presented
+	GSLsfg::Shutdown();
+	WaitForGPUIdle();
+
+	if (!m_swap_chain->ResizeSwapChain(new_window_width, new_window_height, new_window_scale))
+	{
+		// AcquireNextImage() will fail, and we'll recreate the surface.
+		Console.Error("VK: Failed to resize swap chain. Next present will fail.");
+		return;
+	}
+
+	m_window_info = m_swap_chain->GetWindowInfo();
+}
+
+bool GSDeviceVK::SupportsExclusiveFullscreen() const
+{
+	return false;
+}
+
+void GSDeviceVK::DestroySurface()
+{
+	WaitForGPUIdle();
+	m_swap_chain.reset();
+}
+
+std::string GSDeviceVK::GetDriverInfo() const
+{
+	std::string ret;
+	const u32 api_version = m_device_properties.apiVersion;
+	const u32 driver_version = m_device_properties.driverVersion;
+	if (m_optional_extensions.vk_khr_driver_properties)
+	{
+		const VkPhysicalDeviceDriverProperties& props = m_device_driver_properties;
+		ret = StringUtil::StdStringFromFormat(
+			"Driver %u.%u.%u\nVulkan %u.%u.%u\nConformance Version %u.%u.%u.%u\n%s\n%s\n%s",
+			VK_VERSION_MAJOR(driver_version), VK_VERSION_MINOR(driver_version), VK_VERSION_PATCH(driver_version),
+			VK_API_VERSION_MAJOR(api_version), VK_API_VERSION_MINOR(api_version), VK_API_VERSION_PATCH(api_version),
+			props.conformanceVersion.major, props.conformanceVersion.minor, props.conformanceVersion.subminor,
+			props.conformanceVersion.patch, props.driverInfo, props.driverName, m_device_properties.deviceName);
+	}
+	else
+	{
+		ret = StringUtil::StdStringFromFormat("Driver %u.%u.%u\nVulkan %u.%u.%u\n%s", VK_VERSION_MAJOR(driver_version),
+			VK_VERSION_MINOR(driver_version), VK_VERSION_PATCH(driver_version), VK_API_VERSION_MAJOR(api_version),
+			VK_API_VERSION_MINOR(api_version), VK_API_VERSION_PATCH(api_version), m_device_properties.deviceName);
+	}
+
+	return ret;
+}
+
+void GSDeviceVK::SetVSyncMode(GSVSyncMode mode, bool allow_present_throttle)
+{
+	m_allow_present_throttle = allow_present_throttle;
+	if (!m_swap_chain)
+	{
+		// For when it is re-created.
+		m_vsync_mode = mode;
+		return;
+	}
+
+	VkPresentModeKHR present_mode;
+	if (!VKSwapChain::SelectPresentMode(m_swap_chain->GetSurface(), &mode, &present_mode))
+	{
+		ERROR_LOG("Ignoring vsync mode change.");
+		return;
+	}
+
+	// Actually changed? If using a fallback, it might not have.
+	if (m_vsync_mode == mode)
+		return;
+
+	m_vsync_mode = mode;
+
+	// This swap chain should not be used by the current buffer, thus safe to destroy.
+	WaitForGPUIdle();
+	if (!m_swap_chain->SetPresentMode(present_mode))
+	{
+		pxFailRel("Failed to update swap chain present mode.");
+		m_swap_chain.reset();
+	}
+}
+
+GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
+{
+	FlushDeferredDraws();
+	m_present_has_new_frame = false;
+
+	EndRenderPass();
+
+	// Check if the device was lost.
+	if (m_last_submit_failed)
+	{
+		return PresentResult::DeviceLost;
+	}
+
+	if (frame_skip)
+		return PresentResult::FrameSkipped;
+
+	// If we're running surfaceless, kick the command buffer so we don't run out of descriptors.
+	if (!m_swap_chain)
+	{
+#ifdef __ANDROID__
+		// The swap chain should recover through UpdateWindow(), but if it does not the
+		// screen stays black while emulation runs with no other evidence. Log rate-limited.
+		const u64 now = GetCPUTicks();
+		if (m_last_no_swapchain_log_time == 0 ||
+			(now - m_last_no_swapchain_log_time) >= GetTickFrequency())
+		{
+			m_last_no_swapchain_log_time = now;
+			Console.Warning("VK: Skipping present, no swap chain (type=%u %ux%u)",
+				static_cast<u32>(m_window_info.type), m_window_info.surface_width,
+				m_window_info.surface_height);
+		}
+#endif
+		ExecuteCommandBuffer(false);
+		return PresentResult::FrameSkipped;
+	}
+
+	// End the pipeline statistics for this cmdbuffer before postprocessing.
+	FrameResources& resources = m_frame_resources[m_current_frame];
+	if (resources.pipeline_statistics_query == QueryState::Querying)
+	{
+		resources.pipeline_statistics_query = QueryState::Ready;
+		vkCmdEndQuery(m_current_command_buffer, m_pipeline_statistics_query_pool, m_current_frame);
+	}
+
+	// SUBOPTIMAL is a success: the image is acquired and presentable. Adreno returns it when the
+	// compositor changes state (the touch overlay redrawing), and rebuilding the swap chain for it
+	// blanks the window. Rebuilding would not clear it either, since preTransform stays identity.
+	// Real size changes arrive as a host resize, an Android surface change, or OUT_OF_DATE.
+	VkResult res = m_resize_requested ? VK_ERROR_OUT_OF_DATE_KHR : m_swap_chain->AcquireNextImage();
+	if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
+	{
+		m_swap_chain->ReleaseCurrentImage();
+
+		if (res == VK_TIMEOUT)
+		{
+			// The compositor did not return an image within the bounded Android acquire
+			// window. Retry on the next VSync; this is not an error (and must not raise
+			// the device-lost recovery path), but log it rate-limited in case it persists.
+#ifdef __ANDROID__
+			const u64 now = GetCPUTicks();
+			if (m_last_acquire_timeout_log_time == 0 ||
+				(now - m_last_acquire_timeout_log_time) >= GetTickFrequency())
+			{
+				m_last_acquire_timeout_log_time = now;
+				Console.Warning("VK: Timed out acquiring a swap chain image; retrying next frame");
+			}
+#endif
+			// Still submit the command buffer, otherwise we'll end up with several frames waiting.
+			ExecuteCommandBuffer(false);
+			return PresentResult::FrameSkipped;
+		}
+		else if (res == VK_ERROR_OUT_OF_DATE_KHR)
+		{
+			ResizeWindow(0, 0, m_window_info.surface_scale);
+			ImGuiManager::WindowResized();
+			res = m_swap_chain->AcquireNextImage();
+		}
+		else if (res == VK_ERROR_SURFACE_LOST_KHR)
+		{
+			Console.Warning("VK: Surface lost, attempting to recreate");
+			WaitForGPUIdle();
+			if (!AcquireWindow(true))
+			{
+				Console.Error("VK: Failed to reacquire Android window after surface loss");
+				ExecuteCommandBuffer(false);
+				return PresentResult::FrameSkipped;
+			}
+			if (!m_swap_chain->RecreateSurface(m_window_info))
+			{
+				Console.Error("VK: Failed to recreate surface after loss");
+				DestroySurface();
+				ExecuteCommandBuffer(false);
+				return PresentResult::FrameSkipped;
+			}
+			res = m_swap_chain->AcquireNextImage();
+		}
+		else
+		{
+			LOG_VULKAN_ERROR(res, "vkAcquireNextImageKHR() failed: ");
+		}
+
+		// This can happen when multiple resize events happen in quick succession.
+		// In this case, just wait until the next frame to try again.
+		if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
+		{
+			// Still submit the command buffer, otherwise we'll end up with several frames waiting.
+			ExecuteCommandBuffer(false);
+			return PresentResult::FrameSkipped;
+		}
+	}
+
+	VkCommandBuffer cmdbuffer = GetCurrentCommandBuffer();
+
+	// Swap chain images start in undefined
+	GSTextureVK* swap_chain_texture = m_swap_chain->GetCurrentTexture();
+	swap_chain_texture->OverrideImageLayout(GSTextureVK::Layout::Undefined);
+	swap_chain_texture->TransitionToLayout(cmdbuffer, GSTextureVK::Layout::ColorAttachment);
+
+	// Present render pass gets started out here, so we can't transition source textures in DoStretchRect
+	// Make sure they're ready now
+	if (!frame_skip && m_current)
+		static_cast<GSTextureVK*>(m_current)->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+
+	const VkFramebuffer fb = swap_chain_texture->GetFramebuffer(false);
+	if (fb == VK_NULL_HANDLE)
+		return GSDevice::PresentResult::FrameSkipped;
+
+
+	const VkRenderPassBeginInfo rp = {VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, nullptr,
+		GetRenderPass(swap_chain_texture->GetVkFormat(), VK_FORMAT_UNDEFINED, VK_ATTACHMENT_LOAD_OP_CLEAR,
+			VK_ATTACHMENT_STORE_OP_STORE),
+		fb,
+		{{0, 0}, {static_cast<u32>(swap_chain_texture->GetWidth()), static_cast<u32>(swap_chain_texture->GetHeight())}},
+		1u, &s_present_clear_color};
+	vkCmdBeginRenderPass(GetCurrentCommandBuffer(), &rp, VK_SUBPASS_CONTENTS_INLINE);
+
+	const VkViewport vp{0.0f, 0.0f, static_cast<float>(swap_chain_texture->GetWidth()),
+		static_cast<float>(swap_chain_texture->GetHeight()), 0.0f, 1.0f};
+	const VkRect2D scissor{
+		{0, 0}, {static_cast<u32>(swap_chain_texture->GetWidth()), static_cast<u32>(swap_chain_texture->GetHeight())}};
+	vkCmdSetViewport(GetCurrentCommandBuffer(), 0, 1, &vp);
+	vkCmdSetScissor(GetCurrentCommandBuffer(), 0, 1, &scissor);
+	m_is_presenting = true;
+	return PresentResult::OK;
+}
+
+void GSDeviceVK::EndPresent()
+{
+	FlushDeferredDraws();
+#ifndef __ANDROID__
+	RenderImGui();
+#endif
+
+	VkCommandBuffer cmdbuffer = GetCurrentCommandBuffer();
+	vkCmdEndRenderPass(cmdbuffer);
+	m_is_presenting = false;
+	m_swap_chain->GetCurrentTexture()->TransitionToLayout(cmdbuffer, GSTextureVK::Layout::PresentSrc);
+	g_perfmon.Put(GSPerfMon::RenderPasses, 1);
+
+	GSLsfg::SetDllPath(GSConfig.LsfgDllPath);
+	if (GSConfig.LsfgEnabled && GSLsfg::IsAvailable())
+		GSLsfg::Initialize(m_swap_chain.get(), GSConfig.LsfgMultiplier);
+	else if (GSLsfg::IsActive())
+		GSLsfg::Shutdown();
+
+	SubmitCommandBuffer(m_swap_chain.get());
+	MoveToNextCommandBuffer();
+
+	InvalidateCachedState();
+}
+
+bool GSDeviceVK::IsPresenting() const
+{
+	return m_is_presenting;
+}
+
+#ifdef ENABLE_OGL_DEBUG
+static std::array<float, 3> Palette(float phase, const std::array<float, 3>& a, const std::array<float, 3>& b,
+	const std::array<float, 3>& c, const std::array<float, 3>& d)
+{
+	std::array<float, 3> result;
+	result[0] = a[0] + b[0] * std::cos(6.28318f * (c[0] * phase + d[0]));
+	result[1] = a[1] + b[1] * std::cos(6.28318f * (c[1] * phase + d[1]));
+	result[2] = a[2] + b[2] * std::cos(6.28318f * (c[2] * phase + d[2]));
+	return result;
+}
+#endif
+
+void GSDeviceVK::PushDebugGroup(const char* fmt, ...)
+{
+#ifdef ENABLE_OGL_DEBUG
+	if (!vkCmdBeginDebugUtilsLabelEXT || !GSConfig.UseDebugDevice)
+		return;
+
+	std::va_list ap;
+	va_start(ap, fmt);
+	const std::string buf(StringUtil::StdStringFromFormatV(fmt, ap));
+	va_end(ap);
+
+	const std::array<float, 3> color = Palette(
+		++s_debug_scope_depth, {0.5f, 0.5f, 0.5f}, {0.5f, 0.5f, 0.5f}, {1.0f, 1.0f, 0.5f}, {0.8f, 0.90f, 0.30f});
+
+	const VkDebugUtilsLabelEXT label = {
+		VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
+		nullptr,
+		buf.c_str(),
+		{color[0], color[1], color[2], 1.0f},
+	};
+	vkCmdBeginDebugUtilsLabelEXT(GetCurrentCommandBuffer(), &label);
+#endif
+}
+
+void GSDeviceVK::PopDebugGroup()
+{
+#ifdef ENABLE_OGL_DEBUG
+	if (!vkCmdEndDebugUtilsLabelEXT || !GSConfig.UseDebugDevice)
+		return;
+
+	s_debug_scope_depth = (s_debug_scope_depth == 0) ? 0 : (s_debug_scope_depth - 1u);
+
+	vkCmdEndDebugUtilsLabelEXT(GetCurrentCommandBuffer());
+#endif
+}
+
+void GSDeviceVK::InsertDebugMessage(DebugMessageCategory category, const char* fmt, ...)
+{
+#ifdef ENABLE_OGL_DEBUG
+	if (!vkCmdInsertDebugUtilsLabelEXT || !GSConfig.UseDebugDevice)
+		return;
+
+	std::va_list ap;
+	va_start(ap, fmt);
+	const std::string buf(StringUtil::StdStringFromFormatV(fmt, ap));
+	va_end(ap);
+
+	if (buf.empty())
+		return;
+
+	static constexpr float colors[][3] = {
+		{0.1f, 0.1f, 0.0f}, // Cache
+		{0.1f, 0.1f, 0.0f}, // Reg
+		{0.5f, 0.0f, 0.5f}, // Debug
+		{0.0f, 0.5f, 0.5f}, // Message
+		{0.0f, 0.2f, 0.0f} // Performance
+	};
+
+	const VkDebugUtilsLabelEXT label = {VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, nullptr, buf.c_str(),
+		{colors[static_cast<int>(category)][0], colors[static_cast<int>(category)][1],
+			colors[static_cast<int>(category)][2], 1.0f}};
+	vkCmdInsertDebugUtilsLabelEXT(GetCurrentCommandBuffer(), &label);
+#endif
+}
+
+bool GSDeviceVK::CreateVulkanInstanceAndDevice(bool force_surfaceless, VkSurfaceKHR* out_surface,
+	bool enable_debug_utils, bool enable_validation_layer)
+{
+	if (!out_surface)
+		return false;
+	*out_surface = VK_NULL_HANDLE;
+
+	Error error;
+	if (!Vulkan::LoadVulkanLibrary(&error))
+	{
+		Error::AddPrefix(&error, "Failed to load Vulkan library. Does your GPU and/or driver support Vulkan?\nThe error was:\n");
+		Host::ReportErrorAsync("Error", error.GetDescription());
+		return false;
+	}
+	if (force_surfaceless)
+	{
+		m_tfx_preparation_library_loaded = true;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (m_tfx_preparation_failure_stage == TFXPreparationFailureStage::AfterLibraryLoad)
+			return false;
+#endif
+	}
+
+	if (force_surfaceless)
+	{
+		m_window_info = {};
+		m_window_info.type = WindowInfo::Type::Surfaceless;
+	}
+	else if (!AcquireWindow(true))
+	{
+		return false;
+	}
+
+	m_instance = CreateVulkanInstance(m_window_info, &m_optional_extensions, enable_debug_utils, enable_validation_layer);
+	if (m_instance == VK_NULL_HANDLE)
+	{
+		if (enable_debug_utils || enable_validation_layer)
+		{
+			// Try again without the validation layer.
+			enable_debug_utils = false;
+			enable_validation_layer = false;
+			m_instance = CreateVulkanInstance(m_window_info, &m_optional_extensions, enable_debug_utils, enable_validation_layer);
+			if (m_instance == VK_NULL_HANDLE)
+			{
+				Host::ReportErrorAsync("Error", "Failed to create Vulkan instance. Does your GPU and/or driver support Vulkan?");
+				return false;
+			}
+
+			ERROR_LOG("VK: validation/debug layers requested but are unavailable. Creating non-debug device.");
+		}
+	}
+
+	if (!Vulkan::LoadVulkanInstanceFunctions(m_instance))
+	{
+		ERROR_LOG("Failed to load Vulkan instance functions");
+		return false;
+	}
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (force_surfaceless && m_tfx_preparation_failure_stage == TFXPreparationFailureStage::AfterInstanceCreate)
+		return false;
+#endif
+
+	GPUList gpus = EnumerateGPUs(m_instance);
+	if (gpus.empty())
+	{
+		Host::ReportErrorAsync("Error", "No physical devices found. Does your GPU and/or driver support Vulkan?");
+		return false;
+	}
+
+	const bool is_default_gpu = GSConfig.Adapter == GetDefaultAdapter();
+	if (!(GSConfig.Adapter.empty() || is_default_gpu))
+	{
+		u32 gpu_index = 0;
+		for (; gpu_index < static_cast<u32>(gpus.size()); gpu_index++)
+		{
+			DEV_LOG("GPU {}: {}", gpu_index, gpus[gpu_index].second.name);
+			if (gpus[gpu_index].second.name == GSConfig.Adapter)
+			{
+				m_physical_device = gpus[gpu_index].first;
+				break;
+			}
+		}
+
+		if (gpu_index == static_cast<u32>(gpus.size()))
+		{
+			WARNING_LOG("Requested GPU '{}' not found, using first ({})", GSConfig.Adapter, gpus[0].second.name);
+			m_physical_device = gpus[0].first;
+		}
+	}
+	else
+	{
+		INFO_LOG("{} GPU requested, using first ({})", is_default_gpu ? "Default" : "No", gpus[0].second.name);
+		m_physical_device = gpus[0].first;
+	}
+
+	// Read device physical memory properties, we need it for allocating buffers
+	vkGetPhysicalDeviceProperties(m_physical_device, &m_device_properties);
+
+	// Stores the GPU name
+	m_name = m_device_properties.deviceName;
+
+	// We need this to be at least 32 byte aligned for AVX2 stores.
+	m_device_properties.limits.minUniformBufferOffsetAlignment =
+		std::max(m_device_properties.limits.minUniformBufferOffsetAlignment, static_cast<VkDeviceSize>(32));
+	m_device_properties.limits.minTexelBufferOffsetAlignment =
+		std::max(m_device_properties.limits.minTexelBufferOffsetAlignment, static_cast<VkDeviceSize>(32));
+	m_device_properties.limits.optimalBufferCopyOffsetAlignment =
+		std::max(m_device_properties.limits.optimalBufferCopyOffsetAlignment, static_cast<VkDeviceSize>(32));
+	m_device_properties.limits.optimalBufferCopyRowPitchAlignment = std::bit_ceil(
+		std::max(m_device_properties.limits.optimalBufferCopyRowPitchAlignment, static_cast<VkDeviceSize>(32)));
+	m_device_properties.limits.bufferImageGranularity =
+		std::max(m_device_properties.limits.bufferImageGranularity, static_cast<VkDeviceSize>(32));
+
+	if (enable_debug_utils)
+		EnableDebugUtils();
+
+	VkSurfaceKHR surface = VK_NULL_HANDLE;
+	if (m_window_info.type != WindowInfo::Type::Surfaceless)
+	{
+		surface = VKSwapChain::CreateVulkanSurface(m_instance, m_physical_device, &m_window_info);
+		if (surface == VK_NULL_HANDLE)
+			return false;
+	}
+
+	if (!CreateDevice(surface, enable_validation_layer))
+	{
+		if (surface != VK_NULL_HANDLE)
+			vkDestroySurfaceKHR(m_instance, surface, nullptr);
+		return false;
+	}
+
+	*out_surface = surface;
+	return true;
+}
+
+bool GSDeviceVK::CreateDeviceAndSwapChain()
+{
+	std::unique_lock lock(s_instance_mutex);
+	const bool enable_debug_utils = GSConfig.UseDebugDevice;
+	const bool enable_validation_layer = GSConfig.UseDebugDevice;
+	VkSurfaceKHR surface = VK_NULL_HANDLE;
+	ScopedGuard surface_cleanup = [this, &surface]() {
+		if (surface != VK_NULL_HANDLE)
+			vkDestroySurfaceKHR(m_instance, surface, nullptr);
+	};
+	if (!CreateVulkanInstanceAndDevice(false, &surface, enable_debug_utils, enable_validation_layer))
+		return false;
+
+	// And critical resources.
+	if (!CreateAllocator() || !CreateGlobalDescriptorPool() || !CreateCommandBuffers())
+		return false;
+
+	VKShaderCache::Create();
+
+	if (surface != VK_NULL_HANDLE)
+	{
+		VkPresentModeKHR present_mode;
+		if (!VKSwapChain::SelectPresentMode(surface, &m_vsync_mode, &present_mode) ||
+			!(m_swap_chain = VKSwapChain::Create(m_window_info, surface, present_mode,
+				  Pcsx2Config::GSOptions::TriStateToOptionalBoolean(GSConfig.ExclusiveFullscreenControl))))
+		{
+			ERROR_LOG("Failed to create swap chain");
+			return false;
+		}
+
+		// NOTE: This is assigned afterwards, because some platforms can modify the window info (e.g. Metal).
+		m_window_info = m_swap_chain->GetWindowInfo();
+	}
+
+	surface_cleanup.Cancel();
+
+	// Render a frame as soon as possible to clear out whatever was previously being displayed.
+	if (m_window_info.type != WindowInfo::Type::Surfaceless)
+		RenderBlankFrame();
+
+	return true;
+}
+
+void GSDeviceVK::FinalizeDriverCapabilities(bool depth_ready)
+{
+	// Adapted from the exact GSGPUDriverProfile Vulkan rules. The provoking
+	// defect follows the raw proprietary ID, while Turnip allows resolved hints.
+	if (m_device_properties.vendorID == 0x5143 && m_optional_extensions.vk_khr_driver_properties &&
+		m_device_driver_properties.driverID == VK_DRIVER_ID_QUALCOMM_PROPRIETARY)
+		m_optional_extensions.vk_ext_provoking_vertex = false;
+
+	// Older/unknown Turnip can hang on discarding DATE draws using D32S8.
+	// Select plain D32 before texture/pass/pipeline consumers, preserving32bit Z.
+	if (depth_ready && m_road_facts.adreno && m_road_facts.driver == GSVulkanRoad::Driver::Turnip &&
+		(m_device_properties.driverVersion == 0 || m_device_properties.driverVersion < VK_MAKE_VERSION(26, 2, 0)))
+	{
+		m_features.stencil_buffer = false;
+		m_depth_format = VK_FORMAT_D32_SFLOAT;
+	}
+}
+
+bool GSDeviceVK::PreferCachedStreamRings() const
+{
+	return m_road_facts.adreno && m_road_facts.model == 610 &&
+		m_road_facts.driver == GSVulkanRoad::Driver::Turnip;
+}
+
+void GSDeviceVK::SelectStreamRingMemory(const VkPhysicalDeviceMemoryProperties& properties)
+{
+	static_assert(GS_MEMORY_PROPERTY_DEVICE_LOCAL == VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	static_assert(GS_MEMORY_PROPERTY_HOST_VISIBLE == VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+	static_assert(GS_MEMORY_PROPERTY_HOST_COHERENT == VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	static_assert(GS_MEMORY_PROPERTY_HOST_CACHED == VK_MEMORY_PROPERTY_HOST_CACHED_BIT);
+
+	u32 type_flags[VK_MAX_MEMORY_TYPES] = {};
+	for (u32 i = 0; i < properties.memoryTypeCount; i++)
+		type_flags[i] = static_cast<u32>(properties.memoryTypes[i].propertyFlags);
+
+	GSStreamRingMemoryInputs inputs;
+	inputs.type_flags = type_flags;
+	inputs.type_count = properties.memoryTypeCount;
+	inputs.prefer_cached_over_write_combined = PreferCachedStreamRings();
+	m_stream_ring_memory = GSDecideStreamRingMemory(inputs);
+}
+
+bool GSDeviceVK::CheckFeatures()
+{
+	const VkPhysicalDeviceLimits& limits = m_device_properties.limits;
+
+	const bool has_framebuffer_fetch_extension = m_optional_extensions.vk_ext_rasterization_order_attachment_access;
+	const std::string_view driver_info = m_optional_extensions.vk_khr_driver_properties ?
+		std::string_view(m_device_driver_properties.driverInfo) : std::string_view{};
+	const auto road = GSVulkanRoad::ResolveSelection(m_road_facts, GetRoadCapabilities());
+	const bool texture_barrier = road.road.texture_barrier;
+	const bool framebuffer_fetch = road.road.in_tile_read;
+	m_force_feedback_loop_layout = road.road.force_feedback_loop_layout;
+	m_declare_loop_per_draw = road.dynamic_loop;
+
+	m_features.multidraw_fb_copy = false;
+	m_features.broken_point_sampler = false;
+	m_features.broken_blend_constant = GSBlendConstantPolicy::DeviceDefect(true, m_road_facts.adreno,
+		m_road_facts.driver == GSVulkanRoad::Driver::Turnip);
+
+	m_features.framebuffer_fetch = framebuffer_fetch;
+	m_features.texture_barrier = texture_barrier;
+	m_features.feedback_loop_layout = UseFeedbackLoopLayout();
+	m_features.framebuffer_fetch_orders_overlap = framebuffer_fetch;
+	m_features.declared_feedback_loop_orders_overlap = road.road.orders_overlapping_prims;
+	m_features.declared_loop_overlap_needs_raster_order = road.raster_order_on_overlap;
+	m_features.feedback_carry = road.carry;
+	// In-tile reads cannot serve a sampler read of another pixel.
+	m_features.texture_feedback_requires_copy = !texture_barrier ||
+		GSOffsetSelfReadNeedsCopy(GSGetDrawRoadDevice(m_features));
+	m_features.dual_source_blend = m_device_features.dualSrcBlend;
+
+	// geometryShader is needed because gl_PrimitiveID is part of the Geometry SPIR-V Execution Model.
+	m_features.primitive_id = m_device_features.geometryShader;
+
+	m_features.prefer_new_textures = true;
+	m_features.provoking_vertex_last = m_optional_extensions.vk_ext_provoking_vertex;
+	m_features.vs_expand = !GSConfig.DisableVertexShaderExpand;
+	m_features.sprite_edge_clamp = true;
+
+	if (!m_features.texture_barrier)
+		Console.WriteLn("VK: Using render-target snapshots for framebuffer feedback.");
+
+	// Keep the high-precision D32S8 path on every GPU which supports it. D24S8 is a
+	// capability fallback only; forcing it by GPU family can introduce visible
+	// z-fighting in closely layered geometry and decals.
+	{
+		constexpr VkFormatFeatureFlags required =
+			VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
+		static constexpr std::array<VkFormat, 3> candidates = {
+			VK_FORMAT_D32_SFLOAT_S8_UINT,
+			VK_FORMAT_D24_UNORM_S8_UINT,
+			VK_FORMAT_D32_SFLOAT,
+		};
+		for (const VkFormat candidate : candidates)
+		{
+			VkFormatProperties props = {};
+			vkGetPhysicalDeviceFormatProperties(m_physical_device, candidate, &props);
+			if ((props.optimalTilingFeatures & required) == required)
+			{
+				m_depth_format = candidate;
+				break;
+			}
+		}
+		m_features.stencil_buffer = (m_depth_format != VK_FORMAT_D32_SFLOAT);
+	}
+	FinalizeDriverCapabilities(true);
+
+	// Fbfetch is useless if we don't have barriers enabled.
+	m_features.framebuffer_fetch &= m_features.texture_barrier;
+	Console.WriteLn("VK: MaliSX2 framebuffer fetch=%s texture barrier=%s",
+		m_features.framebuffer_fetch ? "enabled" : "disabled", m_features.texture_barrier ? "enabled" : "disabled");
+
+	// Concurrent depth testing/sampling relies on the same feedback synchronization path.
+	ResolveDepthSamplingFeatures();
+
+	// Use D32F depth instead of a stencil format when framebuffer fetch needs it.
+	if (m_features.framebuffer_fetch)
+	{
+		m_features.stencil_buffer = false;
+		m_depth_format = VK_FORMAT_D32_SFLOAT;
+	}
+
+	// Which memory the six stream rings get. Decided here, with the other device-shaped decisions,
+	// because the rings are allocated once at device init and the choice cannot be revisited
+	// afterwards. The policy reads the memory-type table; a cached road is opt-in per measured
+	// driver rule, and with no rule the answer is VMA's own write-combined selection.
+	{
+		VkPhysicalDeviceMemoryProperties memory_properties = {};
+		vkGetPhysicalDeviceMemoryProperties(m_physical_device, &memory_properties);
+
+		SelectStreamRingMemory(memory_properties);
+	}
+
+	// whether we can do point/line expand depends on the range of the device
+	const float f_upscale = GSConfig.UpscaleMultiplier;
+	m_features.point_expand = (m_device_features.largePoints && limits.pointSizeRange[0] <= f_upscale &&
+							   limits.pointSizeRange[1] >= f_upscale);
+	m_features.line_expand =
+		(m_device_features.wideLines && limits.lineWidthRange[0] <= f_upscale && limits.lineWidthRange[1] >= f_upscale);
+
+	// Mobile Vulkan drivers tend to emulate wide points/lines expensively, so keep the
+	// vertex-expansion path on Android.
+#ifdef __ANDROID__
+	const bool prefer_vertex_expansion_for_mobile = true;
+#else
+	const bool prefer_vertex_expansion_for_mobile =
+		(m_device_properties.vendorID == 0x5143u || m_device_properties.vendorID == 0x13B5u);
+#endif
+	if (prefer_vertex_expansion_for_mobile)
+	{
+		m_features.point_expand = false;
+		m_features.line_expand = false;
+	}
+
+	m_features.depth_feedback = GetVKDepthFeedbackSupport(m_features.texture_barrier, GSConfig.DepthFeedbackMode);
+
+	m_features.aa1 = GSConfig.HWAA1 && m_features.vs_expand &&
+		(m_features.texture_barrier || m_features.framebuffer_fetch);
+
+	DevCon.WriteLn("Optional features:%s%s%s%s%s", m_features.primitive_id ? " primitive_id" : "",
+		m_features.texture_barrier ? " texture_barrier" : "", m_features.framebuffer_fetch ? " framebuffer_fetch" : "",
+		m_features.provoking_vertex_last ? " provoking_vertex_last" : "", m_features.vs_expand ? " vs_expand" : "");
+#if defined(__ANDROID__)
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX",
+		"Vulkan GS device=%s vendor=0x%04x driver=0x%08x profile=%s soc=%s "
+		"roaa=%d fbfetch=%d textureBarrier=%d inputAttachmentFeedback=%d "
+		"dualSrcBlend=%d depthFormat=%u rgba16unorm=%d pointExpand=%d",
+		m_device_properties.deviceName, m_device_properties.vendorID, m_device_properties.driverVersion,
+		GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()),
+		IsMediaTekSoC() ? "MediaTek" : "other/unknown",
+		has_framebuffer_fetch_extension ? 1 : 0, m_features.framebuffer_fetch ? 1 : 0,
+		m_features.texture_barrier ? 1 : 0, UsesInputAttachmentFeedbackPath() ? 1 : 0,
+		m_device_features.dualSrcBlend ? 1 : 0, static_cast<unsigned>(m_depth_format),
+		m_features.rgba16_unorm ? 1 : 0, m_features.point_expand ? 1 : 0);
+#endif
+
+	DevCon.WriteLn("Using %s for point expansion and %s for line expansion.",
+		m_features.point_expand ? "hardware" : "vertex expanding",
+		m_features.line_expand ? "hardware" : "vertex expanding");
+
+	bool has_rov_storage_flags = true;
+
+	// ColorClip prefers RGBA16_UNORM for 9bpc blending emulation. Some mobile drivers do not
+	// expose it as a render target; in that case use RGBA32F instead of failing renderer
+	// creation.
+	{
+		constexpr VkFormatFeatureFlags clip_required =
+			VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT;
+		VkFormatProperties props = {};
+		vkGetPhysicalDeviceFormatProperties(m_physical_device, VK_FORMAT_R16G16B16A16_UNORM, &props);
+		m_features.rgba16_unorm = ((props.optimalTilingFeatures & clip_required) == clip_required);
+
+		if (!m_features.rgba16_unorm)
+			Console.Warning("VK: Using RGBA32F instead of RGBA16UNORM for clip textures.");
+	}
+
+	// Check texture format support before we try to create them.
+	for (u32 fmt = static_cast<u32>(GSTexture::Format::Color); fmt < static_cast<u32>(GSTexture::Format::PrimID); fmt++)
+	{
+		const VkFormat vkfmt = LookupNativeFormat(static_cast<GSTexture::Format>(fmt));
+		VkFormatFeatureFlags bits = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
+
+		if (static_cast<GSTexture::Format>(fmt) == GSTexture::Format::DepthStencil)
+			bits |= VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
+		else
+			bits |= VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT;
+
+		VkFormatProperties props = {};
+		vkGetPhysicalDeviceFormatProperties(m_physical_device, vkfmt, &props);
+		if ((props.optimalTilingFeatures & bits) != bits)
+		{
+			Host::ReportFormattedErrorAsync("VK: Renderer Unavailable",
+				"Required format %u is missing bits, you may need to update your driver. (vk:%u, has:0x%x, needs:0x%x)",
+				fmt, static_cast<unsigned>(vkfmt), props.optimalTilingFeatures, bits);
+			return false;
+		}
+
+		if (GSTexture::IsShaderWriteFormat(static_cast<GSTexture::Format>(fmt)))
+			has_rov_storage_flags &= ((props.optimalTilingFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) != 0);
+	}
+
+	m_features.astc_textures = m_device_features.textureCompressionASTC_LDR;
+	for (int fmt=int(GSTexture::Format::ASTC4x4); fmt<=int(GSTexture::Format::ASTC12x12); fmt++)
+	{
+		VkFormatProperties properties{};
+		vkGetPhysicalDeviceFormatProperties(m_physical_device, LookupNativeFormat(static_cast<GSTexture::Format>(fmt)), &properties);
+		constexpr VkFormatFeatureFlags required = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
+		m_features.astc_textures &= (properties.optimalTilingFeatures & required) == required;
+	}
+	m_features.dxt_textures = m_device_features.textureCompressionBC;
+	m_features.bptc_textures = m_device_features.textureCompressionBC;
+
+	if (!m_features.texture_barrier && !m_features.stencil_buffer)
+	{
+		Host::AddKeyedOSDMessage("GSDeviceVK_NoTextureBarrierOrStencilBuffer",
+			TRANSLATE_STR("GS",
+				"Stencil buffers and texture barriers are both unavailable, this will break some graphical effects."),
+			Host::OSD_WARNING_DURATION);
+	}
+
+	m_max_texture_size = m_device_properties.limits.maxImageDimension2D;
+	m_max_framebuffer_width = m_device_properties.limits.maxFramebufferWidth;
+	m_max_framebuffer_height = m_device_properties.limits.maxFramebufferHeight;
+
+	m_features.rov = m_optional_extensions.vk_ext_fragment_shader_interlock &&
+	                 m_device_features.fragmentStoresAndAtomics &&
+	                 has_rov_storage_flags &&
+	                 !m_features.framebuffer_fetch;
+
+	return true;
+}
+
+void GSDeviceVK::DrawIndexedPrimitiveVSExpand(int offset, int count, bool vs_indexing, int vs_indexing_expansion)
+{
+	pxAssert(offset + count <= (int)m_index.count);
+
+	g_perfmon.Put(GSPerfMon::DrawCalls, 1);
+	if (vs_indexing)
+	{
+		SetVSPushConstants(m_vertex.start, m_index.start + offset);
+		vkCmdDraw(GetCurrentCommandBuffer(), count * vs_indexing_expansion, 1, 0, 0);
+	}
+	else
+	{
+		SetVSPushConstants(m_vertex.start);
+		vkCmdDrawIndexed(GetCurrentCommandBuffer(), count, 1, m_index.start + offset, 0, 0);
+	}
+}
+
+void GSDeviceVK::Draw(const GSHWDrawConfig& config, int offset, int count)
+{
+	DeclareDrawFeedbackLoop(config, m_pipeline_selector);
+	if (config.vs.expand != GSHWDrawConfig::VSExpand::None)
+	{
+		const bool vs_indexing = config.vs.UseVSExpandIndexBuffer();
+		const u32 vs_indexing_expansion = GetExpansionFactor(config.vs.expand);
+		DrawIndexedPrimitiveVSExpand(offset, count, vs_indexing, vs_indexing_expansion);
+	}
+	else
+	{
+		DrawIndexedPrimitive(offset, count);
+	}
+}
+
+void GSDeviceVK::VSSetIndexBuffer(const void* index, size_t count)
+{
+	UploadIndices(m_expand_index_stream_buffer, index, count);
+}
+
+void GSDeviceVK::SetVSPushConstants(u32 base_vertex, u32 base_index, bool force_update)
+{
+	GSHWDrawConfig::VSPushConstants pc;
+	pc.base_vertex = base_vertex;
+	pc.base_index = base_index;
+
+	if (m_vs_pc_cache.Update(pc) || force_update)
+	{
+		vkCmdPushConstants(GetCurrentCommandBuffer(), m_tfx_pipeline_layout,
+			VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
+	}
+}
+
+void GSDeviceVK::Draw(const GSHWDrawConfig& config)
+{
+	Draw(config, 0, m_index.count);
+}
+
+void GSDeviceVK::DrawPrimitive()
+{
+	g_perfmon.Put(GSPerfMon::DrawCalls, 1);
+	vkCmdDraw(GetCurrentCommandBuffer(), m_vertex.count, 1, m_vertex.start, 0);
+}
+
+void GSDeviceVK::DrawIndexedPrimitive()
+{
+	g_perfmon.Put(GSPerfMon::DrawCalls, 1);
+	vkCmdDrawIndexed(GetCurrentCommandBuffer(), m_index.count, 1, m_index.start, m_vertex.start, 0);
+}
+
+void GSDeviceVK::DrawIndexedPrimitive(int offset, int count)
+{
+	pxAssert(offset + count <= (int)m_index.count);
+	g_perfmon.Put(GSPerfMon::DrawCalls, 1);
+	vkCmdDrawIndexed(GetCurrentCommandBuffer(), count, 1, m_index.start + offset, m_vertex.start, 0);
+}
+
+VkFormat GSDeviceVK::LookupNativeFormat(GSTexture::Format format) const
+{
+	static constexpr std::array<VkFormat, static_cast<int>(GSTexture::Format::Last) + 1> s_format_mapping = {{
+		VK_FORMAT_UNDEFINED, // Invalid
+		VK_FORMAT_R8G8B8A8_UNORM, // Color
+		VK_FORMAT_A2B10G10R10_UNORM_PACK32, // ColorHQ
+		VK_FORMAT_R16G16B16A16_SFLOAT, // ColorHDR
+		VK_FORMAT_R16G16B16A16_UNORM, // ColorClip
+		VK_FORMAT_D32_SFLOAT_S8_UINT, // DepthStencil
+		VK_FORMAT_R32_SFLOAT, // DepthColor
+		VK_FORMAT_R8_UNORM, // UNorm8
+		VK_FORMAT_R16_UINT, // UInt16
+		VK_FORMAT_R32_UINT, // UInt32
+		VK_FORMAT_R32_SFLOAT, // PrimID
+		VK_FORMAT_BC1_RGBA_UNORM_BLOCK, // BC1
+		VK_FORMAT_BC2_UNORM_BLOCK, // BC2
+		VK_FORMAT_BC3_UNORM_BLOCK, // BC3
+		VK_FORMAT_BC7_UNORM_BLOCK, // BC7
+		VK_FORMAT_ASTC_4x4_UNORM_BLOCK,
+		VK_FORMAT_ASTC_5x4_UNORM_BLOCK,
+		VK_FORMAT_ASTC_5x5_UNORM_BLOCK,
+		VK_FORMAT_ASTC_6x5_UNORM_BLOCK,
+		VK_FORMAT_ASTC_6x6_UNORM_BLOCK,
+		VK_FORMAT_ASTC_8x5_UNORM_BLOCK,
+		VK_FORMAT_ASTC_8x6_UNORM_BLOCK,
+		VK_FORMAT_ASTC_8x8_UNORM_BLOCK,
+		VK_FORMAT_ASTC_10x5_UNORM_BLOCK,
+		VK_FORMAT_ASTC_10x6_UNORM_BLOCK,
+		VK_FORMAT_ASTC_10x8_UNORM_BLOCK,
+		VK_FORMAT_ASTC_10x10_UNORM_BLOCK,
+		VK_FORMAT_ASTC_12x10_UNORM_BLOCK,
+		VK_FORMAT_ASTC_12x12_UNORM_BLOCK,
+
+	}};
+
+	return (format == GSTexture::Format::DepthStencil) ?
+		m_depth_format :
+		(format == GSTexture::Format::ColorClip && !m_features.rgba16_unorm) ?
+			VK_FORMAT_R32G32B32A32_SFLOAT :
+		s_format_mapping[static_cast<int>(format)];
+}
+
+GSTexture* GSDeviceVK::CreateSurface(GSTexture::Usage usage, int width, int height, int levels, GSTexture::Format format)
+{
+	std::unique_ptr<GSTexture> tex = GSTextureVK::Create(usage, format, width, height, levels);
+	if (!tex)
+	{
+		// We're probably out of vram, try flushing the command buffer to release pending textures.
+		PurgePool();
+		ExecuteCommandBufferAndRestartRenderPass(true, "Couldn't allocate texture.");
+		tex = GSTextureVK::Create(usage, format, width, height, levels);
+	}
+
+	return tex.release();
+}
+
+std::unique_ptr<GSDownloadTexture> GSDeviceVK::CreateDownloadTexture(u32 width, u32 height, GSTexture::Format format)
+{
+	return GSDownloadTextureVK::Create(width, height, format);
+}
+
+void GSDeviceVK::CopyRect(GSTexture* sTex, GSTexture* dTex, const GSVector4i& r, u32 destX, u32 destY)
+{
+	FlushDeferredDraws();
+
+	// Empty rect, abort copy.
+	if (r.rempty())
+	{
+		GL_INS("VK: CopyRect rect empty.");
+		return;
+	}
+
+	GSTextureVK* const sTexVK = static_cast<GSTextureVK*>(sTex);
+	GSTextureVK* const dTexVK = static_cast<GSTextureVK*>(dTex);
+	const GSVector4i dst_rect(0, 0, dTexVK->GetWidth(), dTexVK->GetHeight());
+	const bool full_draw_copy = dst_rect.eq(r);
+
+	// Source is cleared, if destination is a render target, we can carry the clear forward.
+	if (sTexVK->GetState() == GSTexture::State::Cleared)
+	{
+		if (dTexVK->IsRenderTargetOrDepthStencil())
+		{
+			if (ProcessClearsBeforeCopy(sTex, dTex, full_draw_copy))
+				return;
+
+			// Do an attachment clear.
+			const bool depth = dTexVK->IsDepthStencil();
+			OMSetRenderTargets(depth ? nullptr : dTexVK, depth ? dTexVK : nullptr, dst_rect);
+			BeginRenderPassForStretchRect(
+				dTexVK, dst_rect, GSVector4i(destX, destY, destX + r.width(), destY + r.height()));
+
+			// so use an attachment clear
+			VkClearAttachment ca;
+			ca.aspectMask = depth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+			GSVector4::store<false>(ca.clearValue.color.float32, sTexVK->GetClearForFormat());
+			ca.clearValue.depthStencil.depth = sTexVK->GetClearDepth();
+			ca.clearValue.depthStencil.stencil = 0;
+			ca.colorAttachment = 0;
+
+			const VkClearRect cr = {{{0, 0}, {static_cast<u32>(r.width()), static_cast<u32>(r.height())}}, 0u, 1u};
+			vkCmdClearAttachments(GetCurrentCommandBuffer(), 1, &ca, 1, &cr);
+
+			return;
+		}
+
+		// commit the clear to the source first, then do normal copy
+		sTexVK->CommitClear();
+	}
+
+	g_perfmon.Put(GSPerfMon::TextureCopies, 1);
+
+	// if the destination has been cleared, and we're not overwriting the whole thing, commit the clear first
+	// (the area outside of where we're copying to)
+	if (dTexVK->GetState() == GSTexture::State::Cleared && !full_draw_copy)
+		dTexVK->CommitClear();
+
+	// *now* we can do a normal image copy.
+	const VkImageAspectFlags src_aspect =
+		(sTexVK->IsDepthStencil()) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+	const VkImageAspectFlags dst_aspect =
+		(dTexVK->IsDepthStencil()) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+	const VkImageCopy ic = {{src_aspect, 0u, 0u, 1u}, {r.left, r.top, 0u}, {dst_aspect, 0u, 0u, 1u},
+		{static_cast<s32>(destX), static_cast<s32>(destY), 0u},
+		{static_cast<u32>(r.width()), static_cast<u32>(r.height()), 1u}};
+
+	EndRenderPass();
+
+	sTexVK->SetUseFenceCounter(GetCurrentFenceCounter());
+	dTexVK->SetUseFenceCounter(GetCurrentFenceCounter());
+	sTexVK->TransitionToLayout(
+		(dTexVK == sTexVK) ? GSTextureVK::Layout::TransferSelf : GSTextureVK::Layout::TransferSrc);
+	dTexVK->TransitionToLayout(
+		(dTexVK == sTexVK) ? GSTextureVK::Layout::TransferSelf : GSTextureVK::Layout::TransferDst);
+
+	vkCmdCopyImage(GetCurrentCommandBuffer(), sTexVK->GetImage(), sTexVK->GetVkLayout(), dTexVK->GetImage(),
+		dTexVK->GetVkLayout(), 1, &ic);
+
+	dTexVK->SetState(GSTexture::State::Dirty);
+}
+
+void GSDeviceVK::DoStretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
+	ShaderConvertSelector shader, Filter filter)
+{
+	pxAssert(dTex);
+	filter = shader.SupportsBilinear() ? Nearest : filter; // Don't allow HW bilinear if SW bilinear is needed.
+	const bool allow_discard = (shader.Mask() == 0xf);
+	DoStretchRect(static_cast<GSTextureVK*>(sTex), sRect, static_cast<GSTextureVK*>(dTex), dRect,
+		GetConvertPipeline(shader), filter, allow_discard);
+}
+
+void GSDeviceVK::DoStretchRect(GSTexture* sTex, const GSVector4& sRect, const GSVector4& dRect,
+	PresentShader shader, Filter filter)
+{
+	DoStretchRect(static_cast<GSTextureVK*>(sTex), sRect, nullptr, dRect,
+		m_present.at(static_cast<u32>(shader)), filter, true);
+}
+
+void GSDeviceVK::PresentRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
+	PresentShader shader, float shaderTime, Filter filter)
+{
+	FlushDeferredDraws();
+	DisplayConstantBuffer cb;
+	cb.SetSource(sRect, sTex->GetSize());
+	cb.SetTarget(dRect, dTex ? dTex->GetSize() : GSVector2i(GetWindowWidth(), GetWindowHeight()));
+	cb.SetTime(shaderTime);
+	SetUtilityPushConstants(&cb, sizeof(cb));
+
+	DoStretchRect(static_cast<GSTextureVK*>(sTex), sRect, static_cast<GSTextureVK*>(dTex), dRect,
+		m_present[static_cast<int>(shader)], filter, true);
+}
+
+void GSDeviceVK::DrawMultiStretchRects(
+	const MultiStretchRect* rects, u32 num_rects, GSTexture* dTex, ShaderConvertSelector shader)
+{
+	FlushDeferredDraws();
+	GSTexture* last_tex = rects[0].src;
+	Filter last_filter = rects[0].filter;
+	u8 last_wmask = rects[0].wmask.wrgba;
+
+	u32 first = 0;
+	u32 count = 1;
+
+	// Make sure all textures are in shader read only layout, so we don't need to break
+	// the render pass to transition.
+	for (u32 i = 0; i < num_rects; i++)
+	{
+		GSTextureVK* const stex = static_cast<GSTextureVK*>(rects[i].src);
+		stex->CommitClear();
+		if (stex->GetLayout() != GSTextureVK::Layout::ShaderReadOnly)
+		{
+			EndRenderPass();
+			stex->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+		}
+	}
+
+	for (u32 i = 1; i < num_rects; i++)
+	{
+		if (rects[i].src == last_tex && rects[i].filter == last_filter && rects[i].wmask.wrgba == last_wmask)
+		{
+			count++;
+			continue;
+		}
+
+		DoMultiStretchRects(rects + first, count, static_cast<GSTextureVK*>(dTex), shader);
+		last_tex = rects[i].src;
+		last_filter = rects[i].filter;
+		last_wmask = rects[i].wmask.wrgba;
+		first += count;
+		count = 1;
+	}
+
+	DoMultiStretchRects(rects + first, count, static_cast<GSTextureVK*>(dTex), shader);
+}
+
+void GSDeviceVK::DoMultiStretchRects(
+	const MultiStretchRect* rects, u32 num_rects, GSTextureVK* dTex, ShaderConvertSelector shader)
+{
+	g_perfmon.Put(GSPerfMon::TextureCopies, 1);
+	
+	// Set up vertices first.
+	const u32 vertex_reserve_size = num_rects * 4 * sizeof(GSVertexPT1);
+	const u32 index_reserve_size = num_rects * 6 * sizeof(u16);
+	if (!m_vertex_stream_buffer.ReserveMemory(vertex_reserve_size, sizeof(GSVertexPT1)) ||
+		!m_index_stream_buffer.ReserveMemory(index_reserve_size, sizeof(u16)))
+	{
+		ExecuteCommandBufferAndRestartRenderPass(false, "Uploading bytes to vertex buffer");
+		if (!m_vertex_stream_buffer.ReserveMemory(vertex_reserve_size, sizeof(GSVertexPT1)) ||
+			!m_index_stream_buffer.ReserveMemory(index_reserve_size, sizeof(u16)))
+		{
+			pxFailRel("Failed to reserve space for vertices");
+		}
+	}
+
+	// Pain in the arse because the primitive topology for the pipelines is all triangle strips.
+	// Don't use primitive restart here, it ends up slower on some drivers.
+	const GSVector2 ds(static_cast<float>(dTex->GetWidth()), static_cast<float>(dTex->GetHeight()));
+	GSVertexPT1* verts = reinterpret_cast<GSVertexPT1*>(m_vertex_stream_buffer.GetCurrentHostPointer());
+	u16* idx = reinterpret_cast<u16*>(m_index_stream_buffer.GetCurrentHostPointer());
+	u32 icount = 0;
+	u32 vcount = 0;
+	for (u32 i = 0; i < num_rects; i++)
+	{
+		const GSVector4& sRect = rects[i].src_rect;
+		const GSVector4& dRect = rects[i].dst_rect;
+
+		const float inv_x = 2.0f / ds.x;
+		const float inv_y = 2.0f / ds.y;
+
+		const float left = dRect.x * inv_x - 1.0f;
+		const float right = dRect.z * inv_x - 1.0f;
+		const float top = 1.0f - dRect.y * inv_y;
+		const float bottom = 1.0f - dRect.w * inv_y;
+
+		const u32 vstart = vcount;
+		verts[vcount++] = {GSVector4(left, top, 0.5f, 1.0f), GSVector2(sRect.x, sRect.y)};
+		verts[vcount++] = {GSVector4(right, top, 0.5f, 1.0f), GSVector2(sRect.z, sRect.y)};
+		verts[vcount++] = {GSVector4(left, bottom, 0.5f, 1.0f), GSVector2(sRect.x, sRect.w)};
+		verts[vcount++] = {GSVector4(right, bottom, 0.5f, 1.0f), GSVector2(sRect.z, sRect.w)};
+
+		if (i > 0)
+			idx[icount++] = vstart;
+
+		idx[icount++] = vstart;
+		idx[icount++] = vstart + 1;
+		idx[icount++] = vstart + 2;
+		idx[icount++] = vstart + 3;
+		idx[icount++] = vstart + 3;
+	};
+
+	m_vertex.start = m_vertex_stream_buffer.GetCurrentOffset() / sizeof(GSVertexPT1);
+	m_vertex.count = vcount;
+	m_index.start = m_index_stream_buffer.GetCurrentOffset() / sizeof(u16);
+	m_index.count = icount;
+	m_vertex_stream_buffer.CommitMemory(vcount * sizeof(GSVertexPT1));
+	m_index_stream_buffer.CommitMemory(icount * sizeof(u16));
+	SetIndexBuffer(m_index_stream_buffer.GetBuffer());
+
+	// Even though we're batching, a cmdbuffer submit could've messed this up.
+	const GSVector4i rc(dTex->GetRect());
+	OMSetRenderTargets(dTex->IsRenderTarget() ? dTex : nullptr, dTex->IsDepthStencil() ? dTex : nullptr, rc);
+	if (!InRenderPass())
+		BeginRenderPassForStretchRect(dTex, rc, rc, false);
+	SetUtilityTexture(rects[0].src, rects[0].filter == Biln ? m_linear_sampler : m_point_sampler);
+
+	SetPipeline(GetConvertPipeline(shader.SetMask(rects[0].wmask.wrgba)));
+
+	if (ApplyUtilityState())
+		DrawIndexedPrimitive();
+}
+
+void GSDeviceVK::BeginRenderPassForStretchRect(
+	GSTextureVK* dTex, const GSVector4i& dtex_rc, const GSVector4i& dst_rc, bool allow_discard)
+{
+	pxAssert(dst_rc.x >= 0 && dst_rc.y >= 0 && dst_rc.z <= dTex->GetWidth() && dst_rc.w <= dTex->GetHeight());
+
+	const VkAttachmentLoadOp load_op =
+		(allow_discard && dst_rc.eq(dtex_rc)) ? VK_ATTACHMENT_LOAD_OP_DONT_CARE : GetLoadOpForTexture(dTex);
+	dTex->SetState(GSTexture::State::Dirty);
+
+	if (dTex->IsDepthStencil())
+	{
+		if (load_op == VK_ATTACHMENT_LOAD_OP_CLEAR)
+			BeginClearRenderPass(m_utility_depth_render_pass_clear, dtex_rc, dTex->GetClearDepth(), 0);
+		else
+			BeginRenderPass((load_op == VK_ATTACHMENT_LOAD_OP_DONT_CARE) ? m_utility_depth_render_pass_discard :
+			                                                               m_utility_depth_render_pass_load, dtex_rc);
+	}
+	else if (dTex->GetFormat() == GSTexture::Format::Color)
+	{
+		if (load_op == VK_ATTACHMENT_LOAD_OP_CLEAR)
+			BeginClearRenderPass(m_utility_color_render_pass_clear, dtex_rc, dTex->GetClearColor());
+		else
+			BeginRenderPass((load_op == VK_ATTACHMENT_LOAD_OP_DONT_CARE) ? m_utility_color_render_pass_discard :
+			                                                               m_utility_color_render_pass_load, dtex_rc);
+	}
+	else
+	{
+		// integer formats, etc
+		const VkRenderPass rp = GetRenderPass(dTex->GetVkFormat(), VK_FORMAT_UNDEFINED, load_op,
+			VK_ATTACHMENT_STORE_OP_STORE, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE);
+		if (load_op == VK_ATTACHMENT_LOAD_OP_CLEAR)
+		{
+			BeginClearRenderPass(rp, dtex_rc, dTex->GetClearColor());
+		}
+		else
+		{
+			BeginRenderPass(rp, dtex_rc);
+		}
+	}
+}
+
+void GSDeviceVK::DoStretchRect(GSTextureVK* sTex, const GSVector4& sRect, GSTextureVK* dTex, const GSVector4& dRect,
+	VkPipeline pipeline, Filter filter, bool allow_discard)
+{
+	if (sTex->GetLayout() != GSTextureVK::Layout::ShaderReadOnly)
+	{
+		// can't transition in a render pass
+		EndRenderPass();
+		sTex->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+	}
+
+	SetUtilityTexture(sTex, filter == Biln ? m_linear_sampler : m_point_sampler);
+	SetPipeline(pipeline);
+
+	const bool is_present = (!dTex);
+	const bool depth = (dTex && dTex->IsDepthStencil());
+	const GSVector2i size(is_present ? GSVector2i(GetWindowWidth(), GetWindowHeight()) : dTex->GetSize());
+	const GSVector4i dtex_rc(0, 0, size.x, size.y);
+	const GSVector4i dst_rc(GSVector4i(dRect).rintersect(dtex_rc));
+
+	// switch rts (which might not end the render pass), so check the bounds
+	if (!is_present)
+	{
+		OMSetRenderTargets(depth ? nullptr : dTex, depth ? dTex : nullptr, dst_rc);
+		if (InRenderPass() && dTex->GetState() == GSTexture::State::Cleared)
+			EndRenderPass();
+	}
+	else
+	{
+		// this is for presenting, we don't want to screw with the viewport/scissor set by display
+		m_dirty_flags &= ~(DIRTY_FLAG_VIEWPORT | DIRTY_FLAG_SCISSOR);
+	}
+
+	if (!is_present && !InRenderPass())
+		BeginRenderPassForStretchRect(dTex, dtex_rc, dst_rc, allow_discard);
+
+	DrawStretchRect(sRect, dRect, size);
+}
+
+void GSDeviceVK::DrawStretchRect(const GSVector4& sRect, const GSVector4& dRect, const GSVector2i& ds)
+{
+	g_perfmon.Put(GSPerfMon::TextureCopies, 1);
+
+	// ia
+	const float inv_x = 2.0f / ds.x;
+	const float inv_y = 2.0f / ds.y;
+
+	const float left = dRect.x * inv_x - 1.0f;
+	const float right = dRect.z * inv_x - 1.0f;
+	const float top = 1.0f - dRect.y * inv_y;
+	const float bottom = 1.0f - dRect.w * inv_y;
+
+	const GSVertexPT1 vertices[] = {
+		{GSVector4(left, top, 0.5f, 1.0f), GSVector2(sRect.x, sRect.y)},
+		{GSVector4(right, top, 0.5f, 1.0f), GSVector2(sRect.z, sRect.y)},
+		{GSVector4(left, bottom, 0.5f, 1.0f), GSVector2(sRect.x, sRect.w)},
+		{GSVector4(right, bottom, 0.5f, 1.0f), GSVector2(sRect.z, sRect.w)},
+	};
+	IASetVertexBuffer(vertices, sizeof(vertices[0]), std::size(vertices));
+
+	if (ApplyUtilityState())
+		DrawPrimitive();
+}
+
+void GSDeviceVK::BlitRect(GSTexture* sTex, const GSVector4i& sRect, u32 sLevel, GSTexture* dTex,
+	const GSVector4i& dRect, u32 dLevel, Filter filter)
+{
+	GSTextureVK* sTexVK = static_cast<GSTextureVK*>(sTex);
+	GSTextureVK* dTexVK = static_cast<GSTextureVK*>(dTex);
+
+	EndRenderPass();
+
+	sTexVK->TransitionToLayout(GSTextureVK::Layout::TransferSrc);
+	dTexVK->TransitionToLayout(GSTextureVK::Layout::TransferDst);
+
+	// ensure we don't leave this bound later on
+	if (m_tfx_textures[0] == sTexVK)
+		PSSetShaderResource(0, nullptr, false);
+
+	pxAssert(sTexVK->IsDepthStencil() == dTexVK->IsDepthStencil());
+	const VkImageAspectFlags aspect =
+		sTexVK->IsDepthStencil() ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+	const VkImageBlit ib{{aspect, sLevel, 0u, 1u}, {{sRect.left, sRect.top, 0}, {sRect.right, sRect.bottom, 1}},
+		{aspect, dLevel, 0u, 1u}, {{dRect.left, dRect.top, 0}, {dRect.right, dRect.bottom, 1}}};
+
+	vkCmdBlitImage(GetCurrentCommandBuffer(), sTexVK->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		dTexVK->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ib,
+		filter == Biln ? VK_FILTER_LINEAR : VK_FILTER_NEAREST);
+}
+
+void GSDeviceVK::UpdateCLUTTexture(
+	GSTexture* sTex, float sScale, u32 offsetX, u32 offsetY, GSTexture* dTex, u32 dOffset, u32 dSize)
+{
+	FlushDeferredDraws();
+	// Super annoying, but apparently NVIDIA doesn't like floats/ints packed together in the same vec4?
+	struct alignas(16) Uniforms
+	{
+		u32 offsetX, offsetY, dOffset, pad1;
+		float scale;
+		float pad2[3];
+	};
+
+	const Uniforms uniforms = {offsetX, offsetY, dOffset, 0, sScale, {}};
+	SetUtilityPushConstants(&uniforms, sizeof(uniforms));
+
+	const GSVector4 dRect(0, 0, dSize, 1);
+	const ShaderConvert shader = (dSize == 16) ? ShaderConvert::CLUT_4 : ShaderConvert::CLUT_8;
+	DoStretchRect(static_cast<GSTextureVK*>(sTex), GSVector4::zero(), static_cast<GSTextureVK*>(dTex), dRect,
+		GetConvertPipeline(shader), Nearest, true);
+}
+
+void GSDeviceVK::ConvertToIndexedTexture(
+	GSTexture* sTex, float sScale, u32 offsetX, u32 offsetY, u32 SBW, u32 SPSM, GSTexture* dTex, u32 DBW, u32 DPSM)
+{
+	FlushDeferredDraws();
+	struct alignas(16) Uniforms
+	{
+		u32 SBW;
+		u32 DBW;
+		u32 PSM;
+		u32 pad1[1];
+		float ScaleFactor;
+		float pad2[3];
+	};
+
+	const Uniforms uniforms = {SBW, DBW, SPSM, {}, sScale, {}};
+	SetUtilityPushConstants(&uniforms, sizeof(uniforms));
+
+	const ShaderConvert shader = ((SPSM & 0xE) == 0) ? ShaderConvert::RGBA_TO_8I : ShaderConvert::RGB5A1_TO_8I;
+	const GSVector4 dRect(0, 0, dTex->GetWidth(), dTex->GetHeight());
+	DoStretchRect(static_cast<GSTextureVK*>(sTex), GSVector4::zero(), static_cast<GSTextureVK*>(dTex), dRect,
+		GetConvertPipeline(shader), Nearest, true);
+}
+
+void GSDeviceVK::FilteredDownsampleTexture(GSTexture* sTex, GSTexture* dTex, u32 downsample_factor, const GSVector2i& clamp_min, const GSVector4& dRect)
+{
+	FlushDeferredDraws();
+	struct alignas(16) Uniforms
+	{
+		GSVector2i clamp_min;
+		int downsample_factor;
+		int pad0;
+		float weight;
+		float step_multiplier;
+		float pad1[2];
+	};
+
+	const Uniforms uniforms = {
+		clamp_min, static_cast<int>(downsample_factor), 0, static_cast<float>(downsample_factor * downsample_factor), (GSConfig.UserHacks_NativeScaling > GSNativeScaling::Aggressive) ? 2.0f : 1.0f};
+	SetUtilityPushConstants(&uniforms, sizeof(uniforms));
+
+	const ShaderConvert shader = ShaderConvert::DOWNSAMPLE_COPY;
+	//const GSVector4 dRect = GSVector4(dTex->GetRect());
+	DoStretchRect(static_cast<GSTextureVK*>(sTex), GSVector4::zero(), static_cast<GSTextureVK*>(dTex), dRect,
+		GetConvertPipeline(shader), Nearest, true);
+}
+
+void GSDeviceVK::DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, GSVector4* dRect,
+	const GSRegPMODE& PMODE, const GSRegEXTBUF& EXTBUF, u32 c, const Filter filter)
+{
+	GL_PUSH("DoMerge");
+
+	const GSVector4 full_r(0.0f, 0.0f, 1.0f, 1.0f);
+	const u32 yuv_constants[4] = {EXTBUF.EMODA, EXTBUF.EMODC};
+	const GSVector4 bg_color = GSVector4::unorm8(c);
+	const bool feedback_write_2 = PMODE.EN2 && sTex[2] != nullptr && EXTBUF.FBIN == 1;
+	const bool feedback_write_1 = PMODE.EN1 && sTex[2] != nullptr && EXTBUF.FBIN == 0;
+	const bool feedback_write_2_but_blend_bg = feedback_write_2 && PMODE.SLBG == 1;
+	const VkSampler& sampler = filter == Biln ? m_linear_sampler : m_point_sampler;
+	// Merge the 2 source textures (sTex[0],sTex[1]). Final results go to dTex. Feedback write will go to sTex[2].
+	// If either 2nd output is disabled or SLBG is 1, a background color will be used.
+	// Note: background color is also used when outside of the unit rectangle area
+	EndRenderPass();
+
+	// transition everything before starting the new render pass
+	const bool has_input_0 = (sTex[0] &&
+		(sTex[0]->GetState() == GSTexture::State::Dirty || (sTex[0]->GetState() == GSTexture::State::Cleared || sTex[0]->GetClearColor() != 0)));
+	const bool has_input_1 = (PMODE.SLBG == 0 || feedback_write_2_but_blend_bg) && sTex[1] &&
+		(sTex[1]->GetState() == GSTexture::State::Dirty || (sTex[1]->GetState() == GSTexture::State::Cleared || sTex[1]->GetClearColor() != 0));
+	if (has_input_0)
+	{
+		static_cast<GSTextureVK*>(sTex[0])->CommitClear();
+		static_cast<GSTextureVK*>(sTex[0])->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+	}
+	if (has_input_1)
+	{
+		static_cast<GSTextureVK*>(sTex[1])->CommitClear();
+		static_cast<GSTextureVK*>(sTex[1])->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+	}
+	static_cast<GSTextureVK*>(dTex)->TransitionToLayout(GSTextureVK::Layout::ColorAttachment);
+
+	const GSVector2i dsize(dTex->GetSize());
+	const GSVector4i darea(0, 0, dsize.x, dsize.y);
+	bool dcleared = false;
+	if (sTex[1] && (PMODE.SLBG == 0 || feedback_write_2_but_blend_bg))
+	{
+		// 2nd output is enabled and selected. Copy it to destination so we can blend it with 1st output
+		// Note: value outside of dRect must contains the background color (c)
+		if (sTex[1]->GetState() == GSTexture::State::Dirty)
+		{
+			static_cast<GSTextureVK*>(sTex[1])->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+			OMSetRenderTargets(dTex, nullptr, darea);
+			SetUtilityTexture(sTex[1], sampler);
+			BeginClearRenderPass(m_utility_color_render_pass_clear, darea, c);
+			SetPipeline(GetConvertPipeline(ShaderConvert::COPY));
+			DrawStretchRect(sRect[1], PMODE.SLBG ? dRect[2] : dRect[1], dsize);
+			dTex->SetState(GSTexture::State::Dirty);
+			dcleared = true;
+		}
+	}
+
+	// Upload constant to select YUV algo
+	const GSVector2i fbsize(sTex[2] ? sTex[2]->GetSize() : GSVector2i(0, 0));
+	const GSVector4i fbarea(0, 0, fbsize.x, fbsize.y);
+	if (feedback_write_2)
+	{
+		EndRenderPass();
+		OMSetRenderTargets(sTex[2], nullptr, fbarea);
+		if (dcleared)
+			SetUtilityTexture(dTex, sampler);
+		// sTex[2] can be sTex[0], in which case it might be cleared (e.g. Xenosaga).
+		BeginRenderPassForStretchRect(static_cast<GSTextureVK*>(sTex[2]), fbarea, GSVector4i(dRect[2]));
+		if (dcleared)
+		{
+			SetPipeline(GetConvertPipeline(ShaderConvert::YUV));
+			SetUtilityPushConstants(yuv_constants, sizeof(yuv_constants));
+			DrawStretchRect(full_r, dRect[2], fbsize);
+		}
+		EndRenderPass();
+
+		if (sTex[0] == sTex[2])
+		{
+			// need a barrier here because of the render pass
+			static_cast<GSTextureVK*>(sTex[2])->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+		}
+	}
+
+	// Restore background color to process the normal merge
+	if (feedback_write_2_but_blend_bg || !dcleared)
+	{
+		EndRenderPass();
+		OMSetRenderTargets(dTex, nullptr, darea);
+		BeginClearRenderPass(m_utility_color_render_pass_clear, darea, c);
+		dTex->SetState(GSTexture::State::Dirty);
+	}
+	else if (!InRenderPass())
+	{
+		OMSetRenderTargets(dTex, nullptr, darea);
+		BeginRenderPass(m_utility_color_render_pass_load, darea);
+	}
+
+	if (sTex[0] && sTex[0]->GetState() == GSTexture::State::Dirty)
+	{
+		// 1st output is enabled. It must be blended
+		SetUtilityTexture(sTex[0], sampler);
+		SetPipeline(m_merge[PMODE.MMOD]);
+		SetUtilityPushConstants(&bg_color, sizeof(bg_color));
+		DrawStretchRect(sRect[0], dRect[0], dTex->GetSize());
+	}
+
+	if (feedback_write_1)
+	{
+		EndRenderPass();
+		SetPipeline(GetConvertPipeline(ShaderConvert::YUV));
+		SetUtilityTexture(dTex, sampler);
+		SetUtilityPushConstants(yuv_constants, sizeof(yuv_constants));
+		OMSetRenderTargets(sTex[2], nullptr, fbarea);
+		BeginRenderPass(m_utility_color_render_pass_load, fbarea);
+		DrawStretchRect(full_r, dRect[2], dsize);
+	}
+
+	EndRenderPass();
+
+	// this texture is going to get used as an input, so make sure we don't read undefined data
+	static_cast<GSTextureVK*>(dTex)->CommitClear();
+	static_cast<GSTextureVK*>(dTex)->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+}
+
+void GSDeviceVK::DoInterlace(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
+	ShaderInterlace shader, Filter filter, const InterlaceConstantBuffer& cb)
+{
+	static_cast<GSTextureVK*>(dTex)->TransitionToLayout(GSTextureVK::Layout::ColorAttachment);
+
+	const GSVector4i rc = GSVector4i(dRect);
+	const GSVector4i dtex_rc = dTex->GetRect();
+	const GSVector4i clamped_rc = rc.rintersect(dtex_rc);
+	EndRenderPass();
+	OMSetRenderTargets(dTex, nullptr, clamped_rc);
+	SetUtilityTexture(sTex, filter == Biln ? m_linear_sampler : m_point_sampler);
+	BeginRenderPassForStretchRect(static_cast<GSTextureVK*>(dTex), dTex->GetRect(), clamped_rc, false);
+	SetPipeline(m_interlace[static_cast<int>(shader)]);
+	SetUtilityPushConstants(&cb, sizeof(cb));
+	DrawStretchRect(sRect, dRect, dTex->GetSize());
+	EndRenderPass();
+
+	static_cast<GSTextureVK*>(dTex)->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+}
+
+void GSDeviceVK::DoShadeBoost(GSTexture* sTex, GSTexture* dTex, const float params[4])
+{
+	const GSVector4 sRect = GSVector4(0.0f, 0.0f, 1.0f, 1.0f);
+	const GSVector4i dRect = dTex->GetRect();
+	EndRenderPass();
+	OMSetRenderTargets(dTex, nullptr, dRect);
+	SetUtilityTexture(sTex, m_point_sampler);
+	BeginRenderPass(m_utility_color_render_pass_discard, dRect);
+	dTex->SetState(GSTexture::State::Dirty);
+	SetPipeline(m_shadeboost_pipeline);
+	SetUtilityPushConstants(params, sizeof(float) * 4);
+	DrawStretchRect(sRect, GSVector4(dRect), dTex->GetSize());
+	EndRenderPass();
+
+	static_cast<GSTextureVK*>(dTex)->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+}
+
+void GSDeviceVK::DoFXAA(GSTexture* sTex, GSTexture* dTex)
+{
+	const GSVector4 sRect = GSVector4(0.0f, 0.0f, 1.0f, 1.0f);
+	const GSVector4i dRect = dTex->GetRect();
+	EndRenderPass();
+	OMSetRenderTargets(dTex, nullptr, dRect);
+	SetUtilityTexture(sTex, m_linear_sampler);
+	BeginRenderPass(m_utility_color_render_pass_discard, dRect);
+	dTex->SetState(GSTexture::State::Dirty);
+	SetPipeline(m_fxaa_pipeline);
+	DrawStretchRect(sRect, GSVector4(dRect), dTex->GetSize());
+	EndRenderPass();
+
+	static_cast<GSTextureVK*>(dTex)->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+}
+
+#ifdef ARMSX2_HAS_LIBRASHADER
+
+static void ReportShaderChainError(const char* what, libra_error_t err)
+{
+	char* msg = nullptr;
+	if (libra_error_write(err, &msg) == 0 && msg)
+	{
+		Console.Error("(GS) librashader %s failed: %s", what, msg);
+		libra_error_free_string(&msg);
+	}
+	else
+	{
+		Console.Error("(GS) librashader %s failed (errno %d)", what, static_cast<int>(libra_error_errno(err)));
+	}
+	libra_error_free(&err);
+}
+
+#endif
+
+void GSDeviceVK::DestroyShaderChain()
+{
+#ifdef ARMSX2_HAS_LIBRASHADER
+	if (m_shader_chain)
+	{
+		libra_vk_filter_chain_t chain = static_cast<libra_vk_filter_chain_t>(m_shader_chain);
+		libra_vk_filter_chain_free(&chain);
+		m_shader_chain = nullptr;
+	}
+#endif
+	m_shader_chain_preset.clear();
+	m_shader_chain_failed = false;
+	m_shader_frame_count = 0;
+	m_shader_param_generation = 0;
+}
+
+void GSDeviceVK::ApplyShaderChainParams()
+{
+#ifdef ARMSX2_HAS_LIBRASHADER
+	// Per-frame fast path: one atomic load. The lock and the copy only happen on the
+	// frames where the user actually moved something.
+	const u64 generation = GetShaderChainParamGeneration();
+	if (generation == m_shader_param_generation)
+		return;
+
+	std::vector<std::pair<std::string, float>> params;
+	if (GetShaderChainParams(m_shader_chain_preset, &params))
+	{
+		libra_vk_filter_chain_t chain = static_cast<libra_vk_filter_chain_t>(m_shader_chain);
+		for (const auto& [name, value] : params)
+		{
+			// A preset can be swapped under a stale override set, so an unknown parameter
+			// name is a routine miss, not a fault: report nothing and keep going, since
+			// the remaining names are still valid.
+			if (libra_error_t err = libra_vk_filter_chain_set_param(&chain, name.c_str(), value))
+				libra_error_free(&err);
+		}
+	}
+
+	// Set even when the store held another preset's values or none at all — otherwise this
+	// re-runs the lookup on every frame for as long as the generation stays ahead.
+	m_shader_param_generation = generation;
+#endif
+}
+
+bool GSDeviceVK::DoApplyShaderChain(GSTexture* sTex, GSTexture* dTex)
+{
+#ifndef ARMSX2_HAS_LIBRASHADER
+	return false;
+#else
+	// A preset that fails to compile must not be retried every frame — that would run a
+	// full slang compile 60x/sec. Latch the failure until the user picks another preset.
+	if (m_shader_chain_failed && m_shader_chain_preset == GSConfig.ShaderChainPreset)
+		return false;
+
+	if (!m_shader_chain || m_shader_chain_preset != GSConfig.ShaderChainPreset)
+	{
+		DestroyShaderChain();
+		m_shader_chain_preset = GSConfig.ShaderChainPreset;
+
+		libra_shader_preset_t preset = nullptr;
+		if (libra_error_t err = libra_preset_create(m_shader_chain_preset.c_str(), &preset))
+		{
+			ReportShaderChainError("preset load", err);
+			m_shader_chain_failed = true;
+			return false;
+		}
+
+		libra_device_vk_t vk = {};
+		vk.physical_device = m_physical_device;
+		vk.instance = m_instance;
+		vk.device = m_device;
+		vk.queue = m_graphics_queue;
+		// librashader resolves Vulkan through this loader rather than linking it, which
+		// is why it transparently rides a user's custom Turnip ICD.
+		vk.entry = vkGetInstanceProcAddr;
+
+		// create() invalidates `preset` unconditionally ("the shader preset is
+		// immediately invalidated"), so it must NOT be freed afterwards on either path.
+		libra_vk_filter_chain_t chain = nullptr;
+		if (libra_error_t err = libra_vk_filter_chain_create(&preset, vk, nullptr, &chain))
+		{
+			ReportShaderChainError("chain create", err);
+			m_shader_chain_failed = true;
+			return false;
+		}
+
+		m_shader_chain = chain;
+		m_shader_frame_count = 0;
+		// The new chain sits at the preset's initial values, so whatever we last pushed is
+		// gone with the old one — force ApplyShaderChainParams to feed it again.
+		m_shader_param_generation = 0;
+		Console.WriteLn("(GS) librashader: loaded preset '%s'", m_shader_chain_preset.c_str());
+	}
+
+	// GS thread, chain alive, before the frame call — the only place a set_param is safe.
+	ApplyShaderChainParams();
+
+	GSTextureVK* const src = static_cast<GSTextureVK*>(sTex);
+	GSTextureVK* const dst = static_cast<GSTextureVK*>(dTex);
+
+	// The chain records its own render passes, so it must not run inside one of ours.
+	EndRenderPass();
+
+	// librashader's contract: source in SHADER_READ_ONLY_OPTIMAL, target in
+	// COLOR_ATTACHMENT_OPTIMAL.
+	src->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+	dst->TransitionToLayout(GSTextureVK::Layout::ColorAttachment);
+
+	const libra_image_vk_t in = {src->GetImage(), src->GetVkFormat(),
+		static_cast<uint32_t>(src->GetWidth()), static_cast<uint32_t>(src->GetHeight())};
+	const libra_image_vk_t out = {dst->GetImage(), dst->GetVkFormat(),
+		static_cast<uint32_t>(dst->GetWidth()), static_cast<uint32_t>(dst->GetHeight())};
+	const libra_viewport_t vp = {0.0f, 0.0f,
+		static_cast<uint32_t>(dst->GetWidth()), static_cast<uint32_t>(dst->GetHeight())};
+
+	// Every librashader entry point takes the chain handle by address, not by value.
+	libra_vk_filter_chain_t chain = static_cast<libra_vk_filter_chain_t>(m_shader_chain);
+	if (libra_error_t err = libra_vk_filter_chain_frame(&chain, GetCurrentCommandBuffer(),
+			m_shader_frame_count, in, out, &vp, nullptr, nullptr))
+	{
+		ReportShaderChainError("frame", err);
+		m_shader_chain_failed = true;
+		return false;
+	}
+	m_shader_frame_count++;
+
+	// The chain left the target in COLOR_ATTACHMENT_OPTIMAL behind the tracker's back, so
+	// resync it WITHOUT emitting a barrier (Override), then transition for real to the
+	// ShaderReadOnly that DoFXAA/DoShadeBoost also leave behind and the presenter expects.
+	// Skipping the Override would make the next barrier start from a stale layout.
+	dst->OverrideImageLayout(GSTextureVK::Layout::ColorAttachment);
+	dst->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+	dst->SetState(GSTexture::State::Dirty);
+
+	// librashader recycles its per-frame objects (VkImageView / VkFramebuffer / descriptor
+	// sets) on its OWN internal frame counter, over a `frames_in_flight`-deep ring
+	// (default 3): frame N destroys what frame N-3 recorded. That is only safe if every
+	// frame() call is followed by a submit, so the fence for N-3 has been waited by the
+	// time N recycles its slot.
+	//
+	// PCSX2 violates that. GSRenderer::VSync calls Merge() -- and therefore the chain --
+	// BEFORE it decides whether to present, and a skipped present (SkipDuplicateFrames,
+	// which is default-on, or the FIFO present throttle) returns early from BeginPresent
+	// and never reaches EndPresent, so it never submits. MAX_SKIPPED_DUPLICATE_FRAMES is
+	// 3 -- exactly the ring depth -- so three skipped frames in a row let librashader
+	// destroy views that are still bound to the command buffer we are STILL recording.
+	// Validation names it: VUID-vkDestroyImageView-imageView-01026, followed by the
+	// buffer going invalid and the Adreno driver segfaulting as it walks it at submit.
+	//
+	// Kicking the buffer here keeps exactly one submit per chain frame, so librashader's
+	// ring and our NUM_COMMAND_BUFFERS ring advance together. The GL backend is immune
+	// because it executes immediately and has no recorded buffer to go stale.
+	ExecuteCommandBuffer(false);
+	return true;
+#endif
+}
+
+void GSDeviceVK::IASetVertexBuffer(const void* vertex, size_t stride, size_t count, size_t align_multiplier)
+{
+	const u32 size = static_cast<u32>(stride) * static_cast<u32>(count);
+	if (!m_vertex_stream_buffer.ReserveMemory(size, static_cast<u32>(stride) * align_multiplier))
+	{
+		// The swap-chain render pass is intentionally not tracked by m_current_render_pass.
+		// Submitting it through the ordinary render-pass restart path would therefore end the
+		// command buffer with an open present pass. Some desktop drivers tolerate that, while
+		// Mali can present a frame with undefined viewport/push-constant state.
+		if (m_is_presenting)
+			ExecuteCommandBufferAndRestartPresent(false, "Uploading bytes to vertex buffer");
+		else
+			ExecuteCommandBufferAndRestartRenderPass(false, "Uploading bytes to vertex buffer");
+		if (!m_vertex_stream_buffer.ReserveMemory(size, static_cast<u32>(stride) * align_multiplier))
+			pxFailRel("Failed to reserve space for vertices");
+	}
+
+	m_vertex.start = m_vertex_stream_buffer.GetCurrentOffset() / stride;
+	m_vertex.count = count;
+
+	GSVector4i::storent(m_vertex_stream_buffer.GetCurrentHostPointer(), vertex, count * stride);
+	m_vertex_stream_buffer.CommitMemory(size);
+}
+
+void GSDeviceVK::UploadIndices(VKStreamBuffer& buffer, const void* index, size_t count)
+{
+	const u32 size = sizeof(u16) * static_cast<u32>(count);
+	if (!buffer.ReserveMemory(size, sizeof(u16)))
+	{
+		if (m_is_presenting)
+			ExecuteCommandBufferAndRestartPresent(false, "Uploading bytes to index buffer");
+		else
+			ExecuteCommandBufferAndRestartRenderPass(false, "Uploading bytes to index buffer");
+		if (!buffer.ReserveMemory(size, sizeof(u16)))
+			pxFailRel("Failed to reserve space for vertices");
+	}
+
+	m_index.start = buffer.GetCurrentOffset() / sizeof(u16);
+	m_index.count = count;
+
+	std::memcpy(buffer.GetCurrentHostPointer(), index, size);
+	buffer.CommitMemory(size);
+}
+
+void GSDeviceVK::IASetIndexBuffer(const void* index, size_t count)
+{
+	UploadIndices(m_index_stream_buffer, index, count);
+
+	SetIndexBuffer(m_index_stream_buffer.GetBuffer());
+}
+
+void GSDeviceVK::OMSetRenderTargets(
+	GSTexture* rt, GSTexture* ds, const GSVector4i& scissor, FeedbackLoopFlag feedback_loop,
+	const GSVector2i& viewport_size)
+{
+	GSTextureVK* vkRt = static_cast<GSTextureVK*>(rt);
+	GSTextureVK* vkDs = static_cast<GSTextureVK*>(ds);
+
+	if (m_current_render_target != vkRt || m_current_depth_target != vkDs ||
+		m_current_framebuffer_feedback_loop != feedback_loop ||
+		m_current_framebuffer == VK_NULL_HANDLE)
+	{
+		// framebuffer change or feedback loop enabled/disabled
+		EndRenderPass();
+
+		if (vkRt)
+		{
+			m_current_framebuffer =
+				vkRt->GetLinkedFramebuffer(vkDs,
+					(feedback_loop & FeedbackLoopFlag_ReadAndWriteRT) != 0,
+					(feedback_loop & (FeedbackLoopFlag_ReadAndWriteDepth | FeedbackLoopFlag_ReadDepth)) != 0);
+		}
+		else if (vkDs)
+		{
+			pxAssert(!(feedback_loop & FeedbackLoopFlag_ReadAndWriteRT));
+			m_current_framebuffer = vkDs->GetLinkedFramebuffer(
+				nullptr, false, (feedback_loop & (FeedbackLoopFlag_ReadAndWriteDepth | FeedbackLoopFlag_ReadDepth)) != 0);
+		}
+		else
+		{
+			m_current_framebuffer = m_null_framebuffer;
+		}
+	}
+	else if (InRenderPass())
+	{
+		// Framebuffer unchanged, but check for clears
+		// Use an attachment clear to wipe it out without restarting the render pass
+		if (IsDeviceNVIDIA())
+		{
+			// Using vkCmdClearAttachments() within a render pass on NVIDIA seems to cause dependency issues
+			// between draws that are testing depth which precede it. The result is flickering where Z tests
+			// should be failing. Breaking/restarting the render pass isn't enough to work around the bug,
+			// it needs an explicit pipeline barrier.
+			if (vkRt && vkRt->GetState() != GSTexture::State::Dirty)
+			{
+				if (vkRt->GetState() == GSTexture::State::Cleared)
+				{
+					EndRenderPass();
+					vkRt->TransitionSubresourcesToLayout(GetCurrentCommandBuffer(), 0, 1,
+						vkRt->GetLayout(), vkRt->GetLayout());
+				}
+				else
+				{
+					// Invalidated -> Dirty.
+					vkRt->SetState(GSTexture::State::Dirty);
+				}
+			}
+			if (vkDs && vkDs->GetState() != GSTexture::State::Dirty)
+			{
+				if (vkDs->GetState() == GSTexture::State::Cleared)
+				{
+					EndRenderPass();
+					vkDs->TransitionSubresourcesToLayout(GetCurrentCommandBuffer(), 0, 1,
+						vkDs->GetLayout(), vkDs->GetLayout());
+				}
+				else
+				{
+					// Invalidated -> Dirty.
+					vkDs->SetState(GSTexture::State::Dirty);
+				}
+			}
+		}
+		else
+		{
+			std::array<VkClearAttachment, 2> cas;
+			u32 num_ca = 0;
+			if (vkRt && vkRt->GetState() != GSTexture::State::Dirty)
+			{
+				if (vkRt->GetState() == GSTexture::State::Cleared)
+				{
+					VkClearAttachment& ca = cas[num_ca++];
+					ca.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+					ca.colorAttachment = 0;
+					GSVector4::store<false>(ca.clearValue.color.float32, vkRt->GetClearForFormat());
+				}
+
+				vkRt->SetState(GSTexture::State::Dirty);
+			}
+			if (vkDs && vkDs->GetState() != GSTexture::State::Dirty)
+			{
+				if (vkDs->GetState() == GSTexture::State::Cleared)
+				{
+					VkClearAttachment& ca = cas[num_ca++];
+					ca.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+					ca.colorAttachment = 1;
+					ca.clearValue.depthStencil = {vkDs->GetClearDepth()};
+				}
+
+				vkDs->SetState(GSTexture::State::Dirty);
+			}
+
+			if (num_ca > 0)
+			{
+				const GSVector2i size = vkRt ? vkRt->GetSize() : vkDs->GetSize();
+				const VkClearRect cr = {{{0, 0}, {static_cast<u32>(size.x), static_cast<u32>(size.y)}}, 0u, 1u};
+				vkCmdClearAttachments(GetCurrentCommandBuffer(), num_ca, cas.data(), 1, &cr);
+			}
+		}
+	}
+
+	m_current_render_target = vkRt;
+	m_current_depth_target = vkDs;
+	m_current_framebuffer_feedback_loop = feedback_loop;
+
+	if (!InRenderPass())
+	{
+		if (vkRt)
+		{
+			if (feedback_loop & FeedbackLoopFlag_ReadAndWriteRT)
+			{
+				// NVIDIA drivers appear to return random garbage when sampling the RT via a feedback loop, if the load op for
+				// the render pass is CLEAR. Using vkCmdClearAttachments() doesn't work, so we have to clear the image instead.
+				if (vkRt->GetState() == GSTexture::State::Cleared && IsDeviceNVIDIA())
+					vkRt->CommitClear();
+
+				if (vkRt->GetLayout() != GSTextureVK::Layout::FeedbackLoop)
+				{
+					// need to update descriptors to reflect the new layout
+					m_dirty_flags |= (DIRTY_FLAG_TFX_TEXTURE_0 << TFX_TEXTURE_RT);
+					if (ShouldDirtyVulkanAliasedTextureDescriptor(
+							m_tfx_textures[TFX_TEXTURE_TEXTURE] == vkRt, true))
+						m_dirty_flags |= (DIRTY_FLAG_TFX_TEXTURE_0 << TFX_TEXTURE_TEXTURE);
+					vkRt->TransitionToLayout(GSTextureVK::Layout::FeedbackLoop);
+				}
+			}
+			else
+			{
+				vkRt->TransitionToLayout(IsMobileGPUProfile() ? GSTextureVK::Layout::FeedbackLoop :
+																GSTextureVK::Layout::ColorAttachment);
+			}
+		}
+		if (vkDs)
+		{
+			// need to update descriptors to reflect the new layout
+			if (feedback_loop & FeedbackLoopFlag_ReadAndWriteDepth)
+			{
+				// NVIDIA drivers appear to return random garbage when sampling the RT via a feedback loop, if the load op for
+				// the render pass is CLEAR. Using vkCmdClearAttachments() doesn't work, so we have to clear the image instead.
+				// Note: DS feedback loop was added later - we will assume that the same issue is relevant.
+				if (vkDs->GetState() == GSTexture::State::Cleared && IsDeviceNVIDIA())
+					vkDs->CommitClear();
+
+				if (vkDs->GetLayout() != GSTextureVK::Layout::FeedbackLoop)
+				{
+					m_dirty_flags |= (DIRTY_FLAG_TFX_TEXTURE_0 << TFX_TEXTURE_DEPTH);
+					if (ShouldDirtyVulkanAliasedTextureDescriptor(
+							m_tfx_textures[TFX_TEXTURE_TEXTURE] == vkDs, true))
+						m_dirty_flags |= (DIRTY_FLAG_TFX_TEXTURE_0 << TFX_TEXTURE_TEXTURE);
+					vkDs->TransitionToLayout(GSTextureVK::Layout::FeedbackLoop);
+				}
+			}
+			else if (feedback_loop & FeedbackLoopFlag_ReadDepth)
+			{
+				const GSTextureVK::Layout layout = (m_features.depth_feedback != DepthFeedbackSupport::None) ?
+					GSTextureVK::Layout::FeedbackLoop : GSTextureVK::Layout::General;
+				if (vkDs->GetLayout() != layout)
+				{
+					m_dirty_flags |= (DIRTY_FLAG_TFX_TEXTURE_0 << TFX_TEXTURE_TEXTURE);
+					if (m_tfx_textures[TFX_TEXTURE_TEXTURE] == vkDs)
+						m_dirty_flags |= DIRTY_FLAG_TFX_TEXTURE_0 << TFX_TEXTURE_TEXTURE;
+					vkDs->TransitionToLayout(layout);
+				}
+			}
+			else
+			{
+				vkDs->TransitionToLayout(IsMobileGPUProfile() ? GSTextureVK::Layout::FeedbackLoop :
+																GSTextureVK::Layout::DepthStencilAttachment);
+			}
+		}
+	}
+
+	// This is used to set/initialize the framebuffer for tfx rendering.
+	const GSVector2i size = (vkRt ? vkRt->GetSize() : (vkDs ? vkDs->GetSize() : viewport_size));
+	const VkViewport vp{0.0f, 0.0f, static_cast<float>(size.x), static_cast<float>(size.y), 0.0f, 1.0f};
+
+	SetViewport(vp);
+	SetScissor(scissor);
+}
+
+VkSampler GSDeviceVK::GetSampler(GSHWDrawConfig::SamplerSelector ss)
+{
+	const auto it = m_samplers.find(ss.key);
+	if (it != m_samplers.end())
+		return it->second;
+
+	const bool aniso = (ss.aniso && GSConfig.MaxAnisotropy > 1 && m_device_features.samplerAnisotropy);
+
+	// See https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkSamplerCreateInfo.html#_description
+	// for the reasoning behind 0.25f here.
+	const VkSamplerCreateInfo ci = {
+		VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, nullptr, 0,
+		ss.IsMagFilterLinear() ? VK_FILTER_LINEAR : VK_FILTER_NEAREST, // min
+		ss.IsMinFilterLinear() ? VK_FILTER_LINEAR : VK_FILTER_NEAREST, // mag
+		ss.IsMipFilterLinear() ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST, // mip
+		static_cast<VkSamplerAddressMode>(
+			ss.tau ? VK_SAMPLER_ADDRESS_MODE_REPEAT : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE), // u
+		static_cast<VkSamplerAddressMode>(
+			ss.tav ? VK_SAMPLER_ADDRESS_MODE_REPEAT : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE), // v
+		VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, // w
+		0.0f, // lod bias
+		static_cast<VkBool32>(aniso), // anisotropy enable
+		aniso ? static_cast<float>(GSConfig.MaxAnisotropy) : 1.0f, // anisotropy
+		VK_FALSE, // compare enable
+		VK_COMPARE_OP_ALWAYS, // compare op
+		0.0f, // min lod
+		(ss.lodclamp || !ss.UseMipmapFiltering()) ? 0.25f : VK_LOD_CLAMP_NONE, // max lod
+		VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK, // border
+		VK_FALSE // unnormalized coordinates
+	};
+	VkSampler sampler = VK_NULL_HANDLE;
+	VkResult res = vkCreateSampler(m_device, &ci, nullptr, &sampler);
+	if (res != VK_SUCCESS)
+		LOG_VULKAN_ERROR(res, "vkCreateSampler() failed: ");
+
+	m_samplers.emplace(ss.key, sampler);
+	return sampler;
+}
+
+void GSDeviceVK::ClearSamplerCache()
+{
+	ExecuteCommandBuffer(true);
+	for (const auto& it : m_samplers)
+	{
+		if (it.second != VK_NULL_HANDLE)
+			vkDestroySampler(m_device, it.second, nullptr);
+	}
+	m_samplers.clear();
+	m_point_sampler = GetSampler(GSHWDrawConfig::SamplerSelector::Point());
+	m_linear_sampler = GetSampler(GSHWDrawConfig::SamplerSelector::Linear());
+	m_utility_sampler = m_point_sampler;
+	m_tfx_sampler = m_point_sampler;
+}
+
+static void AddMacro(std::stringstream& ss, const char* name, int value)
+{
+	ss << "#define " << name << " " << value << "\n";
+}
+
+static void AddShaderHeader(std::stringstream& ss, const GSDeviceVK::TFXShaderSourceCapabilities& capabilities)
+{
+	ss << "#version 460 core\n";
+	ss << "#extension GL_EXT_samplerless_texture_functions : require\n";
+	if (capabilities.rov)
+	{
+		ss << "#extension GL_ARB_fragment_shader_interlock : require\n";
+		ss << "#extension GL_ARB_shader_image_load_store : require\n";
+	}
+
+	if (!capabilities.texture_barrier)
+		ss << "#define DISABLE_TEXTURE_BARRIER 1\n";
+	if (capabilities.texture_barrier && capabilities.feedback_loop_layout)
+		ss << "#define HAS_FEEDBACK_LOOP_LAYOUT 1\n";
+
+	// Some ARM proprietary drivers miscompile vector bitwise AND in shaders. Scalarize it on
+	// the whole mobile path rather than tracking individual driver versions.
+	AddMacro(ss, "DRIVER_SCALARIZE_VECTOR_BITWISE_AND", capabilities.scalarize_vector_bitwise_and ? 1 : 0);
+	ss << R"(
+#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
+uvec2 gpu_bitwise_and(uvec2 a, uvec2 b)
+{
+	return uvec2(a.x & b.x, a.y & b.y);
+}
+
+uvec3 gpu_bitwise_and(uvec3 a, uvec3 b)
+{
+	return uvec3(a.x & b.x, a.y & b.y, a.z & b.z);
+}
+
+uvec4 gpu_bitwise_and(uvec4 a, uvec4 b)
+{
+	return uvec4(a.x & b.x, a.y & b.y, a.z & b.z, a.w & b.w);
+}
+
+ivec3 gpu_bitwise_and(ivec3 a, ivec3 b)
+{
+	return ivec3(a.x & b.x, a.y & b.y, a.z & b.z);
+}
+#else
+#define gpu_bitwise_and(a, b) ((a) & (b))
+#endif
+
+#define gpu_matrix_element(value, column, row) ((value)[column][row])
+)";
+}
+
+static void AddShaderHeader(std::stringstream& ss)
+{
+	const GSDeviceVK* dev = GSDeviceVK::GetInstance();
+	const GSDevice::FeatureSupport features = dev->Features();
+	const GSDeviceVK::TFXShaderSourceCapabilities capabilities = {
+		features.rov,
+		features.texture_barrier,
+		features.texture_barrier && dev->UseFeedbackLoopLayout(),
+		dev->HasMobileGPUProfile(),
+		features.provoking_vertex_last};
+	AddShaderHeader(ss, capabilities);
+}
+
+static void AddShaderStageMacro(std::stringstream& ss, bool vs, bool gs, bool fs)
+{
+	if (vs)
+		ss << "#define VERTEX_SHADER 1\n";
+	else if (gs)
+		ss << "#define GEOMETRY_SHADER 1\n";
+	else if (fs)
+		ss << "#define FRAGMENT_SHADER 1\n";
+}
+
+static void AddUtilityVertexAttributes(Vulkan::GraphicsPipelineBuilder& gpb)
+{
+	gpb.AddVertexBuffer(0, sizeof(GSVertexPT1));
+	gpb.AddVertexAttribute(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
+	gpb.AddVertexAttribute(1, 0, VK_FORMAT_R32G32_SFLOAT, 16);
+	gpb.SetPrimitiveTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+}
+
+static void SetPipelineProvokingVertex(const GSDevice::FeatureSupport& features, Vulkan::GraphicsPipelineBuilder& gpb)
+{
+	// We enable provoking vertex here anyway, in case it doesn't support multiple modes in the same pass.
+	// Normally we wouldn't enable it on the present/swap chain, but apparently the rule is it applies to the last
+	// pipeline bound before the render pass begun, and in this case, we can't bind null.
+	if (features.provoking_vertex_last)
+		gpb.SetProvokingVertex(VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT);
+}
+
+VkShaderModule GSDeviceVK::GetUtilityVertexShader(const std::string& source, const char* replace_main = nullptr)
+{
+	std::stringstream ss;
+	AddShaderHeader(ss);
+	AddShaderStageMacro(ss, true, false, false);
+	if (replace_main)
+		ss << "#define " << replace_main << " main\n";
+	ss << source;
+
+	return g_vulkan_shader_cache->GetVertexShader(ss.str());
+}
+
+VkShaderModule GSDeviceVK::GetUtilityFragmentShader(const std::string& source, const char* replace_main = nullptr)
+{
+	std::stringstream ss;
+	AddShaderHeader(ss);
+	AddShaderStageMacro(ss, false, false, true);
+	if (replace_main)
+		ss << "#define " << replace_main << " main\n";
+	ss << source;
+
+	return g_vulkan_shader_cache->GetFragmentShader(ss.str());
+}
+
+bool GSDeviceVK::CreateNullTexture()
+{
+	m_null_texture = GSTextureVK::Create(GSTexture::ShaderWriteTarget, GSTexture::Format::Color, 1, 1, 1);
+	if (!m_null_texture)
+		return false;
+
+	const VkCommandBuffer cmdbuf = GetCurrentCommandBuffer();
+	const VkImageSubresourceRange srr{VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u};
+	const VkClearColorValue ccv{};
+	m_null_texture->TransitionToLayout(cmdbuf, GSTextureVK::Layout::ClearDst);
+	vkCmdClearColorImage(cmdbuf, m_null_texture->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &ccv, 1, &srr);
+	m_null_texture->TransitionToLayout(cmdbuf, GSTextureVK::Layout::General);
+	Vulkan::SetObjectName(m_device, m_null_texture->GetImage(), "Null texture");
+	Vulkan::SetObjectName(m_device, m_null_texture->GetView(), "Null texture view");
+
+	return true;
+}
+
+bool GSDeviceVK::CreateBuffers()
+{
+	// With vertex expansion the whole ring is bound as one storage buffer, so it cannot outgrow
+	// the device's storage-buffer range.
+	u32 vertex_max_size = VERTEX_BUFFER_MAX_SIZE;
+	if (m_features.vs_expand)
+	{
+		vertex_max_size = static_cast<u32>(std::min<u64>(vertex_max_size, m_device_properties.limits.maxStorageBufferRange));
+		vertex_max_size = std::max<u32>(vertex_max_size, VERTEX_BUFFER_SIZE);
+	}
+
+	if (!m_vertex_stream_buffer.Create(
+			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | (m_features.vs_expand ? VK_BUFFER_USAGE_STORAGE_BUFFER_BIT : 0),
+			VERTEX_BUFFER_SIZE, "vertex", vertex_max_size))
+	{
+		Host::ReportErrorAsync("GS", "Failed to allocate vertex buffer");
+		return false;
+	}
+
+	if (!m_index_stream_buffer.Create(VK_BUFFER_USAGE_INDEX_BUFFER_BIT, INDEX_BUFFER_SIZE, "index"))
+	{
+		Host::ReportErrorAsync("GS", "Failed to allocate index buffer");
+		return false;
+	}
+
+	if (!m_expand_index_stream_buffer.Create(
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, m_features.aa1 ? INDEX_BUFFER_SIZE : 4, "expand-index"))
+	{
+		Host::ReportErrorAsync("GS", "Failed to allocate expansion index buffer (VS resource)");
+		return false;
+	}
+
+	if (!m_vertex_uniform_stream_buffer.Create(
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VERTEX_UNIFORM_BUFFER_SIZE, "vertex-uniform"))
+	{
+		Host::ReportErrorAsync("GS", "Failed to allocate vertex uniform buffer");
+		return false;
+	}
+
+	if (!m_fragment_uniform_stream_buffer.Create(
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, FRAGMENT_UNIFORM_BUFFER_SIZE, "fragment-uniform"))
+	{
+		Host::ReportErrorAsync("GS", "Failed to allocate fragment uniform buffer");
+		return false;
+	}
+
+	if (!m_texture_stream_buffer.Create(
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT, TEXTURE_BUFFER_SIZE, "texture", TEXTURE_BUFFER_MAX_SIZE))
+	{
+		Host::ReportErrorAsync("GS", "Failed to allocate texture upload buffer");
+		return false;
+	}
+
+	if (!AllocatePreinitializedGPUBuffer(EXPAND_BUFFER_SIZE, &m_expand_index_buffer, &m_expand_index_buffer_allocation,
+			VK_BUFFER_USAGE_INDEX_BUFFER_BIT, &GSDevice::GenerateExpansionIndexBuffer))
+	{
+		Host::ReportErrorAsync("GS", "Failed to allocate expansion index buffer");
+		return false;
+	}
+
+	SetIndexBuffer(m_index_stream_buffer.GetBuffer());
+	return true;
+}
+
+bool GSDeviceVK::CreatePipelineLayouts()
+{
+	VkDevice dev = m_device;
+	Vulkan::DescriptorSetLayoutBuilder dslb;
+	Vulkan::PipelineLayoutBuilder plb;
+
+	//////////////////////////////////////////////////////////////////////////
+	// Convert Pipeline Layout
+	//////////////////////////////////////////////////////////////////////////
+
+	if (m_use_push_descriptors)
+		dslb.SetPushFlag();
+	dslb.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, NUM_UTILITY_SAMPLERS, VK_SHADER_STAGE_FRAGMENT_BIT);
+	if ((m_utility_ds_layout = dslb.Create(dev)) == VK_NULL_HANDLE)
+		return false;
+	Vulkan::SetObjectName(dev, m_utility_ds_layout, "Convert descriptor layout");
+
+	plb.AddPushConstants(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, CONVERT_PUSH_CONSTANTS_SIZE);
+	plb.AddDescriptorSet(m_utility_ds_layout);
+	if ((m_utility_pipeline_layout = plb.Create(dev)) == VK_NULL_HANDLE)
+		return false;
+	Vulkan::SetObjectName(dev, m_utility_pipeline_layout, "Convert pipeline layout");
+	return CreateTFXPipelineLayouts();
+}
+
+
+bool GSDeviceVK::CreateTFXPipelineLayouts()
+{
+	VkDevice dev = m_device;
+	Vulkan::DescriptorSetLayoutBuilder dslb;
+	Vulkan::PipelineLayoutBuilder plb;
+	//////////////////////////////////////////////////////////////////////////
+	// Draw/TFX Pipeline Layout
+	//////////////////////////////////////////////////////////////////////////
+	dslb.AddBinding(
+		0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT);
+	dslb.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
+	if (m_features.vs_expand)
+	{
+		dslb.AddBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT);
+		plb.AddPushConstants(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GSHWDrawConfig::VSPushConstants));
+	}
+	if (m_features.aa1)
+		dslb.AddBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT);
+	if ((m_tfx_ubo_ds_layout = dslb.Create(dev)) == VK_NULL_HANDLE)
+		return false;
+	Vulkan::SetObjectName(dev, m_tfx_ubo_ds_layout, "TFX UBO descriptor layout");
+
+	if (m_use_push_descriptors)
+		dslb.SetPushFlag();
+	dslb.AddBinding(TFX_TEXTURE_TEXTURE, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
+	dslb.AddBinding(TFX_TEXTURE_PALETTE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
+	// This must match both tfx.glsl and CreateCachedRenderPass(). Adreno uses the attachment
+	// feedback-loop layout when the driver exposes it; devices without that extension use a
+	// real input-attachment descriptor for the subpassInput shader path.
+	const VkDescriptorType feedback_descriptor_type = UsesInputAttachmentFeedbackPath() ?
+		VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT : VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+	dslb.AddBinding(TFX_TEXTURE_RT, feedback_descriptor_type, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
+	dslb.AddBinding(TFX_TEXTURE_PRIMID, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
+	dslb.AddBinding(TFX_TEXTURE_DEPTH, feedback_descriptor_type, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
+	dslb.AddBinding(TFX_TEXTURE_RT_ROV, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
+	dslb.AddBinding(TFX_TEXTURE_DEPTH_ROV, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
+	if ((m_tfx_texture_ds_layout = dslb.Create(dev)) == VK_NULL_HANDLE)
+		return false;
+	Vulkan::SetObjectName(dev, m_tfx_texture_ds_layout, "TFX texture descriptor layout");
+
+	plb.AddDescriptorSet(m_tfx_ubo_ds_layout);
+	plb.AddDescriptorSet(m_tfx_texture_ds_layout);
+	if ((m_tfx_pipeline_layout = plb.Create(dev)) == VK_NULL_HANDLE)
+		return false;
+	Vulkan::SetObjectName(dev, m_tfx_pipeline_layout, "TFX pipeline layout");
+	return true;
+}
+
+bool GSDeviceVK::CreateRenderPasses()
+{
+#define GET(dest, rt, depth, fbl, dsp, opa, opb, opc) \
+	do \
+	{ \
+		dest = GetRenderPass( \
+			(rt), (depth), ((rt) != VK_FORMAT_UNDEFINED) ? (opa) : VK_ATTACHMENT_LOAD_OP_DONT_CARE, /* color load */ \
+			((rt) != VK_FORMAT_UNDEFINED) ? VK_ATTACHMENT_STORE_OP_STORE : \
+											VK_ATTACHMENT_STORE_OP_DONT_CARE, /* color store */ \
+			((depth) != VK_FORMAT_UNDEFINED) ? (opb) : VK_ATTACHMENT_LOAD_OP_DONT_CARE, /* depth load */ \
+			((depth) != VK_FORMAT_UNDEFINED) ? VK_ATTACHMENT_STORE_OP_STORE : \
+											   VK_ATTACHMENT_STORE_OP_DONT_CARE, /* depth store */ \
+			((depth) != VK_FORMAT_UNDEFINED) ? (opc) : VK_ATTACHMENT_LOAD_OP_DONT_CARE, /* stencil load */ \
+			VK_ATTACHMENT_STORE_OP_DONT_CARE, /* stencil store */ \
+			(fbl), /* feedback loop */ \
+			(dsp) /* depth sampling */ \
+		); \
+		if (dest == VK_NULL_HANDLE) \
+			return false; \
+	} while (0)
+
+	const VkFormat rt_format = LookupNativeFormat(GSTexture::Format::Color);
+	const VkFormat colclip_rt_format = LookupNativeFormat(GSTexture::Format::ColorClip);
+	const VkFormat depth_format = LookupNativeFormat(GSTexture::Format::DepthStencil);
+	m_depth_format = depth_format;
+
+	for (u32 rt = 0; rt < 2; rt++)
+	{
+		for (u32 ds = 0; ds < 2; ds++)
+		{
+			for (u32 colclip = 0; colclip < 2; colclip++)
+			{
+				for (u32 stencil = 0; stencil < 2; stencil++)
+				{
+					for (u32 fbl = 0; fbl < 2; fbl++)
+					{
+						for (u32 dsp = 0; dsp < 2; dsp++)
+						{
+							for (u32 opa = VK_ATTACHMENT_LOAD_OP_LOAD; opa <= VK_ATTACHMENT_LOAD_OP_DONT_CARE; opa++)
+							{
+								for (u32 opb = VK_ATTACHMENT_LOAD_OP_LOAD; opb <= VK_ATTACHMENT_LOAD_OP_DONT_CARE; opb++)
+								{
+									const VkFormat rp_rt_format =
+										(rt != 0) ? ((colclip != 0) ? colclip_rt_format : rt_format) : VK_FORMAT_UNDEFINED;
+									const VkFormat rp_depth_format = (ds != 0) ? depth_format : VK_FORMAT_UNDEFINED;
+									const VkAttachmentLoadOp opc = (!stencil || !m_features.stencil_buffer) ?
+									                                   VK_ATTACHMENT_LOAD_OP_DONT_CARE :
+									                                   VK_ATTACHMENT_LOAD_OP_LOAD;
+									GET(m_tfx_render_pass[rt][ds][colclip][stencil][fbl][dsp][opa][opb], rp_rt_format,
+										rp_depth_format, (fbl != 0), (dsp != 0), static_cast<VkAttachmentLoadOp>(opa),
+										static_cast<VkAttachmentLoadOp>(opb), static_cast<VkAttachmentLoadOp>(opc));
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	GET(m_utility_color_render_pass_load, rt_format, VK_FORMAT_UNDEFINED, false, false, VK_ATTACHMENT_LOAD_OP_LOAD,
+		VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_LOAD_OP_DONT_CARE);
+	GET(m_utility_color_render_pass_clear, rt_format, VK_FORMAT_UNDEFINED, false, false, VK_ATTACHMENT_LOAD_OP_CLEAR,
+		VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_LOAD_OP_DONT_CARE);
+	GET(m_utility_color_render_pass_discard, rt_format, VK_FORMAT_UNDEFINED, false, false,
+		VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_LOAD_OP_DONT_CARE);
+	GET(m_utility_depth_render_pass_load, VK_FORMAT_UNDEFINED, depth_format, false, false,
+		VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_LOAD_OP_DONT_CARE);
+	GET(m_utility_depth_render_pass_clear, VK_FORMAT_UNDEFINED, depth_format, false, false,
+		VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_LOAD_OP_DONT_CARE);
+	GET(m_utility_depth_render_pass_discard, VK_FORMAT_UNDEFINED, depth_format, false, false,
+		VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_LOAD_OP_DONT_CARE);
+
+	m_date_setup_render_pass = GetRenderPass(VK_FORMAT_UNDEFINED, depth_format, VK_ATTACHMENT_LOAD_OP_LOAD,
+		VK_ATTACHMENT_STORE_OP_STORE, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE,
+		m_features.stencil_buffer ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		m_features.stencil_buffer ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE);
+	if (m_date_setup_render_pass == VK_NULL_HANDLE)
+		return false;
+
+#undef GET
+
+	return true;
+}
+
+bool GSDeviceVK::CreateTFXPreparationRenderPasses()
+{
+	const VkFormat color_format = LookupNativeFormat(GSTexture::Format::Color);
+	const VkFormat depth_format = LookupNativeFormat(GSTexture::Format::DepthStencil);
+	m_depth_format = depth_format;
+
+	for (const TFXPreparationRenderPassPlanEntry& pass : BuildTFXPreparationRenderPassPlan())
+	{
+		const VkFormat rt_format = pass.rt ? color_format : VK_FORMAT_UNDEFINED;
+		const VkFormat ds_format = pass.ds ? depth_format : VK_FORMAT_UNDEFINED;
+		const VkRenderPass render_pass = GetRenderPass(
+			rt_format, ds_format,
+			pass.rt ? pass.rt_op : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			pass.rt ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			pass.ds ? pass.ds_op : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			pass.ds ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			pass.feedback_loop, pass.depth_sampling);
+		if (render_pass == VK_NULL_HANDLE)
+			return false;
+
+		m_tfx_render_pass[pass.rt][pass.ds][pass.colclip][pass.date][pass.feedback_loop][pass.depth_sampling]
+			[pass.rt_op][pass.ds_op] = render_pass;
+	}
+
+	return m_render_pass_cache.size() == 2;
+}
+
+bool GSDeviceVK::CompileConvertPipelines()
+{
+	const std::optional<std::string> source = ReadShaderSource("shaders/vulkan/convert.glsl");
+	if (!source)
+	{
+		Host::ReportErrorAsync("GS", "Failed to read shaders/vulkan/convert.glsl.");
+		return false;
+	}
+
+	VkShaderModule vs = GetUtilityVertexShader(*source);
+	if (vs == VK_NULL_HANDLE)
+		return false;
+	ScopedGuard vs_guard([this, &vs]() { vkDestroyShaderModule(m_device, vs, nullptr); });
+
+	Vulkan::GraphicsPipelineBuilder gpb;
+	SetPipelineProvokingVertex(m_features, gpb);
+	AddUtilityVertexAttributes(gpb);
+	gpb.SetPipelineLayout(m_utility_pipeline_layout);
+	gpb.SetDynamicViewportAndScissorState();
+	gpb.AddDynamicState(VK_DYNAMIC_STATE_BLEND_CONSTANTS);
+	gpb.AddDynamicState(VK_DYNAMIC_STATE_LINE_WIDTH);
+	gpb.SetNoCullRasterizationState();
+	gpb.SetNoBlendingState();
+	gpb.SetVertexShader(vs);
+
+	m_convert.resize(ShaderConvertSelector::NUM_TOTAL_SHADERS);
+	for (u32 i = 0; i < ShaderConvertSelector::NUM_TOTAL_SHADERS; i++)
+	{
+		const ShaderConvertSelector shader = ShaderConvertSelector::Get(i);
+
+		VkRenderPass rp;
+		if (shader.DATMConvertShader())
+		{
+			rp = m_date_setup_render_pass;
+		}
+		else if (shader.DepthOutput())
+		{
+			rp = GetRenderPass(
+				LookupNativeFormat(GSTexture::Format::Invalid),
+				LookupNativeFormat(GSTexture::Format::DepthStencil),
+				VK_ATTACHMENT_LOAD_OP_DONT_CARE);
+		}
+		else
+		{
+			rp = GetRenderPass(
+				LookupNativeFormat(shader.OutputFormat()),
+				LookupNativeFormat(GSTexture::Format::Invalid),
+				VK_ATTACHMENT_LOAD_OP_DONT_CARE);
+		}
+
+		if (!rp)
+			return false;
+
+		gpb.SetRenderPass(rp, 0);
+
+		if (shader.DATMConvertShader())
+		{
+			const VkStencilOpState sos = {
+				VK_STENCIL_OP_KEEP, VK_STENCIL_OP_REPLACE, VK_STENCIL_OP_KEEP, VK_COMPARE_OP_ALWAYS, 1u, 1u, 1u};
+			gpb.SetDepthState(false, false, VK_COMPARE_OP_ALWAYS);
+			gpb.SetStencilState(true, sos, sos);
+		}
+		else
+		{
+			gpb.SetDepthState(shader.DepthOutput(), shader.DepthOutput(), VK_COMPARE_OP_ALWAYS);
+			gpb.SetNoStencilState();
+		}
+
+		gpb.SetColorWriteMask(0, shader.Mask());
+
+		std::string macro;
+		macro += fmt::format("#define HAS_BILN {}\n", static_cast<int>(shader.Biln()));
+		macro += fmt::format("#define HAS_STENCIL_OUTPUT {}\n", static_cast<int>(shader.StencilOutput()));
+		macro += fmt::format("#define HAS_INTEGER_OUTPUT {}\n", static_cast<int>(shader.IntegerOutputBpp() != 0));
+		macro += fmt::format("#define HAS_DEPTH_OUTPUT {}\n", static_cast<int>(shader.DepthOutput()));
+		macro += fmt::format("#define HAS_FLOAT32_INPUT {}\n", static_cast<int>(shader.Float32Input()));
+		macro += fmt::format("#define HAS_FLOAT32_OUTPUT {}\n", static_cast<int>(shader.Float32Output()));
+
+		std::string shader_with_header = macro + *source;
+
+		VkShaderModule ps = GetUtilityFragmentShader(shader_with_header, shader.EntryPoint());
+		if (ps == VK_NULL_HANDLE)
+			return false;
+
+		ScopedGuard ps_guard([this, &ps]() { vkDestroyShaderModule(m_device, ps, nullptr); });
+		gpb.SetFragmentShader(ps);
+
+		VkPipeline pipe = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+					
+		if (!pipe)
+			return false;
+
+		m_convert[i] = pipe;
+
+		Vulkan::SetObjectName(m_device, pipe, "Convert pipeline (%s, mask=%x, depth=%d, biln=%d)",
+			shader.Name(), shader.Mask(), static_cast<int>(shader.DepthOutput()),
+			static_cast<int>(shader.Biln()));
+
+		if (shader.Shader() == ShaderConvert::COLCLIP_INIT || shader.Shader() == ShaderConvert::COLCLIP_RESOLVE)
+		{
+			const bool is_setup = shader.Shader() == ShaderConvert::COLCLIP_INIT;
+			VkPipeline(&arr)[2][2] = *(is_setup ? &m_colclip_setup_pipelines : &m_colclip_finish_pipelines);
+			for (u32 ds = 0; ds < 2; ds++)
+			{
+				for (u32 fbl = 0; fbl < 2; fbl++)
+				{
+					pxAssert(!arr[ds][fbl]);
+
+					gpb.SetRenderPass(GetTFXRenderPass(true, ds != 0, is_setup, false, fbl != 0, false,
+						VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_LOAD_OP_DONT_CARE),
+						0);
+					arr[ds][fbl] = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+					if (!arr[ds][fbl])
+						return false;
+
+					Vulkan::SetObjectName(m_device, arr[ds][fbl], "ColorClip %s/copy pipeline (ds=%u, fbl=%u)",
+						is_setup ? "setup" : "finish", i, ds, fbl);
+				}
+			}
+		}
+	}
+
+	// date image setup
+	for (u32 ds = 0; ds < 2; ds++)
+	{
+		for (u32 clear = 0; clear < 2; clear++)
+		{
+			m_primid_image_setup_render_passes[ds][clear] = GetRenderPass(LookupNativeFormat(GSTexture::Format::PrimID),
+				ds ? LookupNativeFormat(GSTexture::Format::DepthStencil) : VK_FORMAT_UNDEFINED,
+				VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_STORE,
+				ds ? (clear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD) :
+					 VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+				ds ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE);
+		}
+	}
+
+	for (u32 datm = 0; datm < 4; datm++)
+	{
+		const std::string entry_point(StringUtil::StdStringFromFormat("ps_primid_image_init_%d", datm));
+		VkShaderModule ps =
+			GetUtilityFragmentShader(*source, entry_point.c_str());
+		if (ps == VK_NULL_HANDLE)
+			return false;
+
+		ScopedGuard ps_guard([this, &ps]() { vkDestroyShaderModule(m_device, ps, nullptr); });
+		gpb.SetPipelineLayout(m_utility_pipeline_layout);
+		gpb.SetFragmentShader(ps);
+		gpb.SetNoDepthTestState();
+		gpb.SetNoStencilState();
+		gpb.ClearBlendAttachments();
+		gpb.SetBlendAttachment(0, false, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD,
+			VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD, VK_COLOR_COMPONENT_R_BIT);
+
+		for (u32 ds = 0; ds < 2; ds++)
+		{
+			gpb.SetRenderPass(m_primid_image_setup_render_passes[ds][0], 0);
+			m_primid_image_setup_pipelines[ds][datm] =
+				gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+			if (!m_primid_image_setup_pipelines[ds][datm])
+				return false;
+
+			Vulkan::SetObjectName(m_device, m_primid_image_setup_pipelines[ds][datm],
+				"DATE image clear pipeline (ds=%u, datm=%u)", ds, (datm == 1 || datm == 3));
+		}
+	}
+
+	return true;
+}
+
+bool GSDeviceVK::CompilePresentPipelines()
+{
+	// we may not have a swap chain if running in headless mode.
+	m_swap_chain_render_pass =
+		GetRenderPass(m_swap_chain ? m_swap_chain->GetTextureFormat() : VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_UNDEFINED);
+	if (m_swap_chain_render_pass == VK_NULL_HANDLE)
+		return false;
+
+	const std::optional<std::string> shader = ReadShaderSource("shaders/vulkan/present.glsl");
+	if (!shader)
+	{
+		Host::ReportErrorAsync("GS", "Failed to read shaders/vulkan/present.glsl.");
+		return false;
+	}
+
+	VkShaderModule vs = GetUtilityVertexShader(*shader);
+	if (vs == VK_NULL_HANDLE)
+		return false;
+	ScopedGuard vs_guard([this, &vs]() { vkDestroyShaderModule(m_device, vs, nullptr); });
+
+	Vulkan::GraphicsPipelineBuilder gpb;
+	SetPipelineProvokingVertex(m_features, gpb);
+	AddUtilityVertexAttributes(gpb);
+	gpb.SetPipelineLayout(m_utility_pipeline_layout);
+	gpb.SetDynamicViewportAndScissorState();
+	gpb.AddDynamicState(VK_DYNAMIC_STATE_BLEND_CONSTANTS);
+	gpb.AddDynamicState(VK_DYNAMIC_STATE_LINE_WIDTH);
+	gpb.SetNoCullRasterizationState();
+	gpb.SetNoBlendingState();
+	gpb.SetVertexShader(vs);
+	gpb.SetDepthState(false, false, VK_COMPARE_OP_ALWAYS);
+	gpb.SetNoStencilState();
+	gpb.SetRenderPass(m_swap_chain_render_pass, 0);
+
+	for (PresentShader i = PresentShader::COPY; i < PresentShader::Count; i = static_cast<PresentShader>(static_cast<int>(i) + 1))
+	{
+		const int index = static_cast<int>(i);
+
+		VkShaderModule ps = GetUtilityFragmentShader(*shader, ShaderEntryPoint(i));
+		if (ps == VK_NULL_HANDLE)
+			return false;
+
+		ScopedGuard ps_guard([this, &ps]() { vkDestroyShaderModule(m_device, ps, nullptr); });
+		gpb.SetFragmentShader(ps);
+
+		m_present[index] = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+		if (!m_present[index])
+			return false;
+
+		Vulkan::SetObjectName(m_device, m_present[index], "Present pipeline %d", i);
+	}
+
+	return true;
+}
+
+
+bool GSDeviceVK::CompileInterlacePipelines()
+{
+	const std::optional<std::string> shader = ReadShaderSource("shaders/vulkan/interlace.glsl");
+	if (!shader)
+	{
+		Host::ReportErrorAsync("GS", "Failed to read shaders/vulkan/interlace.glsl.");
+		return false;
+	}
+
+	VkRenderPass rp =
+		GetRenderPass(LookupNativeFormat(GSTexture::Format::Color), VK_FORMAT_UNDEFINED, VK_ATTACHMENT_LOAD_OP_LOAD);
+	if (!rp)
+		return false;
+
+	VkShaderModule vs = GetUtilityVertexShader(*shader);
+	if (vs == VK_NULL_HANDLE)
+		return false;
+	ScopedGuard vs_guard([this, &vs]() { vkDestroyShaderModule(m_device, vs, nullptr); });
+
+	Vulkan::GraphicsPipelineBuilder gpb;
+	SetPipelineProvokingVertex(m_features, gpb);
+	AddUtilityVertexAttributes(gpb);
+	gpb.SetPipelineLayout(m_utility_pipeline_layout);
+	gpb.SetDynamicViewportAndScissorState();
+	gpb.AddDynamicState(VK_DYNAMIC_STATE_BLEND_CONSTANTS);
+	gpb.AddDynamicState(VK_DYNAMIC_STATE_LINE_WIDTH);
+	gpb.SetNoCullRasterizationState();
+	gpb.SetNoDepthTestState();
+	gpb.SetNoBlendingState();
+	gpb.SetRenderPass(rp, 0);
+	gpb.SetVertexShader(vs);
+
+	for (int i = 0; i < static_cast<int>(m_interlace.size()); i++)
+	{
+		VkShaderModule ps = GetUtilityFragmentShader(*shader, StringUtil::StdStringFromFormat("ps_main%d", i).c_str());
+		if (ps == VK_NULL_HANDLE)
+			return false;
+
+		gpb.SetFragmentShader(ps);
+
+		m_interlace[i] = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+		vkDestroyShaderModule(m_device, ps, nullptr);
+		if (!m_interlace[i])
+			return false;
+
+		Vulkan::SetObjectName(m_device, m_interlace[i], "Interlace pipeline %d", i);
+	}
+
+	return true;
+}
+
+bool GSDeviceVK::CompileMergePipelines()
+{
+	const std::optional<std::string> shader = ReadShaderSource("shaders/vulkan/merge.glsl");
+	if (!shader)
+	{
+		Host::ReportErrorAsync("GS", "Failed to read shaders/vulkan/merge.glsl.");
+		return false;
+	}
+
+	VkRenderPass rp =
+		GetRenderPass(LookupNativeFormat(GSTexture::Format::Color), VK_FORMAT_UNDEFINED, VK_ATTACHMENT_LOAD_OP_LOAD);
+	if (!rp)
+		return false;
+
+	VkShaderModule vs = GetUtilityVertexShader(*shader);
+	if (vs == VK_NULL_HANDLE)
+		return false;
+	ScopedGuard vs_guard([this, &vs]() { vkDestroyShaderModule(m_device, vs, nullptr); });
+
+	Vulkan::GraphicsPipelineBuilder gpb;
+	SetPipelineProvokingVertex(m_features, gpb);
+	AddUtilityVertexAttributes(gpb);
+	gpb.SetPipelineLayout(m_utility_pipeline_layout);
+	gpb.SetDynamicViewportAndScissorState();
+	gpb.AddDynamicState(VK_DYNAMIC_STATE_BLEND_CONSTANTS);
+	gpb.AddDynamicState(VK_DYNAMIC_STATE_LINE_WIDTH);
+	gpb.SetNoCullRasterizationState();
+	gpb.SetNoDepthTestState();
+	gpb.SetRenderPass(rp, 0);
+	gpb.SetVertexShader(vs);
+
+	for (int i = 0; i < static_cast<int>(m_merge.size()); i++)
+	{
+		VkShaderModule ps = GetUtilityFragmentShader(*shader, StringUtil::StdStringFromFormat("ps_main%d", i).c_str());
+		if (ps == VK_NULL_HANDLE)
+			return false;
+
+		gpb.SetFragmentShader(ps);
+		gpb.SetBlendAttachment(0, true, VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD,
+			VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD);
+
+		m_merge[i] = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+		vkDestroyShaderModule(m_device, ps, nullptr);
+		if (!m_merge[i])
+			return false;
+
+		Vulkan::SetObjectName(m_device, m_merge[i], "Merge pipeline %d", i);
+	}
+
+	return true;
+}
+
+bool GSDeviceVK::CompilePostProcessingPipelines()
+{
+	VkRenderPass rp =
+		GetRenderPass(LookupNativeFormat(GSTexture::Format::Color), VK_FORMAT_UNDEFINED, VK_ATTACHMENT_LOAD_OP_LOAD);
+	if (!rp)
+		return false;
+
+	Vulkan::GraphicsPipelineBuilder gpb;
+	SetPipelineProvokingVertex(m_features, gpb);
+	AddUtilityVertexAttributes(gpb);
+	gpb.SetPipelineLayout(m_utility_pipeline_layout);
+	gpb.SetDynamicViewportAndScissorState();
+	gpb.AddDynamicState(VK_DYNAMIC_STATE_BLEND_CONSTANTS);
+	gpb.AddDynamicState(VK_DYNAMIC_STATE_LINE_WIDTH);
+	gpb.SetNoCullRasterizationState();
+	gpb.SetNoDepthTestState();
+	gpb.SetNoBlendingState();
+	gpb.SetRenderPass(rp, 0);
+
+	{
+		const std::optional<std::string> vshader = ReadShaderSource("shaders/vulkan/convert.glsl");
+		if (!vshader)
+		{
+			Host::ReportErrorAsync("GS", "Failed to read shaders/vulkan/convert.glsl.");
+			return false;
+		}
+
+		const std::optional<std::string> pshader = ReadShaderSource("shaders/common/fxaa.fx");
+		if (!pshader)
+		{
+			Host::ReportErrorAsync("GS", "Failed to read shaders/common/fxaa.fx.");
+			return false;
+		}
+
+		const std::string psource = "#define FXAA_GLSL_VK 1\n" + *pshader;
+
+		VkShaderModule vs = GetUtilityVertexShader(*vshader);
+		if (vs == VK_NULL_HANDLE)
+			return false;
+		ScopedGuard vs_guard([this, &vs]() { vkDestroyShaderModule(m_device, vs, nullptr); });
+		VkShaderModule ps = GetUtilityFragmentShader(psource, "ps_main");
+		if (ps == VK_NULL_HANDLE)
+			return false;
+		ScopedGuard ps_guard([this, &ps]() { vkDestroyShaderModule(m_device, ps, nullptr); });
+		gpb.SetVertexShader(vs);
+		gpb.SetFragmentShader(ps);
+
+		m_fxaa_pipeline = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+		if (!m_fxaa_pipeline)
+			return false;
+
+		Vulkan::SetObjectName(m_device, m_fxaa_pipeline, "FXAA pipeline");
+	}
+
+	{
+		const std::optional<std::string> shader = ReadShaderSource("shaders/vulkan/shadeboost.glsl");
+		if (!shader)
+		{
+			Host::ReportErrorAsync("GS", "Failed to read shaders/vulkan/shadeboost.glsl.");
+			return false;
+		}
+
+		VkShaderModule vs = GetUtilityVertexShader(*shader);
+		ScopedGuard vs_guard([this, &vs]() { vkDestroyShaderModule(m_device, vs, nullptr); });
+		if (vs == VK_NULL_HANDLE)
+			return false;
+
+		VkShaderModule ps = GetUtilityFragmentShader(*shader);
+		ScopedGuard ps_guard([this, &ps]() { vkDestroyShaderModule(m_device, ps, nullptr); });
+		if (ps == VK_NULL_HANDLE)
+			return false;
+
+		gpb.SetVertexShader(vs);
+		gpb.SetFragmentShader(ps);
+
+		m_shadeboost_pipeline = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+		if (!m_shadeboost_pipeline)
+			return false;
+
+		Vulkan::SetObjectName(m_device, m_shadeboost_pipeline, "Shadeboost pipeline");
+	}
+
+	return true;
+}
+
+bool GSDeviceVK::CompileCASPipelines()
+{
+	VkDevice dev = m_device;
+	Vulkan::DescriptorSetLayoutBuilder dslb;
+	Vulkan::PipelineLayoutBuilder plb;
+
+	if (m_use_push_descriptors)
+		dslb.SetPushFlag();
+	dslb.AddBinding(0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT);
+	dslb.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT);
+	if ((m_cas_ds_layout = dslb.Create(dev)) == VK_NULL_HANDLE)
+		return false;
+	Vulkan::SetObjectName(dev, m_cas_ds_layout, "CAS descriptor layout");
+
+	plb.AddPushConstants(VK_SHADER_STAGE_COMPUTE_BIT, 0, NUM_CAS_CONSTANTS * sizeof(u32));
+	plb.AddDescriptorSet(m_cas_ds_layout);
+	if ((m_cas_pipeline_layout = plb.Create(dev)) == VK_NULL_HANDLE)
+		return false;
+	Vulkan::SetObjectName(dev, m_cas_pipeline_layout, "CAS pipeline layout");
+
+	// we use specialization constants to avoid compiling it twice
+	std::optional<std::string> cas_source = ReadShaderSource("shaders/vulkan/cas.glsl");
+	if (!cas_source.has_value() || !GetCASShaderSource(&cas_source.value()))
+		return false;
+
+	VkShaderModule mod = g_vulkan_shader_cache->GetComputeShader(cas_source->c_str());
+	ScopedGuard mod_guard = [this, &mod]() { vkDestroyShaderModule(m_device, mod, nullptr); };
+	if (mod == VK_NULL_HANDLE)
+		return false;
+
+	for (u8 sharpen_only = 0; sharpen_only < 2; sharpen_only++)
+	{
+		Vulkan::ComputePipelineBuilder cpb;
+		cpb.SetPipelineLayout(m_cas_pipeline_layout);
+		cpb.SetShader(mod, "main");
+		cpb.SetSpecializationBool(0, sharpen_only != 0);
+		m_cas_pipelines[sharpen_only] = cpb.Create(dev, g_vulkan_shader_cache->GetPipelineCache(true), false);
+		if (!m_cas_pipelines[sharpen_only])
+			return false;
+	}
+
+	m_features.cas_sharpening = true;
+	return true;
+}
+
+bool GSDeviceVK::CompileImGuiPipeline()
+{
+	const std::optional<std::string> glsl = ReadShaderSource("shaders/vulkan/imgui.glsl");
+	if (!glsl.has_value())
+	{
+		Console.Error("VK: Failed to read imgui.glsl");
+		return false;
+	}
+
+	VkShaderModule vs = GetUtilityVertexShader(glsl.value(), "vs_main");
+	if (vs == VK_NULL_HANDLE)
+	{
+		Console.Error("VK: Failed to compile ImGui vertex shader");
+		return false;
+	}
+	ScopedGuard vs_guard([this, &vs]() { vkDestroyShaderModule(m_device, vs, nullptr); });
+
+	VkShaderModule ps = GetUtilityFragmentShader(glsl.value(), "ps_main");
+	if (ps == VK_NULL_HANDLE)
+	{
+		Console.Error("VK: Failed to compile ImGui pixel shader");
+		return false;
+	}
+	ScopedGuard ps_guard([this, &ps]() { vkDestroyShaderModule(m_device, ps, nullptr); });
+
+	Vulkan::GraphicsPipelineBuilder gpb;
+	SetPipelineProvokingVertex(m_features, gpb);
+	gpb.SetPipelineLayout(m_utility_pipeline_layout);
+	gpb.SetRenderPass(m_swap_chain_render_pass, 0);
+	gpb.AddVertexBuffer(0, sizeof(ImDrawVert), VK_VERTEX_INPUT_RATE_VERTEX);
+	gpb.AddVertexAttribute(0, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(ImDrawVert, pos));
+	gpb.AddVertexAttribute(1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(ImDrawVert, uv));
+	gpb.AddVertexAttribute(2, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(ImDrawVert, col));
+	gpb.SetPrimitiveTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+	gpb.SetVertexShader(vs);
+	gpb.SetFragmentShader(ps);
+	gpb.SetNoCullRasterizationState();
+	gpb.SetNoDepthTestState();
+	gpb.SetBlendAttachment(0, true, VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD,
+		VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD);
+	gpb.SetDynamicViewportAndScissorState();
+	gpb.AddDynamicState(VK_DYNAMIC_STATE_BLEND_CONSTANTS);
+	gpb.AddDynamicState(VK_DYNAMIC_STATE_LINE_WIDTH);
+
+	m_imgui_pipeline = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(), false);
+	if (!m_imgui_pipeline)
+	{
+		Console.Error("VK: Failed to compile ImGui pipeline");
+		return false;
+	}
+
+	Vulkan::SetObjectName(m_device, m_imgui_pipeline, "ImGui pipeline");
+	return true;
+}
+
+void GSDeviceVK::RenderImGui()
+{
+	ImGui::Render();
+	const ImDrawData* draw_data = ImGui::GetDrawData();
+	if (draw_data->CmdListsCount == 0)
+		return;
+
+	UpdateImGuiTextures();
+
+	const GSVector4 uniforms(
+		2.0f / static_cast<float>(m_window_info.surface_width),
+		2.0f / static_cast<float>(m_window_info.surface_height),
+		-1.0f,
+		-1.0f);
+
+	SetUtilityPushConstants(&uniforms, sizeof(uniforms));
+	SetPipeline(m_imgui_pipeline);
+
+	if (m_utility_sampler != m_linear_sampler)
+	{
+		m_utility_sampler = m_linear_sampler;
+		m_dirty_flags |= DIRTY_FLAG_UTILITY_TEXTURE;
+	}
+
+	// this is for presenting, we don't want to screw with the viewport/scissor set by display
+	m_dirty_flags &= ~(DIRTY_FLAG_VIEWPORT | DIRTY_FLAG_SCISSOR);
+
+	for (int n = 0; n < draw_data->CmdListsCount; n++)
+	{
+		const ImDrawList* cmd_list = draw_data->CmdLists[n];
+
+		u32 vertex_offset;
+		{
+			const u32 size = sizeof(ImDrawVert) * static_cast<u32>(cmd_list->VtxBuffer.Size);
+			if (!m_vertex_stream_buffer.ReserveMemory(size, sizeof(ImDrawVert)))
+			{
+				Console.Warning("VK: Skipping ImGui draw because of no vertex buffer space");
+				return;
+			}
+
+			vertex_offset = m_vertex_stream_buffer.GetCurrentOffset() / sizeof(ImDrawVert);
+			std::memcpy(m_vertex_stream_buffer.GetCurrentHostPointer(), cmd_list->VtxBuffer.Data, size);
+			m_vertex_stream_buffer.CommitMemory(size);
+		}
+
+		static_assert(sizeof(ImDrawIdx) == sizeof(u16));
+		IASetIndexBuffer(cmd_list->IdxBuffer.Data, cmd_list->IdxBuffer.Size);
+
+		for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++)
+		{
+			const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[cmd_i];
+			pxAssert(!pcmd->UserCallback);
+
+			const GSVector4 clip = GSVector4::load<false>(&pcmd->ClipRect);
+			if ((clip.zwzw() <= clip.xyxy()).mask() != 0)
+				continue;
+
+			SetScissor(GSVector4i(clip).max_i32(GSVector4i::zero()));
+
+			// Since we don't have the GSTexture...
+			GSTextureVK* tex = reinterpret_cast<GSTextureVK*>(pcmd->GetTexID());
+			if (tex)
+				SetUtilityTexture(tex, m_linear_sampler);
+
+			if (ApplyUtilityState())
+			{
+				vkCmdDrawIndexed(GetCurrentCommandBuffer(), pcmd->ElemCount, 1, m_index.start + pcmd->IdxOffset,
+					vertex_offset + pcmd->VtxOffset, 0);
+			}
+		}
+
+		g_perfmon.Put(GSPerfMon::DrawCalls, cmd_list->CmdBuffer.Size);
+	}
+}
+
+void GSDeviceVK::RenderBlankFrame()
+{
+	VkResult res = m_swap_chain->AcquireNextImage();
+	if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
+	{
+		Console.Error("VK: Failed to acquire image for blank frame present");
+		return;
+	}
+
+	VkCommandBuffer cmdbuffer = GetCurrentCommandBuffer();
+	GSTextureVK* sctex = m_swap_chain->GetCurrentTexture();
+	sctex->TransitionToLayout(cmdbuffer, GSTextureVK::Layout::TransferDst);
+
+	constexpr VkImageSubresourceRange srr = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+	vkCmdClearColorImage(
+		cmdbuffer, sctex->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &s_present_clear_color.color, 1, &srr);
+
+	m_swap_chain->GetCurrentTexture()->TransitionToLayout(cmdbuffer, GSTextureVK::Layout::PresentSrc);
+	SubmitCommandBuffer(m_swap_chain.get());
+	ActivateCommandBuffer((m_current_frame + 1) % NUM_COMMAND_BUFFERS);
+}
+
+static constexpr GSTextureVK::Layout GetCASSourceLayout()
+{
+	return GSTextureVK::Layout::ComputeReadOnly;
+}
+
+bool GSDeviceVK::DoCAS(
+	GSTexture* sTex, GSTexture* dTex, bool sharpen_only, const std::array<u32, NUM_CAS_CONSTANTS>& constants)
+{
+	g_perfmon.Put(GSPerfMon::TextureCopies, 1);
+
+	EndRenderPass();
+
+	GSTextureVK* const sTexVK = static_cast<GSTextureVK*>(sTex);
+	GSTextureVK* const dTexVK = static_cast<GSTextureVK*>(dTex);
+	VkCommandBuffer cmdbuf = GetCurrentCommandBuffer();
+
+	sTexVK->TransitionToLayout(cmdbuf, GetCASSourceLayout());
+	dTexVK->TransitionToLayout(cmdbuf, GSTextureVK::Layout::ComputeReadWriteImage);
+
+	// only happening once a frame, so the update isn't a huge deal.
+	Vulkan::DescriptorSetUpdateBuilder dsub;
+	dsub.AddImageDescriptorWrite(VK_NULL_HANDLE, 0, sTexVK->GetView(), sTexVK->GetVkLayout());
+	dsub.AddStorageImageDescriptorWrite(VK_NULL_HANDLE, 1, dTexVK->GetView(), dTexVK->GetVkLayout());
+	if (m_use_push_descriptors)
+	{
+		dsub.PushUpdate(cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, m_cas_pipeline_layout, 0, false);
+	}
+	else
+	{
+		const VkDescriptorSet ds = AllocateFrameDescriptorSet(m_cas_ds_layout);
+		if (ds == VK_NULL_HANDLE)
+			return false;
+
+		dsub.UpdateToDescriptorSet(m_device, ds, true);
+		vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, m_cas_pipeline_layout, 0, 1, &ds, 0,
+			nullptr);
+	}
+
+	// the actual meat and potatoes! only four commands.
+	static const int threadGroupWorkRegionDim = 16;
+	const int dispatchX = (dTex->GetWidth() + (threadGroupWorkRegionDim - 1)) / threadGroupWorkRegionDim;
+	const int dispatchY = (dTex->GetHeight() + (threadGroupWorkRegionDim - 1)) / threadGroupWorkRegionDim;
+
+	vkCmdPushConstants(cmdbuf, m_cas_pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, NUM_CAS_CONSTANTS * sizeof(u32),
+		constants.data());
+	vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, m_cas_pipelines[static_cast<u8>(sharpen_only)]);
+	vkCmdDispatch(cmdbuf, dispatchX, dispatchY, 1);
+
+	dTexVK->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+
+	// all done!
+	return true;
+}
+
+void GSDeviceVK::DestroyResources()
+{
+	if (m_tfx_ubo_descriptor_set != VK_NULL_HANDLE)
+		FreePersistentDescriptorSet(m_tfx_ubo_descriptor_set);
+
+	m_hot_tfx_pipelines.Clear();
+	for (auto& it : m_tfx_pipelines)
+		vkDestroyPipeline(m_device, it.second, nullptr);
+	for (auto& it : m_tfx_fragment_shaders)
+		vkDestroyShaderModule(m_device, it.second, nullptr);
+	for (auto& it : m_tfx_vertex_shaders)
+		vkDestroyShaderModule(m_device, it.second, nullptr);
+	for (VkPipeline it : m_interlace)
+	{
+		if (it != VK_NULL_HANDLE)
+			vkDestroyPipeline(m_device, it, nullptr);
+	}
+	for (VkPipeline it : m_merge)
+	{
+		if (it != VK_NULL_HANDLE)
+			vkDestroyPipeline(m_device, it, nullptr);
+	}
+	for (VkPipeline it : m_present)
+	{
+		if (it != VK_NULL_HANDLE)
+			vkDestroyPipeline(m_device, it, nullptr);
+	}
+	for (const auto& pipe : m_convert)
+	{
+		if (pipe != VK_NULL_HANDLE)
+			vkDestroyPipeline(m_device, pipe, nullptr);
+	}
+	for (u32 ds = 0; ds < 2; ds++)
+	{
+		for (u32 fbl = 0; fbl < 2; fbl++)
+		{
+			if (m_colclip_setup_pipelines[ds][fbl] != VK_NULL_HANDLE)
+				vkDestroyPipeline(m_device, m_colclip_setup_pipelines[ds][fbl], nullptr);
+			if (m_colclip_finish_pipelines[ds][fbl] != VK_NULL_HANDLE)
+				vkDestroyPipeline(m_device, m_colclip_finish_pipelines[ds][fbl], nullptr);
+		}
+	}
+	for (u32 ds = 0; ds < 2; ds++)
+	{
+		for (u32 datm = 0; datm < 4; datm++)
+		{
+			if (m_primid_image_setup_pipelines[ds][datm] != VK_NULL_HANDLE)
+				vkDestroyPipeline(m_device, m_primid_image_setup_pipelines[ds][datm], nullptr);
+		}
+	}
+	if (m_fxaa_pipeline != VK_NULL_HANDLE)
+		vkDestroyPipeline(m_device, m_fxaa_pipeline, nullptr);
+	if (m_shadeboost_pipeline != VK_NULL_HANDLE)
+		vkDestroyPipeline(m_device, m_shadeboost_pipeline, nullptr);
+
+	for (VkPipeline it : m_cas_pipelines)
+	{
+		if (it != VK_NULL_HANDLE)
+			vkDestroyPipeline(m_device, it, nullptr);
+	}
+	if (m_cas_pipeline_layout != VK_NULL_HANDLE)
+		vkDestroyPipelineLayout(m_device, m_cas_pipeline_layout, nullptr);
+	if (m_cas_ds_layout != VK_NULL_HANDLE)
+		vkDestroyDescriptorSetLayout(m_device, m_cas_ds_layout, nullptr);
+	if (m_imgui_pipeline != VK_NULL_HANDLE)
+		vkDestroyPipeline(m_device, m_imgui_pipeline, nullptr);
+
+	for (const auto& it : m_samplers)
+	{
+		if (it.second != VK_NULL_HANDLE)
+			vkDestroySampler(m_device, it.second, nullptr);
+	}
+	m_samplers.clear();
+
+	m_texture_stream_buffer.Destroy(false);
+	m_fragment_uniform_stream_buffer.Destroy(false);
+	m_vertex_uniform_stream_buffer.Destroy(false);
+	m_index_stream_buffer.Destroy(false);
+	m_expand_index_stream_buffer.Destroy(false);
+	m_vertex_stream_buffer.Destroy(false);
+	if (m_expand_index_buffer != VK_NULL_HANDLE)
+	{
+		vmaDestroyBuffer(m_allocator, m_expand_index_buffer, m_expand_index_buffer_allocation);
+		m_expand_index_buffer = VK_NULL_HANDLE;
+		m_expand_index_buffer_allocation = VK_NULL_HANDLE;
+	}
+
+	if (m_tfx_pipeline_layout != VK_NULL_HANDLE)
+		vkDestroyPipelineLayout(m_device, m_tfx_pipeline_layout, nullptr);
+	if (m_tfx_texture_ds_layout != VK_NULL_HANDLE)
+		vkDestroyDescriptorSetLayout(m_device, m_tfx_texture_ds_layout, nullptr);
+	if (m_tfx_ubo_ds_layout != VK_NULL_HANDLE)
+		vkDestroyDescriptorSetLayout(m_device, m_tfx_ubo_ds_layout, nullptr);
+	if (m_utility_pipeline_layout != VK_NULL_HANDLE)
+		vkDestroyPipelineLayout(m_device, m_utility_pipeline_layout, nullptr);
+	if (m_utility_ds_layout != VK_NULL_HANDLE)
+		vkDestroyDescriptorSetLayout(m_device, m_utility_ds_layout, nullptr);
+
+	if (m_null_framebuffer != VK_NULL_HANDLE)
+	{
+		vkDestroyFramebuffer(m_device, m_null_framebuffer, nullptr);
+		m_null_framebuffer = VK_NULL_HANDLE;
+	}
+
+	if (m_null_texture)
+	{
+		m_null_texture->Destroy(false);
+		m_null_texture.reset();
+	}
+
+	for (FrameResources& resources : m_frame_resources)
+	{
+		for (auto& it : resources.cleanup_resources)
+			it();
+		resources.cleanup_resources.clear();
+
+		if (resources.fence != VK_NULL_HANDLE)
+			vkDestroyFence(m_device, resources.fence, nullptr);
+		if (resources.command_buffers[0] != VK_NULL_HANDLE)
+		{
+			vkFreeCommandBuffers(m_device, resources.command_pool, static_cast<u32>(resources.command_buffers.size()),
+				resources.command_buffers.data());
+		}
+		if (resources.command_pool != VK_NULL_HANDLE)
+			vkDestroyCommandPool(m_device, resources.command_pool, nullptr);
+		if (resources.descriptor_pool != VK_NULL_HANDLE)
+			vkDestroyDescriptorPool(m_device, resources.descriptor_pool, nullptr);
+		for (VkDescriptorPool pool : resources.extra_descriptor_pools)
+			vkDestroyDescriptorPool(m_device, pool, nullptr);
+	}
+
+	if (m_timestamp_query_pool != VK_NULL_HANDLE)
+		vkDestroyQueryPool(m_device, m_timestamp_query_pool, nullptr);
+
+	if (m_pipeline_statistics_query_pool != VK_NULL_HANDLE)
+		vkDestroyQueryPool(m_device, m_pipeline_statistics_query_pool, nullptr);
+
+	if (m_global_descriptor_pool != VK_NULL_HANDLE)
+		vkDestroyDescriptorPool(m_device, m_global_descriptor_pool, nullptr);
+
+	for (auto& it : m_render_pass_cache)
+		vkDestroyRenderPass(m_device, it.second, nullptr);
+	m_render_pass_cache.clear();
+
+	if (m_allocator != VK_NULL_HANDLE)
+	{
+		vmaDestroyAllocator(m_allocator);
+		m_allocator = VK_NULL_HANDLE;
+	}
+}
+
+VkShaderModule GSDeviceVK::GetTFXVertexShader(GSHWDrawConfig::VSSelector sel)
+{
+	{
+		std::lock_guard lock(m_tfx_shaders_mutex);
+		const auto it = m_tfx_vertex_shaders.find(sel.key);
+		if (it != m_tfx_vertex_shaders.end())
+			return it->second;
+	}
+
+	const TFXShaderSourceCapabilities capabilities = {
+		m_features.rov,
+		m_features.texture_barrier,
+		m_features.texture_barrier && UseFeedbackLoopLayout(),
+		HasMobileGPUProfile(),
+		m_features.provoking_vertex_last};
+	VkShaderModule mod = g_vulkan_shader_cache->GetVertexShader(
+		BuildTFXVertexShaderSource(m_tfx_source, sel, capabilities));
+	if (mod)
+		Vulkan::SetObjectName(m_device, mod, "TFX Vertex %08X", sel.key);
+
+	std::lock_guard lock(m_tfx_shaders_mutex);
+	const auto [it, inserted] = m_tfx_vertex_shaders.emplace(sel.key, mod);
+	if (!inserted)
+	{
+		if (mod != VK_NULL_HANDLE)
+			vkDestroyShaderModule(m_device, mod, nullptr);
+
+		return it->second;
+	}
+
+	return mod;
+}
+
+VkShaderModule GSDeviceVK::GetTFXFragmentShader(const GSHWDrawConfig::PSSelector& sel)
+{
+	{
+		std::lock_guard lock(m_tfx_shaders_mutex);
+		const auto it = m_tfx_fragment_shaders.find(sel);
+		if (it != m_tfx_fragment_shaders.end())
+			return it->second;
+	}
+
+	const TFXShaderSourceCapabilities capabilities = {
+		m_features.rov,
+		m_features.texture_barrier,
+		m_features.texture_barrier && UseFeedbackLoopLayout(),
+		HasMobileGPUProfile(),
+		m_features.provoking_vertex_last};
+	VkShaderModule mod = g_vulkan_shader_cache->GetFragmentShader(
+		BuildTFXFragmentShaderSource(m_tfx_source, sel, capabilities));
+	if (mod)
+		Vulkan::SetObjectName(m_device, mod, "TFX Fragment %016" PRIX64 "_%016" PRIX64, sel.key_hi, sel.key_lo);
+
+	std::lock_guard lock(m_tfx_shaders_mutex);
+	const auto [it, inserted] = m_tfx_fragment_shaders.emplace(sel, mod);
+	if (!inserted)
+	{
+		if (mod != VK_NULL_HANDLE)
+			vkDestroyShaderModule(m_device, mod, nullptr);
+
+		return it->second;
+	}
+
+	return mod;
+}
+
+void GSDeviceVK::ConfigureTFXBlendPipeline(Vulkan::GraphicsPipelineBuilder& gpb,
+	const PipelineSelector& p, const GSHWDrawConfig::BlendState& pbs)
+{
+	// Blending
+	if (IsDATEModePrimIDInit(p.ps.date))
+	{
+		// image DATE prepass
+		gpb.SetBlendAttachment(0, true, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_MIN, VK_BLEND_FACTOR_ONE,
+			VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD, VK_COLOR_COMPONENT_R_BIT);
+	}
+	else if (pbs.enable)
+	{
+		// clang-format off
+		static constexpr std::array<VkBlendFactor, 16> vk_blend_factors = { {
+			VK_BLEND_FACTOR_SRC_COLOR, VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR, VK_BLEND_FACTOR_DST_COLOR, VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR,
+			VK_BLEND_FACTOR_SRC1_COLOR, VK_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR, VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+			VK_BLEND_FACTOR_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_SRC1_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA,
+			VK_BLEND_FACTOR_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO
+		}};
+		static constexpr std::array<VkBlendOp, 3> vk_blend_ops = {{
+				VK_BLEND_OP_ADD, VK_BLEND_OP_SUBTRACT, VK_BLEND_OP_REVERSE_SUBTRACT
+		}};
+		// clang-format on
+
+		gpb.SetBlendAttachment(0, true, vk_blend_factors[pbs.src_factor], vk_blend_factors[pbs.dst_factor],
+			vk_blend_ops[pbs.op], vk_blend_factors[pbs.src_factor_alpha], vk_blend_factors[pbs.dst_factor_alpha],
+			VK_BLEND_OP_ADD, p.cms.wrgba);
+	}
+	else
+	{
+		gpb.SetBlendAttachment(0, false, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD,
+			VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD, p.cms.wrgba);
+	}
+
+}
+
+VkPipeline GSDeviceVK::CreateTFXPipelineWithCache(
+	const PipelineSelector& p, VkPipelineCache pipeline_cache, bool lock_pipeline_cache)
+{
+#if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	static const bool trace_compile = []() {
+		char value[PROP_VALUE_MAX] = {};
+		return __system_property_get("debug.emucorex.gs_compile_trace", value) == 1 && value[0] == '1';
+	}();
+	using CompileClock = std::chrono::steady_clock;
+	const auto compile_start = trace_compile ? CompileClock::now() : CompileClock::time_point{};
+	auto shaders_end = compile_start;
+	double driver_ms = 0;
+	bool compile_success = false;
+	ScopedGuard compile_trace([&]() {
+		if (!trace_compile) return;
+		static std::atomic<u32> foreground_records{0}, background_records{0};
+		auto& records = lock_pipeline_cache ? foreground_records : background_records;
+		if (records.fetch_add(1, std::memory_order_relaxed) >= (lock_pipeline_cache ? 512u : 128u)) return;
+		const double total_ms = std::chrono::duration<double, std::milli>(CompileClock::now() - compile_start).count();
+		const double shader_ms = std::chrono::duration<double, std::milli>(shaders_end - compile_start).count();
+		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "GSCompile",
+			"foreground=%u success=%u total_ms=%.3f shader_ms=%.3f driver_ms=%.3f vs=%08x ps=%016" PRIX64 "_%016" PRIX64 " baked_hits_total=%u",
+			lock_pipeline_cache ? 1u : 0u, compile_success ? 1u : 0u, total_ms, shader_ms, driver_ms, p.vs.key, p.ps.key_hi, p.ps.key_lo,
+			GSShaderCompileIndicator::GetBakedHitCount());
+	});
+#endif
+	static constexpr std::array<VkPrimitiveTopology, 3> topology_lookup = {{
+		VK_PRIMITIVE_TOPOLOGY_POINT_LIST, // Point
+		VK_PRIMITIVE_TOPOLOGY_LINE_LIST, // Line
+		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, // Triangle
+	}};
+
+	GSHWDrawConfig::BlendState pbs{p.bs};
+	GSHWDrawConfig::PSSelector pps{p.ps};
+	if (!p.bs.IsEffective(p.cms))
+	{
+		// disable blending when colours are masked
+		pbs = {};
+		pps.no_color1 = true;
+	}
+
+	VkShaderModule vs = GetTFXVertexShader(p.vs);
+	VkShaderModule fs = GetTFXFragmentShader(pps);
+#if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (trace_compile) shaders_end = CompileClock::now();
+#endif
+	if (vs == VK_NULL_HANDLE || fs == VK_NULL_HANDLE)
+		return VK_NULL_HANDLE;
+
+	Vulkan::GraphicsPipelineBuilder gpb;
+	SetPipelineProvokingVertex(m_features, gpb);
+
+	// Common state
+	gpb.SetPipelineLayout(m_tfx_pipeline_layout);
+	if (IsDATEModePrimIDInit(p.ps.date))
+	{
+		// DATE image prepass
+		gpb.SetRenderPass(m_primid_image_setup_render_passes[p.ds][0], 0);
+	}
+	else
+	{
+		gpb.SetRenderPass(
+			GetTFXRenderPass(p.rt, p.ds, p.ps.colclip_hw, p.dss.date,
+				p.IsRTFeedbackLoop(), p.IsTestingAndSamplingDepth(),
+				p.rt ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+				p.ds ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_DONT_CARE),
+			0);
+	}
+	gpb.SetPrimitiveTopology(topology_lookup[p.topology]);
+	gpb.SetRasterizationState(VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+	if (m_optional_extensions.vk_ext_line_rasterization &&
+		p.topology == static_cast<u8>(GSHWDrawConfig::Topology::Line))
+	{
+		gpb.SetLineRasterizationMode(VK_LINE_RASTERIZATION_MODE_BRESENHAM_EXT);
+	}
+	gpb.SetDynamicViewportAndScissorState();
+	gpb.AddDynamicState(VK_DYNAMIC_STATE_BLEND_CONSTANTS);
+	gpb.AddDynamicState(VK_DYNAMIC_STATE_LINE_WIDTH);
+
+	// Shaders
+	gpb.SetVertexShader(vs);
+	gpb.SetFragmentShader(fs);
+
+	// IA
+	if (p.vs.expand == GSHWDrawConfig::VSExpand::None)
+	{
+		gpb.AddVertexBuffer(0, sizeof(GSVertex));
+		gpb.AddVertexAttribute(0, 0, VK_FORMAT_R32G32_SFLOAT, 0); // ST
+		gpb.AddVertexAttribute(1, 0, VK_FORMAT_R8G8B8A8_UINT, 8); // RGBA
+		gpb.AddVertexAttribute(2, 0, VK_FORMAT_R32_SFLOAT, 12); // Q
+		gpb.AddVertexAttribute(3, 0, VK_FORMAT_R16G16_UINT, 16); // XY
+		gpb.AddVertexAttribute(4, 0, VK_FORMAT_R32_UINT, 20); // Z
+		gpb.AddVertexAttribute(5, 0, VK_FORMAT_R16G16_UINT, 24); // UV
+		gpb.AddVertexAttribute(6, 0, VK_FORMAT_R8G8B8A8_UNORM, 28); // FOG
+	}
+
+	// DepthStencil
+	static const VkCompareOp ztst[] = {
+		VK_COMPARE_OP_NEVER, VK_COMPARE_OP_ALWAYS, VK_COMPARE_OP_GREATER_OR_EQUAL, VK_COMPARE_OP_GREATER};
+	gpb.SetDepthState((p.dss.ztst != ZTST_ALWAYS || p.dss.zwe), p.dss.zwe, ztst[p.dss.ztst]);
+	if (p.dss.date)
+	{
+		const VkStencilOpState sos{VK_STENCIL_OP_KEEP, p.dss.date_one ? VK_STENCIL_OP_ZERO : VK_STENCIL_OP_KEEP,
+			VK_STENCIL_OP_KEEP, VK_COMPARE_OP_EQUAL, 1u, 1u, 1u};
+		gpb.SetStencilState(true, sos, sos);
+	}
+
+	ConfigureTFXBlendPipeline(gpb, p, pbs);
+
+	// Tests have shown that it's faster to just enable rast order on the entire pass, rather than alternating
+	// between turning it on and off for different draws, and adding the required barrier between non-rast-order
+	// and rast-order draws.
+	ConfigureTFXFeedbackPipeline(gpb, p);
+
+#if defined(__ANDROID__)
+	// If the PowerVR driver aborts inside vkCreateGraphicsPipelines, the crash handler
+	// reports this selector so the exact failing variant can be identified.
+	if (IsDevicePowerVR() && EmuCoreXRecordTFXCompileSelector)
+		EmuCoreXRecordTFXCompileSelector(p.vs.key, p.ps.key_hi, p.ps.key_lo);
+#endif
+
+	VkPipeline pipeline;
+	if (lock_pipeline_cache)
+	{
+		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex());
+#if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		const auto driver_start = trace_compile ? CompileClock::now() : CompileClock::time_point{};
+#endif
+		pipeline = gpb.Create(m_device, pipeline_cache);
+#if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (trace_compile) driver_ms = std::chrono::duration<double, std::milli>(CompileClock::now() - driver_start).count();
+#endif
+	}
+	else
+	{
+#if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		const auto driver_start = trace_compile ? CompileClock::now() : CompileClock::time_point{};
+#endif
+		pipeline = gpb.Create(m_device, pipeline_cache);
+#if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (trace_compile) driver_ms = std::chrono::duration<double, std::milli>(CompileClock::now() - driver_start).count();
+#endif
+	}
+
+#if defined(__ANDROID__)
+	if (IsDevicePowerVR() && EmuCoreXClearTFXCompileSelector)
+		EmuCoreXClearTFXCompileSelector();
+#endif
+
+	if (pipeline)
+	{
+		Vulkan::SetObjectName(
+			m_device, pipeline, "TFX Pipeline %08X/%016" PRIX64 "_%016" PRIX64, p.vs.key, p.ps.key_hi, p.ps.key_lo);
+	}
+
+#if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	compile_success = pipeline != VK_NULL_HANDLE;
+#endif
+	return pipeline;
+}
+
+size_t GSDeviceVK::TFXPipelineCache::Index(const PipelineSelector& p)
+{
+	std::array<u32, sizeof(PipelineSelector) / sizeof(u32)> words;
+	std::memcpy(words.data(), &p, sizeof(p));
+	u32 hash = 0;
+	for (const u32 word : words)
+		hash ^= word;
+	hash ^= hash >> 16;
+	hash ^= hash >> 8;
+	hash ^= hash >> 4;
+	return hash & 63;
+}
+
+VkPipeline GSDeviceVK::TFXPipelineCache::Lookup(const PipelineSelector& p)
+{
+	if (last.pipeline != VK_NULL_HANDLE && last.selector == p)
+		return last.pipeline;
+
+	const Entry& entry = entries[Index(p)];
+	if (entry.pipeline == VK_NULL_HANDLE || entry.selector != p)
+		return VK_NULL_HANDLE;
+
+	std::memcpy(&last.selector, &p, sizeof(p));
+	last.pipeline = entry.pipeline;
+	return entry.pipeline;
+}
+
+void GSDeviceVK::TFXPipelineCache::Insert(const PipelineSelector& p, VkPipeline pipeline)
+{
+	if (pipeline == VK_NULL_HANDLE)
+		return;
+	// Equality includes the complete object representation, including tail padding.
+	// Copy bytes explicitly rather than creating an aggregate temporary with indeterminate padding.
+	std::memcpy(&last.selector, &p, sizeof(p));
+	last.pipeline = pipeline;
+	Entry& entry = entries[Index(p)];
+	std::memcpy(&entry.selector, &p, sizeof(p));
+	entry.pipeline = pipeline;
+}
+
+void GSDeviceVK::TFXPipelineCache::Clear()
+{
+	last.pipeline = VK_NULL_HANDLE;
+	for (Entry& entry : entries)
+		entry.pipeline = VK_NULL_HANDLE;
+}
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+bool GSDeviceVK::TestTFXPipelineCache()
+{
+	TFXPipelineCache cache;
+	PipelineSelector a;
+	PipelineSelector b;
+	b.ps.key_lo = 1;
+	const auto first = reinterpret_cast<VkPipeline>(static_cast<uintptr_t>(1));
+	const auto second = reinterpret_cast<VkPipeline>(static_cast<uintptr_t>(2));
+	if (cache.Lookup(a) != VK_NULL_HANDLE)
+		return false;
+	cache.Insert(a, first);
+	cache.Insert(b, second);
+	if (cache.Lookup(a) != first || cache.Lookup(b) != second)
+		return false;
+	cache.Insert(a, VK_NULL_HANDLE);
+	if (cache.Lookup(a) != first)
+		return false;
+
+	PipelineSelector collision;
+	collision.ps.key_lo = 1;
+	collision.ps.key_hi = 1;
+	if (TFXPipelineCache::Index(a) != TFXPipelineCache::Index(collision))
+		return false;
+	cache.Insert(collision, second);
+	if (cache.Lookup(a) != VK_NULL_HANDLE || cache.Lookup(collision) != second)
+		return false;
+
+	// Every bit participates in exact comparison, even if the small index collides.
+	for (size_t bit = 0; bit < sizeof(PipelineSelector) * 8; ++bit)
+	{
+		std::array<u8, sizeof(PipelineSelector)> bytes{};
+		bytes[bit / 8] ^= static_cast<u8>(1u << (bit % 8));
+		PipelineSelector changed;
+		std::memcpy(&changed, bytes.data(), sizeof(changed));
+		cache.Clear();
+		cache.Insert(a, first);
+		if (cache.Lookup(changed) != VK_NULL_HANDLE)
+			return false;
+		cache.Insert(changed, second);
+		if (cache.Lookup(changed) != second || cache.Lookup(a) == second)
+			return false;
+	}
+
+	cache.Clear();
+	for (u32 i = 0; i < 64; ++i)
+	{
+		PipelineSelector key;
+		key.ps.key_lo = i;
+		cache.Insert(key, reinterpret_cast<VkPipeline>(static_cast<uintptr_t>(i + 1)));
+	}
+	for (u32 i = 0; i < 64; ++i)
+	{
+		PipelineSelector key;
+		key.ps.key_lo = i;
+		if (cache.Lookup(key) != reinterpret_cast<VkPipeline>(static_cast<uintptr_t>(i + 1)))
+			return false;
+	}
+	cache.Clear();
+	for (u32 i = 0; i < 64; ++i)
+	{
+		PipelineSelector key;
+		key.ps.key_lo = i;
+		if (cache.Lookup(key) != VK_NULL_HANDLE)
+			return false;
+	}
+	return true;
+}
+#endif
+
+VkPipeline GSDeviceVK::GetTFXPipeline(const PipelineSelector& p)
+{
+	if (const VkPipeline cached = m_hot_tfx_pipelines.Lookup(p); cached != VK_NULL_HANDLE)
+		return cached;
+
+	{
+		std::lock_guard lock(m_tfx_pipelines_mutex);
+		const auto it = m_tfx_pipelines.find(p);
+		if (it != m_tfx_pipelines.end() && it->second != VK_NULL_HANDLE)
+		{
+			m_hot_tfx_pipelines.Insert(p, it->second);
+			return it->second;
+		}
+	}
+
+	const VkPipeline pipeline =
+		PublishTFXPipeline(p, CreateTFXPipelineWithCache(p, g_vulkan_shader_cache->GetPipelineCache(true), true));
+	m_hot_tfx_pipelines.Insert(p, pipeline);
+
+	// Persist the pipeline cache every N new compiles so an OOM-kill or crash mid-session does
+	// not throw the batch away. The flush is rate-limited internally, and it never runs while
+	// m_tfx_pipelines_mutex is held.
+	static constexpr u32 PIPELINE_CACHE_FLUSH_THRESHOLD = 256;
+	if (pipeline != VK_NULL_HANDLE &&
+		++m_tfx_pipeline_compile_counter >= PIPELINE_CACHE_FLUSH_THRESHOLD)
+	{
+		m_tfx_pipeline_compile_counter = 0;
+		g_vulkan_shader_cache->FlushPipelineCache();
+	}
+
+	return pipeline;
+}
+
+namespace
+{
+size_t BuildTFXWarmupOrder(const std::vector<GSDeviceVK::PipelineSelector>& generic,
+	const std::deque<GSDeviceVK::PipelineSelector>& learned,
+	std::vector<GSDeviceVK::PipelineSelector>& out)
+{
+	out.clear();
+	out.reserve(generic.size() + learned.size());
+
+	std::unordered_set<GSDeviceVK::PipelineSelector, GSDeviceVK::PipelineSelectorHash> present;
+	present.reserve(generic.size() + learned.size());
+	size_t learned_count = 0;
+
+	for (auto it = learned.rbegin(); it != learned.rend(); ++it)
+	{
+		if (present.insert(*it).second)
+		{
+			out.push_back(*it);
+			learned_count++;
+		}
+	}
+
+	for (const GSDeviceVK::PipelineSelector& p : generic)
+	{
+		if (present.insert(p).second)
+			out.push_back(p);
+	}
+
+	return learned_count;
+}
+} // namespace
+
+std::string GSDeviceVK::BuildTFXVertexShaderSource(std::string_view tfx_source, GSHWDrawConfig::VSSelector selector,
+	const TFXShaderSourceCapabilities& capabilities)
+{
+	std::stringstream ss;
+	AddShaderHeader(ss, capabilities);
+	AddShaderStageMacro(ss, true, false, false);
+	AddMacro(ss, "VS_TME", selector.tme);
+	AddMacro(ss, "VS_FST", selector.fst);
+	AddMacro(ss, "VS_IIP", selector.iip);
+	AddMacro(ss, "VS_POINT_SIZE", selector.point_size);
+	AddMacro(ss, "VS_EXPAND", static_cast<int>(selector.expand));
+	AddMacro(ss, "VS_SPRITE_EDGE_CLAMP", selector.sprite_edge_clamp);
+	AddMacro(ss, "VS_PROVOKING_VERTEX_LAST", static_cast<int>(capabilities.provoking_vertex_last));
+	ss << tfx_source;
+	return ss.str();
+}
+
+std::string GSDeviceVK::BuildTFXFragmentShaderSource(std::string_view tfx_source,
+	const GSHWDrawConfig::PSSelector& selector, const TFXShaderSourceCapabilities& capabilities)
+{
+	std::stringstream ss;
+	AddShaderHeader(ss, capabilities);
+	AddShaderStageMacro(ss, false, false, true);
+	AddMacro(ss, "PS_FST", selector.fst);
+	AddMacro(ss, "PS_WMS", selector.wms);
+	AddMacro(ss, "PS_WMT", selector.wmt);
+	AddMacro(ss, "PS_ADJS", selector.adjs);
+	AddMacro(ss, "PS_ADJT", selector.adjt);
+	AddMacro(ss, "PS_AEM_FMT", selector.aem_fmt);
+	AddMacro(ss, "PS_PAL_FMT", selector.pal_fmt);
+	AddMacro(ss, "PS_DST_FMT", selector.dst_fmt);
+	AddMacro(ss, "PS_DEPTH_FMT", selector.depth_fmt);
+	AddMacro(ss, "PS_CHANNEL_FETCH", selector.channel);
+	AddMacro(ss, "PS_URBAN_CHAOS_HLE", selector.urban_chaos_hle);
+	AddMacro(ss, "PS_TALES_OF_ABYSS_HLE", selector.tales_of_abyss_hle);
+	AddMacro(ss, "PS_AEM", selector.aem);
+	AddMacro(ss, "PS_TFX", selector.tfx);
+	AddMacro(ss, "PS_TCC", selector.tcc);
+	AddMacro(ss, "PS_ATST", static_cast<u32>(selector.atst));
+	AddMacro(ss, "PS_AFAIL", static_cast<u32>(selector.afail));
+	AddMacro(ss, "PS_FOG", selector.fog);
+	AddMacro(ss, "PS_BLEND_HW", selector.blend_hw);
+	AddMacro(ss, "PS_A_MASKED", selector.a_masked);
+	AddMacro(ss, "PS_FBA", selector.fba);
+	AddMacro(ss, "PS_LTF", selector.ltf);
+	AddMacro(ss, "PS_AUTOMATIC_LOD", selector.automatic_lod);
+	AddMacro(ss, "PS_MANUAL_LOD", selector.manual_lod);
+	AddMacro(ss, "PS_COLCLIP", selector.colclip);
+	AddMacro(ss, "PS_DATE", selector.date);
+	AddMacro(ss, "PS_TCOFFSETHACK", selector.tcoffsethack);
+	AddMacro(ss, "PS_REGION_RECT", selector.region_rect);
+	AddMacro(ss, "PS_SPRITE_EDGE_CLAMP", selector.sprite_edge_clamp);
+	AddMacro(ss, "PS_AF_IN_SRC1", selector.af_in_src1);
+	AddMacro(ss, "PS_BLEND_A", selector.blend_a);
+	AddMacro(ss, "PS_BLEND_B", selector.blend_b);
+	AddMacro(ss, "PS_BLEND_C", selector.blend_c);
+	AddMacro(ss, "PS_BLEND_D", selector.blend_d);
+	AddMacro(ss, "PS_BLEND_MIX", selector.blend_mix);
+	AddMacro(ss, "PS_ROUND_INV", selector.round_inv);
+	AddMacro(ss, "PS_FIXED_ONE_A", selector.fixed_one_a);
+	AddMacro(ss, "PS_IIP", selector.iip);
+	AddMacro(ss, "PS_SHUFFLE", selector.shuffle);
+	AddMacro(ss, "PS_SHUFFLE_SAME", selector.shuffle_same);
+	AddMacro(ss, "PS_PROCESS_BA", selector.process_ba);
+	AddMacro(ss, "PS_PROCESS_RG", selector.process_rg);
+	AddMacro(ss, "PS_SHUFFLE_ACROSS", selector.shuffle_across);
+	AddMacro(ss, "PS_READ16_SRC", selector.real16src);
+	AddMacro(ss, "PS_WRITE_RG", selector.write_rg);
+	AddMacro(ss, "PS_FBMASK", selector.fbmask);
+	AddMacro(ss, "PS_COLCLIP_HW", selector.colclip_hw);
+	AddMacro(ss, "PS_RTA_CORRECTION", selector.rta_correction);
+	AddMacro(ss, "PS_RTA_SRC_CORRECTION", selector.rta_source_correction);
+	AddMacro(ss, "PS_DITHER", selector.dither);
+	AddMacro(ss, "PS_DITHER_ADJUST", selector.dither_adjust);
+	AddMacro(ss, "PS_ZCLAMP", selector.zclamp);
+	AddMacro(ss, "PS_ZFLOOR", selector.zfloor);
+	AddMacro(ss, "PS_ZWRITE", selector.zwrite);
+	AddMacro(ss, "PS_PABE", selector.pabe);
+	AddMacro(ss, "PS_SCANMSK", selector.scanmsk);
+	AddMacro(ss, "PS_TEX_IS_FB", selector.tex_is_fb);
+	AddMacro(ss, "PS_NO_COLOR", selector.no_color);
+	AddMacro(ss, "PS_NO_COLOR1", selector.no_color1);
+	AddMacro(ss, "PS_ZTST", selector.ztst);
+	AddMacro(ss, "PS_COLOR_FEEDBACK", selector.color_feedback);
+	AddMacro(ss, "PS_DEPTH_FEEDBACK", selector.depth_feedback);
+	AddMacro(ss, "PS_AA1", static_cast<u32>(selector.aa1));
+	AddMacro(ss, "PS_ABE", selector.abe);
+	AddMacro(ss, "PS_ANISOTROPIC_FILTERING", selector.sw_aniso);
+	AddMacro(ss, "PS_ROV_COLOR", selector.rov_color);
+	AddMacro(ss, "PS_ROV_DEPTH", static_cast<u32>(selector.rov_depth));
+	ss << tfx_source;
+	return ss.str();
+}
+
+GSDeviceVK::TFXShaderSourceCatalog GSDeviceVK::BuildTFXShaderSourceCatalog(std::string_view tfx_source,
+	const TFXShaderSourceCapabilities& capabilities)
+{
+	TFXShaderSourceCatalog catalog;
+	catalog.capabilities = capabilities;
+
+	std::vector<PipelineSelector> selectors;
+	BuildWarmupTFXSelectors(selectors);
+	catalog.pipelines.reserve(selectors.size());
+	catalog.vertex_sources.reserve(8);
+	catalog.fragment_sources.reserve(40);
+
+	std::unordered_map<std::string, u32> vertex_source_indices;
+	std::unordered_map<std::string, u32> fragment_source_indices;
+	vertex_source_indices.reserve(8);
+	fragment_source_indices.reserve(40);
+
+	for (const PipelineSelector& selector : selectors)
+	{
+		std::string vertex_source = BuildTFXVertexShaderSource(tfx_source, selector.vs, capabilities);
+		const auto [vertex_it, vertex_inserted] = vertex_source_indices.emplace(
+			vertex_source, static_cast<u32>(catalog.vertex_sources.size()));
+		if (vertex_inserted)
+			catalog.vertex_sources.push_back(std::move(vertex_source));
+
+		std::string fragment_source = BuildTFXFragmentShaderSource(tfx_source, selector.ps, capabilities);
+		const auto [fragment_it, fragment_inserted] = fragment_source_indices.emplace(
+			fragment_source, static_cast<u32>(catalog.fragment_sources.size()));
+		if (fragment_inserted)
+			catalog.fragment_sources.push_back(std::move(fragment_source));
+
+		catalog.pipelines.push_back({selector, vertex_it->second, fragment_it->second});
+	}
+
+	return catalog;
+}
+
+std::string GSDeviceVK::BuildTFXPreparationIdentity(std::string_view source,
+	const TFXShaderSourceCapabilities& capabilities, const VkPhysicalDeviceProperties& properties,
+	bool vertex_expansion, u32 cache_version, std::string_view driver_identity)
+{
+	if (source.empty()) return {};
+	// Length framing keeps identity components unambiguous. These are cache
+	// change fingerprints, not cryptographic authentication of external data.
+	const auto append_u32 = [](std::string& out, u32 value) {
+		for (u32 shift = 0; shift < 32; shift += 8) out.push_back(static_cast<char>(value >> shift));
+	};
+	const auto append_string = [&](std::string& out, std::string_view value) {
+		append_u32(out, static_cast<u32>(value.size()));
+		out.append(value);
+	};
+	const auto digest = [](std::string_view value) {
+		const XXH128_hash_t hash = XXH3_128bits(value.data(), value.size());
+		return fmt::format("{:016x}{:016x}", hash.high64, hash.low64);
+	};
+	std::string device;
+	append_u32(device, 1); // receipt identity schema
+	append_u32(device, cache_version);
+	append_u32(device, properties.vendorID);
+	append_u32(device, properties.deviceID);
+	append_u32(device, properties.driverVersion);
+	append_u32(device, properties.apiVersion);
+	device.append(reinterpret_cast<const char*>(properties.pipelineCacheUUID), VK_UUID_SIZE);
+	append_string(device, driver_identity);
+	device.push_back(vertex_expansion ? 1 : 0);
+	for (bool value : {capabilities.rov, capabilities.texture_barrier, capabilities.feedback_loop_layout,
+		capabilities.scalarize_vector_bitwise_and, capabilities.provoking_vertex_last})
+		device.push_back(value ? 1 : 0);
+
+	const TFXShaderSourceCatalog catalog = BuildTFXShaderSourceCatalog(source, capabilities);
+	std::string sources;
+	append_u32(sources, 1); // catalog receipt schema
+	append_string(sources, source);
+	for (const auto* list : {&catalog.vertex_sources, &catalog.fragment_sources})
+	{
+		append_u32(sources, static_cast<u32>(list->size()));
+		for (const std::string& shader : *list) append_string(sources, shader);
+	}
+	append_u32(sources, static_cast<u32>(catalog.pipelines.size()));
+	for (const TFXShaderSourceCatalog::Pipeline& pipeline : catalog.pipelines)
+	{
+		append_string(sources, std::string_view(reinterpret_cast<const char*>(&pipeline.selector), sizeof(pipeline.selector)));
+		append_u32(sources, pipeline.vertex_source);
+		append_u32(sources, pipeline.fragment_source);
+	}
+	return digest(sources) + digest(device);
+}
+
+std::string GSDeviceVK::GetTFXPreparationIdentity(std::string_view driver_identity) const
+{
+	const TFXShaderSourceCapabilities capabilities = {
+		m_features.rov, m_features.texture_barrier, m_features.texture_barrier && UseFeedbackLoopLayout(),
+		HasMobileGPUProfile(), m_features.provoking_vertex_last};
+	return BuildTFXPreparationIdentity(m_tfx_source, capabilities, m_device_properties,
+		m_features.vs_expand, VKShaderCache::GetTFXPreparationCacheVersion(), driver_identity);
+}
+
+bool GSDeviceVK::TryGetTFXAlphaFallbackKey(const PipelineSelector& selector, PipelineSelector& key)
+{
+	// Only the five shader alpha-test modes have a dynamic equivalent, and only the
+	// keep-on-failure path can share a pipeline without changing depth/color writes.
+	switch (selector.ps.atst)
+	{
+		case GSHWDrawConfig::PS_ATST_NONE:
+		case GSHWDrawConfig::PS_ATST_LEQUAL:
+		case GSHWDrawConfig::PS_ATST_GEQUAL:
+		case GSHWDrawConfig::PS_ATST_EQUAL:
+		case GSHWDrawConfig::PS_ATST_NOTEQUAL:
+			break;
+		default:
+			return false;
+	}
+
+	if (selector.ps.afail != GSHWDrawConfig::PS_AFAIL_KEEP || !selector.rt ||
+		selector.ps.no_color || selector.ps.no_color1 || selector.ps.date != 0 ||
+		selector.dss.date || selector.dss.date_one || selector.feedback_loop_flags != FeedbackLoopFlag_None ||
+		selector.ps.color_feedback || selector.ps.depth_feedback || selector.ps.rov_color ||
+		selector.ps.rov_depth != GSHWDrawConfig::PS_ROV_DEPTH::NONE)
+	{
+		return false;
+	}
+
+	// Copy the full selector representation so padding and every non-ATST key bit
+	// stay exactly as supplied. Rejected calls leave the caller's output untouched.
+	std::memcpy(&key, &selector, sizeof(key));
+	key.ps.atst = GSHWDrawConfig::PS_ATST_NONE;
+	return true;
+}
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+namespace
+{
+struct TFXSourceHash
+{
+	u64 first = 14695981039346656037ull;
+	u64 second = 7809847782465536322ull;
+	u64 count = 0;
+
+	void Add(std::string_view source)
+	{
+		for (unsigned i = 0; i < sizeof(u64); i++)
+		{
+			const u8 byte = static_cast<u8>(source.size() >> (i * 8));
+			first = (first ^ byte) * 1099511628211ull;
+			second = (second ^ (byte + 0x9d)) * 14029467366897019727ull;
+		}
+		for (const unsigned char byte : source)
+		{
+			first = (first ^ byte) * 1099511628211ull;
+			second = (second ^ (byte + 0x9d)) * 14029467366897019727ull;
+		}
+		count++;
+	}
+};
+
+} // namespace
+
+bool GSDeviceVK::TestTFXWarmupOrdering()
+{
+	const auto make_selector = [](u8 key) {
+		PipelineSelector p = {};
+		p.vs.key = key;
+		return p;
+	};
+	const auto matches = [](const std::vector<PipelineSelector>& actual,
+		const std::vector<PipelineSelector>& expected) {
+		return actual.size() == expected.size() && std::equal(actual.begin(), actual.end(), expected.begin());
+	};
+	std::vector<PipelineSelector> ordered;
+	const std::vector<PipelineSelector> empty;
+	const std::deque<PipelineSelector> no_learned;
+
+	if (BuildTFXWarmupOrder(empty, no_learned, ordered) != 0 || !ordered.empty())
+		return false;
+
+	const std::vector<PipelineSelector> generic_only = {make_selector(1), make_selector(2)};
+	if (BuildTFXWarmupOrder(generic_only, no_learned, ordered) != 0 || !matches(ordered, generic_only))
+		return false;
+
+	const std::deque<PipelineSelector> learned_only = {
+		make_selector(1), make_selector(2), make_selector(3), make_selector(2)};
+	if (BuildTFXWarmupOrder(empty, learned_only, ordered) != 3 ||
+		!matches(ordered, {make_selector(2), make_selector(3), make_selector(1)}))
+		return false;
+
+	const std::vector<PipelineSelector> overlapping_generic = {
+		make_selector(2), make_selector(4), make_selector(4), make_selector(5)};
+	if (BuildTFXWarmupOrder(overlapping_generic, learned_only, ordered) != 3)
+		return false;
+	return matches(ordered, {make_selector(2), make_selector(3), make_selector(1), make_selector(4), make_selector(5)});
+}
+
+bool GSDeviceVK::TestTFXShaderSourceBuilders()
+{
+	// A snapped FST sprite must carry its sample limit through every vertex path.
+	const GSHWDrawConfig::VSSelector edge_selector(0x80);
+	if (BuildTFXVertexShaderSource({}, edge_selector, {}).find("#define VS_SPRITE_EDGE_CLAMP 1") == std::string::npos)
+		return false;
+	GSHWDrawConfig::PSSelector edge_pixel;
+	edge_pixel.fst = 1;
+	edge_pixel.sprite_edge_clamp = 1;
+	if (BuildTFXFragmentShaderSource({}, edge_pixel, {}).find("#define PS_SPRITE_EDGE_CLAMP 1") == std::string::npos)
+		return false;
+	TFXSourceHash builder_hash;
+	bool compatible_header = true;
+	const auto AddComparedSource = [&builder_hash, &compatible_header](std::string source) {
+		constexpr std::string_view prefix =
+			"#version 460 core\n#extension GL_EXT_samplerless_texture_functions : require\n";
+		constexpr std::string_view removed_requirement = "#extension GL_ARB_shader_draw_parameters : require\n";
+		compatible_header &= source.starts_with(prefix) && source.find(removed_requirement) == std::string::npos;
+		// Preserve the established 10,496-source oracle after intentionally removing
+		// the unused draw-parameter requirement for MaliSX2. Everything else must
+		// remain byte-identical to the pre-removal shader fixtures.
+		if (source.starts_with(prefix))
+			source.insert(prefix.size(), removed_requirement);
+		// The new selector has its own checks below; preserve all pre-port fixtures.
+		for (const std::string_view macro : {"#define VS_SPRITE_EDGE_CLAMP ", "#define PS_SPRITE_EDGE_CLAMP ", "#define PS_AF_IN_SRC1 "})
+		{
+			const size_t at = source.find(macro);
+			if (at != std::string::npos)
+				source.erase(at, source.find('\n', at) - at + 1);
+		}
+		builder_hash.Add(source);
+	};
+	static constexpr u64 EXPECTED_FIRST_HASH = 0x9C23F4A8F1A120BDull;
+	static constexpr u64 EXPECTED_SECOND_HASH = 0x98F5B591D3E37FD2ull;
+	static constexpr u64 EXPECTED_SOURCE_COUNT = 10496;
+	static constexpr std::array<std::string_view, 2> suffixes = {{
+		{}, "// TFX source builder deterministic suffix fixture\nvoid fixture_marker() {}\n"}};
+	for (u32 capability_bits = 0; capability_bits < 32; capability_bits++)
+	{
+		const TFXShaderSourceCapabilities capabilities = {
+			(capability_bits & (1u << 0)) != 0,
+			(capability_bits & (1u << 1)) != 0,
+			(capability_bits & (1u << 2)) != 0,
+			(capability_bits & (1u << 3)) != 0,
+			(capability_bits & (1u << 4)) != 0};
+		for (const std::string_view suffix : suffixes)
+		{
+			for (u32 key = 0; key < 32; key++)
+			{
+				const GSHWDrawConfig::VSSelector selector(static_cast<u8>(key));
+				AddComparedSource(BuildTFXVertexShaderSource(suffix, selector, capabilities));
+			}
+			for (const u8 key : {static_cast<u8>(0), static_cast<u8>(0xff)})
+			{
+				const GSHWDrawConfig::VSSelector selector(key);
+				AddComparedSource(BuildTFXVertexShaderSource(suffix, selector, capabilities));
+			}
+			for (u32 bit = 0; bit < 128; bit++)
+			{
+				GSHWDrawConfig::PSSelector selector;
+				if (bit < 64)
+					selector.key_lo = u64(1) << bit;
+				else
+					selector.key_hi = u64(1) << (bit - 64);
+				AddComparedSource(BuildTFXFragmentShaderSource(suffix, selector, capabilities));
+			}
+			for (const u64 key_word : {u64(0), ~u64(0)})
+			{
+				GSHWDrawConfig::PSSelector selector;
+				selector.key_lo = key_word;
+				selector.key_hi = key_word;
+				AddComparedSource(BuildTFXFragmentShaderSource(suffix, selector, capabilities));
+			}
+		}
+	}
+	return compatible_header && builder_hash.first == EXPECTED_FIRST_HASH && builder_hash.second == EXPECTED_SECOND_HASH &&
+		builder_hash.count == EXPECTED_SOURCE_COUNT;
+}
+
+bool GSDeviceVK::TestTFXShaderSourceCatalog()
+{
+	static constexpr std::string_view source = "void catalog_fixture() {}\n";
+	for (u32 capability_bits = 0; capability_bits < 32; capability_bits++)
+	{
+		const TFXShaderSourceCapabilities capabilities = {
+			(capability_bits & (1u << 0)) != 0,
+			(capability_bits & (1u << 1)) != 0,
+			(capability_bits & (1u << 2)) != 0,
+			(capability_bits & (1u << 3)) != 0,
+			(capability_bits & (1u << 4)) != 0};
+		const TFXShaderSourceCatalog catalog = BuildTFXShaderSourceCatalog(source, capabilities);
+		const TFXShaderSourceCatalog repeated = BuildTFXShaderSourceCatalog(source, capabilities);
+
+		if (catalog.pipelines.size() != 168 || catalog.vertex_sources.size() != 10 ||
+			catalog.fragment_sources.size() != 42 || catalog.pipelines.size() != repeated.pipelines.size() ||
+			catalog.vertex_sources != repeated.vertex_sources || catalog.fragment_sources != repeated.fragment_sources)
+		{
+			return false;
+		}
+
+		if (catalog.capabilities.rov != capabilities.rov ||
+			catalog.capabilities.texture_barrier != capabilities.texture_barrier ||
+			catalog.capabilities.feedback_loop_layout != capabilities.feedback_loop_layout ||
+			catalog.capabilities.scalarize_vector_bitwise_and != capabilities.scalarize_vector_bitwise_and ||
+			catalog.capabilities.provoking_vertex_last != capabilities.provoking_vertex_last)
+		{
+			return false;
+		}
+
+		std::unordered_set<PipelineSelector, PipelineSelectorHash> unique_selectors;
+		unique_selectors.reserve(catalog.pipelines.size());
+		std::vector<std::string> expected_vertex_sources;
+		std::vector<std::string> expected_fragment_sources;
+		for (size_t i = 0; i < catalog.pipelines.size(); i++)
+		{
+			const TFXShaderSourceCatalog::Pipeline& entry = catalog.pipelines[i];
+			if (!unique_selectors.insert(entry.selector).second || entry.vertex_source >= catalog.vertex_sources.size() ||
+				entry.fragment_source >= catalog.fragment_sources.size() || entry.selector.feedback_loop_flags != 0 ||
+				entry.selector.ps.date != 0 || entry.selector.ps.color_feedback != 0 ||
+				entry.selector.ps.depth_feedback != 0 || entry.selector.ps.rov_color != 0 ||
+				entry.selector.ps.rov_depth != GSHWDrawConfig::PS_ROV_DEPTH::NONE ||
+				!(entry.selector == repeated.pipelines[i].selector) ||
+				entry.vertex_source != repeated.pipelines[i].vertex_source ||
+				entry.fragment_source != repeated.pipelines[i].fragment_source)
+			{
+				return false;
+			}
+
+			const std::string expected_vertex = BuildTFXVertexShaderSource(source, entry.selector.vs, capabilities);
+			const std::string expected_fragment = BuildTFXFragmentShaderSource(source, entry.selector.ps, capabilities);
+			if (catalog.vertex_sources[entry.vertex_source] != expected_vertex ||
+				catalog.fragment_sources[entry.fragment_source] != expected_fragment)
+			{
+				return false;
+			}
+
+			auto vertex_it = std::find(expected_vertex_sources.begin(), expected_vertex_sources.end(), expected_vertex);
+			if (vertex_it == expected_vertex_sources.end())
+			{
+				expected_vertex_sources.push_back(expected_vertex);
+				vertex_it = expected_vertex_sources.end() - 1;
+			}
+			auto fragment_it = std::find(expected_fragment_sources.begin(), expected_fragment_sources.end(), expected_fragment);
+			if (fragment_it == expected_fragment_sources.end())
+			{
+				expected_fragment_sources.push_back(expected_fragment);
+				fragment_it = expected_fragment_sources.end() - 1;
+			}
+			if (entry.vertex_source != static_cast<u32>(vertex_it - expected_vertex_sources.begin()) ||
+				entry.fragment_source != static_cast<u32>(fragment_it - expected_fragment_sources.begin()))
+			{
+				return false;
+			}
+		}
+
+		if (expected_vertex_sources != catalog.vertex_sources || expected_fragment_sources != catalog.fragment_sources)
+			return false;
+	}
+
+	static constexpr std::string_view changed_source = "void catalog_fixture() {}\n// changed source\n";
+	const TFXShaderSourceCapabilities capabilities = {};
+	const TFXShaderSourceCatalog original = BuildTFXShaderSourceCatalog(source, capabilities);
+	const TFXShaderSourceCatalog changed = BuildTFXShaderSourceCatalog(changed_source, capabilities);
+	if (original.vertex_sources.size() != changed.vertex_sources.size() ||
+		original.fragment_sources.size() != changed.fragment_sources.size())
+	{
+		return false;
+	}
+	for (const std::string& generated_source : changed.vertex_sources)
+	{
+		if (generated_source.find("// changed source") == std::string::npos)
+			return false;
+	}
+	for (const std::string& generated_source : changed.fragment_sources)
+	{
+		if (generated_source.find("// changed source") == std::string::npos)
+			return false;
+	}
+	return original.vertex_sources != changed.vertex_sources && original.fragment_sources != changed.fragment_sources;
+}
+
+bool GSDeviceVK::TestOptionalQueryPoolFallback()
+{
+	const auto saved_descriptor = vkCreateDescriptorPool;
+	const auto saved_query = vkCreateQueryPool;
+	const auto saved_name = vkSetDebugUtilsObjectNameEXT;
+	ScopedGuard restore = [&]() {
+		vkCreateDescriptorPool = saved_descriptor;
+		vkCreateQueryPool = saved_query;
+		vkSetDebugUtilsObjectNameEXT = saved_name;
+	};
+	static VkResult descriptor_result, timestamp_result, statistics_result;
+	static u32 query_calls;
+	vkSetDebugUtilsObjectNameEXT = nullptr;
+	vkCreateDescriptorPool = [](VkDevice, const VkDescriptorPoolCreateInfo*, const VkAllocationCallbacks*, VkDescriptorPool* pool) -> VkResult {
+		*pool = reinterpret_cast<VkDescriptorPool>(1);
+		return descriptor_result;
+	};
+	vkCreateQueryPool = [](VkDevice, const VkQueryPoolCreateInfo* info, const VkAllocationCallbacks*, VkQueryPool* pool) -> VkResult {
+		query_calls++;
+		// Failed Vulkan calls do not guarantee the contents of output handles.
+		*pool = reinterpret_cast<VkQueryPool>(2);
+		return info->queryType == VK_QUERY_TYPE_TIMESTAMP ? timestamp_result : statistics_result;
+	};
+	for (const bool timestamp : {true, false})
+	{
+		for (const VkResult result : {VK_SUCCESS, VK_ERROR_FEATURE_NOT_PRESENT, VK_ERROR_OUT_OF_DEVICE_MEMORY, VK_ERROR_DEVICE_LOST})
+		{
+			GSDeviceVK device;
+			device.m_gpu_timing_supported = device.m_gpu_pipeline_statistics_supported = device.m_spinning_supported = true;
+			descriptor_result = VK_SUCCESS;
+			timestamp_result = timestamp ? result : VK_SUCCESS;
+			statistics_result = timestamp ? VK_SUCCESS : result;
+			query_calls = 0;
+			const bool can_render = result == VK_SUCCESS || result == VK_ERROR_FEATURE_NOT_PRESENT;
+			if (device.CreateGlobalDescriptorPool() != can_render)
+				return false;
+			if (result == VK_ERROR_FEATURE_NOT_PRESENT &&
+				((timestamp && (device.m_gpu_timing_supported || device.m_spinning_supported || device.m_timestamp_query_pool != VK_NULL_HANDLE)) ||
+				 (!timestamp && (device.m_gpu_pipeline_statistics_supported || device.m_pipeline_statistics_query_pool != VK_NULL_HANDLE))))
+				return false;
+			if (can_render && (query_calls != 2 ||
+				(timestamp ? !device.m_gpu_pipeline_statistics_supported : (!device.m_gpu_timing_supported || !device.m_spinning_supported))))
+				return false;
+		}
+	}
+	GSDeviceVK device;
+	descriptor_result = VK_ERROR_OUT_OF_DEVICE_MEMORY;
+	query_calls = 0;
+	return !device.CreateGlobalDescriptorPool() && query_calls == 0;
+}
+
+bool GSDeviceVK::TestMaliSX2Policy()
+{
+	constexpr std::string_view mali_driver = "MaliSX2 0.1.4 (r40p0)";
+	constexpr std::string_view mali_driver_upper = "MALISX2 custom Vulkan driver";
+	constexpr std::string_view stock_mali_driver = "ARM Vulkan driver r40p0";
+	constexpr std::string_view generic_libmali = "libmali.so proprietary driver";
+	constexpr u32 required_push_descriptors = NUM_TFX_TEXTURES;
+
+	if (!IsMaliSX2DriverInfo(mali_driver) || !IsMaliSX2DriverInfo(mali_driver_upper) ||
+		IsMaliSX2DriverInfo(stock_mali_driver) || IsMaliSX2DriverInfo(generic_libmali) ||
+		IsMaliSX2DriverInfo(std::string_view{}))
+	{
+		return false;
+	}
+
+	if (!ShouldEnableMaliSX2ROAA(mali_driver, true, true) ||
+		ShouldEnableMaliSX2ROAA(stock_mali_driver, true, true) ||
+		ShouldEnableMaliSX2ROAA(generic_libmali, true, true) ||
+		ShouldEnableMaliSX2ROAA(mali_driver, false, true) ||
+		ShouldEnableMaliSX2ROAA(mali_driver, true, false))
+	{
+		return false;
+	}
+
+	return ShouldUseMaliSX2PushDescriptors(mali_driver, true, required_push_descriptors, required_push_descriptors) &&
+		ShouldUseMaliSX2PushDescriptors(mali_driver, true, required_push_descriptors + 3, required_push_descriptors) &&
+		!ShouldUseMaliSX2PushDescriptors(mali_driver, false, required_push_descriptors, required_push_descriptors) &&
+		!ShouldUseMaliSX2PushDescriptors(mali_driver, true, required_push_descriptors - 1, required_push_descriptors) &&
+		!ShouldUseMaliSX2PushDescriptors(stock_mali_driver, true, required_push_descriptors, required_push_descriptors) &&
+		!ShouldUseMaliSX2PushDescriptors(generic_libmali, true, required_push_descriptors, required_push_descriptors);
+}
+
+bool GSDeviceVK::TestTFXPreparationIdentity()
+{
+	TFXShaderSourceCapabilities capabilities{};
+	VkPhysicalDeviceProperties properties{};
+	properties.vendorID = 0x1234;
+	properties.deviceID = 0x5678;
+	properties.driverVersion = 42;
+	properties.apiVersion = VK_API_VERSION_1_1;
+	properties.pipelineCacheUUID[0] = 17;
+	const auto identity = [&](const TFXShaderSourceCapabilities& caps, const VkPhysicalDeviceProperties& props,
+		bool expansion = true, u32 version = 1, std::string_view driver = "system") {
+		return BuildTFXPreparationIdentity("shader source", caps, props, expansion, version, driver);
+	};
+	const std::string base = identity(capabilities, properties);
+	if (base.size() != 64 || base != identity(capabilities, properties) ||
+		!std::all_of(base.begin(), base.end(), [](char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); }))
+		return false;
+	if (base == BuildTFXPreparationIdentity("changed source", capabilities, properties, true, 1, "system") ||
+		base == identity(capabilities, properties, false) || base == identity(capabilities, properties, true, 2) ||
+		base == identity(capabilities, properties, true, 1, "changed driver"))
+		return false;
+	for (bool TFXShaderSourceCapabilities::* field : {&TFXShaderSourceCapabilities::rov,
+		&TFXShaderSourceCapabilities::texture_barrier, &TFXShaderSourceCapabilities::feedback_loop_layout,
+		&TFXShaderSourceCapabilities::scalarize_vector_bitwise_and, &TFXShaderSourceCapabilities::provoking_vertex_last})
+	{
+		auto changed = capabilities;
+		changed.*field = true;
+		if (identity(changed, properties) == base) return false;
+	}
+	for (u32 VkPhysicalDeviceProperties::* field : {&VkPhysicalDeviceProperties::vendorID,
+		&VkPhysicalDeviceProperties::deviceID, &VkPhysicalDeviceProperties::driverVersion, &VkPhysicalDeviceProperties::apiVersion})
+	{
+		auto changed = properties;
+		++(changed.*field);
+		if (identity(capabilities, changed) == base) return false;
+	}
+	auto changed_uuid = properties;
+	++changed_uuid.pipelineCacheUUID[15];
+	if (identity(capabilities, changed_uuid) == base) return false;
+	auto renamed = properties;
+	std::strcpy(renamed.deviceName, "cosmetic GPU name");
+	return identity(capabilities, renamed) == base &&
+		BuildTFXPreparationIdentity({}, capabilities, properties, true, 1, "system").empty();
+}
+
+bool GSDeviceVK::TestTFXAlphaFallbackClassifier()
+{
+	const auto make_selector = [](bool ds = false) {
+		PipelineSelector selector = {};
+		selector.topology = static_cast<u8>(GSHWDrawConfig::Topology::Triangle);
+		selector.rt = true;
+		selector.ds = ds;
+		selector.vs.iip = true;
+		selector.vs.fst = true;
+		selector.vs.tme = true;
+		selector.ps.iip = true;
+		selector.ps.fst = true;
+		selector.ps.tfx = TFX_MODULATE;
+		selector.ps.tcc = true;
+		selector.ps.afail = GSHWDrawConfig::PS_AFAIL_KEEP;
+		selector.ps.ztst = ZTST_ALWAYS;
+		selector.dss.ztst = ZTST_ALWAYS;
+		selector.dss.zwe = ds;
+		return selector;
+	};
+	const auto key_for = [](const PipelineSelector& selector, PipelineSelector& key) {
+		return TryGetTFXAlphaFallbackKey(selector, key);
+	};
+
+	PipelineSelector canonical_key = {};
+	bool have_canonical_key = false;
+	for (const GSHWDrawConfig::PS_ATST atst : {
+			GSHWDrawConfig::PS_ATST_NONE,
+			GSHWDrawConfig::PS_ATST_LEQUAL,
+			GSHWDrawConfig::PS_ATST_GEQUAL,
+			GSHWDrawConfig::PS_ATST_EQUAL,
+			GSHWDrawConfig::PS_ATST_NOTEQUAL})
+	{
+		PipelineSelector selector = make_selector();
+		selector.ps.atst = atst;
+		PipelineSelector key = {};
+		if (!key_for(selector, key) || key.ps.atst != GSHWDrawConfig::PS_ATST_NONE)
+			return false;
+		if (have_canonical_key && key != canonical_key)
+			return false;
+		canonical_key = key;
+		have_canonical_key = true;
+	}
+
+	// Collapsing ATST must not erase any other shader or pipeline selector axis.
+	const PipelineSelector base = make_selector();
+	PipelineSelector base_key = {};
+	if (!key_for(base, base_key))
+		return false;
+	const std::array<PipelineSelector, 12> changed_selectors = {{
+		[&] { PipelineSelector p = base; p.vs.iip = false; return p; }(),
+		[&] { PipelineSelector p = base; p.ps.tfx = TFX_DECAL; return p; }(),
+		[&] { PipelineSelector p = base; p.ps.tcc = false; return p; }(),
+		[&] { PipelineSelector p = base; p.ps.dst_fmt = 1; return p; }(),
+		[&] { PipelineSelector p = base; p.ps.depth_fmt = 2; return p; }(),
+		[&] { PipelineSelector p = base; p.ps.fog = true; return p; }(),
+		[&] { PipelineSelector p = base; p.topology = static_cast<u8>(GSHWDrawConfig::Topology::Point); return p; }(),
+		[&] { PipelineSelector p = base; p.bs.enable = true; return p; }(),
+		[&] { PipelineSelector p = base; p.dss.ztst = ZTST_GEQUAL; return p; }(),
+		[&] { PipelineSelector p = base; p.cms.key = 0x7; return p; }(),
+		[&] { PipelineSelector p = base; p.ps.no_color = true; return p; }(),
+		[&] { PipelineSelector p = base; p.ps.no_color1 = true; return p; }(),
+	}};
+	for (const PipelineSelector& changed : changed_selectors)
+	{
+		PipelineSelector changed_key = {};
+		if (key_for(changed, changed_key) && changed_key == base_key)
+			return false;
+	}
+
+	// Exhaustively toggle every non-ATST selector/key bit. A selector may be outside
+	// this fallback class, but if accepted it must retain its distinct key.
+	std::array<u8, sizeof(PipelineSelector)> base_bytes{};
+	std::array<u8, sizeof(PipelineSelector)> atst_mask{};
+	std::memcpy(base_bytes.data(), &base, sizeof(base));
+	for (const GSHWDrawConfig::PS_ATST atst : {
+			GSHWDrawConfig::PS_ATST_LEQUAL,
+			GSHWDrawConfig::PS_ATST_GEQUAL,
+			GSHWDrawConfig::PS_ATST_EQUAL,
+			GSHWDrawConfig::PS_ATST_NOTEQUAL})
+	{
+		PipelineSelector variant = base;
+		variant.ps.atst = atst;
+		std::array<u8, sizeof(PipelineSelector)> variant_bytes{};
+		std::memcpy(variant_bytes.data(), &variant, sizeof(variant));
+		for (size_t i = 0; i < atst_mask.size(); i++)
+			atst_mask[i] |= (base_bytes[i] ^ variant_bytes[i]);
+	}
+	for (size_t byte_index = 0; byte_index < base_bytes.size(); byte_index++)
+	{
+		for (u32 bit = 0; bit < 8; bit++)
+		{
+			const u8 bit_mask = static_cast<u8>(1u << bit);
+			if ((atst_mask[byte_index] & bit_mask) != 0)
+				continue;
+			std::array<u8, sizeof(PipelineSelector)> changed_bytes = base_bytes;
+			changed_bytes[byte_index] ^= bit_mask;
+			PipelineSelector changed = {};
+			std::memcpy(&changed, changed_bytes.data(), sizeof(changed));
+			PipelineSelector changed_key = {};
+			if (key_for(changed, changed_key) && changed_key == base_key)
+				return false;
+		}
+	}
+
+	PipelineSelector depth_key = {};
+	for (u32 atst_value = 5; atst_value <= 7; atst_value++)
+	{
+		PipelineSelector selector = base;
+		selector.ps.atst = static_cast<GSHWDrawConfig::PS_ATST>(atst_value);
+		if (key_for(selector, depth_key))
+			return false;
+	}
+	PipelineSelector rejected_output = make_selector(true);
+	rejected_output.ps.tfx = TFX_DECAL;
+	const PipelineSelector original_rejected_output = rejected_output;
+	PipelineSelector invalid_selector = base;
+	invalid_selector.ps.atst = static_cast<GSHWDrawConfig::PS_ATST>(5);
+	if (key_for(invalid_selector, rejected_output) || rejected_output != original_rejected_output)
+		return false;
+	for (const bool no_color1 : {false, true})
+	{
+		PipelineSelector selector = base;
+		if (no_color1)
+			selector.ps.no_color1 = true;
+		else
+			selector.ps.no_color = true;
+		if (key_for(selector, depth_key))
+			return false;
+	}
+
+	if (!key_for(make_selector(true), depth_key) || depth_key == base_key)
+		return false;
+
+	for (const GSHWDrawConfig::PS_AFAIL afail : {
+			GSHWDrawConfig::PS_AFAIL_FB_ONLY,
+			GSHWDrawConfig::PS_AFAIL_ZB_ONLY,
+			GSHWDrawConfig::PS_AFAIL_RGB_ONLY,
+			GSHWDrawConfig::PS_AFAIL_RGB_ONLY_DSB,
+			GSShader::PS_AFAIL::RGB_ONLY_SW_Z})
+	{
+		PipelineSelector selector = base;
+		selector.ps.afail = afail;
+		if (key_for(selector, depth_key))
+			return false;
+	}
+
+	PipelineSelector rejected = base;
+	rejected.rt = false;
+	if (key_for(rejected, depth_key))
+		return false;
+	for (const u8 flags : {u8(1), u8(2), u8(4), u8(7)})
+	{
+		rejected = base;
+		rejected.feedback_loop_flags = flags;
+		if (key_for(rejected, depth_key))
+			return false;
+	}
+	rejected = base;
+	rejected.ps.color_feedback = true;
+	if (key_for(rejected, depth_key))
+		return false;
+	rejected = base;
+	rejected.ps.depth_feedback = true;
+	if (key_for(rejected, depth_key))
+		return false;
+	rejected = base;
+	for (u32 date = 1; date <= 7; date++)
+	{
+		rejected = base;
+		rejected.ps.date = date;
+		if (key_for(rejected, depth_key))
+			return false;
+	}
+	rejected = base;
+	rejected.dss.date = true;
+	if (key_for(rejected, depth_key))
+		return false;
+	rejected.dss.date_one = true;
+	if (key_for(rejected, depth_key))
+		return false;
+	rejected = base;
+	rejected.ps.rov_color = true;
+	if (key_for(rejected, depth_key))
+		return false;
+	for (const GSHWDrawConfig::PS_ROV_DEPTH rov_depth : {
+			GSHWDrawConfig::PS_ROV_DEPTH::READ_WRITE,
+			GSHWDrawConfig::PS_ROV_DEPTH::READ_ONLY,
+			static_cast<GSHWDrawConfig::PS_ROV_DEPTH>(3)})
+	{
+		rejected = base;
+		rejected.ps.rov_depth = rov_depth;
+		if (key_for(rejected, depth_key))
+			return false;
+	}
+
+	return true;
+}
+#endif
+
+void GSDeviceVK::TFXPreparationProgress::Reset(u32 total)
+{
+	m_snapshot = {};
+	m_snapshot.total = total;
+	m_next_index = 0;
+	m_job_states.assign(total, 0);
+}
+
+std::optional<u32> GSDeviceVK::TFXPreparationProgress::TryClaimNext()
+{
+	if (m_snapshot.cancel_requested || m_snapshot.finished || m_next_index >= m_snapshot.total)
+		return std::nullopt;
+
+	const u32 index = m_next_index++;
+	m_job_states[index] = 1;
+	m_snapshot.in_flight++;
+	return index;
+}
+
+bool GSDeviceVK::TFXPreparationProgress::FinishClaim(u32 index, TFXPreparationResult result)
+{
+	if (m_snapshot.finished || index >= m_job_states.size() || m_job_states[index] != 1)
+		return false;
+
+	m_job_states[index] = 2;
+	--m_snapshot.in_flight;
+	switch (result)
+	{
+		case TFXPreparationResult::Published:
+			++m_snapshot.completed;
+			break;
+		case TFXPreparationResult::AlreadyAvailable:
+			++m_snapshot.already_available;
+			break;
+		case TFXPreparationResult::Failed:
+		default:
+			++m_snapshot.failed;
+			break;
+	}
+	return true;
+}
+
+void GSDeviceVK::TFXPreparationProgress::RequestCancel()
+{
+	if (!m_snapshot.finished)
+		m_snapshot.cancel_requested = true;
+}
+
+void GSDeviceVK::TFXPreparationProgress::FinishAfterJoin(bool checkpoint_saved)
+{
+	if (m_snapshot.finished || m_snapshot.in_flight != 0)
+		return;
+
+	const u32 accounted = m_snapshot.completed + m_snapshot.already_available + m_snapshot.failed;
+	if (accounted > m_snapshot.total)
+		return;
+
+	m_snapshot.cancelled = m_snapshot.total - accounted;
+	m_snapshot.checkpoint_saved = checkpoint_saved;
+	m_snapshot.finished = true;
+}
+
+GSDeviceVK::TFXPreparationProgressSnapshot GSDeviceVK::TFXPreparationProgress::Snapshot() const
+{
+	return m_snapshot;
+}
+
+void GSDeviceVK::TFXPreparationMergeCoordinator::Reset(u32 expected_workers)
+{
+	m_expected_workers = expected_workers;
+	m_merged_workers = 0;
+	m_all_succeeded = true;
+}
+
+bool GSDeviceVK::TFXPreparationMergeCoordinator::ReportMerged(bool succeeded)
+{
+	if (m_merged_workers >= m_expected_workers)
+		return false;
+
+	++m_merged_workers;
+	m_all_succeeded = m_all_succeeded && succeeded;
+	return AllMerged();
+}
+
+GSDeviceVK::TFXPreparationProgressSnapshot GSDeviceVK::GetTFXPreparationProgress() const
+{
+	std::lock_guard lock(m_tfx_progress_mutex);
+	return m_tfx_progress.Snapshot();
+}
+
+void GSDeviceVK::RequestTFXPreparationCancel()
+{
+	{
+		std::lock_guard lock(m_tfx_progress_mutex);
+		m_tfx_progress.RequestCancel();
+	}
+	m_tfx_compile_quit.store(true, std::memory_order_relaxed);
+}
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+bool GSDeviceVK::TestTFXPreparationProgress()
+{
+	TFXPreparationProgress progress;
+	progress.Reset(0);
+	if (progress.TryClaimNext().has_value())
+		return false;
+	progress.FinishAfterJoin(true);
+	const TFXPreparationProgressSnapshot empty = progress.Snapshot();
+	if (empty.total != 0 || empty.completed != 0 || empty.already_available != 0 || empty.failed != 0 ||
+		empty.cancelled != 0 || empty.in_flight != 0 || !empty.finished || !empty.checkpoint_saved)
+	{
+		return false;
+	}
+
+	progress.Reset(3);
+	const std::optional<u32> first = progress.TryClaimNext();
+	if (!first.has_value() || *first != 0)
+		return false;
+
+	if (!progress.FinishClaim(*first, TFXPreparationResult::Published))
+		return false;
+	const std::optional<u32> second = progress.TryClaimNext();
+	if (!second.has_value() || *second != 1)
+		return false;
+	const TFXPreparationProgressSnapshot before_duplicate = progress.Snapshot();
+	if (progress.FinishClaim(*first, TFXPreparationResult::Failed))
+		return false;
+	const TFXPreparationProgressSnapshot after_duplicate = progress.Snapshot();
+	if (before_duplicate.completed != after_duplicate.completed ||
+		before_duplicate.failed != after_duplicate.failed || before_duplicate.in_flight != after_duplicate.in_flight)
+	{
+		return false;
+	}
+	if (!progress.FinishClaim(*second, TFXPreparationResult::AlreadyAvailable))
+		return false;
+	const std::optional<u32> third = progress.TryClaimNext();
+	if (!third.has_value() || *third != 2)
+		return false;
+	if (!progress.FinishClaim(*third, TFXPreparationResult::Failed))
+		return false;
+	if (progress.TryClaimNext().has_value())
+		return false;
+
+	progress.FinishAfterJoin(true);
+	const TFXPreparationProgressSnapshot complete = progress.Snapshot();
+	if (complete.total != 3 || complete.completed != 1 || complete.already_available != 1 ||
+		complete.failed != 1 || complete.cancelled != 0 || complete.in_flight != 0 || !complete.finished ||
+		!complete.checkpoint_saved)
+	{
+		return false;
+	}
+
+	progress.Reset(2);
+	progress.RequestCancel();
+	if (progress.TryClaimNext().has_value())
+		return false;
+	progress.FinishAfterJoin(false);
+	const TFXPreparationProgressSnapshot cancelled_before_start = progress.Snapshot();
+	if (cancelled_before_start.total != 2 || cancelled_before_start.completed != 0 ||
+		cancelled_before_start.cancelled != 2 || cancelled_before_start.in_flight != 0 ||
+		!cancelled_before_start.cancel_requested || !cancelled_before_start.finished ||
+		cancelled_before_start.checkpoint_saved)
+	{
+		return false;
+	}
+
+	progress.Reset(4);
+	const std::optional<u32> active = progress.TryClaimNext();
+	if (!active.has_value() || *active != 0)
+		return false;
+	progress.RequestCancel();
+	if (progress.TryClaimNext().has_value())
+		return false;
+	if (!progress.FinishClaim(*active, TFXPreparationResult::Published))
+		return false;
+	progress.FinishAfterJoin(false);
+	const TFXPreparationProgressSnapshot cancelled = progress.Snapshot();
+	if (cancelled.total != 4 || cancelled.completed != 1 || cancelled.already_available != 0 ||
+		cancelled.failed != 0 || cancelled.cancelled != 3 || cancelled.in_flight != 0 ||
+		!cancelled.cancel_requested || !cancelled.finished || cancelled.checkpoint_saved)
+	{
+		return false;
+	}
+
+	// A resumed batch starts with a fresh snapshot and can claim the same stable index.
+	progress.Reset(1);
+	const std::optional<u32> resumed = progress.TryClaimNext();
+	if (!resumed.has_value() || *resumed != 0)
+		return false;
+	if (!progress.FinishClaim(*resumed, TFXPreparationResult::Published))
+		return false;
+	progress.FinishAfterJoin(true);
+	const TFXPreparationProgressSnapshot resumed_snapshot = progress.Snapshot();
+	if (resumed_snapshot.total != 1 || resumed_snapshot.completed != 1 ||
+		resumed_snapshot.already_available != 0 || resumed_snapshot.failed != 0 ||
+		resumed_snapshot.cancelled != 0 || resumed_snapshot.in_flight != 0 || !resumed_snapshot.finished ||
+		!resumed_snapshot.checkpoint_saved)
+	{
+		return false;
+	}
+
+	// The delayed worker cannot permit a flush until all registered caches have merged.
+	TFXPreparationMergeCoordinator coordinator;
+	coordinator.Reset(3);
+	if (coordinator.ReportMerged(true) || coordinator.AllMerged())
+		return false;
+	if (coordinator.ReportMerged(true) || coordinator.AllMerged())
+		return false;
+	if (!coordinator.ReportMerged(true) || !coordinator.AllMerged() || !coordinator.AllMergesSucceeded())
+		return false;
+	coordinator.Reset(3);
+	if (coordinator.ReportMerged(true) || coordinator.ReportMerged(false) ||
+		!coordinator.ReportMerged(true) || !coordinator.AllMerged() || coordinator.AllMergesSucceeded())
+	{
+		return false;
+	}
+
+	// Three callers share one progress state through the same caller-owned mutex.
+	progress.Reset(12);
+	std::mutex progress_mutex;
+	std::mutex gate_mutex;
+	std::condition_variable gate_cv;
+	u32 ready_workers = 0;
+	bool release_workers = false;
+	std::array<std::thread, 3> workers;
+	for (u32 worker_index = 0; worker_index < workers.size(); worker_index++)
+	{
+		workers[worker_index] = std::thread([&, worker_index]() {
+			std::optional<u32> claim;
+			{
+				std::lock_guard lock(progress_mutex);
+				claim = progress.TryClaimNext();
+			}
+			if (!claim.has_value())
+				return;
+
+			{
+				std::unique_lock lock(gate_mutex);
+				++ready_workers;
+				gate_cv.notify_all();
+				gate_cv.wait(lock, [&]() { return release_workers; });
+			}
+
+			std::lock_guard lock(progress_mutex);
+			const TFXPreparationResult result = static_cast<TFXPreparationResult>(worker_index);
+			if (!progress.FinishClaim(*claim, result) || progress.TryClaimNext().has_value())
+				return;
+		});
+	}
+	bool workers_ready;
+	{
+		std::unique_lock lock(gate_mutex);
+		workers_ready = gate_cv.wait_for(lock, std::chrono::seconds(5), [&]() {
+			return ready_workers == workers.size();
+		});
+	}
+	{
+		std::lock_guard lock(progress_mutex);
+		progress.RequestCancel();
+	}
+	{
+		std::lock_guard lock(gate_mutex);
+		release_workers = true;
+	}
+	gate_cv.notify_all();
+	for (std::thread& worker : workers)
+		worker.join();
+	if (!workers_ready)
+		return false;
+	{
+		std::lock_guard lock(progress_mutex);
+		progress.FinishAfterJoin(false);
+	}
+	const TFXPreparationProgressSnapshot concurrent = progress.Snapshot();
+	return concurrent.total == 12 && concurrent.completed == 1 && concurrent.already_available == 1 &&
+		concurrent.failed == 1 && concurrent.cancelled == 9 && concurrent.in_flight == 0 &&
+		concurrent.cancel_requested && concurrent.finished && !concurrent.checkpoint_saved;
+}
+
+bool GSDeviceVK::TestTFXPreparationPlan()
+{
+	const auto passes = BuildTFXPreparationRenderPassPlan();
+	if (passes[0].rt != true || passes[0].ds != false || passes[0].colclip || passes[0].date ||
+		passes[0].feedback_loop || passes[0].depth_sampling || passes[0].rt_op != VK_ATTACHMENT_LOAD_OP_LOAD ||
+		passes[0].ds_op != VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+	{
+		return false;
+	}
+	if (passes[1].rt != true || passes[1].ds != true || passes[1].colclip || passes[1].date ||
+		passes[1].feedback_loop || passes[1].depth_sampling || passes[1].rt_op != VK_ATTACHMENT_LOAD_OP_LOAD ||
+		passes[1].ds_op != VK_ATTACHMENT_LOAD_OP_LOAD)
+	{
+		return false;
+	}
+
+	std::vector<PipelineSelector> selectors;
+	BuildTFXPreparationSelectors(selectors, true);
+	if (selectors.size() != 168)
+		return false;
+
+	u32 without_depth = 0;
+	u32 with_depth = 0;
+	for (const PipelineSelector& selector : selectors)
+	{
+		if (!selector.rt || selector.ps.colclip_hw || selector.dss.date || selector.feedback_loop_flags != 0 ||
+			selector.IsTestingAndSamplingDepth())
+		{
+			return false;
+		}
+		selector.ds ? ++with_depth : ++without_depth;
+	}
+	if (without_depth != 84 || with_depth != 84)
+		return false;
+
+	// Point expansion reads vertices through TFX UBO layout binding 2, which
+	// is absent when GSConfig.DisableVertexShaderExpand disables that feature.
+	// The capability-off baseline must therefore omit those selectors rather
+	// than compile pipelines against a layout missing their declared binding.
+	BuildTFXPreparationSelectors(selectors, false);
+	if (selectors.size() != 86)
+		return false;
+	without_depth = 0;
+	with_depth = 0;
+	for (const PipelineSelector& selector : selectors)
+	{
+		if (selector.vs.expand != GSHWDrawConfig::VSExpand::None || !selector.rt || selector.ps.colclip_hw ||
+			selector.dss.date || selector.feedback_loop_flags != 0 || selector.IsTestingAndSamplingDepth())
+		{
+			return false;
+		}
+		selector.ds ? ++with_depth : ++without_depth;
+	}
+	return without_depth == 43 && with_depth == 43;
+}
+#endif
+
+void GSDeviceVK::BuildWarmupTFXSelectors(std::vector<PipelineSelector>& out)
+{
+	out.clear();
+	out.reserve(168);
+
+	static constexpr std::array<u8, 5> tfx_modes = {{TFX_NONE, TFX_MODULATE, TFX_DECAL, TFX_HIGHLIGHT, TFX_HIGHLIGHT2}};
+	static constexpr std::array<u8, 2> topologies = {{
+		static_cast<u8>(GSHWDrawConfig::Topology::Triangle),
+		static_cast<u8>(GSHWDrawConfig::Topology::Point),
+	}};
+	static constexpr std::array<u8, 2> ztst_values = {{ZTST_ALWAYS, ZTST_GEQUAL}};
+	static constexpr std::array<bool, 2> fst_values = {{true, false}};
+	static constexpr std::array<bool, 2> tcc_values = {{true, false}};
+	static constexpr std::array<bool, 2> ds_values = {{false, true}};
+
+	for (const u8 tfx : tfx_modes)
+	{
+		for (const u8 topo : topologies)
+		{
+			for (const bool fst : fst_values)
+			{
+				for (const bool tcc : tcc_values)
+				{
+					for (const bool ds : ds_values)
+					{
+						for (const u8 ztst : ztst_values)
+						{
+							PipelineSelector pipe = {};
+							pipe.topology = topo;
+							pipe.rt = true;
+							pipe.ds = ds;
+							pipe.vs.iip = true;
+							pipe.vs.fst = fst;
+							pipe.vs.tme = (tfx != TFX_NONE);
+							pipe.vs.expand = (topo == static_cast<u8>(GSHWDrawConfig::Topology::Point))
+								? GSHWDrawConfig::VSExpand::Point
+								: GSHWDrawConfig::VSExpand::None;
+							pipe.ps.iip = true;
+							pipe.ps.fst = fst;
+							pipe.ps.tfx = tfx;
+							pipe.ps.tcc = tcc;
+							pipe.ps.fog = 0;
+							pipe.ps.atst = GSHWDrawConfig::PS_ATST_NONE;
+							pipe.ps.afail = GSHWDrawConfig::PS_AFAIL_KEEP;
+							pipe.ps.date = 0;
+							pipe.ps.shuffle = 0;
+							pipe.ps.shuffle_same = 0;
+							pipe.ps.process_ba = 0;
+							pipe.ps.process_rg = 0;
+							pipe.ps.aem_fmt = 0;
+							pipe.ps.pal_fmt = 0;
+							pipe.ps.dst_fmt = 2;
+							pipe.ps.depth_fmt = ds ? 2u : 0u;
+							pipe.ps.wms = 0;
+							pipe.ps.wmt = 0;
+							pipe.ps.ltf = 0;
+							pipe.ps.write_rg = 1;
+							pipe.ps.fba = 0;
+							pipe.ps.aem = 0;
+							pipe.ps.real16src = 0;
+							pipe.dss = {};
+							pipe.dss.ztst = ztst;
+							pipe.dss.zwe = ds;
+							pipe.dss.date = false;
+							pipe.cms = GSHWDrawConfig::ColorMaskSelector();
+							pipe.bs = GSHWDrawConfig::BlendState();
+							out.push_back(pipe);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Warm blend-enabled variants for the most common TFX mode
+	for (const bool fst : fst_values)
+	{
+		for (const bool ds : ds_values)
+		{
+			PipelineSelector pipe = {};
+			pipe.topology = static_cast<u8>(GSHWDrawConfig::Topology::Triangle);
+			pipe.rt = true;
+			pipe.ds = ds;
+			pipe.vs.iip = true;
+			pipe.vs.fst = fst;
+			pipe.vs.tme = true;
+			pipe.vs.expand = GSHWDrawConfig::VSExpand::None;
+			pipe.ps.iip = true;
+			pipe.ps.fst = fst;
+			pipe.ps.tfx = TFX_MODULATE;
+			pipe.ps.tcc = true;
+			pipe.ps.fog = 0;
+			pipe.ps.atst = GSHWDrawConfig::PS_ATST_NONE;
+			pipe.ps.afail = GSHWDrawConfig::PS_AFAIL_KEEP;
+			pipe.ps.date = 0;
+			pipe.ps.shuffle = 0;
+			pipe.ps.shuffle_same = 0;
+			pipe.ps.process_ba = 0;
+			pipe.ps.process_rg = 0;
+			pipe.ps.aem_fmt = 0;
+			pipe.ps.pal_fmt = 0;
+			pipe.ps.dst_fmt = 2;
+			pipe.ps.depth_fmt = ds ? 2u : 0u;
+			pipe.ps.wms = 0;
+			pipe.ps.wmt = 0;
+			pipe.ps.ltf = 0;
+			pipe.ps.write_rg = 1;
+			pipe.ps.fba = 0;
+			pipe.ps.aem = 0;
+			pipe.ps.real16src = 0;
+			pipe.dss = {};
+			pipe.dss.ztst = ZTST_GEQUAL;
+			pipe.dss.zwe = ds;
+			pipe.dss.date = false;
+			pipe.cms = GSHWDrawConfig::ColorMaskSelector();
+			pipe.bs.enable = true;
+			pipe.bs.constant_enable = false;
+			pipe.bs.constant = 0;
+			pipe.bs.src_factor = SRC_ALPHA;
+			pipe.bs.dst_factor = INV_SRC_ALPHA;
+			pipe.bs.op = OP_ADD;
+			pipe.bs.src_factor_alpha = CONST_ONE;
+			pipe.bs.dst_factor_alpha = INV_SRC_ALPHA;
+			out.push_back(pipe);
+		}
+	}
+
+	// Compile the new sample-limit paths during one-time preparation as well.
+	// One textured baseline per depth mode, with CPU and VS sprite expansion.
+	for (const bool depth : {false, true})
+	{
+		const auto found = std::find_if(out.begin(), out.end(), [depth](const PipelineSelector& p) {
+			return p.ds == depth && p.vs.tme && p.vs.fst && p.ps.fst && p.vs.expand == GSHWDrawConfig::VSExpand::None;
+		});
+		pxAssert(found != out.end());
+		PipelineSelector base = *found;
+		base.vs.iip = base.ps.iip = 0;
+		base.vs.sprite_edge_clamp = base.ps.sprite_edge_clamp = 1;
+		out.push_back(base);
+		base.vs.expand = GSHWDrawConfig::VSExpand::Sprite;
+		out.push_back(base);
+	}
+}
+
+void GSDeviceVK::BuildTFXPreparationSelectors(std::vector<PipelineSelector>& out, bool vs_expand_available)
+{
+	// Preparation intentionally starts from the pure baseline only. Learned
+	// selectors are runtime state and may require render-pass variants this
+	// temporary device does not create.
+	BuildWarmupTFXSelectors(out);
+	if (!vs_expand_available)
+	{
+		out.erase(std::remove_if(out.begin(), out.end(), [](const PipelineSelector& selector) {
+			return selector.vs.expand != GSHWDrawConfig::VSExpand::None;
+		}), out.end());
+	}
+}
+
+std::array<GSDeviceVK::TFXPreparationRenderPassPlanEntry, 2> GSDeviceVK::BuildTFXPreparationRenderPassPlan()
+{
+	return {{
+		{true, false, false, false, false, false, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_LOAD_OP_DONT_CARE},
+		{true, true, false, false, false, false, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_LOAD_OP_LOAD},
+	}};
+}
+
+namespace
+{
+	void LogTFXPreparationProgress(const GSDeviceVK::TFXPreparationProgressSnapshot& progress)
+	{
+		Console.WriteLn("VK: TFX preparation finished: total=%u compiled=%u available=%u failed=%u cancelled=%u in_flight=%u cancel_requested=%u finished=%u checkpoint=%s",
+			progress.total, progress.completed, progress.already_available, progress.failed, progress.cancelled,
+			progress.in_flight, progress.cancel_requested ? 1u : 0u, progress.finished ? 1u : 0u,
+			progress.checkpoint_saved ? "saved" : "not saved");
+#if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		char value[PROP_VALUE_MAX]{};
+		if (__system_property_get("debug.emucorex.gs_compile_trace", value) == 1 && value[0] == '1')
+		{
+			EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "GSPrepare",
+				"total=%u compiled=%u available=%u failed=%u cancelled=%u in_flight=%u cancel_requested=%u finished=%u checkpoint_saved=%u",
+				progress.total, progress.completed, progress.already_available, progress.failed, progress.cancelled,
+				progress.in_flight, progress.cancel_requested ? 1u : 0u, progress.finished ? 1u : 0u,
+				progress.checkpoint_saved ? 1u : 0u);
+		}
+#endif
+	}
+}
+
+void GSDeviceVK::WarmupCommonTFXPipelines()
+{
+	std::vector<PipelineSelector> selectors;
+	BuildWarmupTFXSelectors(selectors);
+	for (const PipelineSelector& p : selectors)
+		GetTFXPipeline(p);
+
+	Console.WriteLn("VK: Warmed %zu common TFX pipelines.", selectors.size());
+}
+
+bool GSDeviceVK::CreateTFXPreparationDevice(std::string tfx_source)
+{
+	if (GetInstance() != this || Vulkan::IsVulkanLibraryLoaded() || g_vulkan_shader_cache || m_instance != VK_NULL_HANDLE ||
+		m_device != VK_NULL_HANDLE || tfx_source.empty())
+	{
+		return false;
+	}
+
+	bool created = false;
+	try
+	{
+		created = [this, &tfx_source]() {
+			std::unique_lock lock(s_instance_mutex);
+			m_optional_extensions = {};
+			m_features = {};
+			m_device_features = {};
+			m_device_properties = {};
+			VkSurfaceKHR surface = VK_NULL_HANDLE;
+			if (!CreateVulkanInstanceAndDevice(true, &surface, GSConfig.UseDebugDevice, GSConfig.UseDebugDevice))
+				return false;
+			if (surface != VK_NULL_HANDLE)
+			{
+				vkDestroySurfaceKHR(m_instance, surface, nullptr);
+				return false;
+			}
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+			if (m_tfx_preparation_failure_stage == TFXPreparationFailureStage::AfterDeviceCreate)
+				return false;
+#endif
+			if (!CheckFeatures())
+				return false;
+
+			// The preparation job uses the same PowerVR compiler path that aborts during
+			// the automatic warmup. Keep the feature unavailable instead of crashing.
+			if (IsDevicePowerVR())
+			{
+				Console.Warning("VK: TFX preparation is disabled on PowerVR.");
+				return false;
+			}
+
+			VKShaderCache::Create();
+			m_tfx_preparation_cache_created = static_cast<bool>(g_vulkan_shader_cache);
+			if (!m_tfx_preparation_cache_created)
+				return false;
+			m_tfx_source = std::move(tfx_source);
+			if (!CreateTFXPipelineLayouts())
+				return false;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+			if (m_tfx_preparation_failure_stage == TFXPreparationFailureStage::AfterTFXLayouts)
+				return false;
+#endif
+			if (!CreateTFXPreparationRenderPasses())
+				return false;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+			if (m_tfx_preparation_failure_stage == TFXPreparationFailureStage::AfterTFXRenderPasses)
+				return false;
+#endif
+			m_tfx_preparation_device = true;
+			return true;
+		}();
+	}
+	catch (...)
+	{
+		created = false;
+	}
+
+	if (!created)
+		DestroyTFXPreparationDevice();
+	return created;
+}
+
+bool GSDeviceVK::StartTFXPreparationBatch()
+{
+	if (!m_tfx_preparation_device || !g_vulkan_shader_cache)
+		return false;
+
+	StopAsyncTFXCompilation();
+	std::vector<PipelineSelector> selectors;
+	BuildTFXPreparationSelectors(selectors, m_features.vs_expand);
+	StartAsyncTFXCompilation(std::move(selectors), 0);
+	return true;
+}
+
+void GSDeviceVK::DestroyTFXPreparationDevice()
+{
+	if (!m_tfx_preparation_device && !m_tfx_preparation_library_loaded &&
+		!m_tfx_preparation_cache_created && m_instance == VK_NULL_HANDLE && m_device == VK_NULL_HANDLE)
+	{
+		return;
+	}
+
+	if (m_tfx_preparation_device || !m_tfx_compile_threads.empty())
+		StopAsyncTFXCompilation();
+
+	std::unique_lock lock(s_instance_mutex);
+	if (m_device != VK_NULL_HANDLE)
+	{
+		for (auto& entry : m_tfx_pipelines)
+		{
+			if (entry.second != VK_NULL_HANDLE)
+				vkDestroyPipeline(m_device, entry.second, nullptr);
+		}
+		m_tfx_pipelines.clear();
+		for (auto& entry : m_tfx_fragment_shaders)
+		{
+			if (entry.second != VK_NULL_HANDLE)
+				vkDestroyShaderModule(m_device, entry.second, nullptr);
+		}
+		m_tfx_fragment_shaders.clear();
+		for (auto& entry : m_tfx_vertex_shaders)
+		{
+			if (entry.second != VK_NULL_HANDLE)
+				vkDestroyShaderModule(m_device, entry.second, nullptr);
+		}
+		m_tfx_vertex_shaders.clear();
+
+		m_hot_tfx_pipelines.Clear();
+		if (m_tfx_pipeline_layout != VK_NULL_HANDLE)
+		{
+			vkDestroyPipelineLayout(m_device, m_tfx_pipeline_layout, nullptr);
+			m_tfx_pipeline_layout = VK_NULL_HANDLE;
+		}
+		if (m_tfx_texture_ds_layout != VK_NULL_HANDLE)
+		{
+			vkDestroyDescriptorSetLayout(m_device, m_tfx_texture_ds_layout, nullptr);
+			m_tfx_texture_ds_layout = VK_NULL_HANDLE;
+		}
+		if (m_tfx_ubo_ds_layout != VK_NULL_HANDLE)
+		{
+			vkDestroyDescriptorSetLayout(m_device, m_tfx_ubo_ds_layout, nullptr);
+			m_tfx_ubo_ds_layout = VK_NULL_HANDLE;
+		}
+
+		for (const auto& entry : m_render_pass_cache)
+		{
+			if (entry.second != VK_NULL_HANDLE)
+				vkDestroyRenderPass(m_device, entry.second, nullptr);
+		}
+		m_render_pass_cache.clear();
+	}
+
+	if (m_tfx_preparation_cache_created)
+	{
+		VKShaderCache::Destroy();
+		m_tfx_preparation_cache_created = false;
+	}
+
+	if (m_device != VK_NULL_HANDLE)
+	{
+		vkDestroyDevice(m_device, nullptr);
+		m_device = VK_NULL_HANDLE;
+	}
+	if (m_debug_messenger_callback != VK_NULL_HANDLE)
+		DisableDebugUtils();
+	if (m_instance != VK_NULL_HANDLE)
+	{
+		vkDestroyInstance(m_instance, nullptr);
+		m_instance = VK_NULL_HANDLE;
+	}
+	if (m_tfx_preparation_library_loaded)
+	{
+		Vulkan::UnloadVulkanLibrary();
+		m_tfx_preparation_library_loaded = false;
+	}
+
+	std::memset(m_tfx_render_pass, 0, sizeof(m_tfx_render_pass));
+	m_physical_device = VK_NULL_HANDLE;
+	m_optional_extensions = {};
+	m_features = {};
+	m_device_features = {};
+	m_device_properties = {};
+	m_current_render_pass = VK_NULL_HANDLE;
+	m_current_command_buffer = VK_NULL_HANDLE;
+	m_current_framebuffer = VK_NULL_HANDLE;
+	m_index_buffer = VK_NULL_HANDLE;
+	m_tfx_source.clear();
+	m_name.clear();
+	m_tfx_preparation_device = false;
+}
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+bool GSDeviceVK::TestTFXPreparationResources() const
+{
+	if (!m_tfx_preparation_device || m_instance == VK_NULL_HANDLE || m_device == VK_NULL_HANDLE ||
+		!g_vulkan_shader_cache || m_tfx_preparation_cache_created == false || m_tfx_pipeline_layout == VK_NULL_HANDLE ||
+		m_tfx_ubo_ds_layout == VK_NULL_HANDLE || m_tfx_texture_ds_layout == VK_NULL_HANDLE ||
+		m_render_pass_cache.size() != 2 || m_allocator != VK_NULL_HANDLE ||
+		m_global_descriptor_pool != VK_NULL_HANDLE || m_null_framebuffer != VK_NULL_HANDLE || m_null_texture ||
+		m_swap_chain || m_current_framebuffer != VK_NULL_HANDLE || m_index_buffer != VK_NULL_HANDLE)
+	{
+		return false;
+	}
+
+	for (const FrameResources& frame : m_frame_resources)
+	{
+		if (frame.fence != VK_NULL_HANDLE || frame.command_pool != VK_NULL_HANDLE ||
+			frame.descriptor_pool != VK_NULL_HANDLE || frame.command_buffers[0] != VK_NULL_HANDLE ||
+			frame.command_buffers[1] != VK_NULL_HANDLE || !frame.extra_descriptor_pools.empty() ||
+			!frame.cleanup_resources.empty())
+		{
+			return false;
+		}
+	}
+	for (const SpinResources& spin : m_spin_resources)
+	{
+		if (spin.command_pool != VK_NULL_HANDLE || spin.command_buffer != VK_NULL_HANDLE ||
+			spin.semaphore != VK_NULL_HANDLE || spin.fence != VK_NULL_HANDLE)
+		{
+			return false;
+		}
+	}
+	if (m_spin_buffer != VK_NULL_HANDLE || m_expand_index_buffer != VK_NULL_HANDLE ||
+		m_timestamp_query_pool != VK_NULL_HANDLE || m_pipeline_statistics_query_pool != VK_NULL_HANDLE ||
+		m_vertex_stream_buffer.IsValid() || m_index_stream_buffer.IsValid() || m_expand_index_stream_buffer.IsValid() ||
+		m_vertex_uniform_stream_buffer.IsValid() || m_fragment_uniform_stream_buffer.IsValid() ||
+		m_texture_stream_buffer.IsValid())
+	{
+		return false;
+	}
+
+	u32 pass_count = 0;
+	for (const auto& rt : m_tfx_render_pass)
+	{
+		for (const auto& ds : rt)
+		{
+			for (const auto& colclip : ds)
+			{
+				for (const auto& date : colclip)
+				{
+					for (const auto& feedback : date)
+					{
+						for (const auto& depth_sampling : feedback)
+						{
+							for (const auto& rt_op : depth_sampling)
+							{
+								for (const VkRenderPass pass : rt_op)
+									pass_count += (pass != VK_NULL_HANDLE);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return pass_count == 2;
+}
+#endif
+
+void GSDeviceVK::StartAsyncTFXCompilation()
+{
+	StopAsyncTFXCompilation();
+
+	LoadLearnedTFXSelectors();
+	std::vector<PipelineSelector> generic_selectors;
+	BuildWarmupTFXSelectors(generic_selectors);
+	std::vector<PipelineSelector> selectors;
+	const size_t learned_count = BuildTFXWarmupOrder(generic_selectors, m_tfx_learned_order, selectors);
+	StartAsyncTFXCompilation(std::move(selectors), learned_count);
+}
+
+void GSDeviceVK::StartAsyncTFXCompilation(std::vector<PipelineSelector> selectors, size_t learned_count)
+{
+	m_tfx_compile_queue = std::move(selectors);
+	if (learned_count > 0)
+		Console.WriteLn("VK: Replaying %zu learned TFX pipelines in the background.", learned_count);
+	m_tfx_compile_quit.store(false, std::memory_order_relaxed);
+	{
+		std::lock_guard lock(m_tfx_progress_mutex);
+		m_tfx_progress.Reset(static_cast<u32>(m_tfx_compile_queue.size()));
+		m_tfx_merge_coordinator.Reset(0);
+	}
+	{
+		std::lock_guard lock(m_tfx_compile_start_mutex);
+		m_tfx_compile_start_released = false;
+	}
+
+	const u32 hw_threads = std::max(1u, std::thread::hardware_concurrency());
+	const u32 worker_count = std::min(MAX_TFX_COMPILE_THREADS, std::max(1u, hw_threads / 2));
+	for (u32 i = 0; i < worker_count; i++)
+	{
+		try
+		{
+			m_tfx_compile_threads.emplace_back(&GSDeviceVK::TFXCompileThreadEntryPoint, this);
+		}
+		catch (...)
+		{
+			break;
+		}
+	}
+	{
+		// Threads cannot drain the queue until every successful spawn is counted.
+		// This prevents an early worker from being mistaken for the final worker.
+		std::lock_guard start_lock(m_tfx_compile_start_mutex);
+		{
+			std::lock_guard progress_lock(m_tfx_progress_mutex);
+			m_tfx_merge_coordinator.Reset(static_cast<u32>(m_tfx_compile_threads.size()));
+		}
+		m_tfx_compile_start_released = true;
+	}
+	m_tfx_compile_start_cv.notify_all();
+
+	if (m_tfx_compile_threads.empty())
+	{
+		Console.Warning("VK: Failed to start TFX compile threads, compiling synchronously.");
+		for (;;)
+		{
+			std::optional<u32> index;
+			{
+				std::lock_guard lock(m_tfx_progress_mutex);
+				index = m_tfx_progress.TryClaimNext();
+			}
+			if (!index.has_value())
+				break;
+			bool claim_finished = false;
+			ScopedGuard claim_cleanup([this, &claim_finished, claim_index = *index]() {
+				if (claim_finished)
+					return;
+				std::lock_guard lock(m_tfx_progress_mutex);
+				claim_finished = m_tfx_progress.FinishClaim(claim_index, TFXPreparationResult::Failed);
+			});
+
+			const PipelineSelector& p = m_tfx_compile_queue[*index];
+			bool already_available = false;
+			{
+				std::lock_guard lock(m_tfx_pipelines_mutex);
+				const auto it = m_tfx_pipelines.find(p);
+				already_available = (it != m_tfx_pipelines.end() && it->second != VK_NULL_HANDLE);
+			}
+
+			TFXPreparationResult result = TFXPreparationResult::Failed;
+			if (already_available)
+			{
+				result = TFXPreparationResult::AlreadyAvailable;
+			}
+			else if (GetTFXPipeline(p) != VK_NULL_HANDLE)
+			{
+				result = TFXPreparationResult::Published;
+			}
+			{
+				std::lock_guard lock(m_tfx_progress_mutex);
+				claim_finished = m_tfx_progress.FinishClaim(*index, result);
+			}
+		}
+
+		const bool flush_succeeded = g_vulkan_shader_cache->FlushPipelineCache(true);
+		{
+			std::lock_guard lock(m_tfx_progress_mutex);
+			const bool checkpoint_saved =
+				g_vulkan_shader_cache->HasPipelineCacheFile() && flush_succeeded;
+			m_tfx_progress.FinishAfterJoin(checkpoint_saved);
+		}
+		const TFXPreparationProgressSnapshot progress = GetTFXPreparationProgress();
+		LogTFXPreparationProgress(progress);
+		m_tfx_compile_queue.clear();
+		return;
+	}
+
+	Console.WriteLn("VK: Compiling %zu common TFX pipelines on %zu background thread(s).",
+		m_tfx_compile_queue.size(), m_tfx_compile_threads.size());
+}
+
+void GSDeviceVK::StopAsyncTFXCompilation()
+{
+	RequestTFXPreparationCancel();
+
+	for (std::thread& thread : m_tfx_compile_threads)
+	{
+		if (thread.joinable())
+			thread.join();
+	}
+
+	m_tfx_compile_threads.clear();
+	m_tfx_compile_queue.clear();
+	{
+		std::lock_guard lock(m_tfx_progress_mutex);
+		const TFXPreparationProgressSnapshot progress = m_tfx_progress.Snapshot();
+		if (!progress.finished && progress.in_flight == 0)
+			m_tfx_progress.FinishAfterJoin(false);
+	}
+
+	SaveLearnedTFXSelectors();
+}
+
+void GSDeviceVK::TFXCompileThreadEntryPoint()
+{
+	{
+		std::unique_lock lock(m_tfx_compile_start_mutex);
+		m_tfx_compile_start_cv.wait(lock, [this]() { return m_tfx_compile_start_released; });
+	}
+
+#if defined(__ANDROID__)
+	// Keep the emulation threads ahead of shader compilation.
+	setpriority(PRIO_PROCESS, 0, 19);
+#endif
+
+	VkPipelineCache transient_cache = VK_NULL_HANDLE;
+	ScopedGuard worker_cleanup([this, &transient_cache]() {
+		const bool merge_succeeded = g_vulkan_shader_cache->MergeTransientPipelineCache(transient_cache);
+		bool last_merge = false;
+		{
+			std::lock_guard lock(m_tfx_progress_mutex);
+			last_merge = m_tfx_merge_coordinator.ReportMerged(merge_succeeded);
+		}
+
+		if (!last_merge)
+			return;
+		const bool flush_succeeded = g_vulkan_shader_cache->FlushPipelineCache(true);
+		bool all_merges_succeeded;
+		{
+			std::lock_guard lock(m_tfx_progress_mutex);
+			all_merges_succeeded = m_tfx_merge_coordinator.AllMergesSucceeded();
+			const bool checkpoint_saved = g_vulkan_shader_cache->HasPipelineCacheFile() &&
+				all_merges_succeeded && flush_succeeded;
+			m_tfx_progress.FinishAfterJoin(checkpoint_saved);
+		}
+		const TFXPreparationProgressSnapshot progress = GetTFXPreparationProgress();
+		LogTFXPreparationProgress(progress);
+	});
+
+	try
+	{
+		transient_cache = g_vulkan_shader_cache->CreateTransientPipelineCache();
+		for (;;)
+		{
+			if (m_tfx_compile_quit.load(std::memory_order_relaxed))
+				break;
+
+			std::optional<u32> index;
+			{
+				std::lock_guard lock(m_tfx_progress_mutex);
+				index = m_tfx_progress.TryClaimNext();
+			}
+			if (!index.has_value())
+				break;
+			bool claim_finished = false;
+			ScopedGuard claim_cleanup([this, &claim_finished, claim_index = *index]() {
+				if (claim_finished)
+					return;
+				std::lock_guard lock(m_tfx_progress_mutex);
+				claim_finished = m_tfx_progress.FinishClaim(claim_index, TFXPreparationResult::Failed);
+			});
+
+			const PipelineSelector& p = m_tfx_compile_queue[*index];
+			bool already_available = false;
+			{
+				std::lock_guard lock(m_tfx_pipelines_mutex);
+				const auto it = m_tfx_pipelines.find(p);
+				already_available = (it != m_tfx_pipelines.end() && it->second != VK_NULL_HANDLE);
+			}
+
+			TFXPreparationResult result = TFXPreparationResult::Failed;
+			if (already_available)
+			{
+				result = TFXPreparationResult::AlreadyAvailable;
+			}
+			else
+			{
+				VkPipeline pipeline = VK_NULL_HANDLE;
+				try
+				{
+					pipeline = CreateTFXPipelineWithCache(p, transient_cache, false);
+					if (pipeline != VK_NULL_HANDLE && PublishTFXPipeline(p, pipeline) != VK_NULL_HANDLE)
+						result = TFXPreparationResult::Published;
+				}
+				catch (...)
+				{
+					Console.Error("VK: Failed to compile TFX pipeline on background thread.");
+				}
+			}
+			{
+				std::lock_guard lock(m_tfx_progress_mutex);
+				claim_finished = m_tfx_progress.FinishClaim(*index, result);
+			}
+		}
+	}
+	catch (...)
+	{
+		Console.Error("VK: TFX preparation worker exited after an unexpected failure.");
+	}
+}
+
+VkPipeline GSDeviceVK::PublishTFXPipeline(const PipelineSelector& p, VkPipeline pipeline)
+{
+	if (pipeline == VK_NULL_HANDLE)
+		return VK_NULL_HANDLE;
+
+	std::lock_guard lock(m_tfx_pipelines_mutex);
+
+	const auto it = m_tfx_pipelines.find(p);
+	if (it == m_tfx_pipelines.end())
+	{
+		m_tfx_pipelines.emplace(p, pipeline);
+		RecordLearnedTFXSelector(p);
+		return pipeline;
+	}
+
+	if (it->second == VK_NULL_HANDLE)
+	{
+		it->second = pipeline;
+		RecordLearnedTFXSelector(p);
+		return pipeline;
+	}
+
+	if (it->second != pipeline)
+		vkDestroyPipeline(m_device, pipeline, nullptr);
+
+	return it->second;
+}
+
+namespace
+{
+#pragma pack(push, 4)
+	struct LearnedTFXSelectorsHeader
+	{
+		u32 magic;
+		u32 version;
+		u32 selector_size;
+		u32 count;
+		u32 shader_cache_version;
+		u32 vendor_id;
+		u32 device_id;
+		u32 reserved;
+		u8 uuid[VK_UUID_SIZE];
+	};
+#pragma pack(pop)
+
+	static constexpr u32 LEARNED_TFX_SELECTORS_MAGIC = 0x4C584654; // 'TFXL'
+	static constexpr u32 LEARNED_TFX_SELECTORS_VERSION = 1;
+
+	static std::string GetLearnedTFXSelectorsFileName()
+	{
+		return Path::Combine(EmuFolders::Cache, "gs_mali_tfx_pipeline_selectors.bin");
+	}
+} // namespace
+
+void GSDeviceVK::LoadLearnedTFXSelectors()
+{
+	m_tfx_learned_set.clear();
+	m_tfx_learned_order.clear();
+	m_tfx_learned_dirty = false;
+
+	std::optional<std::vector<u8>> data = FileSystem::ReadBinaryFile(GetLearnedTFXSelectorsFileName().c_str());
+	if (!data.has_value() || data->size() < sizeof(LearnedTFXSelectorsHeader))
+		return;
+
+	LearnedTFXSelectorsHeader header;
+	std::memcpy(&header, data->data(), sizeof(header));
+
+	const VkPhysicalDeviceProperties& props = m_device_properties;
+	if (header.magic != LEARNED_TFX_SELECTORS_MAGIC || header.version != LEARNED_TFX_SELECTORS_VERSION ||
+		header.selector_size != sizeof(PipelineSelector) || header.shader_cache_version != SHADER_CACHE_VERSION ||
+		header.vendor_id != props.vendorID || header.device_id != props.deviceID ||
+		std::memcmp(header.uuid, props.pipelineCacheUUID, VK_UUID_SIZE) != 0)
+	{
+		return;
+	}
+
+	const size_t available = (data->size() - sizeof(header)) / sizeof(PipelineSelector);
+	const size_t count = std::min<size_t>(header.count, available);
+	for (size_t i = 0; i < count; i++)
+	{
+		PipelineSelector p;
+		std::memcpy(&p, data->data() + sizeof(header) + i * sizeof(PipelineSelector), sizeof(p));
+		if (m_tfx_learned_set.insert(p).second)
+			m_tfx_learned_order.push_back(p);
+	}
+
+	if (!m_tfx_learned_order.empty())
+		Console.WriteLn("VK: Loaded %zu learned TFX pipelines from previous sessions.", m_tfx_learned_order.size());
+}
+
+void GSDeviceVK::SaveLearnedTFXSelectors()
+{
+	if (m_tfx_preparation_device || !m_tfx_learned_dirty || m_tfx_learned_order.empty())
+		return;
+
+	LearnedTFXSelectorsHeader header = {};
+	header.magic = LEARNED_TFX_SELECTORS_MAGIC;
+	header.version = LEARNED_TFX_SELECTORS_VERSION;
+	header.selector_size = sizeof(PipelineSelector);
+	header.count = static_cast<u32>(m_tfx_learned_order.size());
+	header.shader_cache_version = SHADER_CACHE_VERSION;
+	header.vendor_id = m_device_properties.vendorID;
+	header.device_id = m_device_properties.deviceID;
+	std::memcpy(header.uuid, m_device_properties.pipelineCacheUUID, VK_UUID_SIZE);
+
+	std::vector<u8> buffer(sizeof(header) + m_tfx_learned_order.size() * sizeof(PipelineSelector));
+	std::memcpy(buffer.data(), &header, sizeof(header));
+
+	size_t offset = sizeof(header);
+	for (const PipelineSelector& p : m_tfx_learned_order)
+	{
+		std::memcpy(buffer.data() + offset, &p, sizeof(p));
+		offset += sizeof(p);
+	}
+
+	if (FileSystem::WriteBinaryFile(GetLearnedTFXSelectorsFileName().c_str(), buffer.data(), buffer.size()))
+		m_tfx_learned_dirty = false;
+}
+
+void GSDeviceVK::RecordLearnedTFXSelector(const PipelineSelector& p)
+{
+	if (m_tfx_preparation_device)
+		return;
+	if (!m_tfx_learned_set.insert(p).second)
+		return;
+
+	m_tfx_learned_order.push_back(p);
+	m_tfx_learned_dirty = true;
+
+	while (m_tfx_learned_order.size() > MAX_LEARNED_TFX_SELECTORS)
+	{
+		m_tfx_learned_set.erase(m_tfx_learned_order.front());
+		m_tfx_learned_order.pop_front();
+	}
+}
+
+bool GSDeviceVK::BindDrawPipeline(const PipelineSelector& p)
+{
+
+	VkPipeline pipeline = GetTFXPipeline(p);
+	if (pipeline == VK_NULL_HANDLE)
+		return false;
+
+	SetPipeline(pipeline);
+
+	return ApplyTFXState();
+}
+
+void GSDeviceVK::InitializeState()
+{
+	m_current_framebuffer = VK_NULL_HANDLE;
+	m_current_render_pass = VK_NULL_HANDLE;
+
+	for (u32 i = 0; i < NUM_TFX_TEXTURES; i++)
+		m_tfx_textures[i] = m_null_texture.get();
+
+	m_utility_texture = m_null_texture.get();
+
+	m_point_sampler = GetSampler(GSHWDrawConfig::SamplerSelector::Point());
+	if (m_point_sampler)
+		Vulkan::SetObjectName(m_device, m_point_sampler, "Point sampler");
+	m_linear_sampler = GetSampler(GSHWDrawConfig::SamplerSelector::Linear());
+	if (m_linear_sampler)
+		Vulkan::SetObjectName(m_device, m_linear_sampler, "Linear sampler");
+
+	m_tfx_sampler_sel = GSHWDrawConfig::SamplerSelector::Point().key;
+	m_tfx_sampler = m_point_sampler;
+
+	InvalidateCachedState();
+	SetInitialState(m_current_command_buffer);
+}
+
+bool GSDeviceVK::CreatePersistentDescriptorSets()
+{
+	m_tfx_ubo_descriptor_set = CreateTFXUBODescriptorSet();
+	return (m_tfx_ubo_descriptor_set != VK_NULL_HANDLE);
+}
+
+VkDescriptorSet GSDeviceVK::CreateTFXUBODescriptorSet()
+{
+	const VkDevice dev = m_device;
+	Vulkan::DescriptorSetUpdateBuilder dsub;
+
+	const VkDescriptorSet set = AllocatePersistentDescriptorSet(m_tfx_ubo_ds_layout);
+	if (set == VK_NULL_HANDLE)
+		return VK_NULL_HANDLE;
+	dsub.AddBufferDescriptorWrite(set, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+		m_vertex_uniform_stream_buffer.GetBuffer(), 0, sizeof(GSHWDrawConfig::VSConstantBuffer));
+	dsub.AddBufferDescriptorWrite(set, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+		m_fragment_uniform_stream_buffer.GetBuffer(), 0, sizeof(GSHWDrawConfig::PSConstantBuffer));
+	if (m_features.vs_expand)
+	{
+		dsub.AddBufferDescriptorWrite(set, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			m_vertex_stream_buffer.GetBuffer(), 0, m_vertex_stream_buffer.GetCurrentSize());
+	}
+	if (m_features.aa1)
+	{
+		dsub.AddBufferDescriptorWrite(set, 3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			m_expand_index_stream_buffer.GetBuffer(), 0, INDEX_BUFFER_SIZE);
+	}
+	dsub.Update(dev);
+	Vulkan::SetObjectName(dev, set, "Persistent TFX UBO set");
+	return set;
+}
+
+void GSDeviceVK::OnStreamRingReplaced(const VKStreamBuffer& ring)
+{
+	// Recorded image copies already name the old buffer, which retires after
+	// this command buffer's fence. Texture uploads have no persistent binding.
+	if (&ring == &m_texture_stream_buffer)
+		return;
+	pxAssert(&ring == &m_vertex_stream_buffer);
+
+	// Draws already recorded keep the old buffer, which retires with this command buffer. Later
+	// draws, in this command buffer and every one after it, bind the new one.
+	SetInitialState(m_current_command_buffer);
+
+	if (m_features.vs_expand)
+	{
+		// The persistent set is in use by recorded and in-flight command buffers, so it cannot be
+		// rewritten in place: build a new one and free the old one when this command buffer retires.
+		const VkDescriptorSet old_set = m_tfx_ubo_descriptor_set;
+		m_tfx_ubo_descriptor_set = CreateTFXUBODescriptorSet();
+		if (m_tfx_ubo_descriptor_set == VK_NULL_HANDLE)
+			pxFailRel("Failed to allocate the TFX UBO descriptor set for the grown vertex ring");
+		m_frame_resources[m_current_frame].cleanup_resources.push_back(
+			[this, old_set]() { FreePersistentDescriptorSet(old_set); });
+		m_dirty_flags |= DIRTY_FLAG_TFX_UBO;
+	}
+}
+
+void GSDeviceVK::FlushStreamRingWrites()
+{
+	// All six, not just the ones this submission is known to have touched: a ring that was not
+	// written has nothing pending and costs a compare.
+	m_vertex_stream_buffer.FlushPendingWrites();
+	m_index_stream_buffer.FlushPendingWrites();
+	m_expand_index_stream_buffer.FlushPendingWrites();
+	m_vertex_uniform_stream_buffer.FlushPendingWrites();
+	m_fragment_uniform_stream_buffer.FlushPendingWrites();
+	m_texture_stream_buffer.FlushPendingWrites();
+}
+
+GSDeviceVK::WaitType GSDeviceVK::GetWaitType(bool wait, bool spin)
+{
+	if (!wait)
+		return WaitType::None;
+	if (spin)
+		return WaitType::Spin;
+	else
+		return WaitType::Sleep;
+}
+
+void GSDeviceVK::ExecuteCommandBuffer(bool wait_for_completion)
+{
+	EndRenderPass();
+	ExecuteCommandBuffer(GetWaitType(wait_for_completion, GSConfig.HWSpinCPUForReadbacks));
+}
+
+void GSDeviceVK::ExecuteCommandBuffer(bool wait_for_completion, const char* reason, ...)
+{
+	std::va_list ap;
+	va_start(ap, reason);
+	const std::string reason_str(StringUtil::StdStringFromFormatV(reason, ap));
+	va_end(ap);
+
+	ExecuteCommandBuffer(wait_for_completion);
+}
+
+void GSDeviceVK::ExecuteCommandBufferAndRestartRenderPass(bool wait_for_completion, const char* reason)
+{
+	const VkRenderPass render_pass = m_current_render_pass;
+	const GSVector4i render_pass_area = m_current_render_pass_area;
+	const GSVector4i scissor = m_scissor;
+	GSTexture* const current_rt = m_current_render_target;
+	GSTexture* const current_ds = m_current_depth_target;
+	const FeedbackLoopFlag current_feedback_loop = m_current_framebuffer_feedback_loop;
+	// Moving to the next command buffer invalidates texture slots, but this
+	// draw still owns its bound textures. Retain them for descriptor reapply.
+	const auto tfx_textures = m_tfx_textures;
+	const GSTextureVK* const utility_texture = m_utility_texture;
+
+	EndRenderPass();
+	ExecuteCommandBuffer(GetWaitType(wait_for_completion, GSConfig.HWSpinCPUForReadbacks));
+	m_tfx_textures = tfx_textures;
+	m_utility_texture = utility_texture;
+	// These sources can be sampled by the resumed draw without being rebound.
+	// Keep later uploads after that draw rather than in the new init buffer.
+	for (GSTextureVK* texture : m_tfx_textures)
+	{
+		if (texture)
+			texture->SetUseFenceCounter(GetCurrentFenceCounter());
+	}
+	if (m_utility_texture)
+		const_cast<GSTextureVK*>(m_utility_texture)->SetUseFenceCounter(GetCurrentFenceCounter());
+
+	if (render_pass != VK_NULL_HANDLE)
+	{
+		// rebind framebuffer
+		OMSetRenderTargets(current_rt, current_ds, scissor, current_feedback_loop);
+
+		// restart render pass
+		BeginRenderPass(GetRenderPassForRestarting(render_pass), render_pass_area);
+	}
+
+	// Push constants are command-buffer state. Utility draws commonly upload them before
+	// reserving their vertices, so a stream-buffer rollover can happen after the upload.
+	// Restore the cached block in the new command buffer to avoid stale post-process and
+	// interlace coordinates on strict mobile Vulkan drivers.
+	if (m_utility_push_constants_size > 0)
+	{
+		vkCmdPushConstants(GetCurrentCommandBuffer(), m_utility_pipeline_layout,
+			VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+			m_utility_push_constants_size, m_utility_push_constants.data());
+	}
+}
+
+void GSDeviceVK::ExecuteCommandBufferAndRestartPresent(bool wait_for_completion, const char* reason, ...)
+{
+#if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	static const bool trace_present = []() {
+		char value[PROP_VALUE_MAX]{};
+		return __system_property_get("debug.emucorex.gs_compile_trace", value) == 1 && value[0] == '1';
+	}();
+	if (trace_present)
+	{
+		std::va_list ap;
+		va_start(ap, reason);
+		const std::string reason_str(StringUtil::StdStringFromFormatV(reason, ap));
+		va_end(ap);
+		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX", "Vulkan present pass restart: %s", reason_str.c_str());
+	}
+#else
+	(void)reason;
+#endif
+
+	pxAssert(m_is_presenting);
+	vkCmdEndRenderPass(GetCurrentCommandBuffer());
+	ExecuteCommandBuffer(wait_for_completion);
+
+	GSTextureVK* swap_chain_texture = m_swap_chain->GetCurrentTexture();
+
+	const VkFramebuffer fb = swap_chain_texture->GetFramebuffer(false);
+	pxAssert(fb);
+
+	const VkRenderPassBeginInfo rp = {VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, nullptr,
+		GetRenderPass(swap_chain_texture->GetVkFormat(), VK_FORMAT_UNDEFINED, VK_ATTACHMENT_LOAD_OP_LOAD,
+			VK_ATTACHMENT_STORE_OP_STORE),
+		fb,
+		{{0, 0}, {static_cast<u32>(swap_chain_texture->GetWidth()), static_cast<u32>(swap_chain_texture->GetHeight())}},
+		0u, nullptr};
+	vkCmdBeginRenderPass(GetCurrentCommandBuffer(), &rp, VK_SUBPASS_CONTENTS_INLINE);
+
+	// Dynamic viewport/scissor state does not survive a command-buffer submission.
+	// BeginPresent() normally emits it, but this rare restart path must do the same.
+	const VkViewport vp{0.0f, 0.0f, static_cast<float>(swap_chain_texture->GetWidth()),
+		static_cast<float>(swap_chain_texture->GetHeight()), 0.0f, 1.0f};
+	const VkRect2D scissor{
+		{0, 0}, {static_cast<u32>(swap_chain_texture->GetWidth()), static_cast<u32>(swap_chain_texture->GetHeight())}};
+	vkCmdSetViewport(GetCurrentCommandBuffer(), 0, 1, &vp);
+	vkCmdSetScissor(GetCurrentCommandBuffer(), 0, 1, &scissor);
+
+	if (m_utility_push_constants_size > 0)
+	{
+		vkCmdPushConstants(GetCurrentCommandBuffer(), m_utility_pipeline_layout,
+			VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+			m_utility_push_constants_size, m_utility_push_constants.data());
+	}
+}
+
+void GSDeviceVK::ExecuteCommandBufferForReadback()
+{
+	ExecuteCommandBuffer(true);
+	if (m_spinning_supported && GSConfig.HWSpinGPUForReadbacks)
+	{
+		m_spin_timer = 30;
+		m_spin_manager.ReadbackRequested();
+
+		if (!m_optional_extensions.vk_ext_calibrated_timestamps && !m_warned_slow_spin)
+		{
+			m_warned_slow_spin = true;
+			Host::AddKeyedOSDMessage("GSDeviceVK_NoCalibratedTimestamps",
+				TRANSLATE_STR("GS", "Spin GPU During Readbacks is enabled, but calibrated timestamps are unavailable.  "
+									"This might be really slow."),
+				Host::OSD_WARNING_DURATION);
+		}
+	}
+}
+
+void GSDeviceVK::InvalidateCachedState()
+{
+	m_dirty_flags = ALL_DIRTY_STATE;
+	for (u32 i = 0; i < NUM_TFX_TEXTURES; i++)
+		m_tfx_textures[i] = m_null_texture.get();
+	m_utility_texture = m_null_texture.get();
+	m_current_framebuffer = VK_NULL_HANDLE;
+	m_current_render_target = nullptr;
+	m_current_depth_target = nullptr;
+	m_current_framebuffer_feedback_loop = FeedbackLoopFlag_None;
+
+	m_current_pipeline_layout = PipelineLayout::Undefined;
+	m_tfx_texture_descriptor_set = VK_NULL_HANDLE;
+	m_tfx_rt_descriptor_set = VK_NULL_HANDLE;
+	m_utility_descriptor_set = VK_NULL_HANDLE;
+}
+
+void GSDeviceVK::SetIndexBuffer(VkBuffer buffer)
+{
+	if (m_index_buffer == buffer)
+		return;
+
+	m_index_buffer = buffer;
+	m_dirty_flags |= DIRTY_FLAG_INDEX_BUFFER;
+}
+
+void GSDeviceVK::SetBlendConstants(u8 color)
+{
+	if (m_blend_constant_color == color)
+		return;
+
+	m_blend_constant_color = color;
+	m_dirty_flags |= DIRTY_FLAG_BLEND_CONSTANTS;
+}
+
+void GSDeviceVK::SetLineWidth(float width)
+{
+	if (m_current_line_width == width)
+		return;
+
+	m_current_line_width = width;
+	m_dirty_flags |= DIRTY_FLAG_LINE_WIDTH;
+}
+
+void GSDeviceVK::PSSetROVs(GSTexture* rt, GSTexture* ds, bool write_rt, bool write_ds)
+{
+	GSTextureVK* vkRt = static_cast<GSTextureVK*>(rt);
+	GSTextureVK* vkDs = static_cast<GSTextureVK*>(ds);
+	GSTextureVK* oldVkRt = m_tfx_textures[TFX_TEXTURE_RT_ROV] != m_null_texture.get() ?
+	                       m_tfx_textures[TFX_TEXTURE_RT_ROV] : nullptr;
+	GSTextureVK* oldVkDs = m_tfx_textures[TFX_TEXTURE_DEPTH_ROV] != m_null_texture.get() ?
+	                       m_tfx_textures[TFX_TEXTURE_DEPTH_ROV] : nullptr;
+
+	if (!(vkRt || vkDs || oldVkRt || oldVkDs))
+		return;
+
+	pxAssert(!(vkRt || vkDs) || m_features.rov);
+
+	if (vkRt)
+	{
+		PSSetShaderResource(TFX_TEXTURE_RT_ROV, vkRt, true, ResourceType::UAV);
+
+		// Unbind conflicting RT texture
+		PSSetShaderResource(TFX_TEXTURE_RT, nullptr, false);
+
+		// Unbind conflicting source texture
+		if (m_tfx_textures[TFX_TEXTURE_TEXTURE] == vkRt)
+		{
+			PSSetShaderResource(TFX_TEXTURE_TEXTURE, nullptr, false);
+		}
+
+		if (write_rt)
+		{
+			vkRt->SetState(GSTexture::State::Dirty);
+		}
+	}
+	else
+	{
+		// Unbind to avoid conflicts with OM targets.
+		PSSetShaderResource(TFX_TEXTURE_RT_ROV, nullptr, false);
+	}
+
+	if (vkDs)
+	{
+		PSSetShaderResource(TFX_TEXTURE_DEPTH_ROV, vkDs, true, ResourceType::UAV);
+
+		// Unbind conflicting depth texture
+		PSSetShaderResource(TFX_TEXTURE_DEPTH, nullptr, false);
+
+		// Unbind conflicting source texture
+		if (m_tfx_textures[TFX_TEXTURE_TEXTURE] == vkDs)
+		{
+			PSSetShaderResource(TFX_TEXTURE_TEXTURE, nullptr, false);
+		}
+
+		if (write_ds)
+		{
+			vkDs->SetState(GSTexture::State::Dirty);
+		}
+	}
+	else
+	{
+		// Unbind to avoid conflicts with OM targets.
+		PSSetShaderResource(TFX_TEXTURE_DEPTH_ROV, nullptr, false);
+	}
+
+	if (IsDeviceNVIDIA() && InRenderPass())
+	{
+		// Nvidia doesn't like switching ROV targets mid-render pass, doing so causes flickering or missing geometry.
+		// End the render pass to avoid such issues.
+		if (vkRt != oldVkRt || vkDs != oldVkDs)
+		{
+			GL_INS("VK: Ending render pass due to UAV switch");
+			EndRenderPass();
+		}
+	}
+
+	if (GSConfig.HWROVBarriersVK)
+	{
+		// This is to fix issues with some systems that seem to require barriers even with FSI.
+		// Adds a barriers to the UAVs before every draw. Can result in a large performance hit.
+		if ((vkRt || vkDs) && InRenderPass())
+		{
+			GL_INS("Ending render pass due to UAV barrier");
+			EndRenderPass();
+		}
+		for (GSTextureVK* tex : std::array{ vkRt, vkDs })
+		{
+			if (tex)
+			{
+				if (InRenderPass())
+				{
+					GL_INS("Ending render pass due to UAV barrier");
+					EndRenderPass();
+				}
+				// The subresources version does the barrier even when the before/after layout
+				// are the same since we want a memory barrier here, not just a layout change.
+				tex->TransitionSubresourcesToLayout(GetCurrentCommandBuffer(), 0, 1, tex->GetLayout(), tex->GetLayout());
+			}
+		}
+	}
+}
+
+void GSDeviceVK::PSSetShaderResource(int i, GSTexture* sr, bool check_state, ResourceType type)
+{
+	GSTextureVK* vkTex = static_cast<GSTextureVK*>(sr);
+	bool update_layout = false;
+	if (vkTex)
+	{
+		if (check_state)
+		{
+			vkTex->CommitClear();
+			if (vkTex->GetLayout() != GSTextureVK::Layout::ShaderReadOnly)
+			{
+				update_layout = true;
+				if (InRenderPass())
+				{
+					GL_INS("Ending render pass due to resource transition");
+					EndRenderPass();
+				}
+				vkTex->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+			}
+		}
+		vkTex->SetUseFenceCounter(GetCurrentFenceCounter());
+	}
+	else
+	{
+		vkTex = m_null_texture.get();
+		if (!vkTex)
+			return; // Null texture creation failed — skip binding to avoid crash
+	}
+
+	if (!ShouldRefreshVulkanTextureDescriptor(m_tfx_textures[i] == vkTex, update_layout))
+		return;
+
+	m_tfx_textures[i] = vkTex;
+	m_dirty_flags |= (DIRTY_FLAG_TFX_TEXTURE_0 << i);
+}
+
+void GSDeviceVK::PSSetSampler(GSHWDrawConfig::SamplerSelector sel)
+{
+	if (m_tfx_sampler_sel == sel.key)
+		return;
+
+	m_tfx_sampler_sel = sel.key;
+	m_tfx_sampler = GetSampler(sel);
+	m_dirty_flags |= DIRTY_FLAG_TFX_TEXTURE_0;
+}
+
+void GSDeviceVK::SetUtilityTexture(GSTexture* tex, VkSampler sampler)
+{
+	GSTextureVK* vkTex = static_cast<GSTextureVK*>(tex);
+	if (vkTex)
+	{
+		vkTex->CommitClear();
+		vkTex->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+		vkTex->SetUseFenceCounter(GetCurrentFenceCounter());
+	}
+	else
+	{
+		vkTex = m_null_texture.get();
+	}
+
+	if (m_utility_texture == vkTex && m_utility_sampler == sampler)
+		return;
+
+	m_utility_texture = vkTex;
+	m_utility_sampler = sampler;
+	m_dirty_flags |= DIRTY_FLAG_UTILITY_TEXTURE;
+}
+
+void GSDeviceVK::SetUtilityPushConstants(const void* data, u32 size)
+{
+	pxAssert(size <= m_utility_push_constants.size());
+	std::memcpy(m_utility_push_constants.data(), data, size);
+	m_utility_push_constants_size = size;
+	vkCmdPushConstants(GetCurrentCommandBuffer(), m_utility_pipeline_layout,
+		VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, size, data);
+}
+
+void GSDeviceVK::UnbindTexture(GSTextureVK* tex)
+{
+	for (u32 i = 0; i < NUM_TFX_TEXTURES; i++)
+	{
+		if (m_tfx_textures[i] == tex)
+		{
+			m_tfx_textures[i] = m_null_texture.get();
+			m_dirty_flags |= (DIRTY_FLAG_TFX_TEXTURE_0 << i);
+		}
+	}
+	if (m_utility_texture == tex)
+	{
+		m_utility_texture = m_null_texture.get();
+		m_dirty_flags |= DIRTY_FLAG_UTILITY_TEXTURE;
+	}
+	if (m_current_render_target == tex || m_current_depth_target == tex)
+	{
+		EndRenderPass();
+		m_current_framebuffer = VK_NULL_HANDLE;
+		m_current_render_target = nullptr;
+		m_current_depth_target = nullptr;
+	}
+}
+
+bool GSDeviceVK::InRenderPass()
+{
+	return m_current_render_pass != VK_NULL_HANDLE;
+}
+
+void GSDeviceVK::BeginRenderPass(VkRenderPass rp, const GSVector4i& rect)
+{
+
+	if (m_current_render_pass != VK_NULL_HANDLE)
+		EndRenderPass();
+
+	m_current_render_pass = rp;
+	m_loop_declared_in_pass = false;
+	m_current_render_pass_area = rect;
+
+	const VkRenderPassBeginInfo begin_info = {VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, nullptr, m_current_render_pass,
+		m_current_framebuffer, {{rect.x, rect.y}, {static_cast<u32>(rect.width()), static_cast<u32>(rect.height())}}, 0,
+		nullptr};
+
+	m_command_buffer_render_passes++;
+	vkCmdBeginRenderPass(GetCurrentCommandBuffer(), &begin_info, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void GSDeviceVK::BeginClearRenderPass(VkRenderPass rp, const GSVector4i& rect, const VkClearValue* cv, u32 cv_count)
+{
+	if (m_current_render_pass != VK_NULL_HANDLE)
+		EndRenderPass();
+
+	m_current_render_pass = rp;
+	m_loop_declared_in_pass = false;
+	m_current_render_pass_area = rect;
+
+	const VkRenderPassBeginInfo begin_info = {VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, nullptr, m_current_render_pass,
+		m_current_framebuffer, {{rect.x, rect.y}, {static_cast<u32>(rect.width()), static_cast<u32>(rect.height())}},
+		cv_count, cv};
+
+	vkCmdBeginRenderPass(GetCurrentCommandBuffer(), &begin_info, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void GSDeviceVK::BeginClearRenderPass(VkRenderPass rp, const GSVector4i& rect, u32 clear_color)
+{
+
+	alignas(16) VkClearValue cv;
+	GSVector4::store<true>((void*)cv.color.float32, GSVector4::unorm8(clear_color));
+	BeginClearRenderPass(rp, rect, &cv, 1);
+}
+
+void GSDeviceVK::BeginClearRenderPass(VkRenderPass rp, const GSVector4i& rect, float depth, u8 stencil)
+{
+
+	VkClearValue cv;
+	cv.depthStencil.depth = depth;
+	cv.depthStencil.stencil = stencil;
+	BeginClearRenderPass(rp, rect, &cv, 1);
+}
+
+void GSDeviceVK::EndRenderPass()
+{
+
+	if (m_current_render_pass == VK_NULL_HANDLE)
+		return;
+
+	m_current_render_pass = VK_NULL_HANDLE;
+	m_loop_declared_in_pass = false;
+	g_perfmon.Put(GSPerfMon::RenderPasses, 1);
+
+	vkCmdEndRenderPass(GetCurrentCommandBuffer());
+
+	// Same-attachment pass consumers are ordered by the incoming dependency.
+	// Sampling, transfer and compute consumers retain their explicit transitions.
+}
+
+void GSDeviceVK::SetViewport(const VkViewport& viewport)
+{
+	if (std::memcmp(&viewport, &m_viewport, sizeof(VkViewport)) == 0)
+		return;
+
+	std::memcpy(&m_viewport, &viewport, sizeof(VkViewport));
+	m_dirty_flags |= DIRTY_FLAG_VIEWPORT;
+}
+
+void GSDeviceVK::SetScissor(const GSVector4i& scissor)
+{
+	if (m_scissor.eq(scissor))
+		return;
+
+	m_scissor = scissor;
+	m_dirty_flags |= DIRTY_FLAG_SCISSOR;
+}
+
+void GSDeviceVK::SetPipeline(VkPipeline pipeline)
+{
+	if (m_current_pipeline == pipeline)
+		return;
+
+	m_current_pipeline = pipeline;
+	m_dirty_flags |= DIRTY_FLAG_PIPELINE;
+}
+
+void GSDeviceVK::SetInitialState(VkCommandBuffer cmdbuf)
+{
+	VkBuffer buffer = *m_vertex_stream_buffer.GetBufferPtr();
+	if (buffer != VK_NULL_HANDLE)
+	{
+		constexpr VkDeviceSize buffer_offset = 0;
+		vkCmdBindVertexBuffers(cmdbuf, 0, 1, &buffer, &buffer_offset);
+	}
+}
+
+__ri void GSDeviceVK::ApplyBaseState(u32 flags, VkCommandBuffer cmdbuf)
+{
+	if (flags & DIRTY_FLAG_INDEX_BUFFER)
+		vkCmdBindIndexBuffer(cmdbuf, m_index_buffer, 0, VK_INDEX_TYPE_UINT16);
+
+	if (flags & DIRTY_FLAG_PIPELINE)
+		vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_current_pipeline);
+
+	if (flags & DIRTY_FLAG_VIEWPORT)
+		vkCmdSetViewport(cmdbuf, 0, 1, &m_viewport);
+
+	if (flags & DIRTY_FLAG_SCISSOR)
+	{
+		const VkRect2D vscissor{
+			{m_scissor.x, m_scissor.y}, {static_cast<u32>(m_scissor.width()), static_cast<u32>(m_scissor.height())}};
+		vkCmdSetScissor(cmdbuf, 0, 1, &vscissor);
+	}
+
+	if (flags & DIRTY_FLAG_BLEND_CONSTANTS)
+	{
+		const GSVector4 col(static_cast<float>(m_blend_constant_color) / 128.0f);
+		vkCmdSetBlendConstants(cmdbuf, col.v);
+	}
+
+	if (flags & DIRTY_FLAG_LINE_WIDTH)
+		vkCmdSetLineWidth(cmdbuf, m_current_line_width);
+}
+
+bool GSDeviceVK::ApplyTFXState(bool already_execed)
+{
+	if (m_current_pipeline_layout == PipelineLayout::TFX && m_dirty_flags == 0)
+		return true;
+
+	const VkCommandBuffer cmdbuf = GetCurrentCommandBuffer();
+	u32 flags = m_dirty_flags;
+	m_dirty_flags &= ~(DIRTY_TFX_STATE | DIRTY_CONSTANT_BUFFER_STATE | DIRTY_FLAG_TFX_UBO);
+
+	// do cbuffer first, because it's the most likely to cause an exec
+	if (flags & DIRTY_FLAG_VS_CONSTANT_BUFFER)
+	{
+		if (!m_vertex_uniform_stream_buffer.ReserveMemory(
+				sizeof(m_vs_cb_cache), static_cast<u32>(m_device_properties.limits.minUniformBufferOffsetAlignment)))
+		{
+			if (already_execed)
+			{
+				Console.Error("VK: Failed to reserve vertex uniform space");
+				return false;
+			}
+
+			ExecuteCommandBufferAndRestartRenderPass(false, "Ran out of vertex uniform space");
+			return ApplyTFXState(true);
+		}
+
+		std::memcpy(m_vertex_uniform_stream_buffer.GetCurrentHostPointer(), &m_vs_cb_cache, sizeof(m_vs_cb_cache));
+		m_tfx_dynamic_offsets[0] = m_vertex_uniform_stream_buffer.GetCurrentOffset();
+		m_vertex_uniform_stream_buffer.CommitMemory(sizeof(m_vs_cb_cache));
+		flags |= DIRTY_FLAG_TFX_UBO;
+	}
+
+	if (flags & DIRTY_FLAG_PS_CONSTANT_BUFFER)
+	{
+		if (!m_fragment_uniform_stream_buffer.ReserveMemory(
+				sizeof(m_ps_cb_cache), static_cast<u32>(m_device_properties.limits.minUniformBufferOffsetAlignment)))
+		{
+			if (already_execed)
+			{
+				Console.Error("VK: Failed to reserve pixel uniform space");
+				return false;
+			}
+
+			ExecuteCommandBufferAndRestartRenderPass(false, "Ran out of pixel uniform space");
+			return ApplyTFXState(true);
+		}
+
+		std::memcpy(m_fragment_uniform_stream_buffer.GetCurrentHostPointer(), &m_ps_cb_cache, sizeof(m_ps_cb_cache));
+		m_tfx_dynamic_offsets[1] = m_fragment_uniform_stream_buffer.GetCurrentOffset();
+		m_fragment_uniform_stream_buffer.CommitMemory(sizeof(m_ps_cb_cache));
+		flags |= DIRTY_FLAG_TFX_UBO;
+	}
+
+	Vulkan::DescriptorSetUpdateBuilder dsub;
+	if (m_current_pipeline_layout != PipelineLayout::TFX)
+	{
+		m_current_pipeline_layout = PipelineLayout::TFX;
+		flags |= DIRTY_FLAG_TFX_UBO | DIRTY_FLAG_TFX_TEXTURES | DIRTY_FLAG_VS_PUSH_CONSTANTS;
+
+		// Clear out the RT/DS binding if feedback loop isn't on, because it'll be in the wrong state and make
+		// the validation layer cranky. Not a big deal since we need to write it anyway.
+		std::array<TFX_TEXTURES, 2> texture_types = { TFX_TEXTURE_RT, TFX_TEXTURE_DEPTH };
+		for (u32 texture_type : texture_types)
+		{
+			const GSTextureVK::Layout tex_layout = m_tfx_textures[texture_type]->GetLayout();
+			if (tex_layout != GSTextureVK::Layout::FeedbackLoop && tex_layout != GSTextureVK::Layout::ShaderReadOnly)
+				m_tfx_textures[texture_type] = m_null_texture.get();
+		}
+	}
+
+	if (flags & DIRTY_FLAG_TFX_UBO)
+	{
+		// Still need to bind the UBO descriptor set.
+		vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_tfx_pipeline_layout, 0, 1,
+			&m_tfx_ubo_descriptor_set, NUM_TFX_DYNAMIC_OFFSETS, m_tfx_dynamic_offsets.data());
+	}
+
+	if ((flags & DIRTY_FLAG_VS_PUSH_CONSTANTS) && m_features.vs_expand)
+		SetVSPushConstants(m_vs_pc_cache.base_vertex, m_vs_pc_cache.base_index, true);
+
+	if (flags & DIRTY_FLAG_TFX_TEXTURES)
+	{
+		// Push descriptors can update only changed bindings. A freshly allocated descriptor set cannot:
+		// every binding must be initialized before the draw which consumes the set.
+		if (!m_use_push_descriptors)
+			flags |= DIRTY_FLAG_TFX_TEXTURES;
+
+		if (flags & DIRTY_FLAG_TFX_TEXTURE_TEX)
+		{
+			dsub.AddCombinedImageSamplerDescriptorWrite(VK_NULL_HANDLE, TFX_TEXTURE_TEXTURE,
+				m_tfx_textures[TFX_TEXTURE_TEXTURE]->GetView(), m_tfx_sampler,
+				m_tfx_textures[TFX_TEXTURE_TEXTURE]->GetVkLayout());
+		}
+		if (flags & DIRTY_FLAG_TFX_TEXTURE_PALETTE)
+		{
+			dsub.AddImageDescriptorWrite(VK_NULL_HANDLE, TFX_TEXTURE_PALETTE,
+				m_tfx_textures[TFX_TEXTURE_PALETTE]->GetView(), m_tfx_textures[TFX_TEXTURE_PALETTE]->GetVkLayout());
+		}
+		if (flags & DIRTY_FLAG_TFX_TEXTURE_RT)
+		{
+			if (UsesInputAttachmentFeedbackPath())
+			{
+				dsub.AddInputAttachmentDescriptorWrite(
+					VK_NULL_HANDLE, TFX_TEXTURE_RT, m_tfx_textures[TFX_TEXTURE_RT]->GetView(), VK_IMAGE_LAYOUT_GENERAL);
+			}
+			else
+			{
+				dsub.AddImageDescriptorWrite(VK_NULL_HANDLE, TFX_TEXTURE_RT, m_tfx_textures[TFX_TEXTURE_RT]->GetView(),
+					m_tfx_textures[TFX_TEXTURE_RT]->GetVkLayout());
+			}
+		}
+		if (flags & DIRTY_FLAG_TFX_TEXTURE_PRIMID)
+		{
+			dsub.AddImageDescriptorWrite(VK_NULL_HANDLE, TFX_TEXTURE_PRIMID,
+				m_tfx_textures[TFX_TEXTURE_PRIMID]->GetView(), m_tfx_textures[TFX_TEXTURE_PRIMID]->GetVkLayout());
+		}
+		if (flags & DIRTY_FLAG_TFX_TEXTURE_DEPTH)
+		{
+			if (UsesInputAttachmentFeedbackPath())
+			{
+				dsub.AddInputAttachmentDescriptorWrite(
+					VK_NULL_HANDLE, TFX_TEXTURE_DEPTH, m_tfx_textures[TFX_TEXTURE_DEPTH]->GetView(), VK_IMAGE_LAYOUT_GENERAL);
+			}
+			else
+			{
+				dsub.AddImageDescriptorWrite(VK_NULL_HANDLE, TFX_TEXTURE_DEPTH, m_tfx_textures[TFX_TEXTURE_DEPTH]->GetView(),
+					m_tfx_textures[TFX_TEXTURE_DEPTH]->GetVkLayout());
+			}
+		}
+		if (flags & DIRTY_FLAG_TFX_TEXTURE_RT_ROV)
+		{
+			dsub.AddImageDescriptorWrite(VK_NULL_HANDLE, TFX_TEXTURE_RT_ROV, m_tfx_textures[TFX_TEXTURE_RT_ROV]->GetView(),
+				m_tfx_textures[TFX_TEXTURE_RT_ROV]->GetVkLayout(), true);
+		}
+		if (flags & DIRTY_FLAG_TFX_TEXTURE_DEPTH_ROV)
+		{
+			dsub.AddImageDescriptorWrite(VK_NULL_HANDLE, TFX_TEXTURE_DEPTH_ROV, m_tfx_textures[TFX_TEXTURE_DEPTH_ROV]->GetView(),
+				m_tfx_textures[TFX_TEXTURE_DEPTH_ROV]->GetVkLayout(), true);
+		}
+
+		if (m_use_push_descriptors)
+		{
+			dsub.PushUpdate(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_tfx_pipeline_layout, TFX_DESCRIPTOR_SET_TEXTURES);
+		}
+		else
+		{
+			TextureDescriptorKey key;
+			key.layout = m_tfx_texture_ds_layout;
+			key.sampler = m_tfx_sampler;
+			for (u32 i = 0; i < NUM_TFX_TEXTURES; i++)
+			{
+				key.views[i] = m_tfx_textures[i]->GetView();
+				key.layouts[i] = (UsesInputAttachmentFeedbackPath() &&
+					(i == TFX_TEXTURE_RT || i == TFX_TEXTURE_DEPTH)) ?
+					VK_IMAGE_LAYOUT_GENERAL : m_tfx_textures[i]->GetVkLayout();
+			}
+			auto& cache = m_frame_resources[m_current_frame].texture_descriptor_cache;
+			const auto it = cache.find(key);
+			VkDescriptorSet ds;
+			if (it != cache.end())
+				ds = it->second;
+			else
+			{
+				ds = AllocateFrameDescriptorSet(m_tfx_texture_ds_layout);
+				if (ds == VK_NULL_HANDLE)
+					return false;
+				dsub.UpdateToDescriptorSet(m_device, ds, true);
+				cache.emplace(key, ds);
+			}
+			vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_tfx_pipeline_layout,
+				TFX_DESCRIPTOR_SET_TEXTURES, 1, &ds, 0, nullptr);
+		}
+	}
+
+	ApplyBaseState(flags, cmdbuf);
+	return true;
+}
+
+bool GSDeviceVK::ApplyUtilityState(bool already_execed)
+{
+	if (m_current_pipeline_layout == PipelineLayout::Utility && m_dirty_flags == 0)
+		return true;
+
+	const VkCommandBuffer cmdbuf = GetCurrentCommandBuffer();
+	u32 flags = m_dirty_flags;
+	m_dirty_flags &= ~DIRTY_UTILITY_STATE;
+
+	if (m_current_pipeline_layout != PipelineLayout::Utility || flags & DIRTY_FLAG_UTILITY_TEXTURE)
+	{
+		m_current_pipeline_layout = PipelineLayout::Utility;
+
+		Vulkan::DescriptorSetUpdateBuilder dsub;
+		dsub.AddCombinedImageSamplerDescriptorWrite(
+			VK_NULL_HANDLE, 0, m_utility_texture->GetView(), m_utility_sampler, m_utility_texture->GetVkLayout());
+		if (m_use_push_descriptors)
+		{
+			dsub.PushUpdate(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_utility_pipeline_layout, 0, false);
+		}
+		else
+		{
+			TextureDescriptorKey key;
+			key.layout = m_utility_ds_layout;
+			key.sampler = m_utility_sampler;
+			key.views[0] = m_utility_texture->GetView();
+			key.layouts[0] = m_utility_texture->GetVkLayout();
+			auto& cache = m_frame_resources[m_current_frame].texture_descriptor_cache;
+			const auto it = cache.find(key);
+			VkDescriptorSet ds;
+			if (it != cache.end())
+				ds = it->second;
+			else
+			{
+				ds = AllocateFrameDescriptorSet(m_utility_ds_layout);
+				if (ds == VK_NULL_HANDLE)
+					return false;
+				dsub.UpdateToDescriptorSet(m_device, ds, true);
+				cache.emplace(key, ds);
+			}
+			vkCmdBindDescriptorSets(
+				cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_utility_pipeline_layout, 0, 1, &ds, 0, nullptr);
+		}
+	}
+
+
+	ApplyBaseState(flags, cmdbuf);
+	return true;
+}
+
+void GSDeviceVK::SetVSConstantBuffer(const GSHWDrawConfig::VSConstantBuffer& cb)
+{
+	if (m_vs_cb_cache.Update(cb))
+		m_dirty_flags |= DIRTY_FLAG_VS_CONSTANT_BUFFER;
+}
+
+void GSDeviceVK::SetPSConstantBuffer(const GSHWDrawConfig::PSConstantBuffer& cb)
+{
+	if (m_ps_cb_cache.Update(cb))
+		m_dirty_flags |= DIRTY_FLAG_PS_CONSTANT_BUFFER;
+}
+
+void GSDeviceVK::SetupDATE(GSTexture* rt, GSTexture* ds, SetDATM datm, const GSVector4i& bbox)
+{
+	g_perfmon.Put(GSPerfMon::TextureCopies, 1);
+
+	GL_PUSH("SetupDATE {%d,%d} %dx%d", bbox.left, bbox.top, bbox.width(), bbox.height());
+
+	const GSVector2i size(ds->GetSize());
+	const GSVector4 src = GSVector4(bbox) / GSVector4(size).xyxy();
+	const GSVector4 dst = src * 2.0f - 1.0f;
+	const GSVertexPT1 vertices[] = {
+		{GSVector4(dst.x, -dst.y, 0.5f, 1.0f), GSVector2(src.x, src.y)},
+		{GSVector4(dst.z, -dst.y, 0.5f, 1.0f), GSVector2(src.z, src.y)},
+		{GSVector4(dst.x, -dst.w, 0.5f, 1.0f), GSVector2(src.x, src.w)},
+		{GSVector4(dst.z, -dst.w, 0.5f, 1.0f), GSVector2(src.z, src.w)},
+	};
+
+	// sfex3 (after the capcom logo), vf4 (first menu fading in), ffxii shadows, rumble roses shadows, persona4 shadows
+	EndRenderPass();
+	SetUtilityTexture(rt, m_point_sampler);
+	OMSetRenderTargets(nullptr, ds, bbox);
+	IASetVertexBuffer(vertices, sizeof(vertices[0]), 4);
+	SetPipeline(GetConvertPipeline(SetDATMShader(datm)));
+	BeginClearRenderPass(m_date_setup_render_pass, bbox, 0.0f, 0);
+	if (ApplyUtilityState())
+		DrawPrimitive();
+
+	EndRenderPass();
+}
+
+GSTextureVK* GSDeviceVK::SetupPrimitiveTrackingDATE(GSHWDrawConfig& config)
+{
+
+	g_perfmon.Put(GSPerfMon::TextureCopies, 1);
+
+	// How this is done:
+	// - can't put a barrier for the image in the middle of the normal render pass, so that's out
+	// - so, instead of just filling the int texture with INT_MAX, we sample the RT and use -1 for failing values
+	// - then, instead of sampling the RT with DATE=1/2, we just do a min() without it, the -1 gets preserved
+	// - then, the DATE=3 draw is done as normal
+	GL_INS("Setup DATE Primitive ID Image for {%d,%d}-{%d,%d}", config.drawarea.left, config.drawarea.top,
+		config.drawarea.right, config.drawarea.bottom);
+
+	const GSVector2i rtsize(config.rt->GetSize());
+	GSTextureVK* image =
+		static_cast<GSTextureVK*>(CreateRenderTarget(rtsize.x, rtsize.y, GSTexture::Format::PrimID, false));
+	if (!image)
+		return nullptr;
+
+	EndRenderPass();
+
+	// setup the fill quad to prefill with existing alpha values
+	SetUtilityTexture(config.rt, m_point_sampler);
+	OMSetRenderTargets(image, config.ds, config.drawarea);
+
+	// if the depth target has been cleared, we need to preserve that clear
+	const VkAttachmentLoadOp ds_load_op = GetLoadOpForTexture(static_cast<GSTextureVK*>(config.ds));
+	const u32 ds = (config.ds ? 1 : 0);
+
+	if (ds_load_op == VK_ATTACHMENT_LOAD_OP_CLEAR)
+	{
+		VkClearValue cv[2] = {};
+		cv[1].depthStencil.depth = static_cast<GSTextureVK*>(config.ds)->GetClearDepth();
+		cv[1].depthStencil.stencil = 1;
+		BeginClearRenderPass(m_primid_image_setup_render_passes[ds][1], GSVector4i::loadh(rtsize), cv, 2);
+	}
+	else
+	{
+		BeginRenderPass(m_primid_image_setup_render_passes[ds][0], config.drawarea);
+	}
+
+	// draw the quad to prefill the image
+	const GSVector4 src = GSVector4(config.drawarea) / GSVector4(rtsize).xyxy();
+	const GSVector4 dst = src * 2.0f - 1.0f;
+	const GSVertexPT1 vertices[] = {
+		{GSVector4(dst.x, -dst.y, 0.5f, 1.0f), GSVector2(src.x, src.y)},
+		{GSVector4(dst.z, -dst.y, 0.5f, 1.0f), GSVector2(src.z, src.y)},
+		{GSVector4(dst.x, -dst.w, 0.5f, 1.0f), GSVector2(src.x, src.w)},
+		{GSVector4(dst.z, -dst.w, 0.5f, 1.0f), GSVector2(src.z, src.w)},
+	};
+	const VkPipeline pipeline = m_primid_image_setup_pipelines[ds][static_cast<u8>(config.datm)];
+	SetPipeline(pipeline);
+	IASetVertexBuffer(vertices, sizeof(vertices[0]), std::size(vertices));
+	if (ApplyUtilityState())
+		DrawPrimitive();
+
+	// image is now filled with either -1 or INT_MAX, so now we can do the prepass
+	UploadHWDrawVerticesAndIndices(config);
+
+	// primid texture will get re-bound, so clear it since we're using push descriptors
+	PSSetShaderResource(3, m_null_texture.get(), false);
+
+	// cut down the configuration for the prepass, we don't need blending or any feedback loop
+	PipelineSelector& pipe = m_pipeline_selector;
+	UpdateHWPipelineSelector(config, pipe);
+	pipe.dss.zwe = false;
+	pipe.cms.wrgba = 0;
+	pipe.bs = {};
+	pipe.feedback_loop_flags = FeedbackLoopFlag_None;
+	pipe.rt = true;
+	pipe.ps.blend_a = pipe.ps.blend_b = pipe.ps.blend_c = pipe.ps.blend_d = false;
+	pipe.ps.no_color = false;
+	pipe.ps.no_color1 = true;
+	if (BindDrawPipeline(pipe))
+		Draw(config);
+
+	// image is initialized/prepass is done, so finish up and get ready to do the "real" draw
+	EndRenderPass();
+
+	// .. by setting it to DATE=3
+	config.ps.date = 3;
+	config.alpha_second_pass.ps.date = 3;
+
+	// and bind the image to the primitive sampler
+	image->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+	PSSetShaderResource(3, image, false);
+	return image;
+}
+
+void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
+{
+
+	m_draws_in_command_buffer++;
+
+	// Mid-frame command-buffer kick.
+	// While a frame records, submit accumulated work to keep the GPU busy
+	// so it runs concurrently with GS-thread recording instead of only starting
+	// when the readback fence-waits on it. This fixes massive slowdowns on tilers.
+	// On mobile tile GPUs, mid-frame submits are very expensive because they break tile
+	// binning. Use a much higher threshold on the mobile path.
+	{
+		constexpr u32 kick_threshold_desktop = 4000;
+		constexpr u32 kick_threshold_mobile = 40000;
+		const u32 kick_threshold = HasMobileGPUProfile() ? kick_threshold_mobile : kick_threshold_desktop;
+		if (m_draws_in_command_buffer >= kick_threshold)
+		{
+			ScanForCommandBufferCompletion();
+			const u32 next_buffer = (m_current_frame + 1) % NUM_COMMAND_BUFFERS;
+			if (m_frame_resources[next_buffer].fence_counter <= m_completed_fence_counter)
+			{
+				ExecuteCommandBuffer(false);
+				m_draws_in_command_buffer = 0;
+			}
+		}
+	}
+
+	m_pipeline_selector.vs.expand = config.vs.expand;
+	const GSVector2i rtsize(config.rt ? config.rt->GetSize() : config.ds->GetSize());
+	GSTextureVK* draw_rt = config.ps.HasColorROV() ? nullptr : static_cast<GSTextureVK*>(config.rt);
+	GSTextureVK* draw_ds = config.ps.HasDepthROV() ? nullptr : static_cast<GSTextureVK*>(config.ds);
+	GSTextureVK* draw_rt_rov = config.ps.HasColorROV() ? static_cast<GSTextureVK*>(config.rt) : nullptr;
+	GSTextureVK* draw_ds_rov = config.ps.HasDepthROV() ? static_cast<GSTextureVK*>(config.ds) : nullptr;
+	GSTextureVK* draw_rt_clone = nullptr;
+	GSTextureVK* colclip_rt = static_cast<GSTextureVK*>(g_gs_device->GetColorClipTexture());
+
+	// stream buffer in first, in case we need to exec
+	SetVSConstantBuffer(config.cb_vs);
+	SetPSConstantBuffer(config.cb_ps);
+
+	// bind textures before checking the render pass, in case we need to transition them
+	if (config.tex)
+	{
+		PSSetShaderResource(TFX_TEXTURE_TEXTURE, config.tex, config.tex != config.rt && config.tex != config.ds);
+		PSSetSampler(config.sampler);
+	}
+	if (config.pal)
+		PSSetShaderResource(TFX_TEXTURE_PALETTE, config.pal, true);
+
+	if (config.blend.constant_enable)
+		SetBlendConstants(config.blend.constant);
+
+	if (config.topology == GSHWDrawConfig::Topology::Line)
+		SetLineWidth(config.line_expand ? config.cb_ps.ScaleFactor.z : 1.0f);
+
+	// Primitive ID tracking DATE setup.
+	// Needs to be done before
+	GSTextureVK* date_image = nullptr;
+	if (config.destination_alpha == GSHWDrawConfig::DestinationAlphaMode::PrimIDTracking)
+	{
+		// If we have a colclip in progress, we need to use the colclip texture, but we can't check this later as there's a chicken/egg problem with the pipe setup.
+		GSTexture* backup_rt = config.rt;
+
+		if (colclip_rt)
+			config.rt = colclip_rt;
+
+		date_image = SetupPrimitiveTrackingDATE(config);
+		if (!date_image)
+		{
+			Console.Warning("VK: Failed to allocate DATE image, aborting draw.");
+			return;
+		}
+
+		config.rt = backup_rt;
+	}
+
+	// figure out the pipeline
+	PipelineSelector& pipe = m_pipeline_selector;
+	UpdateHWPipelineSelector(config, pipe);
+
+	// If the current pass was not created as a feedback loop, end it before sampling an attachment.
+	// Setting require_one_barrier here is too late: UpdateHWPipelineSelector() has already selected
+	// the render pass and pipeline feedback flags.
+	if (InRenderPass())
+	{
+		if (HWDrawNeedsAttachmentRestart(config, pipe))
+			EndRenderPass();
+	}
+
+	// now blit the colclip texture back to the original target
+	if (colclip_rt)
+	{
+		if (config.colclip_mode == GSHWDrawConfig::ColClipMode::EarlyResolve)
+		{
+			GL_PUSH("Blit ColorClip back to RT");
+
+			EndRenderPass();
+			colclip_rt->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+
+			draw_rt = static_cast<GSTextureVK*>(config.rt);
+			OMSetRenderTargets(draw_rt, draw_ds, GSVector4i::loadh(rtsize), static_cast<FeedbackLoopFlag>(pipe.feedback_loop_flags));
+
+			// if this target was cleared and never drawn to, perform the clear as part of the resolve here.
+			if (draw_rt->GetState() == GSTexture::State::Cleared)
+			{
+				alignas(16) VkClearValue cvs[2];
+				u32 cv_count = 0;
+				GSVector4::store<true>(&cvs[cv_count++].color, draw_rt->GetClearForFormat());
+				if (draw_ds)
+					cvs[cv_count++].depthStencil = {draw_ds->GetClearDepth(), 1};
+
+				BeginClearRenderPass(GetTFXRenderPass(true, pipe.ds, false, false, pipe.IsRTFeedbackLoop(),
+										 pipe.IsTestingAndSamplingDepth(), VK_ATTACHMENT_LOAD_OP_CLEAR,
+										 pipe.ds ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_DONT_CARE),
+					draw_rt->GetRect(), cvs, cv_count);
+				draw_rt->SetState(GSTexture::State::Dirty);
+			}
+			else
+			{
+				BeginRenderPass(GetTFXRenderPass(true, pipe.ds, false, false, pipe.IsRTFeedbackLoop(),
+									pipe.IsTestingAndSamplingDepth(), VK_ATTACHMENT_LOAD_OP_LOAD,
+									pipe.ds ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_DONT_CARE),
+					draw_rt->GetRect());
+			}
+
+			const GSVector4 drawareaf = GSVector4(config.colclip_update_area);
+			const GSVector4 sRect(drawareaf / GSVector4(rtsize).xyxy());
+			SetPipeline(m_colclip_finish_pipelines[pipe.ds][pipe.IsRTFeedbackLoop()]);
+			SetUtilityTexture(colclip_rt, m_point_sampler);
+			DrawStretchRect(sRect, drawareaf, rtsize);
+
+			Recycle(colclip_rt);
+			g_gs_device->SetColorClipTexture(nullptr);
+
+			colclip_rt = nullptr;
+			draw_rt = config.ps.HasColorROV() ? nullptr : static_cast<GSTextureVK*>(config.rt);
+		}
+		else
+		{
+			pipe.ps.colclip_hw = 1;
+			draw_rt = colclip_rt;
+		}
+	}
+
+	// Destination Alpha Setup
+	switch (config.destination_alpha)
+	{
+		case GSHWDrawConfig::DestinationAlphaMode::Off: // No setup
+		case GSHWDrawConfig::DestinationAlphaMode::Full: // No setup
+		case GSHWDrawConfig::DestinationAlphaMode::PrimIDTracking: // Setup is done below
+			break;
+		case GSHWDrawConfig::DestinationAlphaMode::StencilOne: // setup is done below
+		{
+			// we only need to do the setup here if we don't have barriers, in which case do full DATE.
+			if (!m_features.texture_barrier)
+			{
+				SetupDATE(draw_rt, config.ds, config.datm, config.drawarea);
+				config.destination_alpha = GSHWDrawConfig::DestinationAlphaMode::Stencil;
+			}
+		}
+		break;
+
+		case GSHWDrawConfig::DestinationAlphaMode::Stencil:
+			SetupDATE(draw_rt, config.ds, config.datm, config.drawarea);
+			break;
+	}
+
+	// Switch to colclip target for colclip hw rendering
+	if (pipe.ps.colclip_hw)
+	{
+		if (!colclip_rt)
+		{
+			config.colclip_update_area = config.drawarea;
+			EndRenderPass();
+			colclip_rt = static_cast<GSTextureVK*>(CreateFeedbackTarget(rtsize.x, rtsize.y, GSTexture::Format::ColorClip, false));
+			if (!colclip_rt)
+			{
+				Console.Warning("VK: Failed to allocate ColorClip render target, aborting draw.");
+
+				if (date_image)
+					Recycle(date_image);
+
+				GL_POP();
+				return;
+			}
+			g_gs_device->SetColorClipTexture(static_cast<GSTexture*>(colclip_rt));
+
+			// propagate clear value through if the colclip render is the first
+			if (draw_rt->GetState() == GSTexture::State::Cleared)
+			{
+				colclip_rt->SetState(GSTexture::State::Cleared);
+				colclip_rt->SetClearColor(draw_rt->GetClearColor());
+
+				// If depth is cleared, we need to commit it, because we're only going to draw to the active part of the FB.
+				if (draw_ds && draw_ds->GetState() == GSTexture::State::Cleared && !config.drawarea.eq(GSVector4i::loadh(rtsize)))
+					draw_ds->CommitClear(m_current_command_buffer);
+			}
+			else if (draw_rt->GetState() == GSTexture::State::Dirty)
+			{
+				GL_PUSH_("ColorClip Render Target Setup");
+				draw_rt->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+			}
+
+			// we're not drawing to the RT, so we can use it as a source
+			if (config.require_one_barrier && !m_features.texture_barrier)
+				PSSetShaderResource(2, draw_rt, true);
+		}
+		draw_rt = colclip_rt;
+	}
+
+	// clear texture binding when it's bound to RT or DS.
+	if (!config.tex && ((config.rt && static_cast<GSTextureVK*>(config.rt) == m_tfx_textures[0]) ||
+						   (config.ds && static_cast<GSTextureVK*>(config.ds) == m_tfx_textures[0])))
+	{
+		PSSetShaderResource(0, nullptr, false);
+	}
+
+	// render pass restart optimizations
+	if (colclip_rt && (config.colclip_mode == GSHWDrawConfig::ColClipMode::ConvertAndResolve || config.colclip_mode == GSHWDrawConfig::ColClipMode::ConvertOnly))
+	{
+		// colclip hw requires blitting.
+		EndRenderPass();
+	}
+	else if (InRenderPass() &&
+		((draw_rt && m_current_render_target == draw_rt) ||
+		(draw_ds && m_current_depth_target == draw_ds)))
+	{
+		// avoid restarting the render pass just to switch from rt+depth to rt and vice versa
+		// keep the depth even if doing colclip hw draws, because the next draw will probably re-enable depth.
+		if (!(draw_rt || draw_rt_rov) && m_current_render_target && config.tex != m_current_render_target &&
+			draw_ds && m_current_render_target->GetSize() == draw_ds->GetSize())
+		{
+			draw_rt = m_current_render_target;
+			m_pipeline_selector.rt = true;
+		}
+		else if (!(draw_ds || draw_ds_rov) && m_current_depth_target && config.tex != m_current_depth_target &&
+			draw_rt && m_current_depth_target->GetSize() == draw_rt->GetSize())
+		{
+			draw_ds = m_current_depth_target;
+			m_pipeline_selector.ds = true;
+		}
+
+		ApplyHWDrawFeedbackCarry(config, pipe, draw_rt, draw_ds);
+
+	}
+
+	if (draw_rt && config.road.clone_rt)
+	{
+		// Requires a copy of the RT.
+		draw_rt_clone = static_cast<GSTextureVK*>(CreateTexture(rtsize.x, rtsize.y, 1, draw_rt->GetFormat(), true));
+		if (draw_rt_clone)
+		{
+			GL_PUSH("VK: Copy RT to temp texture {%d,%d %dx%d}",
+				config.drawarea.left, config.drawarea.top,
+				config.drawarea.width(), config.drawarea.height());
+			EndRenderPass();
+			if (config.tex_hazard)
+			{
+				const GSVector4i union_rect = config.drawarea.runion(config.samplearea);
+				const u32 size_union = union_rect.width() * union_rect.height();
+				const u32 size_indiv = config.drawarea.width() * config.drawarea.height() +
+				                       config.samplearea.width() * config.samplearea.height();
+
+				// Do an individual copy if the union is larger than the sum of individual areas.
+				if (size_union > size_indiv)
+				{
+					const GSVector4i snapped_drawarea = ProcessCopyArea(GSVector4i(0, 0, rtsize.x, rtsize.y), config.drawarea);
+					const GSVector4i snapped_samplearea = ProcessCopyArea(GSVector4i(0, 0, rtsize.x, rtsize.y), config.samplearea);
+					CopyRect(draw_rt, draw_rt_clone, snapped_drawarea, snapped_drawarea.left, snapped_drawarea.top);
+					CopyRect(draw_rt, draw_rt_clone, snapped_samplearea, snapped_samplearea.left, snapped_samplearea.top);
+				}
+				else
+				{
+					CopyRect(draw_rt, draw_rt_clone, union_rect, union_rect.left, union_rect.top);
+				}
+			}
+			else
+			{
+				CopyRect(draw_rt, draw_rt_clone, config.drawarea, config.drawarea.left, config.drawarea.top);
+			}
+
+			if (GSNeedsRTSnapshotBinding(config))
+				PSSetShaderResource(2, draw_rt_clone, true);
+			if (config.tex_hazard == GSHWDrawConfig::TEX_HAZARD_RT)
+				PSSetShaderResource(0, draw_rt_clone, true);
+		}
+		else
+			Console.Warning("VK: Failed to allocate temp texture for RT copy.");
+	}
+
+	if (pipe.IsRTFeedbackLoop() && draw_rt)
+	{
+		pxAssertMsg(m_features.texture_barrier, "Texture barriers enabled");
+		PSSetShaderResource(TFX_TEXTURE_RT, draw_rt, false);
+
+		if (m_tfx_textures[TFX_TEXTURE_RT_ROV] == draw_rt)
+		{
+			// Unbind to avoid conflicts.
+			PSSetShaderResource(TFX_TEXTURE_RT_ROV, nullptr, false);
+			m_dirty_flags |= static_cast<u32>(DIRTY_FLAG_TFX_TEXTURE_RT_ROV);
+		}
+	}
+	else
+	{
+		// Preserve this draw's snapshot; only unused feedback bindings should be cleared.
+		PSSetShaderResource(TFX_TEXTURE_RT, GSNeedsRTSnapshotBinding(config) ? draw_rt_clone : nullptr, false);
+	}
+	if (pipe.IsDepthFeedbackLoop())
+	{
+		pxAssertMsg(m_features.texture_barrier, "Texture barriers enabled");
+		PSSetShaderResource(TFX_TEXTURE_DEPTH, draw_ds, false);
+
+		if (m_tfx_textures[TFX_TEXTURE_DEPTH_ROV] == draw_ds)
+		{
+			// Unbind to avoid conflicts.
+			PSSetShaderResource(TFX_TEXTURE_DEPTH_ROV, nullptr, false);
+			m_dirty_flags |= static_cast<u32>(DIRTY_FLAG_TFX_TEXTURE_DEPTH_ROV);
+		}
+	}
+	else
+	{
+		PSSetShaderResource(TFX_TEXTURE_DEPTH, nullptr, false);
+	}
+
+	PSSetROVs(draw_rt_rov, draw_ds_rov, config.ps.HasColorOutput(), config.ps.HasDepthROVWrite());
+
+	OMSetRenderTargets(draw_rt, draw_ds, config.scissor,
+		static_cast<FeedbackLoopFlag>(pipe.feedback_loop_flags), rtsize);
+
+	// Begin render pass if new target or out of the area.
+	if (!InRenderPass())
+	{
+		const VkAttachmentLoadOp rt_op = GetLoadOpForTexture(draw_rt);
+		const VkAttachmentLoadOp ds_op = GetLoadOpForTexture(draw_ds);
+		const VkRenderPass rp = GetTFXRenderPass(pipe.rt, pipe.ds, pipe.ps.colclip_hw,
+			config.destination_alpha == GSHWDrawConfig::DestinationAlphaMode::Stencil, pipe.IsRTFeedbackLoop(),
+			pipe.IsTestingAndSamplingDepth(), rt_op, ds_op);
+		const bool is_clearing_rt = (rt_op == VK_ATTACHMENT_LOAD_OP_CLEAR || ds_op == VK_ATTACHMENT_LOAD_OP_CLEAR);
+
+		// Only draw to the active area of the colclip hw target. Except when depth is cleared, we need to use the full
+		// buffer size, otherwise it'll only clear the draw part of the depth buffer.
+		const GSVector4i render_area = (pipe.ps.colclip_hw && (config.colclip_mode == GSHWDrawConfig::ColClipMode::ConvertAndResolve) && ds_op != VK_ATTACHMENT_LOAD_OP_CLEAR)
+		                             ? config.drawarea
+		                             : GSVector4i::loadh(rtsize);
+
+		if (is_clearing_rt)
+		{
+			// when we're clearing, we set the draw area to the whole fb, otherwise part of it will be undefined
+			alignas(16) VkClearValue cvs[2];
+			u32 cv_count = 0;
+			if (draw_rt)
+			{
+				GSVector4 clear_color = draw_rt->GetClearForFormat();
+				if (pipe.ps.colclip_hw)
+				{
+					// Denormalize clear color for hw colclip.
+					clear_color *= GSVector4::cxpr(255.0f / 65535.0f, 255.0f / 65535.0f, 255.0f / 65535.0f, 1.0f);
+				}
+				GSVector4::store<true>(&cvs[cv_count++].color, clear_color);
+			}
+			if (draw_ds)
+				cvs[cv_count++].depthStencil = {draw_ds->GetClearDepth(), 0};
+
+			BeginClearRenderPass(rp, render_area, cvs, cv_count);
+		}
+		else
+		{
+			BeginRenderPass(rp, render_area);
+		}
+	}
+
+	if (config.destination_alpha == GSHWDrawConfig::DestinationAlphaMode::StencilOne)
+	{
+		const VkClearAttachment ca = {VK_IMAGE_ASPECT_STENCIL_BIT, 0u, {.depthStencil = {0.0f, 1u}}};
+		const VkClearRect rc = {{{config.drawarea.left, config.drawarea.top},
+									{static_cast<u32>(config.drawarea.width()), static_cast<u32>(config.drawarea.height())}},
+			0u, 1u};
+		vkCmdClearAttachments(m_current_command_buffer, 1, &ca, 1, &rc);
+	}
+
+	// rt -> colclip hw blit if enabled
+	if (colclip_rt && (config.colclip_mode == GSHWDrawConfig::ColClipMode::ConvertOnly || config.colclip_mode == GSHWDrawConfig::ColClipMode::ConvertAndResolve) && config.rt->GetState() == GSTexture::State::Dirty)
+	{
+		OMSetRenderTargets(draw_rt, draw_ds, GSVector4i::loadh(rtsize), static_cast<FeedbackLoopFlag>(pipe.feedback_loop_flags));
+		SetUtilityTexture(static_cast<GSTextureVK*>(config.rt), m_point_sampler);
+		SetPipeline(m_colclip_setup_pipelines[pipe.ds][pipe.IsRTFeedbackLoop()]);
+
+		const GSVector4 drawareaf = GSVector4((config.colclip_mode == GSHWDrawConfig::ColClipMode::ConvertOnly) ? GSVector4i::loadh(rtsize) : config.drawarea);
+		const GSVector4 sRect(drawareaf / GSVector4(rtsize).xyxy());
+		DrawStretchRect(sRect, drawareaf, rtsize);
+
+		GL_POP();
+		OMSetRenderTargets(draw_rt, draw_ds, config.scissor, static_cast<FeedbackLoopFlag>(pipe.feedback_loop_flags));
+	}
+
+	// VB/IB upload, if we did DATE setup and it's not colclip hw this has already been done
+	if (!date_image || colclip_rt)
+		UploadHWDrawVerticesAndIndices(config);
+
+	// now we can do the actual draw
+	if (BindDrawPipeline(pipe))
+		SendHWDraw(config, pipe.IsRTFeedbackLoop() ? draw_rt : nullptr, pipe.IsDepthFeedbackLoop() ? draw_ds : nullptr,
+			config.require_one_barrier, config.require_full_barrier);
+
+	// blend second pass
+	if (config.blend_multi_pass.enable)
+	{
+		if (config.blend_multi_pass.blend.constant_enable)
+			SetBlendConstants(config.blend_multi_pass.blend.constant);
+
+		pipe.bs = config.blend_multi_pass.blend;
+		pipe.ps.no_color1 = config.blend_multi_pass.no_color1;
+		pipe.ps.blend_hw = config.blend_multi_pass.blend_hw;
+		pipe.ps.dither = config.blend_multi_pass.dither;
+		if (BindDrawPipeline(pipe))
+		{
+			// TODO: This probably should have barriers, in case we want to use it conditionally.
+			Draw(config);
+		}
+	}
+
+	// and the alpha pass
+	if (config.alpha_second_pass.enable)
+	{
+		// cbuffer will definitely be dirty if aref changes, no need to check it
+		if (config.cb_ps.FogColor_AREF.a != config.alpha_second_pass.ps_aref)
+		{
+			config.cb_ps.FogColor_AREF.a = config.alpha_second_pass.ps_aref;
+			SetPSConstantBuffer(config.cb_ps);
+		}
+
+		pipe.ps = config.alpha_second_pass.ps;
+		pipe.cms = config.alpha_second_pass.colormask;
+		pipe.dss = config.alpha_second_pass.depth;
+		pipe.bs = config.blend;
+		if (BindDrawPipeline(pipe))
+		{
+			SendHWDraw(config, pipe.IsRTFeedbackLoop() ? draw_rt : nullptr, pipe.IsDepthFeedbackLoop() ? draw_ds : nullptr,
+				config.alpha_second_pass.require_one_barrier, config.alpha_second_pass.require_full_barrier);
+		}
+	}
+
+	if (draw_rt_clone)
+		Recycle(draw_rt_clone);
+
+	if (date_image)
+		Recycle(date_image);
+
+	// now blit the colclip texture back to the original target
+	if (colclip_rt)
+	{
+		config.colclip_update_area = config.colclip_update_area.runion(config.drawarea);
+
+		if ((config.colclip_mode == GSHWDrawConfig::ColClipMode::ResolveOnly || config.colclip_mode == GSHWDrawConfig::ColClipMode::ConvertAndResolve))
+		{
+			GL_PUSH("Blit ColorClip back to RT");
+
+			EndRenderPass();
+
+			colclip_rt->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+
+			draw_rt = static_cast<GSTextureVK*>(config.rt);
+			OMSetRenderTargets(draw_rt, draw_ds, (config.colclip_mode == GSHWDrawConfig::ColClipMode::ResolveOnly) ? GSVector4i::loadh(rtsize) : config.scissor, static_cast<FeedbackLoopFlag>(pipe.feedback_loop_flags));
+
+			// if this target was cleared and never drawn to, perform the clear as part of the resolve here.
+			if (draw_rt->GetState() == GSTexture::State::Cleared)
+			{
+				alignas(16) VkClearValue cvs[2];
+				u32 cv_count = 0;
+				GSVector4::store<true>(&cvs[cv_count++].color, draw_rt->GetClearForFormat());
+				if (draw_ds)
+					cvs[cv_count++].depthStencil = {draw_ds->GetClearDepth(), 1};
+
+				BeginClearRenderPass(GetTFXRenderPass(true, pipe.ds, false, false, pipe.IsRTFeedbackLoop(),
+										 pipe.IsTestingAndSamplingDepth(), VK_ATTACHMENT_LOAD_OP_CLEAR,
+										 pipe.ds ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_DONT_CARE),
+					draw_rt->GetRect(), cvs, cv_count);
+				draw_rt->SetState(GSTexture::State::Dirty);
+			}
+			else
+			{
+				BeginRenderPass(GetTFXRenderPass(true, pipe.ds, false, false, pipe.IsRTFeedbackLoop(),
+									pipe.IsTestingAndSamplingDepth(), VK_ATTACHMENT_LOAD_OP_LOAD,
+									pipe.ds ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_DONT_CARE),
+					draw_rt->GetRect());
+			}
+
+			const GSVector4 drawareaf = GSVector4(config.colclip_update_area);
+			const GSVector4 sRect(drawareaf / GSVector4(rtsize).xyxy());
+			SetPipeline(m_colclip_finish_pipelines[pipe.ds][pipe.IsRTFeedbackLoop()]);
+			SetUtilityTexture(colclip_rt, m_point_sampler);
+			DrawStretchRect(sRect, drawareaf, rtsize);
+
+			Recycle(colclip_rt);
+			g_gs_device->SetColorClipTexture(nullptr);
+		}
+	}
+
+	config.colclip_mode = GSHWDrawConfig::ColClipMode::NoModify;
+}
+
+GSVulkanRoad::Identity GSDeviceVK::GetRoadIdentity() const
+{
+    using Driver = GSVulkanRoad::Driver;
+    Driver driver = Driver::Unknown;
+    if (m_optional_extensions.vk_khr_driver_properties)
+    switch (m_device_driver_properties.driverID)
+    {
+        case VK_DRIVER_ID_ARM_PROPRIETARY: driver = Driver::Arm; break;
+        case VK_DRIVER_ID_MESA_PANVK: driver = Driver::PanVK; break;
+        case VK_DRIVER_ID_QUALCOMM_PROPRIETARY: driver = Driver::Qualcomm; break;
+        case VK_DRIVER_ID_MESA_TURNIP: driver = Driver::Turnip; break;
+        case VK_DRIVER_ID_IMAGINATION_PROPRIETARY: driver = Driver::Imagination; break;
+        case VK_DRIVER_ID_IMAGINATION_OPEN_SOURCE_MESA: driver = Driver::MesaPowerVR; break;
+        case VK_DRIVER_ID_MESA_HONEYKRISP: driver = Driver::Honeykrisp; break;
+        default: break;
+    }
+    return {.vendor = m_device_properties.vendorID, .driver = driver, .name = m_device_properties.deviceName,
+        .driver_name = m_optional_extensions.vk_khr_driver_properties ? std::string_view(m_device_driver_properties.driverName) : std::string_view{},
+        .info = m_optional_extensions.vk_khr_driver_properties ? std::string_view(m_device_driver_properties.driverInfo) : std::string_view{},
+        .platform = m_road_platform_hints, .mediatek = GpuProfileDetector::DetectMediaTekSoC(),
+        .device_id = m_device_properties.deviceID};
+}
+
+GSVulkanRoad::Capabilities GSDeviceVK::GetRoadCapabilities(u32 push_count) const
+{
+    return {.roaa = m_optional_extensions.vk_ext_rasterization_order_attachment_access,
+        .layout = m_optional_extensions.vk_ext_attachment_feedback_loop_layout,
+        .dynamic_state = m_optional_extensions.vk_ext_attachment_feedback_loop_dynamic_state,
+        .dynamic_command = vkCmdSetAttachmentFeedbackLoopEnableEXT != nullptr,
+        .push_descriptors = m_optional_extensions.vk_khr_push_descriptor,
+        .max_push_descriptors = push_count ? push_count : m_max_push_descriptors,
+        .texture_barriers = static_cast<s8>(GSConfig.OverrideTextureBarriers),
+        .disable_fetch = GSConfig.DisableFramebufferFetch,
+#if defined(__ANDROID__)
+        .android = true,
+#else
+        .android = false,
+#endif
+        .mobile_profile = IsMobileGPUProfile()};
+}
+
+void GSDeviceVK::ConfigureTFXFeedbackPipeline(Vulkan::GraphicsPipelineBuilder& gpb, const PipelineSelector& p) const
+{
+    const auto aspects = GetVulkanFeedbackPipelineAspects(GetFeedbackPath(), p.IsRTFeedbackLoop(), p.IsTestingAndSamplingDepth());
+    if (aspects && m_declare_loop_per_draw)
+        gpb.AddDynamicState(VK_DYNAMIC_STATE_ATTACHMENT_FEEDBACK_LOOP_ENABLE_EXT);
+    else
+    {
+        VkPipelineCreateFlags flags = 0;
+        if (aspects & VulkanFeedbackPipelineAspectColor) flags |= VK_PIPELINE_CREATE_COLOR_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+        if (aspects & VulkanFeedbackPipelineAspectDepthStencil) flags |= VK_PIPELINE_CREATE_DEPTH_STENCIL_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+        gpb.AddPipelineFlags(flags);
+    }
+    // Proprietary PowerVR's ordered input read is not the ROAA extension.
+    // Tagged Adreno7xx requests its overlap mode only on the affected draws.
+    if (p.IsRTFeedbackLoop() && (UsesRasterizationOrderAttachmentAccessForFeedback() ||
+        (p.raster_order && m_features.declared_loop_overlap_needs_raster_order &&
+            m_optional_extensions.vk_ext_rasterization_order_attachment_access)))
+        gpb.AddBlendFlags(VK_PIPELINE_COLOR_BLEND_STATE_CREATE_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_BIT_EXT);
+}
+
+void GSDeviceVK::DeclareDrawFeedbackLoop(const GSHWDrawConfig& config, const PipelineSelector& pipe)
+{
+    if (!m_declare_loop_per_draw || !vkCmdSetAttachmentFeedbackLoopEnableEXT ||
+        (!pipe.IsRTFeedbackLoop() && !pipe.IsTestingAndSamplingDepth()))
+        return;
+    VkImageAspectFlags aspects = 0;
+    if (pipe.IsRTFeedbackLoop() && config.IsFeedbackLoopRT(pipe.ps)) aspects |= VK_IMAGE_ASPECT_COLOR_BIT;
+    if (pipe.IsTestingAndSamplingDepth()) aspects |= VK_IMAGE_ASPECT_DEPTH_BIT;
+    const auto writes = GSLoopEnableWritesForDraw(aspects, m_loop_declared_in_pass);
+    for (u32 i = 0; i < writes.count; ++i)
+        vkCmdSetAttachmentFeedbackLoopEnableEXT(GetCurrentCommandBuffer(), writes.values[i]);
+    if (aspects) m_loop_declared_in_pass = true;
+}
+
+bool GSDeviceVK::HWDrawNeedsAttachmentRestart(const GSHWDrawConfig& config, const PipelineSelector& pipe) const
+{
+	return config.tex && ((!pipe.IsRTFeedbackLoop() && config.tex == m_current_render_target) ||
+		(!pipe.IsDepthFeedbackLoop() && config.tex == m_current_depth_target));
+}
+
+void GSDeviceVK::ApplyHWDrawFeedbackCarry(const GSHWDrawConfig& config, PipelineSelector& pipe,
+	GSTextureVK* rt, GSTextureVK* ds)
+{
+	if (!InRenderPass() || config.road.clone_rt)
+		return;
+	if (config.road.carry_rt && rt && m_current_render_target == rt && rt->GetState() != GSTexture::State::Cleared)
+		pipe.feedback_loop_flags |= m_current_framebuffer_feedback_loop & FeedbackLoopFlag_ReadAndWriteRT;
+	if (config.road.carry_depth && ds && m_current_depth_target == ds && ds->GetState() != GSTexture::State::Cleared)
+		pipe.feedback_loop_flags |= m_current_framebuffer_feedback_loop &
+			(FeedbackLoopFlag_ReadAndWriteDepth | FeedbackLoopFlag_ReadDepth);
+}
+
+void GSDeviceVK::UpdateHWPipelineSelector(GSHWDrawConfig& config, PipelineSelector& pipe)
+{
+
+	pipe.vs.key = config.vs.key;
+	pipe.ps.key_hi = config.ps.key_hi;
+	pipe.ps.key_lo = config.ps.key_lo;
+	pipe.dss.key = config.ps.HasDepthROV() ? GSHWDrawConfig::DepthStencilSelector::NoDepth().key : config.depth.key;
+	pipe.bs.key = config.ps.HasColorROV() ? GSHWDrawConfig::BlendState().key : config.blend.key;
+	pipe.bs.constant = 0; // don't dupe states with different alpha values
+	pipe.cms.key = config.ps.HasColorROV() ? GSHWDrawConfig::ColorMaskSelector().key : config.colormask.key;
+	pipe.topology = static_cast<u32>(config.topology);
+	pipe.rt = config.rt != nullptr && !config.ps.HasColorROV();
+	pipe.ds = config.ds != nullptr && !config.ps.HasDepthROV();
+	pipe.line_width = config.line_expand;
+	pipe.raster_order = config.raster_order && config.road.rt_loop;
+	pipe.feedback_loop_flags = FeedbackLoopFlag_None;
+	if (pipe.rt && config.road.rt_loop)
+		pipe.feedback_loop_flags |= FeedbackLoopFlag_ReadAndWriteRT;
+	if (pipe.ds && config.road.depth_loop)
+		pipe.feedback_loop_flags |= FeedbackLoopFlag_ReadAndWriteDepth;
+	else if (config.road.depth_read && pipe.ds)
+		pipe.feedback_loop_flags |= FeedbackLoopFlag_ReadDepth;
+
+	// enable point size in the vertex shader if we're rendering points regardless of upscaling.
+	pipe.vs.point_size |= (config.topology == GSHWDrawConfig::Topology::Point);
+}
+
+void GSDeviceVK::UploadHWDrawVerticesAndIndices(GSHWDrawConfig& config)
+{
+	IASetVertexBuffer(config.verts, sizeof(GSVertex), config.nverts, GetVertexAlignment(config.vs.expand));
+
+	if (config.vs.UseFixedExpandIndexBuffer())
+	{
+		m_index.start = 0;
+		m_index.count = config.nindices;
+		SetIndexBuffer(m_expand_index_buffer);
+	}
+	else if (config.vs.UseVSExpandIndexBuffer())
+	{
+		VSSetIndexBuffer(config.indices, config.nindices);
+		SetVSConstantBuffer(config.cb_vs);
+	}
+	else
+	{
+		IASetIndexBuffer(config.indices, config.nindices);
+	}
+}
+
+VkImageMemoryBarrier GSDeviceVK::GetColorBufferFeedbackBarrier(GSTextureVK* rt) const
+{
+	const VkImageLayout layout =
+		UseFeedbackLoopLayout() ? VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT : VK_IMAGE_LAYOUT_GENERAL;
+	const VkAccessFlags dst_access =
+		UseFeedbackLoopLayout() ? VK_ACCESS_SHADER_READ_BIT : VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+	return {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, nullptr,
+		VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, dst_access, layout, layout,
+		VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, rt->GetImage(), {VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u}};
+}
+
+VkImageMemoryBarrier GSDeviceVK::GetDepthStencilBufferFeedbackBarrier(GSTextureVK* ds) const
+{
+	const VkImageLayout layout =
+		UseFeedbackLoopLayout() ? VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT : VK_IMAGE_LAYOUT_GENERAL;
+	const VkAccessFlags dst_access =
+		UseFeedbackLoopLayout() ? VK_ACCESS_SHADER_READ_BIT : VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+	return {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, nullptr,
+		VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, dst_access, layout, layout,
+		VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, ds->GetImage(),
+		{VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0u, 1u, 0u, 1u}};
+}
+
+VkDependencyFlags GSDeviceVK::GetFeedbackBarrierDependencyFlags() const
+{
+	return UseFeedbackLoopLayout() ? (VK_DEPENDENCY_BY_REGION_BIT | VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT) :
+	                                 VK_DEPENDENCY_BY_REGION_BIT;
+}
+
+void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, GSTextureVK* draw_ds,
+	bool one_barrier, bool full_barrier)
+{
+	if (!m_features.texture_barrier) [[unlikely]]
+	{
+		Draw(config);
+		return;
+	}
+
+#ifdef PCSX2_DEVBUILD
+	if ((one_barrier || full_barrier) && !(config.IsFeedbackLoopRT(m_pipeline_selector.ps) || config.IsFeedbackLoopDepth(m_pipeline_selector.ps))) [[unlikely]]
+		Console.Warning("VK: Possible unnecessary barrier detected.");
+#endif
+
+	const VkDependencyFlags barrier_flags = GetFeedbackBarrierDependencyFlags();
+
+	std::array<VkImageMemoryBarrier, 2> barriers = {};
+	u32 n_barriers = 0;
+	VkPipelineStageFlags barrier_src_stages = 0;
+	VkPipelineStageFlags barrier_dst_stages = 0;
+	if (full_barrier || one_barrier)
+	{
+		if (draw_rt)
+		{
+			barriers[n_barriers++] = GetColorBufferFeedbackBarrier(draw_rt);
+			barrier_src_stages |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			barrier_dst_stages |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		}
+		if (draw_ds)
+		{
+			barriers[n_barriers++] = GetDepthStencilBufferFeedbackBarrier(draw_ds);
+			barrier_src_stages |=
+				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+			barrier_dst_stages |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		}
+	}
+
+	const auto IssueBarriers = [&]() {
+		if (n_barriers == 0)
+			return;
+
+		vkCmdPipelineBarrier(GetCurrentCommandBuffer(), barrier_src_stages, barrier_dst_stages, barrier_flags, 0,
+			nullptr, 0, nullptr, n_barriers, barriers.data());
+	};
+
+	if (full_barrier)
+	{
+		pxAssert(config.drawlist && !config.drawlist->empty());
+
+		const u32 indices_per_prim = config.indices_per_prim;
+		const u32 draw_list_size = static_cast<u32>(config.drawlist->size());
+
+		GL_PUSH("Split the draw");
+		g_perfmon.Put(GSPerfMon::Barriers, n_barriers * static_cast<u32>(draw_list_size));
+
+		for (u32 n = 0, p = 0; n < draw_list_size; n++)
+		{
+			IssueBarriers();
+
+			const u32 count = (*config.drawlist)[n] * indices_per_prim;
+			Draw(config, p, count);
+			p += count;
+		}
+
+		return;
+	}
+
+	if (one_barrier)
+	{
+		g_perfmon.Put(GSPerfMon::Barriers, n_barriers);
+		IssueBarriers();
+	}
+
+
+	Draw(config);
+}
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#include "GSTextureUploadTests.inl"
+#include "GSRenderPassRestartTests.inl"
+#include "GSRenderPassOrderingTests.inl"
+#include "GSDrawRoadTests.inl"
+#include "GSRoadFamilyTests.inl"
+#include "GSBlendConstantTests.inl"
+#include "GSBlendConstantPixelTests.inl"
+#include "GSRoadModelTests.inl"
+#include "GSDepthSamplingTests.inl"
+#endif

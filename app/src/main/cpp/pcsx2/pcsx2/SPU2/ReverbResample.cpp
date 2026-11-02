@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "GS/GSVector.h"
+#include <GS/GSVector.h>
 #include "SPU2/defs.h"
 
 MULTI_ISA_UNSHARED_START

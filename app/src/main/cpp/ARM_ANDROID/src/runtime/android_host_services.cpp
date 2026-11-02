@@ -8,9 +8,9 @@
 
 #include "pcsx2/Achievements.h"
 #include "pcsx2/Counters.h"
-#include "pcsx2/GS/GS.h"
-#include "pcsx2/GS/Renderers/Common/GSDevice.h"
-#include "pcsx2/GS/Renderers/Vulkan/GSLsfg.h"
+#include <GS/GS.h>
+#include <GS/Renderers/Common/GSDevice.h>
+#include <GS/Renderers/Vulkan/GSLsfg.h>
 #include "pcsx2/Host.h"
 #include "pcsx2/Input/InputManager.h"
 #include "pcsx2/MTGS.h"

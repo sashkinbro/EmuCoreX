@@ -11,8 +11,8 @@
 
 #include "PerformanceMetrics.h"
 
-#include "GS.h"
-#include "GS/GSCapture.h"
+#include <GS.h>
+#include <GS/GSCapture.h>
 #include "MTGS.h"
 #include "MTVU.h"
 #include "VMManager.h"
