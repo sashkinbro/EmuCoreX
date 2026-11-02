@@ -904,8 +904,8 @@ static void recMADDExact_emit_oaknut()
 	recMoveGPRtoOakW(oak::util::W0, _Rs_);
 	recMoveGPRtoOakW(oak::util::W4, _Rt_);
 	oakLoad32(oak::util::W2, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.LO.UL[HiloID * 2]))});
-	oakLoad32(oak::util::W5, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.HI.UL[HiloID * 2]))});
-	oakAsm->ORR(oak::util::X2, oak::util::X2, oak::util::X5, oak::LogShift::LSL, 32);
+	oakLoad32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.HI.UL[HiloID * 2]))});
+	oakAsm->ORR(oak::util::X2, oak::util::X2, OAK_XSCRATCH, oak::LogShift::LSL, 32);
 
 	if constexpr (Signed)
 		oakAsm->SMADDL(oak::util::X0, oak::util::W0, oak::util::W4, oak::util::X2);

@@ -107,5 +107,46 @@ static void EeMaddNativeOracleTests()
         std::snprintf(label, sizeof(label), "EE %s constant-constant control rd=%u", names[op], rd);
         CompareEE(RunEEProgram(false, code, false, initial), RunEEProgram(true, code, false, initial), label);
     }
+
+    for (u32 op = 0; op < 4; ++op)
+    for (u32 rd : {0u, 8u, 16u})
+    for (u32 source_style = 0; source_style < 3; ++source_style)
+    {
+        u64 initial[32]{};
+        for (u32 r = 1; r < 32; ++r)
+            initial[r] = 0x8100000000000000ull | (u64(r) * 0x01020305u);
+        initial[8] = 0x7fffffffu;
+        initial[9] = 0x80000001u;
+        initial[12] = 0x12345678u;
+        initial[13] = 0x87654321u;
+
+        const bool upper = op >= 2;
+        const u32 banked = upper ? 0x1cu << 26 : 0;
+        std::vector<u32> code = {
+            // These values stay live across MADD. Logical host register 4 is SP and
+            // reserved, so the allocator maps the first two to W3 and W5.
+            MipsI(9, 16, 16, 1), MipsI(9, 17, 17, 2), MipsI(9, 18, 18, 3)
+        };
+        if (source_style == 1)
+        {
+            code.push_back(MipsI(15, 0, 8, 0x8123));
+            code.push_back(MipsI(13, 8, 8, 0x4567));
+        }
+        else if (source_style == 2)
+        {
+            code.push_back(MipsI(15, 0, 9, 0xfedc));
+            code.push_back(MipsI(13, 9, 9, 0xba98));
+        }
+        code.push_back(upper ? (banked | MipsR(12, 0, 0, 0, 0x11)) : MipsR(12, 0, 0, 0, 0x11));
+        code.push_back(upper ? (banked | MipsR(13, 0, 0, 0, 0x13)) : MipsR(13, 0, 0, 0, 0x13));
+        code.push_back((0x1cu << 26) | MipsR(8, 9, rd, 0, opcodes[op]));
+        code.push_back(MipsR(16, 17, 22, 0, 0x21));
+        code.push_back(MipsR(18, 22, 23, 0, 0x21));
+
+        char label[160];
+        std::snprintf(label, sizeof(label), "EE %s live cached GPR sentinels across MADD rd=%u sources=%u",
+            names[op], rd, source_style);
+        CompareEE(RunEEProgram(false, code, false, initial), RunEEProgram(true, code, false, initial), label);
+    }
 }
 #endif
