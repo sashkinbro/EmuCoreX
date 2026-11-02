@@ -4,6 +4,10 @@
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 #include "VuAotPersist.h"
 #include "VuAotCompileObserve.h"
+#if !defined(NDEBUG)
+#include <array>
+#include <vector>
+#endif
 #endif
 struct microVU;
 struct microProgram;
@@ -51,6 +55,25 @@ namespace mvu_aot
 	Stats GetStats();
 	u32 CodegenModes();
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	#if !defined(NDEBUG)
+	struct PublishedNodeForTest
+	{
+		u32 pc = 0, codeOffset = 0, entryOffset = 0;
+		std::array<u8, 96> key{};
+	};
+	struct PublishedSpanForTest
+	{
+		std::vector<u8> bytes;
+		std::array<u8, 96> rootKey{};
+		std::vector<PublishedNodeForTest> nodes;
+		u64 generation = 0, microSnapshotHash = 0;
+		u32 rootPC = 0, ownerOrdinal = 0;
+		size_t registeredCodeBytes = 0;
+		uintptr_t base = 0;
+		bool retier = false, body = false, importedUnknown = false;
+	};
+	bool CopyLastPublishedSpanForTest(PublishedSpanForTest& out);
+	#endif
 	bool CachedTargetsMatchForTest(u32 sourceA, u32 sourceB, u32 target);
 	void TestRelinkJumpCaches(bool enabled);
 	void SetPipelineForTest(const void* key, u32 viBackup);

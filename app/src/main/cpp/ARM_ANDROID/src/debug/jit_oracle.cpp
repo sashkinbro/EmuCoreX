@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0+
 #include "Common.h"
 #include <GS/GSUtil.h>
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+#include <GS/GSXXH.h>
+#endif
 #include "arm64/vuaot/VuAotPipe.h"
 #include "arm64/vuaot/VuAotLower.h"
 #include "arm64/vuaot/VuAotIR.h"
@@ -8,6 +11,9 @@
 #include "arm64/vuaot/VuAotConstants.h"
 #include "Vif_Dynarec.h"
 #include "arm64/vuaot/VuAotRuntime.h"
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+#include "arm64/vuaot/VuAotSpanDump.h"
+#endif
 #include "arm64/vuaot/VuAotLive.h"
 #include "arm64/vu/microVU_Persist-arm64.h"
 #include "arm64/vu/microVU_ProgCache-arm64.h"
@@ -2269,6 +2275,7 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vuaot_compile_branch.inl"
 #include "jit_oracle_vuaot_fast_dispatch.inl"
 #include "jit_oracle_vuaot_compile_observe.inl"
+#include "jit_oracle_vuaot_spandump.inl"
 #include "jit_oracle_vuaot_static_link_safety.inl"
 #include "jit_oracle_vuaot_conditional_fall.inl"
 #include "jit_oracle_vuaot_compile_branch_cold.inl"
@@ -12499,6 +12506,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         RunVuAotFastDispatchTests();
     else if (std::strcmp(suite, "vu-aot-compile-observe") == 0)
         RunVuAotCompileObservationTests();
+    else if (std::strcmp(suite, "vu-aot-span-dump") == 0)
+        RunVuAotSpanDumpTests();
     else if (std::strcmp(suite, "vu-aot-conditional-fall") == 0)
         RunVuAotConditionalFallTests();
     else if (std::strcmp(suite, "vu-aot-static-link-safety") == 0)

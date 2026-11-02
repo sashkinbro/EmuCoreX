@@ -140,7 +140,7 @@ std::string GetAndroidSystemProperty(const char* name)
 
 bool DebugPerformanceLogEnabled()
 {
-#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
 	static const bool enabled = GetAndroidSystemProperty("debug.emucorex.perf_log") == "1";
 	return enabled;
 #else
@@ -472,6 +472,7 @@ void Host::OnGameChanged(const std::string& title, const std::string&, const std
 
 void Host::OnPerformanceMetricsUpdated()
 {
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
 	if (DebugPerformanceLogEnabled())
 	{
 		static auto last_log = std::chrono::steady_clock::time_point{};
@@ -480,13 +481,17 @@ void Host::OnPerformanceMetricsUpdated()
 		{
 			last_log = now;
 			EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuPerf",
-				"frames=%llu vps=%.2f speed=%.2f ee_ms=%.3f gs_ms=%.3f frame_ms=%.3f",
+				"frames=%llu vps=%.2f speed=%.2f ee_ms=%.3f gs_ms=%.3f frame_ms=%.3f internal_fps=%.2f fps_valid=%d vu_ms=%.3f gpu_ms=%.3f gpu_usage=%.2f",
 				static_cast<unsigned long long>(PerformanceMetrics::GetFrameNumber()),
 				PerformanceMetrics::GetFPS(), PerformanceMetrics::GetSpeed(),
 				PerformanceMetrics::GetCPUThreadAverageTime(), PerformanceMetrics::GetGSThreadAverageTime(),
-				PerformanceMetrics::GetAverageFrameTime());
+				PerformanceMetrics::GetAverageFrameTime(), PerformanceMetrics::GetInternalFPS(),
+				PerformanceMetrics::IsInternalFPSValid() ? 1 : 0,
+				PerformanceMetrics::GetVUThreadAverageTime(), PerformanceMetrics::GetGPUAverageTime(),
+				PerformanceMetrics::GetGPUUsage());
 		}
 	}
+#endif
 	if (!s_performance_metrics_enabled.load(std::memory_order_relaxed))
 		return;
 

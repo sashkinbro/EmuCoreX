@@ -6,6 +6,9 @@
 #include "arm64/vuaot/VuAotBackground.h"
 #include "arm64/vuaot/VuAotOaknut.h"
 #include "arm64/vuaot/VuAotLive.h"
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+#include "arm64/vuaot/VuAotSpanDump.h"
+#endif
 #include "common/ScopedGuard.h"
 #include <atomic>
 #include <set>
@@ -175,6 +178,13 @@ namespace mvu_aot
 			u64 readyBytes = 0, readySerial = 0;
 			u32 readyJobs = 0;
 			Stats stats;
+		#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+			BuildJob* lastPublishedForTest = nullptr; // Program.jobs owns it until Reset.
+			u8* lastPublishedBaseForTest = nullptr;
+			size_t lastPublishedBytesForTest = 0;
+			size_t lastPublishedCodeBytesForTest = 0;
+			u32 lastPublishedOrdinalForTest = 0;
+		#endif
 		};
 		Runtime& runtime = *new Runtime(); // Generated entries outlive static destructor ordering.
 		std::atomic<u64> regionCount{0};
@@ -1047,7 +1057,52 @@ namespace mvu_aot
                 Perf::vu1.Register(base, job->code.size(), job->body ? "vu-aot-body" : "vu-aot-region");
                 Perf::vu1.Register(base + job->code.size(),
                     static_cast<size_t>(mvu.prog.x86ptr - base) - job->code.size(), "vu-aot-bridge");
+				#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+				if (vuaot::spandump::GetStats().enabled)
+				{
+				try
+				{
+					std::vector<vuaot::spandump::Node> dumpNodes;
+					dumpNodes.reserve(job->nodes.size());
+					for (const auto& node : job->nodes)
+					{
+						vuaot::spandump::Node dumpNode;
+						dumpNode.pc = node->pc;
+						dumpNode.codeOffset = node->codeOffset;
+						dumpNode.entryOffset = static_cast<u32>(static_cast<u8*>(node->entry) - base);
+						dumpNode.key = node->key.bytes;
+						dumpNodes.push_back(dumpNode);
+					}
+					vuaot::spandump::PublishedSpan span;
+					span.base = base;
+					span.totalBytes = static_cast<size_t>(mvu.prog.x86ptr - base);
+					span.registeredCodeBytes = job->code.size();
+					span.rootPC = job->trace.startPC;
+					span.ownerOrdinal = static_cast<u32>(program.jobs.size());
+					span.generation = job->generation;
+					span.rootKey = job->trace.entryState;
+					span.microSnapshotHash = GSXXH3_64bits(job->micro.data(), job->micro.size());
+					span.retier = job->retier;
+					span.kindOrigin = job->loadedPlan ? vuaot::spandump::KindOrigin::ImportedUnknown :
+						(job->body ? vuaot::spandump::KindOrigin::LiveBody : vuaot::spandump::KindOrigin::LiveRegion);
+					span.nodes = dumpNodes.data();
+					span.nodeCount = dumpNodes.size();
+					vuaot::spandump::RecordPublishedSpan(span);
+				}
+				catch (...)
+				{
+					vuaot::spandump::DisableForCurrentEpoch("exception while capturing published span");
+				}
+				}
+				#endif
 				program.jobs.push_back(job);
+				#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+				runtime.lastPublishedForTest = job.get();
+				runtime.lastPublishedBaseForTest = base;
+				runtime.lastPublishedBytesForTest = static_cast<size_t>(mvu.prog.x86ptr - base);
+				runtime.lastPublishedCodeBytesForTest = job->code.size();
+				runtime.lastPublishedOrdinalForTest = static_cast<u32>(program.jobs.size() - 1);
+				#endif
 				program.MarkSavedDirty();
 				for (const auto& node : job->nodes)
 				{
@@ -1128,6 +1183,17 @@ namespace mvu_aot
 		saved::Save(mvu);
 		for (const auto& [block, entry] : runtime.original)
 			block->x86ptrStart = static_cast<u8*>(entry);
+		#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+		bool generationHasJobs = false;
+		for (const auto& entry : runtime.programs)
+			generationHasJobs |= !entry.second.jobs.empty();
+		if (generationHasJobs)
+			vuaot::spandump::EndGeneration(runtime.generation);
+		runtime.lastPublishedForTest = nullptr;
+		runtime.lastPublishedBaseForTest = nullptr;
+		runtime.lastPublishedBytesForTest = 0;
+		runtime.lastPublishedCodeBytesForTest = 0;
+		#endif
 		++runtime.generation;
 		runtime.programs.clear();
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
@@ -1136,6 +1202,9 @@ namespace mvu_aot
 		runtime.readyBytes = runtime.readyJobs = 0;
 		runtime.readySerial = 0;
 		runtime.original.clear();
+		#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+		vuaot::spandump::BeginEpochFromProperties();
+		#endif
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && defined(__ANDROID__) && !defined(NDEBUG)
         char property[PROP_VALUE_MAX]{};
         logStats=__system_property_get("debug.emucorex.vu_aot_stats",property)>0 && property[0]=='1';
@@ -1820,6 +1889,39 @@ namespace mvu_aot
         stats.stickyRejected = sticky::state.rejected.load(std::memory_order_relaxed);
         return stats;
     }
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+	bool CopyLastPublishedSpanForTest(PublishedSpanForTest& out)
+	{
+		BuildJob* const job = runtime.lastPublishedForTest;
+		const u8* const base = runtime.lastPublishedBaseForTest;
+		const size_t byteCount = runtime.lastPublishedBytesForTest;
+		if (!job || !base || !byteCount)
+			return false;
+		out = {};
+		out.bytes.assign(base, base + byteCount);
+		std::memcpy(out.rootKey.data(), job->trace.entryState, out.rootKey.size());
+		out.generation = job->generation;
+		out.microSnapshotHash = GSXXH3_64bits(job->micro.data(), job->micro.size());
+		out.rootPC = job->trace.startPC;
+		out.ownerOrdinal = runtime.lastPublishedOrdinalForTest;
+		out.registeredCodeBytes = runtime.lastPublishedCodeBytesForTest;
+		out.base = reinterpret_cast<uintptr_t>(base);
+		out.retier = job->retier;
+		out.body = job->body;
+		out.importedUnknown = static_cast<bool>(job->loadedPlan);
+		out.nodes.reserve(job->nodes.size());
+		for (const auto& node : job->nodes)
+		{
+			PublishedNodeForTest snapshot;
+			snapshot.pc = node->pc;
+			snapshot.codeOffset = node->codeOffset;
+			snapshot.entryOffset = static_cast<u32>(static_cast<u8*>(node->entry) - base);
+			std::memcpy(snapshot.key.data(), node->key.bytes, snapshot.key.size());
+			out.nodes.push_back(snapshot);
+		}
+		return true;
+	}
+#endif
     u32 CodegenModes()
     {
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
