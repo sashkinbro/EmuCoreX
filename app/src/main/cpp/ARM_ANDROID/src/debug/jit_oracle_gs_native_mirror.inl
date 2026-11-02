@@ -3,7 +3,7 @@
 // Include after the existing packed/strip/mirror/carrying helpers.
 extern "C" void EmuCoreXOracleSetGSNativeMirror(bool enabled,bool observe,u32 mutation);
 extern "C" void EmuCoreXOracleGSNativeMirrorStats(u64* values);
-#if defined(EMUCOREX_GS_FAMILY_MALI)
+#if defined(EMUCOREX_GS_FAMILY_MALI) || defined(EMUCOREX_GS_FAMILY_ADRENO)
 extern "C" void EmuCoreXOracleSetGSXYZ2Batch(bool enabled, bool observe, u32 mutation);
 extern "C" void EmuCoreXOracleGSXYZ2BatchStats(u64* values);
 #endif
@@ -137,7 +137,7 @@ void GSNativeMirrorTests()
 {
     using namespace GSNativeMirrorOracle;const auto saved=GSConfig;
     const ScopedGuard restore([&](){GSConfig=saved;EmuCoreXOracleSetGSNativeMirror(true,false,0);EmuCoreXOracleSetGSPackedBatch(true,false);EmuCoreXOracleSetGSStripKernel(true,false,0);
-#if defined(EMUCOREX_GS_FAMILY_MALI)
+#if defined(EMUCOREX_GS_FAMILY_MALI) || defined(EMUCOREX_GS_FAMILY_ADRENO)
         EmuCoreXOracleSetGSXYZ2Batch(true, false, 0);
 #endif
     });
@@ -200,7 +200,7 @@ void GSNativeMirrorTests()
     }
     Check(newStats[0]>0&&newStats[1]>0,"native single XYZ handler actually executes persistent mirror attempts and rejects");
     Check(oldStats[2]>0&&newStats[2]<oldStats[2],"native single persistent mirror eliminates actual repeated legacy vector rejection calls");
-#if defined(EMUCOREX_GS_FAMILY_MALI)
+#if defined(EMUCOREX_GS_FAMILY_MALI) || defined(EMUCOREX_GS_FAMILY_ADRENO)
     {
         const auto packet=Singles(129,false,false,0,true,false);
         u64 oldStats[5]{};
@@ -216,10 +216,10 @@ void GSNativeMirrorTests()
         const auto actual=Capture(*state);
         u64 stats[5]{};
         EmuCoreXOracleGSXYZ2BatchStats(stats);
-        Check(reference==actual,"Mali repeated single-register XYZ2 strip tag keeps complete vertex/index/draw state under passive observation");
+        Check(reference==actual,"GS repeated single-register XYZ2 strip tag keeps complete vertex/index/draw state under passive observation");
         Check(oldStats[0]==1&&oldStats[1]==129&&oldStats[2]==129&&oldStats[3]==0&&
             stats[0]==1&&stats[1]==129&&stats[2]==0&&stats[3]==1&&stats[4]==129,
-            "Mali NREG=1 XYZ2 strip dispatches all 129 vertices in one batch instead of 129 scalar handlers");
+            "GS NREG=1 XYZ2 strip dispatches all 129 vertices in one batch instead of 129 scalar handlers");
 
         bool oddCountParity=true;
         for(u32 count=1;count<=7;++count)
@@ -233,7 +233,7 @@ void GSNativeMirrorTests()
             oddCountParity&=oddActual==oddReference&&oddStats[0]==1&&oddStats[1]==count&&
                 oddStats[2]==0&&oddStats[3]==1&&oddStats[4]==count;
         }
-        Check(oddCountParity,"Mali XYZ2 batching preserves exact state and ADC behavior for counts one through seven");
+        Check(oddCountParity,"GS XYZ2 batching preserves exact state and ADC behavior for counts one through seven");
 
         Prepare(*state,GS_TRIANGLESTRIP);
         EmuCoreXOracleSetGSXYZ2Batch(true,true,0);
@@ -241,9 +241,9 @@ void GSNativeMirrorTests()
         const auto split=Capture(*state);
         u64 splitStats[5]{};
         EmuCoreXOracleGSXYZ2BatchStats(splitStats);
-        Check(split==reference,"Mali split Transfer chunks retain exact vertex/index/draw state");
+        Check(split==reference,"GS split Transfer chunks retain exact vertex/index/draw state");
         Check(splitStats[0]==1&&splitStats[2]==127&&splitStats[3]==1&&splitStats[4]==2,
-            "Mali split Transfer chunks keep 127 partial qwords scalar and batch only the final complete two-qword suffix");
+            "GS split Transfer chunks keep 127 partial qwords scalar and batch only the final complete two-qword suffix");
         std::printf("GS_XYZ2_SPLIT tags=%llu eligible=%llu scalar=%llu batches=%llu batch_vertices=%llu\n",
             static_cast<unsigned long long>(splitStats[0]),static_cast<unsigned long long>(splitStats[1]),
             static_cast<unsigned long long>(splitStats[2]),static_cast<unsigned long long>(splitStats[3]),
@@ -259,7 +259,7 @@ void GSNativeMirrorTests()
             depthParity&=Capture(*state)==depthReference;
         }
         GSConfig.UserHacks_Limit24BitDepth=GSLimit24BitDepth::Disabled;
-        Check(depthParity,"Mali XYZ2 batch preserves both existing 24-bit depth prioritization modes");
+        Check(depthParity,"GS XYZ2 batch preserves both existing 24-bit depth prioritization modes");
 
         bool flushParity=true;
         const auto large=Singles(22000);
@@ -271,7 +271,7 @@ void GSNativeMirrorTests()
             const auto result=Capture(*state);
             if(!enabled)expected=result;else flushParity&=result==expected;
         }
-        Check(flushParity,"Mali XYZ2 batch preserves exact state and draw trace across the real vertex-count flush");
+        Check(flushParity,"GS XYZ2 batch preserves exact state and draw trace across the real vertex-count flush");
 
         bool fallbackParity=true;
         for(const auto prim:{GS_TRIANGLELIST,GS_TRIANGLESTRIP})
@@ -286,7 +286,7 @@ void GSNativeMirrorTests()
             fallbackParity&=fallbackReference==fallbackActual&&fallbackStats[0]==0&&fallbackStats[3]==0;
         }
         GSConfig.UserHacks_AutoFlush=GSHWAutoFlushLevel::Disabled;
-        Check(fallbackParity,"Mali XYZ2 batch leaves triangle-list and auto-flush tags on their scalar fallback");
+        Check(fallbackParity,"GS XYZ2 batch leaves triangle-list and auto-flush tags on their scalar fallback");
 
         Prepare(*state,GS_TRIANGLESTRIP);state->Submit(Offset(16,32),0);
         EmuCoreXOracleSetGSXYZ2Batch(false,true,0);state->Submit(Singles(17),0);
@@ -296,7 +296,7 @@ void GSNativeMirrorTests()
         const auto dirtyActual=Capture(*state);
         u64 dirtyStats[5]{};EmuCoreXOracleGSXYZ2BatchStats(dirtyStats);
         Check(dirtyReference==dirtyActual&&dirtyStats[0]==0&&dirtyStats[3]==0,
-            "Mali dirty XYOFFSET state keeps repeated XYZ2 tags on the exact scalar fallback");
+            "GS dirty XYOFFSET state keeps repeated XYZ2 tags on the exact scalar fallback");
 
         Prepare(*state,GS_TRIANGLESTRIP);
         EmuCoreXOracleSetGSXYZ2Batch(true,true,1);
@@ -305,7 +305,7 @@ void GSNativeMirrorTests()
         u64 mutationStats[5]{};
         EmuCoreXOracleGSXYZ2BatchStats(mutationStats);
         Check(mutated!=reference&&mutationStats[3]==1,
-            "Mali XYZ2 batch oracle detects an intentionally inverted ADC skip on an interior vertex");
+            "GS XYZ2 batch oracle detects an intentionally inverted ADC skip on an interior vertex");
         EmuCoreXOracleSetGSXYZ2Batch(true,false,0);
         std::printf("GS_XYZ2_BATCH tags=%llu vertices=%llu scalar=%llu batches=%llu batch_vertices=%llu\n",
             static_cast<unsigned long long>(stats[0]),static_cast<unsigned long long>(stats[1]),

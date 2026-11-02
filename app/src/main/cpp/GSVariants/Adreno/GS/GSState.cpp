@@ -1117,6 +1117,21 @@ static thread_local bool s_gsNativeMirrorEnabled = true;
 static thread_local bool s_gsNativeMirrorObserve = false;
 static thread_local u32 s_gsNativeMirrorMutation = 0;
 static thread_local u64 s_gsNativeMirrorStats[8] = {}; // fast, reject, legacy, build, refresh, batch, invalidation, fallback
+static thread_local bool s_gsXYZ2BatchEnabled = true;
+static thread_local bool s_gsXYZ2BatchObserve = false;
+static thread_local u32 s_gsXYZ2BatchMutation = 0;
+static thread_local u64 s_gsXYZ2BatchStats[5] = {}; // eligible tags, eligible vertices, scalar dispatches, batches, batched vertices
+extern "C" void EmuCoreXOracleSetGSXYZ2Batch(bool enabled, bool observe, u32 mutation)
+{
+	s_gsXYZ2BatchEnabled = enabled;
+	s_gsXYZ2BatchObserve = observe;
+	s_gsXYZ2BatchMutation = mutation;
+	std::fill(std::begin(s_gsXYZ2BatchStats), std::end(s_gsXYZ2BatchStats), 0);
+}
+extern "C" void EmuCoreXOracleGSXYZ2BatchStats(u64* values)
+{
+	std::copy(std::begin(s_gsXYZ2BatchStats), std::end(s_gsXYZ2BatchStats), values);
+}
 extern "C" void EmuCoreXOracleSetGSNativeMirror(bool enabled,bool observe,u32 mutation)
 {
     s_gsNativeMirrorEnabled=enabled;s_gsNativeMirrorObserve=observe;s_gsNativeMirrorMutation=mutation;
@@ -1300,6 +1315,42 @@ extern "C" void EmuCoreXOraclePackSTQRGBA(const GIFPackedReg* input, GSVector4i*
 
 // Parse directly into vectors and retain the live buffer cursors across a
 // complete fused packet. Auto-flush handlers retain the staged path below.
+template <u32 prim>
+void GSState::KickPackedXYZ2Batch(const GIFPackedReg* RESTRICT r, u32 size)
+{
+	static_assert(prim == GS_TRIANGLESTRIP);
+	VertexKickCursor c;
+	c.Load(*this);
+	const GSLimit24BitDepth depth = GetDepthClampMode();
+	const GSVector4i m0(m_v.m[0]);
+	GSVector4i m1(m_v.m[1]);
+	for (u32 i = 0; i < size; ++i)
+	{
+		const GIFPackedReg& packed = r[i];
+		m1.U32[0] = static_cast<u32>(packed.XYZ2.X) | (static_cast<u32>(packed.XYZ2.Y) << 16);
+		m1.U32[1] = packed.XYZ2.Z;
+		if (depth == GSLimit24BitDepth::PrioritizeUpper)
+			m1.U32[1] = ((m1.U32[1] >> 8) & ~0xFF) | (m1.U32[1] & 0xFF);
+		else if (depth == GSLimit24BitDepth::PrioritizeLower)
+			m1.U32[1] &= 0x00FFFFFF;
+		u32 skip = packed.XYZ2.Skip();
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (s_gsXYZ2BatchMutation == 1 && i == 17)
+			skip ^= 1;
+#endif
+		VertexKickDirect<prim>(skip, m0, m1, c);
+	}
+	c.Store(*this);
+	m_v.m[1] = m1;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (s_gsXYZ2BatchObserve)
+	{
+		++s_gsXYZ2BatchStats[3];
+		s_gsXYZ2BatchStats[4] += size;
+	}
+#endif
+}
+
 template <u32 prim, bool xyzf2>
 void GSState::KickPackedBatch(const GIFPackedReg* RESTRICT r, u32 size)
 {
@@ -3364,6 +3415,20 @@ void GSState::Transfer(const u8* mem, u32 size)
 
 				if (path.tag.PRE && path.tag.FLG == GIF_FLG_PACKED)
 					ApplyPRIM(path.tag.PRIM);
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+				if constexpr (index == 3)
+				{
+					if (s_gsXYZ2BatchObserve && path.tag.FLG == GIF_FLG_PACKED && path.nreg == 1 &&
+						path.GetReg(0) == GIF_REG_XYZ2 && m_env.PRIM.PRIM == GS_TRIANGLESTRIP &&
+						m_dirty_gs_regs == 0 && GSConfig.UserHacks_AutoFlush == GSHWAutoFlushLevel::Disabled &&
+						!GSConfig.AutoFlushSW)
+					{
+						++s_gsXYZ2BatchStats[0];
+						s_gsXYZ2BatchStats[1] += path.nloop;
+					}
+				}
+#endif
 			}
 		}
 		else
@@ -3420,12 +3485,41 @@ void GSState::Transfer(const u8* mem, u32 size)
 							[[fallthrough]];
 							case GIFPath::TYPE_UNKNOWN:
 							{
+								#if defined(__ANDROID__) && defined(ARCH_ARM64) && defined(EMUCOREX_GS_FAMILY_ADRENO)
+								if constexpr (index == 3)
+								{
+								#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+									const bool xyz2BatchEnabled = s_gsXYZ2BatchEnabled;
+								#else
+									constexpr bool xyz2BatchEnabled = true;
+								#endif
+									if (xyz2BatchEnabled && path.tag.FLG == GIF_FLG_PACKED && path.nreg == 1 &&
+										path.GetReg(0) == GIF_REG_XYZ2 && m_env.PRIM.PRIM == GS_TRIANGLESTRIP &&
+										m_dirty_gs_regs == 0 && GSConfig.UserHacks_AutoFlush == GSHWAutoFlushLevel::Disabled &&
+										!GSConfig.AutoFlushSW)
+									{
+										KickPackedXYZ2Batch<GS_TRIANGLESTRIP>((const GIFPackedReg*)mem, total);
+										mem += total * sizeof(GIFPackedReg);
+										break;
+									}
+								}
+								#endif
 								u32 reg = 0;
 
 								do
 								{
 									const u32 cur_reg = path.GetReg(reg++);
 									(this->*m_fpGIFPackedRegHandlers[cur_reg])((GIFPackedReg*)mem);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+								if constexpr (index == 3)
+								{
+									if (s_gsXYZ2BatchObserve && path.tag.FLG == GIF_FLG_PACKED && path.nreg == 1 &&
+										path.GetReg(0) == GIF_REG_XYZ2 && m_env.PRIM.PRIM == GS_TRIANGLESTRIP &&
+										m_dirty_gs_regs == 0 && GSConfig.UserHacks_AutoFlush == GSHWAutoFlushLevel::Disabled &&
+										!GSConfig.AutoFlushSW)
+										++s_gsXYZ2BatchStats[2];
+								}
+#endif
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 									if (s_gsCarryingLayoutsObserve) ++s_gsCarryingLayoutsStats[3];
 #endif
@@ -3468,6 +3562,16 @@ void GSState::Transfer(const u8* mem, u32 size)
 						do
 						{
 							(this->*m_fpGIFPackedRegHandlers[path.GetReg()])((GIFPackedReg*)mem);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+							if constexpr (index == 3)
+							{
+								if (s_gsXYZ2BatchObserve && path.tag.FLG == GIF_FLG_PACKED && path.nreg == 1 &&
+									path.GetReg(0) == GIF_REG_XYZ2 && m_env.PRIM.PRIM == GS_TRIANGLESTRIP &&
+									m_dirty_gs_regs == 0 && GSConfig.UserHacks_AutoFlush == GSHWAutoFlushLevel::Disabled &&
+									!GSConfig.AutoFlushSW)
+									++s_gsXYZ2BatchStats[2];
+							}
+#endif
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 							if (s_gsCarryingLayoutsObserve) ++s_gsCarryingLayoutsStats[3];
 #endif

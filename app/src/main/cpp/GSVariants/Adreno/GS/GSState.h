@@ -237,6 +237,7 @@ protected:
 	};
 	GSLimit24BitDepth GetDepthClampMode() const;
 	template <u32 prim> void VertexKickDirect(u32 skip, const GSVector4i& v0, const GSVector4i& v1, VertexKickCursor& c);
+	template <u32 prim> void KickPackedXYZ2Batch(const GIFPackedReg* RESTRICT r, u32 size);
 	template <u32 prim, bool xyzf2> void KickPackedBatch(const GIFPackedReg* RESTRICT r, u32 size);
 	template <u32 prim, bool xyzf2> u32 KickPackedStripChunk(const GIFPackedReg* RESTRICT r, u32 remaining,
 		VertexKickCursor& cursor, u64 uvfog, GSLimit24BitDepth depth, GSVector4i& last0, GSVector4i& last1);
