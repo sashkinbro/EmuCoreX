@@ -1,4 +1,4 @@
-package com.sbro.emucorex.ui.gamedb
+package com.sbro.emucorex.data.gamedb
 
 import android.content.Context
 import com.sbro.emucorex.data.AppPreferences
@@ -15,6 +15,54 @@ enum class GameDbSettingCategory {
     GRAPHICS_FIX
 }
 
+/**
+ * Sections of the bundled GameIndex file. The names are the YAML keys the emulator core reads,
+ * and the same names identify a fix inside [GameDbUserOverrides].
+ */
+enum class GameDbFixSection(val yamlName: String) {
+    GAME_FIXES("gameFixes"),
+    ROUND_MODES("roundModes"),
+    CLAMP_MODES("clampModes"),
+    SPEED_HACKS("speedHacks"),
+    GS_HW_FIXES("gsHWFixes");
+
+    companion object {
+        fun fromYamlName(name: String): GameDbFixSection? = entries.firstOrNull { it.yamlName == name }
+    }
+}
+
+val GameDbSettingCategory.section: GameDbFixSection
+    get() = when (this) {
+        GameDbSettingCategory.CORE_FIX -> GameDbFixSection.GAME_FIXES
+        GameDbSettingCategory.ROUND_MODE -> GameDbFixSection.ROUND_MODES
+        GameDbSettingCategory.CLAMP_MODE -> GameDbFixSection.CLAMP_MODES
+        GameDbSettingCategory.SPEED_HACK -> GameDbFixSection.SPEED_HACKS
+        GameDbSettingCategory.GRAPHICS_FIX -> GameDbFixSection.GS_HW_FIXES
+    }
+
+val GameDbFixSection.category: GameDbSettingCategory
+    get() = when (this) {
+        GameDbFixSection.GAME_FIXES -> GameDbSettingCategory.CORE_FIX
+        GameDbFixSection.ROUND_MODES -> GameDbSettingCategory.ROUND_MODE
+        GameDbFixSection.CLAMP_MODES -> GameDbSettingCategory.CLAMP_MODE
+        GameDbFixSection.SPEED_HACKS -> GameDbSettingCategory.SPEED_HACK
+        GameDbFixSection.GS_HW_FIXES -> GameDbSettingCategory.GRAPHICS_FIX
+    }
+
+/** Stable, serial-independent identity of a single GameDB line: `<section>|<key>`. */
+object GameDbFixId {
+    private const val SEPARATOR = '|'
+
+    fun of(section: GameDbFixSection, key: String): String = "${section.yamlName}$SEPARATOR$key"
+
+    fun of(setting: GameDbSettingItem): String = of(setting.category.section, setting.key)
+
+    fun sectionOf(id: String): GameDbFixSection? =
+        GameDbFixSection.fromYamlName(id.substringBefore(SEPARATOR, ""))
+
+    fun keyOf(id: String): String = id.substringAfter(SEPARATOR, "")
+}
+
 data class GameDbSettingItem(
     val category: GameDbSettingCategory,
     val key: String,
@@ -22,6 +70,8 @@ data class GameDbSettingItem(
     val note: String?,
     val controlledByGameFixesToggle: Boolean
 ) {
+    val id: String = GameDbFixId.of(category.section, key)
+
     val searchableText: String = listOfNotNull(key, value, note)
         .joinToString(" ")
         .lowercase(Locale.ROOT)

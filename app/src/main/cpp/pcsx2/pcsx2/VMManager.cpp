@@ -853,6 +853,9 @@ static void ApplyManualCpuModeOverrides(Pcsx2Config& config, SettingsInterface& 
 
 void VMManager::ApplyGameFixes()
 {
+	// Pick up fixes the user turned on or off in the GameDB browser without restarting the app.
+	GameDatabase::applyUserOverridesIfChanged();
+
 	if (!s_acgame.empty())
 	{
 		if (const auto* game = GameDatabase::findGame(ACJV::GetGameId()))

@@ -141,6 +141,11 @@ namespace GameDatabaseSchema
 namespace GameDatabase
 {
 	void ensureLoaded();
+
+	/// Rebuilds the database when the in-app GameDB editor rewrote the user overlay since the last
+	/// load. Safe to call before every boot; the common path only reads one small file.
+	void applyUserOverridesIfChanged();
+
 	const GameDatabaseSchema::GameEntry* findGame(const std::string_view serial);
 
 	struct TrackHash

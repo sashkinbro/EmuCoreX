@@ -6,10 +6,12 @@
 # Applied on tiler-GPU tiers (Android, iOS and ARM64 Linux) on top of
 # bin/resources/GameIndex.yaml, through the GameDatabase override path.
 #
-# gsHWFixes is always replaced wholesale. gameFixes, speedHacks, patches, memcardFilters
-# and dynaPatches are replaced wholesale whenever the entry lists at least one item. So
-# an entry that names one of those fields must restate every upstream key it wants to
-# keep. clampModes and roundModes merge one key at a time.
+# gsHWFixes is always replaced wholesale. gameFixes and speedHacks are replaced wholesale
+# whenever the entry names them, and an empty list or map there clears the upstream one.
+# patches, memcardFilters and dynaPatches are replaced wholesale whenever the entry lists at
+# least one item. So an entry that names one of those fields must restate every upstream key
+# it wants to keep. clampModes and roundModes merge one key at a time; a negative value there
+# clears the upstream mode, which is what the in-app GameDB editor writes when a mode is off.
 #
 # REQUIRED: every entry, and every later edit to one, carries a comment directly above it
 # recording its provenance:

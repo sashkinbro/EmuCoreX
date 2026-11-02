@@ -3,6 +3,8 @@ package com.sbro.emucorex.ui.gamedb
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import android.content.Context
+import com.sbro.emucorex.data.gamedb.GameDbCatalogRepository
+import com.sbro.emucorex.data.gamedb.GameDbSettingCategory
 import com.sbro.emucorex.data.pcsx2.GameIndexOverlay
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityRepository
 import org.junit.Assert.assertEquals

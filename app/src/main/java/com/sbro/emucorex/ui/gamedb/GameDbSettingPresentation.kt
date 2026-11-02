@@ -4,6 +4,8 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.sbro.emucorex.R
+import com.sbro.emucorex.data.gamedb.GameDbSettingCategory
+import com.sbro.emucorex.data.gamedb.GameDbSettingItem
 
 data class GameDbText(
     @param:StringRes val resourceId: Int,
@@ -77,6 +79,10 @@ object GameDbSettingPresentationMapper {
         "cpuSpriteRenderLevel" -> R.string.settings_cpu_sprite_render_level
         "deinterlace" -> R.string.gamedb_setting_deinterlace_mode
         "disablePartialInvalidation" -> R.string.settings_disable_partial_invalidation
+        "disableDepthSupport" -> R.string.settings_disable_depth_conversion
+        "trilinearFiltering" -> R.string.settings_trilinear_filtering
+        "skipDrawStart" -> R.string.settings_skip_draw_start
+        "skipDrawEnd" -> R.string.settings_skip_draw_end
         "estimateTextureRegion" -> R.string.settings_estimate_texture_region
         "forceEvenSpritePosition" -> R.string.settings_force_even_sprite_position
         "getSkipCount" -> R.string.gamedb_setting_skip_draw_handler

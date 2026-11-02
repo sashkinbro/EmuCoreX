@@ -43,9 +43,15 @@ namespace GameDatabase
 static constexpr char GAMEDB_YAML_FILE_NAME[] = "GameIndex.yaml";
 // Mobile tuning from ARMSX2 is applied after the base database. Missing overlay is harmless.
 static constexpr char GAMEDB_OVERRIDE_YAML_FILE_NAME[] = "emucorex_overrides.yaml";
+// Per-game edits made in the in-app GameDB browser. Written by the app at runtime, never shipped,
+// and applied last so a user decision always wins over both bundled files.
+static constexpr char GAMEDB_USER_OVERRIDE_YAML_FILE_NAME[] = "emucorex_user_overrides.yaml";
 
 static std::unordered_map<std::string, GameDatabaseSchema::GameEntry> s_game_db;
 static std::once_flag s_load_once_flag;
+// Content of the in-app editor overlay that is currently baked into s_game_db.
+static std::string s_last_user_overlay;
+static bool s_user_overlay_loaded = false;
 
 std::string GameDatabaseSchema::GameEntry::memcardFiltersAsString() const
 {
@@ -123,6 +129,8 @@ void GameDatabase::populateEntry(GameDatabaseSchema::GameEntry& gameEntry, const
 			node["roundModes"]["eeRoundMode"] >> eeVal;
 			if (eeVal >= 0 && eeVal < static_cast<int>(FPRoundMode::MaxCount))
 				gameEntry.eeRoundMode = static_cast<FPRoundMode>(eeVal);
+			else if (is_override && eeVal < 0)
+				gameEntry.eeRoundMode = FPRoundMode::MaxCount; // -1 from the in-app editor: keep the user's mode
 			else
 				Console.Error(fmt::format("GameDB: Invalid EE round mode '{}', specified for serial: '{}'.", eeVal, serial));
 		}
@@ -132,6 +140,8 @@ void GameDatabase::populateEntry(GameDatabaseSchema::GameEntry& gameEntry, const
 			node["roundModes"]["eeDivRoundMode"] >> eeVal;
 			if (eeVal >= 0 && eeVal < static_cast<int>(FPRoundMode::MaxCount))
 				gameEntry.eeDivRoundMode = static_cast<FPRoundMode>(eeVal);
+			else if (is_override && eeVal < 0)
+				gameEntry.eeDivRoundMode = FPRoundMode::MaxCount;
 			else
 				Console.Error(fmt::format("GameDB: Invalid EE division round mode '{}', specified for serial: '{}'.", eeVal, serial));
 		}
@@ -144,6 +154,11 @@ void GameDatabase::populateEntry(GameDatabaseSchema::GameEntry& gameEntry, const
 				gameEntry.vu0RoundMode = static_cast<FPRoundMode>(vuVal);
 				gameEntry.vu1RoundMode = static_cast<FPRoundMode>(vuVal);
 			}
+			else if (is_override && vuVal < 0)
+			{
+				gameEntry.vu0RoundMode = FPRoundMode::MaxCount;
+				gameEntry.vu1RoundMode = FPRoundMode::MaxCount;
+			}
 			else
 			{
 				Console.Error(fmt::format("GameDB: Invalid VU round mode '{}', specified for serial: '{}'.", vuVal, serial));
@@ -155,6 +170,8 @@ void GameDatabase::populateEntry(GameDatabaseSchema::GameEntry& gameEntry, const
 			node["roundModes"]["vu0RoundMode"] >> vuVal;
 			if (vuVal >= 0 && vuVal < static_cast<int>(FPRoundMode::MaxCount))
 				gameEntry.vu0RoundMode = static_cast<FPRoundMode>(vuVal);
+			else if (is_override && vuVal < 0)
+				gameEntry.vu0RoundMode = FPRoundMode::MaxCount;
 			else
 				Console.Error(fmt::format("GameDB: Invalid VU0 round mode '{}', specified for serial: '{}'.", vuVal, serial));
 		}
@@ -164,6 +181,8 @@ void GameDatabase::populateEntry(GameDatabaseSchema::GameEntry& gameEntry, const
 			node["roundModes"]["vu1RoundMode"] >> vuVal;
 			if (vuVal >= 0 && vuVal < static_cast<int>(FPRoundMode::MaxCount))
 				gameEntry.vu1RoundMode = static_cast<FPRoundMode>(vuVal);
+			else if (is_override && vuVal < 0)
+				gameEntry.vu1RoundMode = FPRoundMode::MaxCount;
 			else
 				Console.Error(fmt::format("GameDB: Invalid VU1 round mode '{}', specified for serial: '{}'.", vuVal, serial));
 		}
@@ -176,6 +195,8 @@ void GameDatabase::populateEntry(GameDatabaseSchema::GameEntry& gameEntry, const
 			node["clampModes"]["eeClampMode"] >> eeVal;
 			if (eeVal >= 0 && eeVal <= 3)
 				gameEntry.eeClampMode = static_cast<GameDatabaseSchema::ClampMode>(eeVal);
+			else if (is_override && eeVal < 0)
+				gameEntry.eeClampMode = GameDatabaseSchema::ClampMode::Undefined; // keep the user's clamp mode
 			else
 				Console.Error(fmt::format("GameDB: Invalid EE/FPU clamp mode '{}', specified for serial: '{}'.", eeVal, serial));
 		}
@@ -188,6 +209,11 @@ void GameDatabase::populateEntry(GameDatabaseSchema::GameEntry& gameEntry, const
 				gameEntry.vu0ClampMode = static_cast<GameDatabaseSchema::ClampMode>(vuVal);
 				gameEntry.vu1ClampMode = static_cast<GameDatabaseSchema::ClampMode>(vuVal);
 			}
+			else if (is_override && vuVal < 0)
+			{
+				gameEntry.vu0ClampMode = GameDatabaseSchema::ClampMode::Undefined;
+				gameEntry.vu1ClampMode = GameDatabaseSchema::ClampMode::Undefined;
+			}
 			else
 				Console.Error(fmt::format("GameDB: Invalid VU clamp mode '{}', specified for serial: '{}'.", vuVal, serial));
 		}
@@ -197,6 +223,8 @@ void GameDatabase::populateEntry(GameDatabaseSchema::GameEntry& gameEntry, const
 			node["clampModes"]["vu0ClampMode"] >> vuVal;
 			if (vuVal >= 0 && vuVal <= 3)
 				gameEntry.vu0ClampMode = static_cast<GameDatabaseSchema::ClampMode>(vuVal);
+			else if (is_override && vuVal < 0)
+				gameEntry.vu0ClampMode = GameDatabaseSchema::ClampMode::Undefined;
 			else
 				Console.Error(fmt::format("GameDB: Invalid VU0 clamp mode '{}', specified for serial: '{}'.", vuVal, serial));
 		}
@@ -206,65 +234,81 @@ void GameDatabase::populateEntry(GameDatabaseSchema::GameEntry& gameEntry, const
 			node["clampModes"]["vu1ClampMode"] >> vuVal;
 			if (vuVal >= 0 && vuVal <= 3)
 				gameEntry.vu1ClampMode = static_cast<GameDatabaseSchema::ClampMode>(vuVal);
+			else if (is_override && vuVal < 0)
+				gameEntry.vu1ClampMode = GameDatabaseSchema::ClampMode::Undefined;
 			else
 				Console.Error(fmt::format("GameDB: Invalid VU1 clamp mode '{}', specified for serial: '{}'.", vuVal, serial));
 		}
 	}
 
 	// Validate game fixes, invalid ones will be dropped!
-	if (node.has_child("gameFixes") && node["gameFixes"].has_children())
+	// An override that names the section but lists nothing clears the upstream list. That is how
+	// the in-app GameDB browser turns every fix of a game off, and it mirrors gsHWFixes below.
+	if (node.has_child("gameFixes"))
 	{
 		if (is_override)
 			gameEntry.gameFixes.clear();
-		for (const auto& n : node["gameFixes"].children())
-		{
-			bool fixValidated = false;
-			auto fix = std::string(n.val().str, n.val().len);
 
-			// Enum values don't end with Hack, but gamedb does, so remove it before comparing.
-			if (fix.ends_with("Hack"))
+		const auto game_fixes_node = node["gameFixes"];
+		if (game_fixes_node.is_seq())
+		{
+			for (const auto& n : game_fixes_node.children())
 			{
-				fix.erase(fix.size() - 4);
-				for (GamefixId id = GamefixId_FIRST; id < GamefixId_COUNT; id = static_cast<GamefixId>(enum_cast(id) + 1))
+				bool fixValidated = false;
+				auto fix = std::string(n.val().str, n.val().len);
+
+				// Enum values don't end with Hack, but gamedb does, so remove it before comparing.
+				if (fix.ends_with("Hack"))
 				{
-					if (fix.compare(Pcsx2Config::GamefixOptions::GetGameFixName(id)) == 0 &&
-						std::find(gameEntry.gameFixes.begin(), gameEntry.gameFixes.end(), id) == gameEntry.gameFixes.end())
+					fix.erase(fix.size() - 4);
+					for (GamefixId id = GamefixId_FIRST; id < GamefixId_COUNT; id = static_cast<GamefixId>(enum_cast(id) + 1))
 					{
-						gameEntry.gameFixes.push_back(id);
-						fixValidated = true;
-						break;
+						if (fix.compare(Pcsx2Config::GamefixOptions::GetGameFixName(id)) == 0 &&
+							std::find(gameEntry.gameFixes.begin(), gameEntry.gameFixes.end(), id) == gameEntry.gameFixes.end())
+						{
+							gameEntry.gameFixes.push_back(id);
+							fixValidated = true;
+							break;
+						}
 					}
 				}
-			}
 
-			if (!fixValidated)
-			{
-				Console.Error(fmt::format("GameDB: Invalid gamefix: '{}', specified for serial: '{}'. Dropping!", fix, serial));
+				if (!fixValidated)
+				{
+					Console.Error(fmt::format("GameDB: Invalid gamefix: '{}', specified for serial: '{}'. Dropping!", fix, serial));
+				}
 			}
 		}
 	}
 
-	if (node.has_child("speedHacks") && node["speedHacks"].has_children())
+	// Same clear-then-replace rule as gameFixes: an override that names speedHacks but lists
+	// nothing removes every upstream speed hack for the serial.
+	if (node.has_child("speedHacks"))
 	{
 		if (is_override)
 			gameEntry.speedHacks.clear();
-		for (const auto& n : node["speedHacks"].children())
-		{
-			const std::string_view id_view = std::string_view(n.key().str, n.key().len);
-			const std::string_view value_view = std::string_view(n.val().str, n.val().len);
-			const std::optional<SpeedHack> id = Pcsx2Config::SpeedhackOptions::ParseSpeedHackName(id_view);
-			const std::optional<int> value = StringUtil::FromChars<int>(value_view);
 
-			if (id.has_value() && value.has_value() &&
-				std::none_of(gameEntry.speedHacks.begin(), gameEntry.speedHacks.end(),
-					[&id](const auto& it) { return it.first == id.value(); }))
+		const auto speed_hacks_node = node["speedHacks"];
+		if (speed_hacks_node.is_map())
+		{
+			for (const auto& n : speed_hacks_node.children())
 			{
-				gameEntry.speedHacks.emplace_back(id.value(), value.value());
-			}
-			else
-			{
-				Console.Error(fmt::format("GameDB: Invalid speedhack: '{}={}', specified for serial: '{}'. Dropping!",
-					id_view, value_view, serial));
+				const std::string_view id_view = std::string_view(n.key().str, n.key().len);
+				const std::string_view value_view = std::string_view(n.val().str, n.val().len);
+				const std::optional<SpeedHack> id = Pcsx2Config::SpeedhackOptions::ParseSpeedHackName(id_view);
+				const std::optional<int> value = StringUtil::FromChars<int>(value_view);
+
+				if (id.has_value() && value.has_value() &&
+					std::none_of(gameEntry.speedHacks.begin(), gameEntry.speedHacks.end(),
+						[&id](const auto& it) { return it.first == id.value(); }))
+				{
+					gameEntry.speedHacks.emplace_back(id.value(), value.value());
+				}
+				else
+				{
+					Console.Error(fmt::format("GameDB: Invalid speedhack: '{}={}', specified for serial: '{}'. Dropping!",
+						id_view, value_view, serial));
+				}
 			}
 		}
 	}
@@ -811,7 +855,18 @@ bool GameDatabaseSchema::GameEntry::TestMobileOverlayPolicy()
 	invalid.applyGSHardwareFixes(untouched);
 	ok &= untouched.HWDownloadMode == GSHardwareDownloadMode::Enabled && untouched.UserHacks_BilinearHack == GSBilinearDirtyMode::Automatic && untouched.CopyRoadMaximumBlendingLevel == -1;
 	ok &= parse("gsHWFixes: {}\ngameFixes: []\n");
-	ok &= s_game_db.at(serial).gsHWFixes.empty() && s_game_db.at(serial).gameFixes.size() == 1;
+	ok &= s_game_db.at(serial).gsHWFixes.empty() && s_game_db.at(serial).gameFixes.empty();
+	// The in-app GameDB browser relies on an empty section clearing the upstream list, and on a
+	// negative round/clamp mode meaning "keep the user's own mode instead of the database one".
+	ok &= parse("gameFixes:\n  - EETimingHack\n  - DMABusyHack\nspeedHacks:\n  eeCycleRate: 2\nroundModes:\n  eeRoundMode: 1\nclampModes:\n  vuClampMode: 3\n");
+	ok &= s_game_db.at(serial).gameFixes.size() == 2 && s_game_db.at(serial).speedHacks.size() == 1 &&
+		s_game_db.at(serial).eeRoundMode == FPRoundMode::NegativeInfinity &&
+		s_game_db.at(serial).vu0ClampMode == ClampMode::Full;
+	ok &= parse("gameFixes: []\nspeedHacks: {}\nroundModes:\n  eeRoundMode: -1\nclampModes:\n  vuClampMode: -1\n");
+	ok &= s_game_db.at(serial).gameFixes.empty() && s_game_db.at(serial).speedHacks.empty() &&
+		s_game_db.at(serial).eeRoundMode == FPRoundMode::MaxCount &&
+		s_game_db.at(serial).vu0ClampMode == ClampMode::Undefined &&
+		s_game_db.at(serial).vu1ClampMode == ClampMode::Undefined;
 	restore();
 	return ok;
 }
@@ -1275,6 +1330,13 @@ void GameDatabase::initDatabase()
 {
 	loadFile(Path::Combine(EmuFolders::Resources, GAMEDB_YAML_FILE_NAME), GAMEDB_YAML_FILE_NAME, false);
 	loadFile(Path::Combine(EmuFolders::Resources, GAMEDB_OVERRIDE_YAML_FILE_NAME), GAMEDB_OVERRIDE_YAML_FILE_NAME, true);
+
+	// Edits made in the in-app GameDB browser are written next to the bundled files and applied
+	// last, so they always win. The file only exists once the user changes something.
+	const std::string user_override_path =
+		Path::Combine(EmuFolders::Resources, GAMEDB_USER_OVERRIDE_YAML_FILE_NAME);
+	if (FileSystem::FileExists(user_override_path.c_str()))
+		loadFile(user_override_path, GAMEDB_USER_OVERRIDE_YAML_FILE_NAME, true);
 }
 
 void GameDatabase::ensureLoaded()
@@ -1285,6 +1347,32 @@ void GameDatabase::ensureLoaded()
 		initDatabase();
 		Console.WriteLn("GameDB: %zu games on record (loaded in %.2fms)", s_game_db.size(), timer.GetTimeMilliseconds());
 	});
+}
+
+void GameDatabase::applyUserOverridesIfChanged()
+{
+	// The first call only records what initDatabase() already applied, so a normal boot parses the
+	// database once. A later boot after an edit in the GameDB browser rebuilds it from disk.
+	ensureLoaded();
+
+	const std::string path = Path::Combine(EmuFolders::Resources, GAMEDB_USER_OVERRIDE_YAML_FILE_NAME);
+	const std::string current = FileSystem::ReadFileToString(path.c_str()).value_or(std::string());
+	if (s_user_overlay_loaded)
+	{
+		if (current == s_last_user_overlay)
+			return;
+
+		Common::Timer timer;
+		s_last_user_overlay = current;
+		s_game_db.clear();
+		initDatabase();
+		Console.WriteLn("GameDB: User overrides changed, reloaded %zu games in %.2fms", s_game_db.size(),
+			timer.GetTimeMilliseconds());
+		return;
+	}
+
+	s_last_user_overlay = current;
+	s_user_overlay_loaded = true;
 }
 
 const GameDatabaseSchema::GameEntry* GameDatabase::findGame(const std::string_view serial)

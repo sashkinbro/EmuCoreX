@@ -6,6 +6,7 @@ import android.util.Log
 import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.BackupSessionGate
 import com.sbro.emucorex.data.drive.DriveBackupArchive
+import com.sbro.emucorex.data.gamedb.GameDbUserOverrides
 import org.json.JSONObject
 import java.io.File
 import java.io.InputStream
@@ -58,6 +59,7 @@ class SettingsBackupRepository(
         ZipOutputStream(output).use { zip ->
             zip.writeJsonEntry("settings.json", preferences.exportJson())
             zip.writeJsonEntry("per-game-settings.json", perGameSettingsRepository.exportJson())
+            zip.writeJsonEntry("gamedb-overrides.json", GameDbUserOverrides(context).exportJson())
             zip.writeJsonEntry("cheats.json", cheatRepository.exportJson())
             zip.writeFlatDirectory(
                 "cheat-files",
@@ -89,6 +91,7 @@ class SettingsBackupRepository(
                 when (entry.name) {
                     "settings.json" -> preferences.importJson(JSONObject(zip.readBytes().decodeToString()))
                     "per-game-settings.json" -> perGameSettingsRepository.importJson(JSONObject(zip.readBytes().decodeToString()))
+                    "gamedb-overrides.json" -> GameDbUserOverrides(context).importJson(JSONObject(zip.readBytes().decodeToString()))
                     "cheats.json" -> cheatRepository.importJson(JSONObject(zip.readBytes().decodeToString()))
                     CustomFontRepository.BACKUP_ENTRY -> {
                         customFontRepository.restoreFromBackup(zip).getOrThrow()

@@ -448,6 +448,7 @@ object NativeApp {
         val dataRoot = resolveDataRoot(context.applicationContext)
         prepareNativeDataRoot(File(dataRoot))
         copyAssetTree(context.applicationContext, RESOURCE_ROOT, File(dataRoot, RESOURCE_ROOT))
+        renderGameDbUserOverrides(context.applicationContext, File(dataRoot))
         verifyBundledPatchArchive(File(dataRoot, "$RESOURCE_ROOT/patches.zip"))
         val caBundle = File(dataRoot, "system-ca-bundle.pem")
         exportSystemCaBundle(caBundle)
@@ -599,6 +600,18 @@ object NativeApp {
         }.getOrElse { error ->
             Log.w(TAG, "Native data root is not writable: ${root.absolutePath}", error)
             false
+        }
+    }
+
+    /**
+     * Rewrites the per-game GameDB overlay the core reads after the bundled files. Cheap when the
+     * user never edited a GameDB fix: the stored app stamp short-circuits the whole pass.
+     */
+    private fun renderGameDbUserOverrides(context: Context, dataRoot: File) {
+        runCatching {
+            com.sbro.emucorex.data.gamedb.GameDbOverrideRenderer.render(context, dataRoot)
+        }.onFailure { error ->
+            Log.w(TAG, "Unable to prepare the GameDB user overlay", error)
         }
     }
 

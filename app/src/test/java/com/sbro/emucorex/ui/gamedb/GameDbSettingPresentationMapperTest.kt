@@ -1,6 +1,8 @@
 package com.sbro.emucorex.ui.gamedb
 
 import com.sbro.emucorex.R
+import com.sbro.emucorex.data.gamedb.GameDbSettingCategory
+import com.sbro.emucorex.data.gamedb.GameDbSettingItem
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
