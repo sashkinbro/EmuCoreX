@@ -3025,4 +3025,10 @@
     <string name="game_picker_change_game">Změnit hru</string>
     <string name="game_picker_all_filter">Vše</string>
     <string name="game_picker_clear_search">Vymazat hledání</string>
+    <string name="settings_iop_thread">Vlákno IOP</string>
+    <string name="settings_iop_thread_desc">Spouštět procesor I/O na samostatném jádru CPU</string>
+    <string name="settings_help_iop_thread">Může zvýšit rychlost na zařízeních s dostatečným počtem výkonných jader. Nepodporovaná zařízení a režimy automaticky použijí běžné provádění.</string>
+    <string name="settings_vu_aot">Kompilátor VU1 AOT</string>
+    <string name="settings_vu_aot_desc">Optimalizovat často používaný kód VU1</string>
+    <string name="settings_help_vu_aot">Může zvýšit rychlost při zapnutém rekompilátoru VU1. Nepodporovaný kód automaticky použije běžný kompilátor.</string>
 </resources>

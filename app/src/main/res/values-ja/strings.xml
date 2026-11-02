@@ -3004,4 +3004,10 @@
     <string name="game_picker_change_game">ゲームを変更</string>
     <string name="game_picker_all_filter">すべて</string>
     <string name="game_picker_clear_search">検索をクリア</string>
+    <string name="settings_iop_thread">IOP スレッド</string>
+    <string name="settings_iop_thread_desc">I/O プロセッサを別の CPU コアで実行</string>
+    <string name="settings_help_iop_thread">十分な数の高性能コアを備えた端末では速度が向上する場合があります。非対応の端末やモードでは自動的に通常の実行方式が使われます。</string>
+    <string name="settings_vu_aot">VU1 AOT コンパイラー</string>
+    <string name="settings_vu_aot_desc">頻繁に使用される VU1 コードを最適化</string>
+    <string name="settings_help_vu_aot">VU1 リコンパイラーが有効な場合、速度が向上することがあります。非対応コードでは自動的に通常のコンパイラーが使われます。</string>
 </resources>

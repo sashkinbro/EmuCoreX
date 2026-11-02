@@ -11,6 +11,12 @@ class StringsLocalizationTest {
         "hardware_warning_gpu",
         "hardware_warning_recommended",
         "hardware_warning_continue",
+        "settings_iop_thread",
+        "settings_iop_thread_desc",
+        "settings_help_iop_thread",
+        "settings_vu_aot",
+        "settings_vu_aot_desc",
+        "settings_help_vu_aot",
         "settings_keyboard_mouse_section",
         "settings_keyboard_input",
         "settings_keyboard_input_desc",
@@ -66,7 +72,7 @@ class StringsLocalizationTest {
     )
 
     @Test
-    fun `hardware warning strings exist in every locale`() {
+    fun `required strings exist in every locale`() {
         val resDir = resolveResDir()
         val localeDirs = resDir
             .listFiles { file -> file.isDirectory && file.name.startsWith("values") }

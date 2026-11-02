@@ -3019,4 +3019,10 @@
     <string name="game_picker_change_game">Ganti game</string>
     <string name="game_picker_all_filter">Semua</string>
     <string name="game_picker_clear_search">Hapus pencarian</string>
+    <string name="settings_iop_thread">Thread IOP</string>
+    <string name="settings_iop_thread_desc">Jalankan prosesor I/O pada inti CPU terpisah</string>
+    <string name="settings_help_iop_thread">Dapat meningkatkan kecepatan pada perangkat dengan jumlah inti CPU berperforma tinggi yang memadai. Perangkat dan mode yang tidak didukung otomatis menggunakan eksekusi normal.</string>
+    <string name="settings_vu_aot">Kompiler AOT VU1</string>
+    <string name="settings_vu_aot_desc">Optimalkan kode VU1 yang sering digunakan</string>
+    <string name="settings_help_vu_aot">Dapat meningkatkan kecepatan saat rekompiler VU1 aktif. Kode yang tidak didukung otomatis menggunakan kompiler normal.</string>
 </resources>

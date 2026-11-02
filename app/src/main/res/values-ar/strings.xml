@@ -3009,4 +3009,10 @@
     <string name="game_picker_change_game">تغيير اللعبة</string>
     <string name="game_picker_all_filter">الكل</string>
     <string name="game_picker_clear_search">مسح البحث</string>
+    <string name="settings_iop_thread">مؤشر ترابط IOP</string>
+    <string name="settings_iop_thread_desc">تشغيل معالج الإدخال/الإخراج على نواة CPU منفصلة</string>
+    <string name="settings_help_iop_thread">قد يحسن السرعة على الأجهزة التي تملك عددًا كافيًا من أنوية الأداء. ستستخدم الأجهزة والأوضاع غير المدعومة التنفيذ العادي تلقائيًا.</string>
+    <string name="settings_vu_aot">مترجم AOT لـ VU1</string>
+    <string name="settings_vu_aot_desc">تحسين الشيفرة المستخدمة كثيرًا في VU1</string>
+    <string name="settings_help_vu_aot">قد يحسن السرعة عند تفعيل إعادة الترجمة لـ VU1. ستستخدم الشيفرة غير المدعومة المترجم العادي تلقائيًا.</string>
 </resources>

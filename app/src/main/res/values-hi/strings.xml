@@ -3005,4 +3005,10 @@
     <string name="game_picker_change_game">गेम बदलें</string>
     <string name="game_picker_all_filter">सभी</string>
     <string name="game_picker_clear_search">खोज साफ़ करें</string>
+    <string name="settings_iop_thread">IOP थ्रेड</string>
+    <string name="settings_iop_thread_desc">I/O प्रोसेसर को अलग CPU कोर पर चलाएँ</string>
+    <string name="settings_help_iop_thread">पर्याप्त परफ़ॉर्मेंस कोर वाले डिवाइस पर गति बेहतर हो सकती है। असमर्थित डिवाइस और मोड अपने आप सामान्य निष्पादन का उपयोग करेंगे।</string>
+    <string name="settings_vu_aot">VU1 AOT कंपाइलर</string>
+    <string name="settings_vu_aot_desc">अक्सर उपयोग होने वाले VU1 कोड को ऑप्टिमाइज़ करें</string>
+    <string name="settings_help_vu_aot">VU1 री-कंपाइलर चालू होने पर गति बेहतर हो सकती है। असमर्थित कोड अपने आप सामान्य कंपाइलर का उपयोग करेगा।</string>
 </resources>

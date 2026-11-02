@@ -3010,4 +3010,10 @@
     <string name="game_picker_change_game">Сменить игру</string>
     <string name="game_picker_all_filter">Все</string>
     <string name="game_picker_clear_search">Очистить поиск</string>
+    <string name="settings_iop_thread">Поток IOP</string>
+    <string name="settings_iop_thread_desc">Запускать процессор ввода-вывода на отдельном ядре CPU</string>
+    <string name="settings_help_iop_thread">Может повысить скорость на устройствах с достаточным количеством производительных ядер. Неподдерживаемые устройства и режимы автоматически используют обычное выполнение.</string>
+    <string name="settings_vu_aot">AOT-компилятор VU1</string>
+    <string name="settings_vu_aot_desc">Оптимизировать часто используемый код VU1</string>
+    <string name="settings_help_vu_aot">Может повысить скорость при включённом рекомпиляторе VU1. Неподдерживаемый код автоматически обрабатывается обычным компилятором.</string>
 </resources>

@@ -3006,4 +3006,10 @@
     <string name="game_picker_change_game">更换游戏</string>
     <string name="game_picker_all_filter">全部</string>
     <string name="game_picker_clear_search">清除搜索</string>
+    <string name="settings_iop_thread">IOP 线程</string>
+    <string name="settings_iop_thread_desc">在独立的 CPU 核心上运行 I/O 处理器</string>
+    <string name="settings_help_iop_thread">在拥有足够高性能核心的设备上可能提升速度。不支持的设备和模式会自动使用常规执行方式。</string>
+    <string name="settings_vu_aot">VU1 AOT 编译器</string>
+    <string name="settings_vu_aot_desc">优化频繁使用的 VU1 代码</string>
+    <string name="settings_help_vu_aot">启用 VU1 重编译器后可能提升速度。不支持的代码会自动使用常规编译器。</string>
 </resources>

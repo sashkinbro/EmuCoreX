@@ -3007,4 +3007,10 @@
     <string name="game_picker_change_game">Spiel ändern</string>
     <string name="game_picker_all_filter">Alle</string>
     <string name="game_picker_clear_search">Suche löschen</string>
+    <string name="settings_iop_thread">IOP-Thread</string>
+    <string name="settings_iop_thread_desc">I/O-Prozessor auf einem separaten CPU-Kern ausführen</string>
+    <string name="settings_help_iop_thread">Kann auf Geräten mit genügend leistungsstarken CPU-Kernen die Geschwindigkeit verbessern. Nicht unterstützte Geräte und Modi wechseln automatisch zur normalen Ausführung.</string>
+    <string name="settings_vu_aot">VU1-AOT-Compiler</string>
+    <string name="settings_vu_aot_desc">Häufig verwendeten VU1-Code optimieren</string>
+    <string name="settings_help_vu_aot">Kann bei aktiviertem VU1-Recompiler die Geschwindigkeit verbessern. Nicht unterstützter Code wird automatisch mit dem normalen Compiler verarbeitet.</string>
 </resources>

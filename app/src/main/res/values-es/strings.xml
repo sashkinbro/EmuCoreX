@@ -3007,4 +3007,10 @@
     <string name="game_picker_change_game">Cambiar juego</string>
     <string name="game_picker_all_filter">Todos</string>
     <string name="game_picker_clear_search">Borrar búsqueda</string>
+    <string name="settings_iop_thread">Hilo de IOP</string>
+    <string name="settings_iop_thread_desc">Ejecutar el procesador de E/S en un núcleo de CPU independiente</string>
+    <string name="settings_help_iop_thread">Puede mejorar la velocidad en dispositivos con suficientes núcleos de alto rendimiento. Los dispositivos y modos no compatibles usan automáticamente la ejecución normal.</string>
+    <string name="settings_vu_aot">Compilador AOT de VU1</string>
+    <string name="settings_vu_aot_desc">Optimizar el código de VU1 que se usa con frecuencia</string>
+    <string name="settings_help_vu_aot">Puede mejorar la velocidad si el recompilador de VU1 está activado. El código no compatible usa automáticamente el compilador normal.</string>
 </resources>

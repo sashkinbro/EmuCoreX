@@ -3027,4 +3027,10 @@
     <string name="game_picker_change_game">Zmień grę</string>
     <string name="game_picker_all_filter">Wszystkie</string>
     <string name="game_picker_clear_search">Wyczyść wyszukiwanie</string>
+    <string name="settings_iop_thread">Wątek IOP</string>
+    <string name="settings_iop_thread_desc">Uruchom procesor I/O na osobnym rdzeniu CPU</string>
+    <string name="settings_help_iop_thread">Może zwiększyć szybkość na urządzeniach z wystarczającą liczbą wydajnych rdzeni. Nieobsługiwane urządzenia i tryby automatycznie używają zwykłego wykonania.</string>
+    <string name="settings_vu_aot">Kompilator AOT VU1</string>
+    <string name="settings_vu_aot_desc">Optymalizuj często używany kod VU1</string>
+    <string name="settings_help_vu_aot">Może zwiększyć szybkość, gdy rekompilator VU1 jest włączony. Nieobsługiwany kod automatycznie używa zwykłego kompilatora.</string>
 </resources>

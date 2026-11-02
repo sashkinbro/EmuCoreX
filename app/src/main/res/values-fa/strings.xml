@@ -3020,4 +3020,10 @@
     <string name="game_picker_change_game">تغییر بازی</string>
     <string name="game_picker_all_filter">همه</string>
     <string name="game_picker_clear_search">پاک کردن جستجو</string>
+    <string name="settings_iop_thread">رشتهٔ IOP</string>
+    <string name="settings_iop_thread_desc">اجرای پردازندهٔ ورودی/خروجی روی یک هستهٔ جداگانهٔ CPU</string>
+    <string name="settings_help_iop_thread">ممکن است سرعت را در دستگاه‌هایی با تعداد کافی هستهٔ پرقدرت افزایش دهد. دستگاه‌ها و حالت‌های پشتیبانی‌نشده به‌طور خودکار از اجرای عادی استفاده می‌کنند.</string>
+    <string name="settings_vu_aot">کامپایلر AOT برای VU1</string>
+    <string name="settings_vu_aot_desc">بهینه‌سازی کد پراستفادهٔ VU1</string>
+    <string name="settings_help_vu_aot">ممکن است با فعال بودن کامپایلر مجدد VU1 سرعت را افزایش دهد. کد پشتیبانی‌نشده به‌طور خودکار از کامپایلر عادی استفاده می‌کند.</string>
 </resources>
