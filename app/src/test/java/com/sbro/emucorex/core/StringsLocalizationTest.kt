@@ -52,6 +52,7 @@ class StringsLocalizationTest {
         "settings_mouse_invert_y_desc",
         "settings_mouse_capture",
         "settings_mouse_capture_desc",
+        "settings_fps_metric_iop",
         "settings_mouse_left_handed",
         "settings_mouse_left_handed_desc",
         "settings_mouse_wheel",

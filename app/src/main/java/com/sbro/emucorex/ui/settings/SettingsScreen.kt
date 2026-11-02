@@ -7529,6 +7529,7 @@ internal fun fpsOverlayMetricOptions(): List<Pair<Int, String>> = listOf(
     PerformanceOverlayMetrics.EE to stringResource(R.string.settings_fps_metric_ee),
     PerformanceOverlayMetrics.GS to stringResource(R.string.settings_fps_metric_gs),
     PerformanceOverlayMetrics.VU to stringResource(R.string.settings_fps_metric_vu),
+    PerformanceOverlayMetrics.IOP to stringResource(R.string.settings_fps_metric_iop),
     PerformanceOverlayMetrics.SOFTWARE_THREADS to stringResource(R.string.settings_fps_metric_software_threads)
 )
 

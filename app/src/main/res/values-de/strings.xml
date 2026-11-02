@@ -1872,6 +1872,7 @@
     <string name="settings_fps_metric_ee">EE</string>
     <string name="settings_fps_metric_gs">GS</string>
     <string name="settings_fps_metric_vu">VU</string>
+    <string name="settings_fps_metric_iop">IOP</string>
     <string name="settings_fps_metric_software_threads">Software-Threads</string>
     <string name="settings_ra_achievement_indicators">Erfolgsindikatoren</string>
     <string name="settings_ra_achievement_indicators_desc">Zeigt Abzeichen für aktive Herausforderungen und den gemessenen Fortschritt von Erfolgen während des Spiels an.</string>

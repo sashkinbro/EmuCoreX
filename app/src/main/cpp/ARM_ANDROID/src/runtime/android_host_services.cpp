@@ -563,8 +563,13 @@ void Host::OnPerformanceMetricsUpdated()
 		}
 
 		const CPUInfo& cpu_info = GetCPUInfo();
+		float iop_usage = 0.0f;
+		float iop_time = 0.0f;
+		const bool iop_active = PerformanceMetrics::GetIOPThreadMetrics(iop_usage, iop_time);
 		double cpu_usage = PerformanceMetrics::GetCPUThreadUsage() + PerformanceMetrics::GetGSThreadUsage() +
 			PerformanceMetrics::GetVUThreadUsage();
+		if (iop_active)
+			cpu_usage += iop_usage;
 		const u32 gs_sw_threads = PerformanceMetrics::GetGSSWThreadCount();
 		for (u32 thread = 0; thread < gs_sw_threads; thread++)
 			cpu_usage += PerformanceMetrics::GetGSSWThreadUsage(thread);
@@ -603,6 +608,13 @@ void Host::OnPerformanceMetricsUpdated()
 		line.clear();
 		AppendProcessorStat(line, "VU: ", PerformanceMetrics::GetVUThreadUsage(), PerformanceMetrics::GetVUThreadAverageTime());
 		AppendLine(overlay, line);
+
+		if (iop_active)
+		{
+			line.clear();
+			AppendProcessorStat(line, "IOP: ", iop_usage, iop_time);
+			AppendLine(overlay, line);
+		}
 
 		for (u32 thread = 0; thread < gs_sw_threads; thread++)
 		{

@@ -81,6 +81,7 @@ internal fun buildPerformanceOverlayLayout(
             line.startsWith("EE:") -> PerformanceOverlayMetrics.EE
             line.startsWith("GS:") -> PerformanceOverlayMetrics.GS
             line.startsWith("VU:") -> PerformanceOverlayMetrics.VU
+            line.startsWith("IOP:") -> PerformanceOverlayMetrics.IOP
             line.startsWith("SW-") -> PerformanceOverlayMetrics.SOFTWARE_THREADS
             line.startsWith("CPU:") -> PerformanceOverlayMetrics.HOST_CPU
             line.startsWith("GPU:") -> PerformanceOverlayMetrics.HOST_GPU
@@ -122,7 +123,7 @@ internal fun buildPerformanceOverlayLayout(
             line.startsWith("Speed:") || line.startsWith("Target:") || line.startsWith("LSFG:")
     }
     val processorLines = displayLines.filter { line ->
-        line.startsWith("EE:") || line.startsWith("GS:") || line.startsWith("VU:")
+        line.startsWith("EE:") || line.startsWith("GS:") || line.startsWith("VU:") || line.startsWith("IOP:")
     }
     val hardwareLines = displayLines.filter { line ->
         line.startsWith("CPU:") || line.startsWith("GPU:")

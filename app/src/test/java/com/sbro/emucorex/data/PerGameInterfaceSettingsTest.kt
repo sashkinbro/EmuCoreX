@@ -72,4 +72,10 @@ class PerGameInterfaceSettingsTest {
         assertEquals(AppPreferences.MAX_FPS_OVERLAY_SCALE, invalid.fpsOverlayScale)
         assertEquals(1, invalid.autoSaveIntervalMinutes)
     }
+
+    @Test fun iopOverlayMetricSurvivesPreferenceSanitizingAndImport() {
+        val imported = defaults.copy(fpsOverlayMetrics = PerformanceOverlayMetrics.IOP or Int.MIN_VALUE).sanitized()
+        assertEquals(PerformanceOverlayMetrics.IOP, imported.fpsOverlayMetrics)
+        assertEquals(PerformanceOverlayMetrics.IOP, PerGameInterfaceSettings.decode(imported.encode()).fpsOverlayMetrics)
+    }
 }

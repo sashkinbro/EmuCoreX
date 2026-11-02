@@ -1900,6 +1900,7 @@
     <string name="settings_fps_metric_ee">EE</string>
     <string name="settings_fps_metric_gs">GS</string>
     <string name="settings_fps_metric_vu">VU</string>
+    <string name="settings_fps_metric_iop">IOP</string>
     <string name="settings_fps_metric_software_threads">Програмні потоки</string>
     <string name="settings_ra_achievement_indicators">Індикатори досягнень</string>
     <string name="settings_ra_achievement_indicators_desc">Показувати значки для активних випробувань та виміряний прогрес досягнень під час гри.</string>

@@ -1869,6 +1869,7 @@
     <string name="settings_fps_metric_ee">EE</string>
     <string name="settings_fps_metric_gs">GS</string>
     <string name="settings_fps_metric_vu">VU</string>
+    <string name="settings_fps_metric_iop">IOP</string>
     <string name="settings_fps_metric_software_threads">ソフトウェアスレッド</string>
     <string name="settings_ra_achievement_indicators">実績インジケーター</string>
     <string name="settings_ra_achievement_indicators_desc">ゲームプレイ中のアクティブなチャレンジのバッジや、測定された実績の進行状況を表示します。</string>

@@ -1871,6 +1871,7 @@
     <string name="settings_fps_metric_ee">EE</string>
     <string name="settings_fps_metric_gs">GS</string>
     <string name="settings_fps_metric_vu">VU</string>
+    <string name="settings_fps_metric_iop">IOP</string>
     <string name="settings_fps_metric_software_threads">软件线程</string>
     <string name="settings_ra_achievement_indicators">成就指示器</string>
     <string name="settings_ra_achievement_indicators_desc">在游戏过程中显示活跃挑战的徽章和已计量的成就进度。</string>

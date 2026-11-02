@@ -20,6 +20,7 @@ class PerformanceOverlayLayoutTest {
         EE: 55.2% (11.04 ms)
         GS: 57.7% (11.53 ms)
         VU: 57.4% (11.49 ms)
+        IOP: 12.4% (2.48 ms)
         SW-0: 20.0% (4.00 ms)
         Audio:OpenSL ES
     """.trimIndent()
@@ -38,6 +39,7 @@ class PerformanceOverlayLayoutTest {
         assertTrue(layout.mainLines.any { it.startsWith("CPU:") })
         assertTrue(layout.mainLines.any { it.startsWith("GPU:") })
         assertTrue(layout.mainLines.any { it.startsWith("EE:") })
+        assertTrue(layout.mainLines.any { it.startsWith("IOP:") })
         assertTrue(layout.mainLines.any { it.startsWith("SW-0:") })
         assertFalse(layout.mainLines.any { it.startsWith("Audio:") })
         assertEquals("Vulkan HW|VRAM:24MB|TGT:8MB|SRC:4MB", layout.bottomLines[0])
@@ -162,10 +164,37 @@ class PerformanceOverlayLayoutTest {
         val layout = buildPerformanceOverlayLayout(fullSnapshot, PerformanceOverlayMetrics.ALL)
 
         val vuIndex = layout.mainLines.indexOfFirst { it.startsWith("VU:") }
-        assertEquals(vuIndex + 1, layout.mainLines.indexOfFirst { it.startsWith("CPU:") })
-        assertEquals(vuIndex + 2, layout.mainLines.indexOfFirst { it.startsWith("GPU:") })
-        assertEquals(vuIndex + 3, layout.mainLines.indexOfFirst { it.startsWith("SW-0:") })
-        assertEquals(vuIndex + 4, layout.mainLines.indexOfFirst { it.startsWith("Audio:") })
+        val iopIndex = layout.mainLines.indexOfFirst { it.startsWith("IOP:") }
+        assertEquals(vuIndex + 1, iopIndex)
+        assertEquals(iopIndex + 1, layout.mainLines.indexOfFirst { it.startsWith("CPU:") })
+        assertEquals(iopIndex + 2, layout.mainLines.indexOfFirst { it.startsWith("GPU:") })
+        assertEquals(iopIndex + 3, layout.mainLines.indexOfFirst { it.startsWith("SW-0:") })
+        assertEquals(iopIndex + 4, layout.mainLines.indexOfFirst { it.startsWith("Audio:") })
+    }
+
+    @Test
+    fun absentIopWorkerRowStaysHidden() {
+        val withoutIop = fullSnapshot.lineSequence()
+            .filterNot { it.startsWith("IOP:") }
+            .joinToString("\n")
+        val layout = buildPerformanceOverlayLayout(withoutIop, PerformanceOverlayMetrics.ALL)
+
+        assertFalse(layout.mainLines.any { it.startsWith("IOP:") })
+        assertEquals(
+            layout.mainLines.indexOfFirst { it.startsWith("VU:") } + 1,
+            layout.mainLines.indexOfFirst { it.startsWith("CPU:") }
+        )
+    }
+
+    @Test
+    fun iopMetricCanBeSelectedAndIsOrderedWithProcessorMetrics() {
+        val onlyIop = buildPerformanceOverlayLayout(fullSnapshot, PerformanceOverlayMetrics.IOP)
+        assertEquals(listOf("IOP:12.4%(2.48ms)"), onlyIop.mainLines)
+
+        val all = buildPerformanceOverlayLayout(fullSnapshot, PerformanceOverlayMetrics.ALL)
+        val vuIndex = all.mainLines.indexOfFirst { it.startsWith("VU:") }
+        assertEquals(vuIndex + 1, all.mainLines.indexOfFirst { it.startsWith("IOP:") })
+        assertTrue(PerformanceOverlayMetrics.DEFAULT and PerformanceOverlayMetrics.IOP != 0)
     }
 
     @Test

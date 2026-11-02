@@ -1869,6 +1869,7 @@
     <string name="settings_fps_metric_ee">EE</string>
     <string name="settings_fps_metric_gs">GS</string>
     <string name="settings_fps_metric_vu">VU</string>
+    <string name="settings_fps_metric_iop">IOP</string>
     <string name="settings_fps_metric_software_threads">소프트웨어 스레드</string>
     <string name="settings_ra_achievement_indicators">업적 표시기</string>
     <string name="settings_ra_achievement_indicators_desc">게임 플레이 중 진행 중인 도전 과제에 대한 배지와 측정된 업적 진행률을 표시합니다.</string>

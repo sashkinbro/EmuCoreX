@@ -1870,6 +1870,7 @@
     <string name="settings_fps_metric_ee">EE</string>
     <string name="settings_fps_metric_gs">GS</string>
     <string name="settings_fps_metric_vu">VU</string>
+    <string name="settings_fps_metric_iop">IOP</string>
     <string name="settings_fps_metric_software_threads">Thread software</string>
     <string name="settings_ra_achievement_indicators">Indicatori degli obiettivi</string>
     <string name="settings_ra_achievement_indicators_desc">Mostra i badge per le sfide attive e i progressi misurati degli obiettivi durante il gioco.</string>

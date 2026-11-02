@@ -17,15 +17,16 @@ object PerformanceOverlayMetrics {
     const val HOST_CPU = 1 shl 13
     const val HOST_GPU = 1 shl 14
     const val AUDIO = 1 shl 15
+    const val IOP = 1 shl 17
 
     const val VERSION = 1 shl 16
 
     const val ALL = VERSION or FPS or VPS or SPEED or TARGET or RENDERER or VRAM or FRAME_TIME or QUEUE or
-        RESOLUTION or EE or GS or VU or SOFTWARE_THREADS or HOST_CPU or HOST_GPU or AUDIO
+        RESOLUTION or EE or GS or VU or SOFTWARE_THREADS or HOST_CPU or HOST_GPU or AUDIO or IOP
 
     // Audio remains opt-in; all other useful hardware metrics are visible by default.
     const val DEFAULT = VERSION or FPS or VPS or SPEED or TARGET or RENDERER or VRAM or FRAME_TIME or
-        RESOLUTION or EE or GS or VU or SOFTWARE_THREADS or HOST_CPU or HOST_GPU
+        RESOLUTION or EE or GS or VU or SOFTWARE_THREADS or HOST_CPU or HOST_GPU or IOP
 
     fun sanitize(mask: Int): Int = mask and ALL
 

@@ -1870,6 +1870,7 @@
     <string name="settings_fps_metric_ee">EE</string>
     <string name="settings_fps_metric_gs">GS</string>
     <string name="settings_fps_metric_vu">VU</string>
+    <string name="settings_fps_metric_iop">IOP</string>
     <string name="settings_fps_metric_software_threads">Yazılım iş parçacıkları</string>
     <string name="settings_ra_achievement_indicators">Başarı Göstergeleri</string>
     <string name="settings_ra_achievement_indicators_desc">Oyun sırasında aktif zorluklar ve ölçülen başarı ilerlemesi için rozetleri gösterir.</string>

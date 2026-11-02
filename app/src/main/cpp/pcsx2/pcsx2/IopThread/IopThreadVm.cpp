@@ -199,8 +199,8 @@ namespace IopThread
 		{
 			if (g_thread.Mode() == IopThreadMode::Threaded)
 				BooksFromThread();
-			// The metrics stop reading the handle before the thread is joined, since a joined thread has none.
-
+			// Clear under the metrics lock before Stop() joins and closes the handle.
+			PerformanceMetrics::SetIOPThread(Threading::ThreadHandle());
 			g_thread.Stop();
 		}
 	} // namespace
@@ -317,6 +317,7 @@ namespace IopThread
 				Console.Error("IOP thread: startup failed, effective mode is Off.");
 				return;
 			}
+			PerformanceMetrics::SetIOPThread(g_thread.GetThreadHandle());
 
 			const char* const names[] = {"Off", "Lockstep", "Threaded"};
 			Console.WriteLn(Color_StrongGreen, "IOP thread: started in %s mode.", names[static_cast<int>(GetMode())]);

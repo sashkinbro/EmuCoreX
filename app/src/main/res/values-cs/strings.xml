@@ -863,6 +863,7 @@
     <string name="settings_fps_metric_ee">EE</string>
     <string name="settings_fps_metric_gs">GS</string>
     <string name="settings_fps_metric_vu">VU</string>
+    <string name="settings_fps_metric_iop">IOP</string>
     <string name="settings_fps_metric_software_threads">Softwarová vlákna</string>
     <string name="emulation_show_fps">Zobrazit FPS</string>
     <string name="emulation_hide_fps">Skrýt FPS</string>

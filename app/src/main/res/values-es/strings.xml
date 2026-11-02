@@ -1872,6 +1872,7 @@
     <string name="settings_fps_metric_ee">EE</string>
     <string name="settings_fps_metric_gs">GS</string>
     <string name="settings_fps_metric_vu">VU</string>
+    <string name="settings_fps_metric_iop">IOP</string>
     <string name="settings_fps_metric_software_threads">Hilos de software</string>
     <string name="settings_ra_achievement_indicators">Indicadores de logros</string>
     <string name="settings_ra_achievement_indicators_desc">Muestra insignias para los desafíos activos y el progreso medido de los logros durante el juego.</string>

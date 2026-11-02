@@ -1870,6 +1870,7 @@
     <string name="settings_fps_metric_ee">EE</string>
     <string name="settings_fps_metric_gs">GS</string>
     <string name="settings_fps_metric_vu">VU</string>
+    <string name="settings_fps_metric_iop">IOP</string>
     <string name="settings_fps_metric_software_threads">सॉफ़्टवेयर थ्रेड्स</string>
     <string name="settings_ra_achievement_indicators">उपलब्धि संकेतक</string>
     <string name="settings_ra_achievement_indicators_desc">गेमप्ले के दौरान सक्रिय चुनौतियों के लिए बैज और मापी गई उपलब्धि की प्रगति दिखाएं।</string>

@@ -37,6 +37,8 @@ namespace PerformanceMetrics
 
 	/// Sets the EE thread for CPU usage calculations.
 	void SetCPUThread(Threading::ThreadHandle thread);
+	/// Sets the IOP worker handle on the CPU thread; clear it before joining/stopping the worker.
+	void SetIOPThread(Threading::ThreadHandle thread);
 
 	/// Sets timers for GS software threads.
 	void SetGSSWThreadCount(u32 count);
@@ -56,6 +58,8 @@ namespace PerformanceMetrics
 
 	double GetCPUThreadUsage();
 	double GetCPUThreadAverageTime();
+	/// Returns a consistent usage/time snapshot when an IOP worker handle is installed.
+	bool GetIOPThreadMetrics(float& usage, float& average_time);
 	float GetGSThreadUsage();
 	float GetGSThreadAverageTime();
 	float GetVUThreadUsage();

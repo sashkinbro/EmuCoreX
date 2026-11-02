@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <mutex>
 #include <vector>
 
 #include "common/Timer.h"
@@ -49,6 +50,10 @@ static u32 s_gs_framebuffer_blits_since_last_update = 0;
 static u32 s_gs_privileged_register_writes_since_last_update = 0;
 
 static Threading::ThreadHandle s_cpu_thread_handle;
+static std::mutex s_iop_thread_mutex;
+static Threading::ThreadHandle s_iop_thread_handle;
+static u64 s_last_iop_time = 0;
+static bool s_iop_thread_usage_active = false;
 static u64 s_last_cpu_time = 0;
 static u64 s_last_gs_time = 0;
 static u64 s_last_vu_time = 0;
@@ -63,6 +68,8 @@ static float s_gs_thread_usage = 0.0f;
 static float s_gs_thread_time = 0.0f;
 static float s_vu_thread_usage = 0.0f;
 static float s_vu_thread_time = 0.0f;
+static float s_iop_thread_usage = 0.0f;
+static float s_iop_thread_time = 0.0f;
 static float s_capture_thread_usage = 0.0f;
 static float s_capture_thread_time = 0.0f;
 
@@ -108,6 +115,11 @@ void PerformanceMetrics::Clear()
 	s_gs_thread_time = 0.0f;
 	s_vu_thread_usage = 0.0f;
 	s_vu_thread_time = 0.0f;
+	{
+		std::lock_guard lock(s_iop_thread_mutex);
+		s_iop_thread_usage = 0.0f;
+		s_iop_thread_time = 0.0f;
+	}
 	s_capture_thread_usage = 0.0f;
 	s_capture_thread_time = 0.0f;
 
@@ -148,6 +160,13 @@ void PerformanceMetrics::Reset()
 
 		for (GSSWThreadStats& stat : s_gs_sw_threads)
 			stat.last_cpu_time = stat.handle.GetCPUTime();
+	}
+	{
+		std::lock_guard lock(s_iop_thread_mutex);
+		s_last_iop_time = s_iop_thread_handle ? s_iop_thread_handle.GetCPUTime() : 0;
+		s_iop_thread_usage_active = false;
+		s_iop_thread_usage = 0.0f;
+		s_iop_thread_time = 0.0f;
 	}
 	s_frame_time_stats_active = s_frame_time_stats_requested.load(std::memory_order_relaxed) ||
 		GSConfig.OsdShowGSStats || GSConfig.OsdShowFrameTimes;
@@ -259,6 +278,7 @@ void PerformanceMetrics::Update(bool gs_register_write, bool fb_blit, bool is_sk
 		const u64 cpu_time = s_cpu_thread_handle.GetCPUTime();
 		const u64 gs_time = MTGS::GetThreadHandle().GetCPUTime();
 		const u64 vu_time = THREAD_VU1 ? vu1Thread.GetThreadHandle().GetCPUTime() : 0;
+		u64 iop_time = 0;
 		const u64 capture_time = GSCapture::IsCapturing() ? GSCapture::GetEncoderThreadHandle().GetCPUTime() : 0;
 
 		if (s_cpu_thread_usage_active)
@@ -287,6 +307,42 @@ void PerformanceMetrics::Update(bool gs_register_write, bool fb_blit, bool is_sk
 				thread.usage = static_cast<double>(delta) * pct_divider;
 				thread.time = static_cast<double>(delta) * time_divider;
 			}
+			{
+				// The IOP lifecycle clears this handle under the same lock before Stop()/join.
+				// Hold the lock through GetCPUTime so a concurrent stop cannot close it between
+				// the active check and the sample.
+				std::lock_guard lock(s_iop_thread_mutex);
+				if (s_iop_thread_handle)
+				{
+					iop_time = s_iop_thread_handle.GetCPUTime();
+					if (iop_time == 0 || iop_time < s_last_iop_time)
+					{
+						// Handle loss/reset must rebase the sample instead of underflowing u64.
+						s_iop_thread_usage = 0.0f;
+						s_iop_thread_time = 0.0f;
+						s_iop_thread_usage_active = false;
+					}
+					else if (s_iop_thread_usage_active)
+					{
+						const u64 delta = iop_time - s_last_iop_time;
+						s_iop_thread_usage = static_cast<float>(static_cast<double>(delta) * pct_divider);
+						s_iop_thread_time = static_cast<float>(static_cast<double>(delta) * time_divider);
+					}
+					else
+					{
+						s_iop_thread_usage = 0.0f;
+						s_iop_thread_time = 0.0f;
+						s_iop_thread_usage_active = true;
+					}
+					s_last_iop_time = iop_time;
+				}
+				else
+				{
+					s_iop_thread_usage = 0.0f;
+					s_iop_thread_time = 0.0f;
+					s_iop_thread_usage_active = false;
+				}
+			}
 		}
 		else
 		{
@@ -297,6 +353,13 @@ void PerformanceMetrics::Update(bool gs_register_write, bool fb_blit, bool is_sk
 			s_cpu_thread_time = 0.0;
 			s_gs_thread_time = 0.0f;
 			s_vu_thread_time = 0.0f;
+			{
+				std::lock_guard lock(s_iop_thread_mutex);
+				s_last_iop_time = s_iop_thread_handle ? s_iop_thread_handle.GetCPUTime() : 0;
+				s_iop_thread_usage = 0.0f;
+				s_iop_thread_time = 0.0f;
+				s_iop_thread_usage_active = false;
+			}
 			s_capture_thread_time = 0.0f;
 			for (GSSWThreadStats& thread : s_gs_sw_threads)
 			{
@@ -316,6 +379,11 @@ void PerformanceMetrics::Update(bool gs_register_write, bool fb_blit, bool is_sk
 	else
 	{
 		s_cpu_thread_usage_active = false;
+		std::lock_guard lock(s_iop_thread_mutex);
+			s_last_iop_time = s_iop_thread_handle ? s_iop_thread_handle.GetCPUTime() : 0;
+		s_iop_thread_usage = 0.0f;
+		s_iop_thread_time = 0.0f;
+		s_iop_thread_usage_active = false;
 	}
 
 	s_frames_since_last_update = 0;
@@ -352,6 +420,17 @@ void PerformanceMetrics::SetCPUThread(Threading::ThreadHandle thread)
 {
 	s_last_cpu_time = thread ? thread.GetCPUTime() : 0;
 	s_cpu_thread_handle = std::move(thread);
+}
+
+void PerformanceMetrics::SetIOPThread(Threading::ThreadHandle thread)
+{
+	std::lock_guard lock(s_iop_thread_mutex);
+	s_iop_thread_handle = std::move(thread);
+	const bool active = static_cast<bool>(s_iop_thread_handle);
+	s_last_iop_time = active ? s_iop_thread_handle.GetCPUTime() : 0;
+	s_iop_thread_usage_active = active && s_last_iop_time != 0;
+	s_iop_thread_usage = 0.0f;
+	s_iop_thread_time = 0.0f;
 }
 
 void PerformanceMetrics::SetGSSWThreadCount(u32 count)
@@ -419,6 +498,20 @@ double PerformanceMetrics::GetCPUThreadUsage()
 double PerformanceMetrics::GetCPUThreadAverageTime()
 {
 	return s_cpu_thread_time;
+}
+
+bool PerformanceMetrics::GetIOPThreadMetrics(float& usage, float& average_time)
+{
+	std::lock_guard lock(s_iop_thread_mutex);
+	if (!s_iop_thread_handle)
+	{
+		usage = 0.0f;
+		average_time = 0.0f;
+		return false;
+	}
+	usage = s_iop_thread_usage;
+	average_time = s_iop_thread_time;
+	return true;
 }
 
 float PerformanceMetrics::GetGSThreadUsage()

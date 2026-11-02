@@ -19,6 +19,11 @@ void IopThreadNativeTests()
     psxCpu->Reserve();
     const auto saved_cpu = psxCpu;
     const auto saved_fpcr = FPControlRegister::GetCurrent();
+    float existing_iop_usage = 0.0f;
+    float existing_iop_time = 0.0f;
+    const bool can_check_iop_metric_lifecycle =
+        !PerformanceMetrics::GetIOPThreadMetrics(existing_iop_usage, existing_iop_time);
+    bool checked_iop_metric_lifecycle = false;
     for (const auto mode : {IopThreadMode::Lockstep, IopThreadMode::Threaded})
     {
         for (const bool jit : {false, true})
@@ -53,6 +58,25 @@ void IopThreadNativeTests()
                     worker.PublishWatermark(budget);
                     // Catch up to the published watermark and acquire the CPU state before inspecting it.
                     IopThread::ScopedHold hold(worker);
+                }
+                if (can_check_iop_metric_lifecycle && !checked_iop_metric_lifecycle)
+                {
+                    PerformanceMetrics::SetIOPThread(worker.GetThreadHandle());
+                    float usage = -1.0f;
+                    float average_time = -1.0f;
+                    const bool active_metric = PerformanceMetrics::GetIOPThreadMetrics(usage, average_time);
+                    Check(active_metric, "IOP metric exposes an active real worker handle");
+                    Check(std::isfinite(usage) && usage >= 0.0f && std::isfinite(average_time) && average_time >= 0.0f,
+                        "IOP active worker metric snapshot is finite and non-negative");
+                    Check(usage == 0.0f && average_time == 0.0f,
+                        "new IOP worker resets the previous sample before collection");
+                    PerformanceMetrics::SetIOPThread(Threading::ThreadHandle());
+                    usage = -1.0f;
+                    average_time = -1.0f;
+                    const bool stopped_metric = PerformanceMetrics::GetIOPThreadMetrics(usage, average_time);
+                    Check(!stopped_metric && usage == 0.0f && average_time == 0.0f,
+                        "IOP metric clears the stopped worker row and stale sample");
+                    checked_iop_metric_lifecycle = true;
                 }
                 worker.Stop();
                 CompareIOP(expected, actual, jit ? "IOP JIT inline/worker equality" : "IOP interpreter inline/worker equality");

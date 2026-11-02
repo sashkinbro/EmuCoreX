@@ -19,6 +19,7 @@
 #include "arm64/vu/microVU_ProgCache-arm64.h"
 #include "IopThread/IopThread.h"
 #include "IopThread/IopThreadVm.h"
+#include "PerformanceMetrics.h"
 #include "DebugTools/Breakpoints.h"
 #include "IopMem.h"
 #include "IopHw.h"
@@ -67,6 +68,7 @@ extern "C" void EmuCoreXOracleBlendCarry(void (*check)(bool, const char*));
 #include <cstring>
 #include <vector>
 #include <chrono>
+#include <cmath>
 #include <thread>
 #include <sys/stat.h>
 #include <unistd.h>
