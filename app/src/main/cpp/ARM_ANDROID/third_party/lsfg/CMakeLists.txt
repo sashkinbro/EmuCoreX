@@ -105,9 +105,8 @@ if(NOT TARGET lsfg-vk-framegen)
 	return()
 endif()
 
-# DXBC->SPIR-V compiler. Its upstream submodule (PancakeTAS/dxbc) was deleted from GitHub and
-# no complete public copy survives, so the frame-generation feature is compiled out until a
-# replacement compiler is dropped into ARM_ANDROID/third_party/dxbc.
+# DXBC->SPIR-V compiler. Upstream's submodule (PancakeTAS/dxbc) was deleted from GitHub, so a
+# standalone copy rebuilt from DXVK v2.4.1 lives in ARM_ANDROID/third_party/dxbc.
 if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/../dxbc/CMakeLists.txt")
 	message(WARNING "LSFG: DXBC compiler unavailable — compiling the frame-generation feature out")
 	set(EMUCOREX_HAVE_LSFG OFF PARENT_SCOPE)
@@ -115,6 +114,11 @@ if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/../dxbc/CMakeLists.txt")
 endif()
 add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/../dxbc"
 	"${CMAKE_CURRENT_BINARY_DIR}/dxbc" EXCLUDE_FROM_ALL)
+# The compiler needs the Vulkan headers for VkShaderStageFlagBits and friends; the project
+# resolves them through the `vulkan` target rather than a find_package module.
+if(TARGET vulkan)
+	target_link_libraries(dxbc PUBLIC vulkan)
+endif()
 add_subdirectory("${lsfg_src_SOURCE_DIR}/thirdparty/pe-parse/pe-parser-library"
 	"${CMAKE_CURRENT_BINARY_DIR}/pe-parse" EXCLUDE_FROM_ALL)
 # framegen links volk PUBLIC. It is NOT in the fetch's SOURCE_SUBDIR, so it has to be added
