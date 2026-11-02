@@ -58,6 +58,9 @@
 #if defined(__ANDROID__)
 #include <sys/resource.h>
 #endif
+#if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+#include <sys/system_properties.h>
+#endif
 
 #include "common/Console.h"
 #include "common/Error.h"
@@ -4375,7 +4378,47 @@ void VMManager::SetEmuThreadAffinities()
 		MTGS::GetThreadHandle().SetAffinity(mask);
 		vu1Thread.GetThreadHandle().SetAffinity(mtvu ? mask : 0);
 		if (IopThread::g_thread.IsRunning())
-			IopThread::g_thread.GetThreadHandle().SetAffinity(mask);
+		{
+			u64 iop_mask = mask;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+			// Debug-only experiment knob. Keep requests inside the enumerated processor topology.
+			if (mask != 0)
+			{
+				char value[PROP_VALUE_MAX] = {};
+				const int length = __system_property_get("debug.emucorex.iop_affinity_mask", value);
+				if (length > 0)
+				{
+					std::string_view digits(value, static_cast<size_t>(length));
+					if (digits.starts_with("0x") || digits.starts_with("0X"))
+						digits.remove_prefix(2);
+
+					u64 known_processor_mask = 0;
+					for (const u32 processor_id : s_processor_list)
+					{
+						if (processor_id < 64)
+							known_processor_mask |= u64{1} << processor_id;
+					}
+
+					std::string_view remaining;
+					const std::optional<u64> parsed = (digits.empty() || digits.size() > 16) ? std::nullopt :
+						StringUtil::FromChars<u64>(digits, 16, &remaining);
+					if (parsed.has_value() && remaining.empty() && *parsed != 0 && known_processor_mask != 0 &&
+						(*parsed & ~known_processor_mask) == 0)
+					{
+						iop_mask = *parsed;
+						static bool logged = false;
+						if (!logged)
+						{
+							INFO_LOG("Debug IOP affinity mask override selected: 0x{:x} (known processor mask 0x{:x})",
+								iop_mask, known_processor_mask);
+							logged = true;
+						}
+					}
+				}
+			}
+#endif
+			IopThread::g_thread.GetThreadHandle().SetAffinity(iop_mask);
+		}
 		return;
 	}
 #endif
