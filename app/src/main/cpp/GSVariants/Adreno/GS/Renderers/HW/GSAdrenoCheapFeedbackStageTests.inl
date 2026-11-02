@@ -224,7 +224,26 @@ void GSRendererHW::TestAdrenoCheapFeedbackStage(void (*check)(bool, const char*)
 		"Adreno constant-Ad control keeps the real Basic stage AFIX fold and does not request RT feedback");
 
 	// Non-policy controls must keep their existing actual stage behavior. Fetch
-	// qualifies as the reference cheap-read control; native barriers alone do not.
+	// is useful only when the backend reports that this feedback path is cheap.
+	// Vulkan ROAA publishes framebuffer_fetch as an input-attachment path, but
+	// that capability alone does not establish its cost on Adreno.
+	GSDevice::FeatureSupport roaa_unmeasured = copy_road;
+	roaa_unmeasured.framebuffer_fetch = true;
+	roaa_unmeasured.cheap_rt_feedback_read = false;
+	g_gs_device->SetFeaturesForTesting(roaa_unmeasured);
+	GSHWDrawConfig roaa_unmeasured_config{};
+	AccBlendLevel roaa_unmeasured_accuracy = AccBlendLevel::Minimum;
+	const bool roaa_unmeasured_staged = PrepareAdrenoCheapFeedbackStage(&target, nullptr, base_input,
+		&roaa_unmeasured_config, &roaa_unmeasured_accuracy);
+	DumpAdrenoCheapFeedbackStage("roaa-unmeasured", roaa_unmeasured_staged, roaa_unmeasured_accuracy,
+		base_input, roaa_unmeasured_config);
+	check(roaa_unmeasured_staged && !roaa_unmeasured_config.ps.a_masked &&
+		roaa_unmeasured_config.ps.blend_c == 1 && roaa_unmeasured_config.colormask.wrgba == 7 &&
+		roaa_unmeasured_accuracy == AccBlendLevel::Basic,
+		"Adreno ROAA input-fetch capability alone does not qualify the Basic alpha-masked Ad shortcut");
+
+	// A fetch path qualifies once its backend has explicitly reported cheap reads;
+	// native barriers alone still do not.
 	GSDevice::FeatureSupport fetch_road = copy_road;
 	fetch_road.framebuffer_fetch = true;
 	fetch_road.cheap_rt_feedback_read = true;

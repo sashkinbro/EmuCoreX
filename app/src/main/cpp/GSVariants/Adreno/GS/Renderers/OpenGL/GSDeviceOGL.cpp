@@ -1131,6 +1131,9 @@ bool GSDeviceOGL::CheckFeatures()
 		m_features.texture_barrier = has_texture_barrier_extension;
 
 	m_features.framebuffer_fetch = framebuffer_fetch;
+	// Only the selected Adreno GL framebuffer-fetch path is known to make this
+	// destination read cheap. Extension presence alone does not set the fact.
+	m_features.cheap_rt_feedback_read = gpu_profile_adreno && framebuffer_fetch;
 	m_features.framebuffer_fetch_orders_overlap = FbFetchOrdersOverlappingPrims(fetch.backend);
 	// Framebuffer fetch cannot stand in for a texture barrier when a draw samples its attached
 	// target. Only Haunting Ground performs the offset reads which need the bounded source copy;

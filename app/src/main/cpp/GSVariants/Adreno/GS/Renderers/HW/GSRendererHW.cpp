@@ -6269,11 +6269,11 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, DATEOptio
 	// Replace Ad with As, blend flags will be used from As since we are chaging the blend_index value.
 	// Must be done before index calculation, after blending equation optimizations
 	const bool blend_ad = m_conf.ps.blend_c == 1;
-	// Without framebuffer fetch, this shortcut can add render-target feedback work
-	// in blend-heavy scenes. Keep it when fetch is available or the backend reports
-	// that no-barrier feedback reads are cheap.
-	const bool fast_ad_alpha_masked_feedback = features.framebuffer_fetch ||
-		(!features.texture_barrier && features.cheap_rt_feedback_read);
+	// Use this shortcut only on a path with an explicitly cheap destination read.
+	// Vulkan ROAA can publish an input-attachment fetch without establishing that
+	// this extra feedback work is inexpensive on the device.
+	const bool fast_ad_alpha_masked_feedback = features.cheap_rt_feedback_read &&
+		(features.framebuffer_fetch || !features.texture_barrier);
 	bool blend_ad_alpha_masked = blend_ad && !m_conf.colormask.wa && fast_ad_alpha_masked_feedback;
 	const bool is_basic_blend = GSConfig.AccurateBlendingUnit != AccBlendLevel::Minimum;
 	if (blend_ad_alpha_masked && ((is_basic_blend || (COLCLAMP.CLAMP == 0) || m_conf.require_one_barrier)))
