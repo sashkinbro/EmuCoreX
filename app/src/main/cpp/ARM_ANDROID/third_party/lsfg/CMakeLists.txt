@@ -60,10 +60,12 @@ FetchContent_Declare(lsfg_src
 	# GIT_SHALLOW cannot fetch an arbitrary commit — a shallow clone only carries branch tips,
 	# so it works for a ref name and fails for the SHA above.
 	GIT_SHALLOW    FALSE
-	# Only these three submodules are used below. Recursing through every upstream submodule also
+	# Only these submodules are used below. Recursing through every upstream submodule also
 	# downloads toml11's documentation/test dependencies (doctest, nlohmann/json), which are not
 	# part of the backend and exceed Windows' path limit inside Gradle's CMake build directory.
-	GIT_SUBMODULES "thirdparty/dxbc;thirdparty/pe-parse;thirdparty/volk"
+	# dxbc is deliberately NOT fetched: its upstream (PancakeTAS/dxbc) was removed from GitHub,
+	# so fetching the submodule aborts the whole configure with "Repository not found".
+	GIT_SUBMODULES "thirdparty/pe-parse;thirdparty/volk"
 	GIT_SUBMODULES_RECURSE FALSE
 	# Populate only; its top-level CMakeLists builds the layer .so we do not want, and adding
 	# it wholesale would drag the Rust UI target in with it.
@@ -90,7 +92,7 @@ endif()
 # extract.cpp is deliberately NOT taken: it hunts for Steam install paths and pulls in
 # upstream's toml11 config system, neither of which means anything on Android. Our path
 # comes from the SAF picker, so GSLsfg.cpp does that ~30 lines of pe-parse itself.
-foreach(dep dxbc pe-parse/pe-parser-library volk)
+foreach(dep pe-parse/pe-parser-library volk)
 	if(NOT EXISTS "${lsfg_src_SOURCE_DIR}/thirdparty/${dep}/CMakeLists.txt")
 		message(WARNING "LSFG: thirdparty/${dep} missing (submodules not fetched?) — compiling out")
 		set(EMUCOREX_HAVE_LSFG OFF PARENT_SCOPE)
@@ -103,7 +105,15 @@ if(NOT TARGET lsfg-vk-framegen)
 	return()
 endif()
 
-add_subdirectory("${lsfg_src_SOURCE_DIR}/thirdparty/dxbc"
+# DXBC->SPIR-V compiler. Its upstream submodule (PancakeTAS/dxbc) was deleted from GitHub and
+# no complete public copy survives, so the frame-generation feature is compiled out until a
+# replacement compiler is dropped into ARM_ANDROID/third_party/dxbc.
+if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/../dxbc/CMakeLists.txt")
+	message(WARNING "LSFG: DXBC compiler unavailable — compiling the frame-generation feature out")
+	set(EMUCOREX_HAVE_LSFG OFF PARENT_SCOPE)
+	return()
+endif()
+add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/../dxbc"
 	"${CMAKE_CURRENT_BINARY_DIR}/dxbc" EXCLUDE_FROM_ALL)
 add_subdirectory("${lsfg_src_SOURCE_DIR}/thirdparty/pe-parse/pe-parser-library"
 	"${CMAKE_CURRENT_BINARY_DIR}/pe-parse" EXCLUDE_FROM_ALL)
