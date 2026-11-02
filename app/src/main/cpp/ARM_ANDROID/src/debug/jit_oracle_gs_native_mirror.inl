@@ -296,7 +296,66 @@ void GSNativeMirrorTests()
         const auto dirtyActual=Capture(*state);
         u64 dirtyStats[5]{};EmuCoreXOracleGSXYZ2BatchStats(dirtyStats);
         Check(dirtyReference==dirtyActual&&dirtyStats[0]==0&&dirtyStats[3]==0,
-            "GS dirty XYOFFSET state keeps repeated XYZ2 tags on the exact scalar fallback");
+            "GS dirty XYOFFSET with no pending draw keeps repeated XYZ2 tags on the exact scalar fallback");
+
+#if defined(EMUCOREX_GS_FAMILY_MALI)
+        // A dirty XYOFFSET prefix needs one scalar kick to run CheckFlushes;
+        // later vertices in the same packed XYZ2 tag can use the direct kernel.
+        bool dirtyPrefixParity=true;
+        bool dirtyPrefixWork=true;
+        for (const bool rawADC : {false, true})
+        {
+            const auto prefixPacket=Singles(129,false,false,0,rawADC,false);
+            Prepare(*state,GS_TRIANGLESTRIP);state->Submit(Singles(3),0);state->Submit(Offset(16,32),0);
+            EmuCoreXOracleSetGSXYZ2Batch(false,true,0);state->Submit(prefixPacket,0);
+            const auto prefixReference=Capture(*state);
+
+            Prepare(*state,GS_TRIANGLESTRIP);state->Submit(Singles(3),0);state->Submit(Offset(16,32),0);
+            EmuCoreXOracleSetGSXYZ2Batch(true,true,0);state->Submit(prefixPacket,0);
+            dirtyPrefixParity&=Capture(*state)==prefixReference;
+            u64 dirtyPrefixStats[5]{};EmuCoreXOracleGSXYZ2BatchStats(dirtyPrefixStats);
+            dirtyPrefixWork&=dirtyPrefixStats[2]==1&&dirtyPrefixStats[3]==1&&dirtyPrefixStats[4]==128;
+        }
+        Check(dirtyPrefixParity,
+            "Mali dirty-prefix XYZ2 suffix preserves full state and draw trace with and without leading ADC skips");
+        Check(dirtyPrefixWork,
+            "Mali dirty-prefix XYZ2 with pending draw scalar-kicks once then batches its 128-vertex suffix");
+
+        const auto adcPrefix=Singles(129,false,false,0,true,false);
+        Prepare(*state,GS_TRIANGLESTRIP);state->Submit(Scissor(1,1,500,500),0);
+        EmuCoreXOracleSetGSXYZ2Batch(false,true,0);state->Submit(adcPrefix,0);
+        const auto adcDirtyReference=Capture(*state);
+        Prepare(*state,GS_TRIANGLESTRIP);state->Submit(Scissor(1,1,500,500),0);
+        EmuCoreXOracleSetGSXYZ2Batch(true,true,0);state->Submit(adcPrefix,0);
+        const auto adcDirtyActual=Capture(*state);
+        u64 adcDirtyStats[5]{};EmuCoreXOracleGSXYZ2BatchStats(adcDirtyStats);
+        Check(adcDirtyActual==adcDirtyReference&&adcDirtyStats[3]==0,
+            "Mali ADC-first XYZ2 keeps a non-XYOFFSET dirty prefix scalar when its first kick cannot flush it");
+
+        bool dirtySplitParity=true;
+        for (const bool candidate:{false,true})
+        {
+            Prepare(*state,GS_TRIANGLESTRIP);state->Submit(Singles(3),0);state->Submit(Offset(16,32),0);
+            EmuCoreXOracleSetGSXYZ2Batch(candidate,true,0);state->Submit(packet,32);
+            const auto splitResult=Capture(*state);
+            if (!candidate) expected=splitResult; else dirtySplitParity&=splitResult==expected;
+        }
+        Check(dirtySplitParity,
+            "Mali dirty-prefix XYZ2 suffix keeps exact state and draw trace across split Transfer chunks");
+
+        bool dirtyFlushParity=true;
+        const auto dirtyLarge=Singles(22000);
+        for (const bool candidate:{false,true})
+        {
+            Prepare(*state,GS_TRIANGLESTRIP);state->Submit(Singles(3),0);state->Submit(Offset(16,32),0);
+            EmuCoreXOracleSetGSXYZ2Batch(candidate,false,0);
+            for (u32 i=0;i<3;++i) state->Submit(dirtyLarge,0);
+            const auto flushResult=Capture(*state);
+            if (!candidate) expected=flushResult; else dirtyFlushParity&=flushResult==expected;
+        }
+        Check(dirtyFlushParity,
+            "Mali dirty-prefix XYZ2 suffix preserves exact vertex-count flush state and draw trace");
+#endif
 
         Prepare(*state,GS_TRIANGLESTRIP);
         EmuCoreXOracleSetGSXYZ2Batch(true,true,1);

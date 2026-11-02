@@ -3495,14 +3495,39 @@ void GSState::Transfer(const u8* mem, u32 size)
 								#else
 									constexpr bool xyz2BatchEnabled = true;
 									#endif
-									if (xyz2BatchEnabled && path.tag.FLG == GIF_FLG_PACKED && path.nreg == 1 &&
+									const bool xyz2StripTag = xyz2BatchEnabled && path.tag.FLG == GIF_FLG_PACKED && path.nreg == 1 &&
 										path.GetReg(0) == GIF_REG_XYZ2 && m_env.PRIM.PRIM == GS_TRIANGLESTRIP &&
-										m_dirty_gs_regs == 0 && GSConfig.UserHacks_AutoFlush == GSHWAutoFlushLevel::Disabled &&
-										!GSConfig.AutoFlushSW)
+										GSConfig.UserHacks_AutoFlush == GSHWAutoFlushLevel::Disabled && !GSConfig.AutoFlushSW;
+									if (xyz2StripTag && m_dirty_gs_regs == 0)
 									{
 										KickPackedXYZ2Batch<GS_TRIANGLESTRIP>((const GIFPackedReg*)mem, total);
 										mem += total * sizeof(GIFPackedReg);
 										break;
+									}
+									else if (xyz2StripTag && m_dirty_gs_regs != 0 && total > 1)
+									{
+										// Preserve the original scalar dirty-prefix check. Only
+										// batch the suffix when that kick resolved the pending state.
+										(this->*m_fpGIFPackedRegHandlers[GIF_REG_XYZ2])((GIFPackedReg*)mem);
+										mem += sizeof(GIFPackedReg);
+										--total;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+										if (s_gsXYZ2BatchObserve && m_dirty_gs_regs == 0)
+											++s_gsXYZ2BatchStats[2];
+#endif
+										if (m_dirty_gs_regs == 0)
+										{
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+											if (s_gsXYZ2BatchObserve)
+											{
+												++s_gsXYZ2BatchStats[0];
+												s_gsXYZ2BatchStats[1] += total;
+											}
+#endif
+											KickPackedXYZ2Batch<GS_TRIANGLESTRIP>((const GIFPackedReg*)mem, total);
+											mem += total * sizeof(GIFPackedReg);
+											break;
+										}
 									}
 								}
 								#endif
