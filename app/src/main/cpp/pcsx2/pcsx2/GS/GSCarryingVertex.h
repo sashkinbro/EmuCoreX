@@ -110,9 +110,8 @@ namespace GSCarryingVertex
             u64* sideXY,u64* sideMeta,const GSStripKickKernel::Bounds& bounds,s32 ofx,s32 ofy) const
         {
             u32 i=0;
-            // These are the only carrying layouts with a production Rows
-            // consumer. STQ/UV pairs retain their existing sprite policy.
-            if constexpr(L==Layout::NopTriple||L==Layout::RGBAPair||L==Layout::UVTriple)
+            // Every classified Rows consumer shares the same bounded raw-XYZ
+            // mirror; DecodeRow retains each layout's carried vertex fields.
             {
                 const auto mirror=GSStripKickKernel::MakeMirrorBounds(bounds,ofx,ofy);
                 for(const u32 quads=count&~3u;i<quads;i+=4)

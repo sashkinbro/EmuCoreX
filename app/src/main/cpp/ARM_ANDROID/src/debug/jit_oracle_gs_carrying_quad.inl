@@ -75,10 +75,9 @@ namespace GSCarryingQuadOracle
                         (static_cast<u64>(oc)<<56)|(xyz.U32[3]&0x8000u?1ull<<60:0ull);
                     exact&=xy[i+1]==expectedXY&&meta[i+1]==expectedMeta;
                 }
-                const bool rowsConsumer=family==0||family==3||family==4;
-                work.expectedSmall+=rowsConsumer?(count<4?count:0):count;
-                work.expectedQuads+=rowsConsumer&&count>=4?count/4+(count%4!=0):0;
-                work.expectedTail+=rowsConsumer&&count>=4&&count%4!=0;++work.cases;work.vertices+=count;
+                work.expectedSmall+=count<4?count:0;
+                work.expectedQuads+=count>=4?count/4+(count%4!=0):0;
+                work.expectedTail+=count>=4&&count%4!=0;++work.cases;work.vertices+=count;
             }
         }
         u64 stats[3]{};EmuCoreXOracleGSMirrorStats(stats);work.quads=stats[0];work.scalar=stats[1];work.tail=stats[2];return exact;
@@ -160,8 +159,8 @@ void GSCarryingQuadTests()
         "carrying quad RGBA pair uses latched Q with exact bounded vertices/meta/state",
         "carrying quad UV triple carries ST and uses latched Q with exact colour fog bounded vertices/meta/state"};
     constexpr const char* workNames[]={"carrying quad NOP triple actually vectorizes mirror work and eliminates scalar Rows metadata",
-        "carrying STQ sprite pair executes classified kernel with scalar mirror metadata and zero quad work",
-        "carrying UV sprite pair executes classified kernel with scalar mirror metadata and zero quad work",
+        "carrying STQ sprite pair actually vectorizes mirror work and eliminates scalar Rows metadata",
+        "carrying UV sprite pair actually vectorizes mirror work and eliminates scalar Rows metadata",
         "carrying quad RGBA pair actually vectorizes mirror work and eliminates scalar Rows metadata",
         "carrying quad UV triple actually vectorizes mirror work and eliminates scalar Rows metadata"};
     for(u32 family=0;family<5;++family)
@@ -169,9 +168,8 @@ void GSCarryingQuadTests()
         GSCarryingQuadOracle::Work raw;const bool byteExact=GSCarryingQuadOracle::Raw(family,raw);u64 productionQuads=0,productionScalar=0;
         const bool stateExact=GSCarryingQuadOracle::State(family,productionQuads,productionScalar);
         Check(byteExact&&stateExact,controls[family]);
-        const bool rowsConsumer=family==0||family==3||family==4;
         Check(raw.quads==raw.expectedQuads&&raw.scalar==raw.expectedSmall&&raw.tail==raw.expectedTail&&
-            (rowsConsumer?productionQuads>0:productionQuads==0)&&(rowsConsumer?productionScalar==0:productionScalar>0),workNames[family]);
+            productionQuads>0&&productionScalar==0,workNames[family]);
         std::printf("GS_CARRY_CONTROL family=%u raw=%u classified=%u\n",family,byteExact,stateExact);
         std::printf("GS_CARRY_QUAD family=%u cases=%llu vertices=%llu rawQuads=%llu/%llu scalar=%llu/%llu tail=%llu/%llu productionQuads=%llu productionScalar=%llu\n",family,
             static_cast<unsigned long long>(raw.cases),static_cast<unsigned long long>(raw.vertices),static_cast<unsigned long long>(raw.quads),static_cast<unsigned long long>(raw.expectedQuads),
