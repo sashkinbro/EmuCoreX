@@ -14,7 +14,7 @@
 #include "Common.h"
 #include "VU.h"
 #include "MTVU.h"
-#include <GS.h>
+#include "GS.h"
 #include "Gif_Unit.h"
 #include "arm64/ee/iR5900-arm64.h"
 #include "arm64/ir/IrLower-arm64.h"

@@ -1166,6 +1166,8 @@ bool GSDeviceOGL::CheckFeatures()
 	// texture_barrier is unavailable. Expose this so GSRendererHW doesn't disable full-barrier
 	// paths before the OpenGL fallback in SendHWDraw() gets a chance to handle them.
 	m_features.multidraw_fb_copy = !m_features.texture_barrier;
+	// OpenGL framebuffer fetch reads the live target directly; without it, only the explicit copy fallback qualifies.
+	m_features.cheap_rt_feedback_read = m_features.framebuffer_fetch || m_features.multidraw_fb_copy;
 
 #if defined(__ANDROID__)
 	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX",

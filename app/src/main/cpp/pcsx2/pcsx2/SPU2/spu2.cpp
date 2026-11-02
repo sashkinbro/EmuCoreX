@@ -9,7 +9,7 @@
 #include "Common.h"
 #include "Host/AudioStream.h"
 #include "Host.h"
-#include <GS/GSCapture.h>
+#include "GS/GSCapture.h"
 #include "MTGS.h"
 #include "R3000A.h"
 #include "VMManager.h"

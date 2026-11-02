@@ -1129,46 +1129,6 @@ set(pcsx2arm64Headers
 	arm64/vu/ShuffleLanes-arm64.h
 	)
 
-# Android builds select one complete, physically separate GS implementation
-# while keeping the CPU/core source tree shared. Rewrite both translation-unit
-# and header manifest entries, and put the same branch root first for every
-# PCSX2 translation unit so host code including GS/... sees the selected fork.
-if(ANDROID AND DEFINED EMUCOREX_GS_FAMILY)
-	if(EMUCOREX_GS_FAMILY STREQUAL "ADRENO")
-		set(_emucorex_gs_variant_directory "Adreno")
-	else()
-		set(_emucorex_gs_variant_directory "Mali")
-	endif()
-	set(_emucorex_gs_variant_root "${PCSX2_UPSTREAM_DIR}/../GSVariants/${_emucorex_gs_variant_directory}")
-	get_filename_component(_emucorex_gs_variant_root "${_emucorex_gs_variant_root}" ABSOLUTE)
-	if(NOT EXISTS "${_emucorex_gs_variant_root}/GS.h" OR NOT EXISTS "${_emucorex_gs_variant_root}/GS.cpp" OR NOT EXISTS "${_emucorex_gs_variant_root}/Host.cpp" OR NOT EXISTS "${_emucorex_gs_variant_root}/GS/GS.cpp" OR NOT EXISTS "${_emucorex_gs_variant_root}/GS/GSState.cpp")
-		message(FATAL_ERROR "Incomplete ${EMUCOREX_GS_FAMILY} GS fork at ${_emucorex_gs_variant_root}/GS")
-	endif()
-	foreach(_gs_manifest pcsx2Sources pcsx2GSSources pcsx2GSSourcesUnshared pcsx2GSHeaders pcsx2Headers)
-		set(_gs_variant_manifest)
-		foreach(_gs_path IN LISTS ${_gs_manifest})
-			if(_gs_path STREQUAL "GS.cpp")
-				list(APPEND _gs_variant_manifest "${_emucorex_gs_variant_root}/GS.cpp")
-			elseif(_gs_path STREQUAL "Host.cpp")
-				list(APPEND _gs_variant_manifest "${_emucorex_gs_variant_root}/Host.cpp")
-			elseif(_gs_path STREQUAL "GS.h" OR _gs_path MATCHES "^GS/")
-				list(APPEND _gs_variant_manifest "${_emucorex_gs_variant_root}/${_gs_path}")
-			else()
-				list(APPEND _gs_variant_manifest "${_gs_path}")
-			endif()
-		endforeach()
-		set(${_gs_manifest} "${_gs_variant_manifest}")
-	endforeach()
-
-	target_include_directories(PCSX2_FLAGS BEFORE INTERFACE "${_emucorex_gs_variant_root}")
-	target_include_directories(PCSX2 BEFORE PRIVATE "${_emucorex_gs_variant_root}")
-	if(EMUCOREX_GS_FAMILY STREQUAL "ADRENO")
-		target_compile_definitions(PCSX2_FLAGS INTERFACE EMUCOREX_GS_FAMILY_ADRENO=1)
-	else()
-		target_compile_definitions(PCSX2_FLAGS INTERFACE EMUCOREX_GS_FAMILY_MALI=1)
-	endif()
-endif()
-
 # These ones benefit a lot from LTO
 set(pcsx2LTOSources
 	${pcsx2Sources}
@@ -1195,9 +1155,6 @@ endif()
 
 if(LTO_PCSX2_CORE)
 	add_library(PCSX2_LTO ${pcsx2LTOSources})
-	if(ANDROID AND DEFINED _emucorex_gs_variant_root)
-		target_include_directories(PCSX2_LTO BEFORE PRIVATE "${_emucorex_gs_variant_root}")
-	endif()
 	if (DISABLE_ADVANCE_SIMD)
 		target_compile_definitions(PCSX2_LTO PRIVATE MULTI_ISA_SHARED_COMPILATION)
 	endif()

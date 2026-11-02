@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Achievements.h"
-#include <GS.h>
+#include "GS.h"
 #include "Host.h"
 #include "IconsFontAwesome.h"
 #include "ImGui/FullscreenUI.h"

@@ -367,6 +367,7 @@ public:
 	static void TestFeedbackBlendStages(void (*check)(bool, const char*));
 	static void TestBlendCarry(void (*check)(bool, const char*));
 	static void TestProvokingFallback(void (*check)(bool, const char*));
+	static void TestMaliDirtyRectUnion(void (*check)(bool, const char*));
 	static bool PrepareBlendCarryGPU(GSTexture* target, const GSVertex* vertices, const u16* indices,
 		GSHWDrawConfig* legacy, GSHWDrawConfig* carried, bool interpolate);
 #endif

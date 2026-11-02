@@ -251,6 +251,16 @@ public:
 		bool m_used = false;
 		float OffsetHack_modxy = 0.0f;
 		GSDirtyRectList m_dirty;
+		// Dirty-list revision and the revision last checked for union coverage.
+		u32 m_dirty_revision = 0;
+		u32 m_dirty_cover_checked = 0;
+		// A pixel the last union check found uncovered; revalidated against every changed list before use.
+		GSVector2i m_dirty_hole = GSVector2i(-1, -1);
+		void DirtyListChanged()
+		{
+			m_dirty_revision++;
+			m_dirty_hole = GSVector2i(-1, -1);
+		}
 		GSVector4i m_valid{};
 		GSVector4i m_drawn_since_read{};
 		int readbacks_since_draw = 0;
@@ -579,6 +589,9 @@ public:
 	void ResizeTarget(Target* t, GSVector4i rect, u32 tbp, u32 psm, u32 tbw);
 	static bool FullRectDirty(Target* target, u32 rgba_mask);
 	static bool FullRectDirty(Target* target);
+	static bool DirtyRectsCover(const GSDirtyRectList& list, u32 psm, u32 bw, u32 rgba_mask,
+		const GSVector4i& area, GSVector2i* hole = nullptr);
+	static bool FullRectDirtyByUnion(Target* target);
 	bool CanTranslate(u32 bp, u32 bw, u32 spsm, GSVector4i r, u32 dbp, u32 dpsm, u32 dbw);
 	GSVector4i TranslateAlignedRectByPage(u32 tbp, u32 tebp, u32 tbw, u32 tpsm, GSVector4i t_r, u32 sbp, u32 spsm, u32 sbw, GSVector4i src_r, bool is_invalidation = false);
 	GSVector4i TranslateAlignedRectByPage(Target* t, u32 sbp, u32 spsm, u32 sbw, GSVector4i src_r, bool is_invalidation = false);

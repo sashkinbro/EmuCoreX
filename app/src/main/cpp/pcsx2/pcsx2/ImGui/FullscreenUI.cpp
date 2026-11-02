@@ -3,8 +3,8 @@
 
 #include "BuildVersion.h"
 #include "CDVD/CDVDcommon.h"
-#include <GS/Renderers/Common/GSDevice.h>
-#include <GS/Renderers/Common/GSTexture.h>
+#include "GS/Renderers/Common/GSDevice.h"
+#include "GS/Renderers/Common/GSTexture.h"
 #include "Achievements.h"
 #include "CDVD/CDVDdiscReader.h"
 #include "GameList.h"

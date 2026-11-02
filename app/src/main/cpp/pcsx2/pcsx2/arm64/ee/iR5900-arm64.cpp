@@ -6,7 +6,7 @@
 #include "CDVD/CDVD.h"
 #include "DebugTools/Breakpoints.h"
 #include "Elfheader.h"
-#include <GS.h>
+#include "GS.h"
 #include "Memory.h"
 #include "Patch.h"
 #include "R3000A.h"

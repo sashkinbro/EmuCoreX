@@ -3,7 +3,7 @@
 #include "emucorex/android_signal_chain.h"
 
 #include "pcsx2/Gif.h"
-#include <GS.h>
+#include "pcsx2/GS.h"
 #include "pcsx2/Hw.h"
 #include "pcsx2/Dmac.h"
 #include "pcsx2/Memory.h"

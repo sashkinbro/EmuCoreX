@@ -4,7 +4,7 @@
 #include "Host/AudioStream.h"
 #include "FreeSurroundDecoder.h"
 #include "Host.h"
-#include <GS/GSVector.h>
+#include "GS/GSVector.h"
 
 #include "common/Assertions.h"
 #include "common/BitUtils.h"

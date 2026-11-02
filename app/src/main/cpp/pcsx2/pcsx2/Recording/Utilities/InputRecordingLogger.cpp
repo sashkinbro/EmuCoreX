@@ -7,7 +7,7 @@
 #include "common/Console.h"
 #include "IconsPromptFont.h"
 #include "IconsFontAwesome.h"
-#include <GS.h>
+#include "GS.h"
 #include "Host.h"
 
 #include "fmt/format.h"

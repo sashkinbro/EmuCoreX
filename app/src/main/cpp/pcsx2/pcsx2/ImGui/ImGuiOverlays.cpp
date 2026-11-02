@@ -4,15 +4,15 @@
 #include "BuildVersion.h"
 #include "Config.h"
 #include "Counters.h"
-#include <GS/GS.h>
-#include <GS/GSShaderCompileIndicator.h>
-#include <GS/GSCapture.h>
-#include <GS/GSVector.h>
-#include <GS/Renderers/Common/GSDevice.h>
+#include "GS/GS.h"
+#include "GS/GSShaderCompileIndicator.h"
+#include "GS/GSCapture.h"
+#include "GS/GSVector.h"
+#include "GS/Renderers/Common/GSDevice.h"
 #ifdef _WIN32
-#include <GS/Renderers/DX12/GSDevice12.h>
+#include "GS/Renderers/DX12/GSDevice12.h"
 #endif
-#include <GS/Renderers/HW/GSTextureReplacements.h>
+#include "GS/Renderers/HW/GSTextureReplacements.h"
 #include "Host.h"
 #include "IconsFontAwesome.h"
 #include "IconsPromptFont.h"

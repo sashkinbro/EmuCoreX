@@ -3473,6 +3473,8 @@ bool GSDeviceVK::CheckFeatures()
 	m_declare_loop_per_draw = road.dynamic_loop;
 
 	m_features.multidraw_fb_copy = false;
+	// Vulkan input-attachment/feedback-loop reads are in-tile, but selecting them can restart a pass.
+	m_features.cheap_rt_feedback_read = false;
 	m_features.broken_point_sampler = false;
 	m_features.broken_blend_constant = GSBlendConstantPolicy::DeviceDefect(true, m_road_facts.adreno,
 		m_road_facts.driver == GSVulkanRoad::Driver::Turnip);

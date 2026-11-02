@@ -5,7 +5,7 @@
 
 #include "IPU/IPU.h"
 #include "IPU/mpeg2_vlc.h"
-#include <GS/MultiISA.h>
+#include "GS/MultiISA.h"
 
 #ifdef _MSC_VER
 #include <intrin.h>

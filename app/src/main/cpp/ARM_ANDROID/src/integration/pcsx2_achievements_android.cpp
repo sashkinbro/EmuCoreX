@@ -11,7 +11,7 @@
 #include "CDVD/CDVD.h"
 #include "Elfheader.h"
 #include "Host.h"
-#include <GS/Renderers/Common/GSTexture.h>
+#include "GS/Renderers/Common/GSTexture.h"
 #include "ImGui/FullscreenUI.h"
 #include "ImGui/ImGuiFullscreen.h"
 #include "ImGui/ImGuiManager.h"

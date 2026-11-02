@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
-#include <GS.h>
-#include <GS/GSLzma.h>
+#include "GS.h"
+#include "GS/GSLzma.h"
 #include "GSDumpReplayer.h"
 #include "GameList.h"
 #include "Gif.h"

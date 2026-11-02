@@ -3,9 +3,9 @@
 #include "emucorex/android_crash_diagnostics.h"
 #include "emucorex/upstream_vm_bridge.h"
 
-#include <GS/GS.h>
-#include <GS/Renderers/Common/GSRenderer.h>
-#include <GS/Renderers/Vulkan/GSLsfg.h>
+#include "GS/GS.h"
+#include "GS/Renderers/Common/GSRenderer.h"
+#include "GS/Renderers/Vulkan/GSLsfg.h"
 #include "MTGS.h"
 #include "common/FileSystem.h"
 #include "common/HostSys.h"

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 EmuCoreX Team
 // SPDX-License-Identifier: GPL-3.0+
 // Include after jit_oracle_gs_vertices.inl; both paths consume identical GIF streams.
-#include <GS/GSUtil.h>
+#include "GS/GSUtil.h"
 extern "C" void EmuCoreXOracleSetGSPackedBatch(bool enabled, bool observe = true);
 extern "C" void EmuCoreXOracleGSPackedBatchStats(u64* values);
 

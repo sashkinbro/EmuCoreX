@@ -5,7 +5,7 @@
 
 #include "VU1Fingerprint.h"
 #include "Config.h"
-#include <GS/GSXXH.h>
+#include "GS/GSXXH.h"
 #include "VMManager.h"
 #include "VUmicro.h"
 

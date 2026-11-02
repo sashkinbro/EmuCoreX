@@ -4,14 +4,14 @@
 #include "emucorex/upstream_vm_bridge.h"
 
 #include "pcsx2/Config.h"
-#include <GS/GS.h>
+#include "pcsx2/GS/GS.h"
 #include "pcsx2/Host.h"
 #include "common/SettingsInterface.h"
-#include <GS/Renderers/Common/GSDevice.h>
-#include <GS/Renderers/Vulkan/GSDeviceVK.h>
-#include <GS/Renderers/Vulkan/VKShaderCache.h>
+#include "pcsx2/GS/Renderers/Common/GSDevice.h"
+#include "pcsx2/GS/Renderers/Vulkan/GSDeviceVK.h"
+#include "pcsx2/GS/Renderers/Vulkan/VKShaderCache.h"
 #include "pcsx2/VMManager.h"
-#include <GS/Renderers/Vulkan/VKLoader.h>
+#include "pcsx2/GS/Renderers/Vulkan/VKLoader.h"
 
 #include <array>
 #include <cstdio>

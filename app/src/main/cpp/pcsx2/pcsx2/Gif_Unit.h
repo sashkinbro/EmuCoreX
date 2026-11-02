@@ -6,8 +6,8 @@
 #include <thread>
 #include "Gif.h"
 #include "Vif.h"
-#include <GS.h>
-#include <GS/GSRegs.h>
+#include "GS.h"
+#include "GS/GSRegs.h"
 #include "MTGS.h"
 
 // FIXME common path ?

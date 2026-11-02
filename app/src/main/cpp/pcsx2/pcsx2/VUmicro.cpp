@@ -4,7 +4,7 @@
 #include "Common.h"
 #include "VUmicro.h"
 #include "MTVU.h"
-#include <GS.h>
+#include "GS.h"
 #include "Gif_Unit.h"
 
 BaseVUmicroCPU* CpuVU0 = nullptr;
