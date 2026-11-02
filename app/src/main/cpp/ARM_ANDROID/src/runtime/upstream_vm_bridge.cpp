@@ -300,7 +300,7 @@ void ApplyOldCoreJitSettings(SettingsInterface& si, const VmLaunchConfig& config
 		GetBoolSetting(config.settings, "EmuCore/CPU/Recompiler", "EnableVU0", true));
 	si.SetBoolValue("EmuCore/CPU/Recompiler", "EnableVU1",
 		GetBoolSetting(config.settings, "EmuCore/CPU/Recompiler", "EnableVU1", true));
-	bool enable_vu_aot = GetBoolSetting(config.settings, "EmuCore/CPU/Recompiler", "EnableVUAot", false);
+	bool enable_vu_aot = GetBoolSetting(config.settings, "EmuCore/CPU/Recompiler", "EnableVUAot", true);
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	char vu_aot_override[PROP_VALUE_MAX] = {};
 	if (__system_property_get("debug.emucorex.vu_aot", vu_aot_override) == 1 &&
@@ -351,7 +351,7 @@ void ApplyOldCoreJitSettings(SettingsInterface& si, const VmLaunchConfig& config
 	si.SetBoolValue("EmuCore/CPU/Recompiler", "vu1SignOverflow",
 		GetBoolSetting(config.settings, "EmuCore/CPU/Recompiler", "vu1SignOverflow", false));
 	si.SetBoolValue("EmuCore/Speedhacks", "iopThread",
-		GetBoolSetting(config.settings, "EmuCore/Speedhacks", "iopThread", false));
+		GetBoolSetting(config.settings, "EmuCore/Speedhacks", "iopThread", true));
 	si.SetBoolValue("EmuCore/Speedhacks", "iopThreadLockstep",
 		GetBoolSetting(config.settings, "EmuCore/Speedhacks", "iopThreadLockstep", false));
 	si.SetIntValue("EmuCore/Speedhacks", "iopThreadLag",

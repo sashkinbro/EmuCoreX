@@ -159,8 +159,8 @@ data class SettingsSnapshot(
     val enableVuFlagHack: Boolean = true,
     val enableInstantVu1: Boolean = true,
     val enableMtvu: Boolean = true,
-    val enableIopThread: Boolean = false,
-    val enableVUAot: Boolean = false,
+    val enableIopThread: Boolean = true,
+    val enableVUAot: Boolean = true,
     val enableThreadPinning: Boolean = AppPreferences.DEFAULT_THREAD_PINNING,
     val enableFastCdvd: Boolean = false,
     val enableCheats: Boolean = false,
@@ -1992,8 +1992,8 @@ class AppPreferences(private val context: Context) {
                 enableVuFlagHack = prefs[ENABLE_VU_FLAG_HACK] ?: true,
                 enableInstantVu1 = prefs[ENABLE_INSTANT_VU1] ?: true,
                 enableMtvu = prefs[ENABLE_MTVU] ?: true,
-                enableIopThread = prefs[ENABLE_IOP_THREAD] ?: false,
-                enableVUAot = prefs[ENABLE_VU_AOT] ?: false,
+                enableIopThread = prefs[ENABLE_IOP_THREAD] ?: true,
+                enableVUAot = prefs[ENABLE_VU_AOT] ?: true,
                 enableThreadPinning = prefs[ENABLE_THREAD_PINNING] ?: DEFAULT_THREAD_PINNING,
                 enableFastCdvd = prefs[ENABLE_FAST_CDVD] ?: false,
                 enableCheats = prefs[ENABLE_CHEATS] ?: false,
@@ -3285,18 +3285,18 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { it[ENABLE_THREAD_PINNING] = enabled }
     }
 
-    // IopThread opt-in
+    // IopThread defaults on; an explicitly stored false remains an opt-out.
     val enableIopThread: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[ENABLE_IOP_THREAD] ?: false
+        prefs[ENABLE_IOP_THREAD] ?: true
     }
 
     suspend fun setEnableIopThread(enabled: Boolean) {
         context.dataStore.edit { it[ENABLE_IOP_THREAD] = enabled }
     }
 
-    // VUAot opt-in
+    // VUAot defaults on; an explicitly stored false remains an opt-out.
     val enableVUAot: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[ENABLE_VU_AOT] ?: false
+        prefs[ENABLE_VU_AOT] ?: true
     }
 
     suspend fun setEnableVUAot(enabled: Boolean) {
@@ -4822,8 +4822,8 @@ class AppPreferences(private val context: Context) {
             put("enableVuFlagHack", prefs[ENABLE_VU_FLAG_HACK] ?: true)
             put("enableInstantVu1", prefs[ENABLE_INSTANT_VU1] ?: true)
             put("enableMtvu", prefs[ENABLE_MTVU] ?: true)
-            put("enableIopThread", prefs[ENABLE_IOP_THREAD] ?: false)
-            put("enableVUAot", prefs[ENABLE_VU_AOT] ?: false)
+            put("enableIopThread", prefs[ENABLE_IOP_THREAD] ?: true)
+            put("enableVUAot", prefs[ENABLE_VU_AOT] ?: true)
             put("enableThreadPinning", prefs[ENABLE_THREAD_PINNING] ?: DEFAULT_THREAD_PINNING)
             put("enableFastCdvd", prefs[ENABLE_FAST_CDVD] ?: false)
             put("hwDownloadMode", GsHackDefaults.coerceHardwareDownloadMode(
@@ -5345,8 +5345,8 @@ class AppPreferences(private val context: Context) {
             prefs[ENABLE_VU_FLAG_HACK] = json.optBoolean("enableVuFlagHack", true)
             prefs[ENABLE_INSTANT_VU1] = json.optBoolean("enableInstantVu1", true)
             prefs[ENABLE_MTVU] = json.optBoolean("enableMtvu", true)
-            prefs[ENABLE_IOP_THREAD] = json.optBoolean("enableIopThread", false)
-            prefs[ENABLE_VU_AOT] = json.optBoolean("enableVUAot", false)
+            prefs[ENABLE_IOP_THREAD] = json.optBoolean("enableIopThread", true)
+            prefs[ENABLE_VU_AOT] = json.optBoolean("enableVUAot", true)
             prefs[ENABLE_THREAD_PINNING] = json.optBoolean("enableThreadPinning", DEFAULT_THREAD_PINNING)
             prefs[ENABLE_FAST_CDVD] = json.optBoolean("enableFastCdvd", false)
             prefs[HW_DOWNLOAD_MODE] = GsHackDefaults.coerceHardwareDownloadMode(

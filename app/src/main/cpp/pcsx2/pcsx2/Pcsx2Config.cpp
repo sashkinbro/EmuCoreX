@@ -381,6 +381,7 @@ Pcsx2Config::SpeedhackOptions::SpeedhackOptions()
 	DisableAll();
 
 	// Set recommended speedhacks to enabled by default. They'll still be off globally on resets.
+	iopThread = true;
 	WaitLoop = true;
 	IntcStat = true;
 	vuFlagHack = true;
@@ -458,7 +459,7 @@ Pcsx2Config::RecompilerOptions::RecompilerOptions()
 	EnableVU1 = true;
 	EnableFastmem = true;
 	PauseOnTLBMiss = false;
-	EnableVUAot = false;
+	EnableVUAot = true;
 	EnableVUProgramCache = false;
 
 	// vu and fpu clamping default to standard overflow.

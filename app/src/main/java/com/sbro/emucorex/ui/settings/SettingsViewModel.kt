@@ -90,8 +90,8 @@ internal fun settingsGsOverrideFlags(hwDownloadMode: Boolean, blendingAccuracy: 
 
 data class WorkerOptimizationUiState(
     val enableMtvu: Boolean = true,
-    val enableIopThread: Boolean = false,
-    val enableVUAot: Boolean = false
+    val enableIopThread: Boolean = true,
+    val enableVUAot: Boolean = true
 )
 
 data class SettingsUiState(
