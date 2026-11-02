@@ -6,15 +6,28 @@
 
 static void vifLoad32ToS(oak::QReg dst, OakMemOperand mem)
 {
-	oakLoad32(OAK_WSCRATCH, mem);
-	oakAsm->FMOV(dst.toS(), OAK_WSCRATCH);
+	oakLoadScalar32(dst.toS(), mem);
 }
 
 static void vifLoad64ToD(oak::QReg dst, OakMemOperand mem)
 {
-	oakLoad64(OAK_XSCRATCH, mem);
-	oakAsm->FMOV(dst.toD(), OAK_XSCRATCH);
+	oakLoadVector64(dst.toD(), mem);
 }
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+// Exercises the actual narrow-load wrappers, including architectural upper
+// clearing, without changing their production emission before the RED gate.
+extern "C" u32 EmuCoreXOracleCompileVifNarrowLoad(u32 width, s64 offset, u8* code, u32 capacity)
+{
+    pxAssert((width==4||width==8)&&!oakHasBlock());
+    oakSetAsmPtr(code,capacity);u8* const begin=oakStartBlock();
+    oakAsm->MOVI(oak::util::Q0.B16(),0xff);
+    if(width==4)vifLoad32ToS(oak::util::Q0,{OAK_XARG1,offset});
+    else vifLoad64ToD(oak::util::Q0,{OAK_XARG1,offset});
+    oakAsm->STR(oak::util::Q0,OAK_XARG2);oakAsm->RET();
+    u8* const end=oakEndBlock();return static_cast<u32>(end-begin);
+}
+#endif
 
 static void vifLoadQFromAddress(oak::QReg dst, const void* addr)
 {

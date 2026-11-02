@@ -2280,6 +2280,7 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vuaot_quiet_generation_cold.inl"
 #include "jit_oracle_vuaot_ready_jobs.inl"
 #include "jit_oracle_vif_pair_copy.inl"
+#include "jit_oracle_vif_narrow_load.inl"
 #include "jit_oracle_vuaot_division.inl"
 
 void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin_only = false,
@@ -12516,6 +12517,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         RunVuAotReadyJobsTests();
     else if (std::strcmp(suite, "vif-pair-copy") == 0)
         RunVifPairCopyTests();
+    else if (std::strcmp(suite, "vif-narrow-load") == 0)
+        RunVifNarrowLoadTests();
     else if (std::strcmp(suite, "spu2-volume") == 0)
         EmuCoreXOracleTestVolumeSlide(Check);
     else if (std::strcmp(suite, "vif-mpg") == 0)
