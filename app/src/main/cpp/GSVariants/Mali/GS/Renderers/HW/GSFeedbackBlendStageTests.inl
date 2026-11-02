@@ -87,6 +87,45 @@ void GSRendererHW::TestFeedbackBlendStages(void (*check)(bool,const char*))
     check(legalClip&&hardwareClip>0&&softwareClip>0,"GS actual retained and fresh ColorClip stages satisfy full-barrier invariant without weakening assert");
     check(legalMultipass&&multipass>0,"GS actual generated blend multipass stages preserve the full-barrier exclusion");
     check(noAlphaOnly&&feedback>0,"GS actual alpha-second-pass generation does not introduce an unprepared alpha-only depth reader");
+
+    // Use an eligible variable Ad draw (alpha preserved, RGB written, non-overlap)
+    // so this checks the actual EmulateBlending selector rather than a synthetic counter.
+    const auto runAdCase = [&](bool texture_barrier,bool cheap_read) {
+        GSDevice::FeatureSupport ad_features{};
+        ad_features.texture_barrier=texture_barrier;
+        ad_features.framebuffer_fetch=true;
+        ad_features.framebuffer_fetch_orders_overlap=true;
+        ad_features.cheap_rt_feedback_read=cheap_read;
+        ad_features.dual_source_blend=true;
+        g_gs_device->SetFeaturesForTesting(ad_features);
+        r.ResetStates();
+        r.m_conf.colclip_mode=GSHWDrawConfig::ColClipMode::NoModify;
+        r.m_draw_env=&r.m_env;r.PRIM=&r.m_env.PRIM;
+        r.m_env.PRIM.ABE=true;r.m_env.PRIM.AA1=false;r.m_env.PRIM.TME=false;r.m_env.PRIM.FGE=false;
+        r.m_env.PABE.PABE=false;r.m_env.COLCLAMP.CLAMP=true;
+        r.m_context->ALPHA.A=0;r.m_context->ALPHA.B=1;r.m_context->ALPHA.C=1;r.m_context->ALPHA.D=1;
+        r.m_context->ALPHA.FIX=128;
+        r.m_context->FRAME.PSM=PSMCT32;r.m_context->FRAME.FBW=1;r.m_context->FRAME.FBMSK=0xFF000000;
+        r.m_cached_ctx.FRAME=r.m_context->FRAME;
+        r.m_cached_ctx.TEST=GIFRegTEST{};r.m_cached_ctx.TEST.ZTE=false;
+        r.m_cached_ctx.ZBUF.PSM=PSMZ32;r.m_cached_ctx.ZBUF.ZMSK=true;
+        r.m_vt.m_primclass=GS_TRIANGLE_CLASS;r.m_prim_overlap=PRIM_OVERLAP_NO;
+        r.m_vt.m_alpha={64,192,true};r.m_vt.m_eq.value=0;
+        r.m_vt.m_min.c=GSVector4i(160,96,32,64);r.m_vt.m_max.c=GSVector4i(160,96,32,192);
+        rt.m_alpha_min=0;rt.m_alpha_max=255;
+        r.m_r=GSVector4i(0,0,8,8);r.m_conf.rt=&color;r.m_conf.ds=nullptr;
+        r.m_conf.depth=GSHWDrawConfig::DepthStencilSelector::NoDepth();
+        r.m_conf.ps.no_color1=true;r.m_conf.topology=GSHWDrawConfig::Topology::Triangle;
+        r.m_conf.drawarea=r.m_conf.scissor=GSVector4i(0,0,8,8);
+        r.EmulateTextureShuffleAndFbmask(&rt,nullptr);
+        DATEOptions ad_date{};r.EmulateAlphaTest(ad_date);
+        bool ad_scale=false;r.EmulateBlending(0,255,ad_date,&rt,false,ad_scale);
+        return (r.m_conf.ps.a_masked ? 0x100u : 0u) | (u32(r.m_conf.ps.blend_c) << 4) | u32(r.m_conf.colormask.wrgba);
+    };
+    const auto vulkan_ad=runAdCase(true,false);
+    const auto gl_fetch_ad=runAdCase(false,true);
+    check(vulkan_ad==23u,"GS Vulkan ROAA/input-attachment Ad case avoids voluntary alpha-masked feedback");
+    check(gl_fetch_ad==279u,"GS GL framebuffer-fetch Ad case retains the cheap alpha-masked feedback path");
     std::printf("GS_CLIP_STAGES cases=%u hardwareClip=%u softwareClip=%u multipass=%u depthFeedback=%u\n",cases,hardwareClip,softwareClip,multipass,feedback);
 }
 extern "C" void EmuCoreXOracleFeedbackBlendStages(void (*check)(bool,const char*))

@@ -1457,6 +1457,7 @@ public:
 		bool declared_feedback_loop_orders_overlap : 1; ///< Declared loop orders overlapping primitives.
 		GSFeedbackCarry feedback_carry = GSFeedbackCarry::None;
 		bool framebuffer_fetch    : 1; ///< Can sample from the framebuffer without texture barriers.
+		bool cheap_rt_feedback_read : 1; ///< Backend has evidence voluntary RT feedback reads avoid a costly pass/copy.
 		bool texture_feedback_requires_copy : 1; ///< Framebuffer fetch cannot make ordinary sampler reads of attached textures safe (Haunting Ground-only workaround).
 		bool stencil_buffer       : 1; ///< Supports stencil buffer, and can use for DATE.
 		bool cas_sharpening       : 1; ///< Supports sufficient functionality for contrast adaptive sharpening.
