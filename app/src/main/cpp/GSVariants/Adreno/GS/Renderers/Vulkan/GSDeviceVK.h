@@ -875,6 +875,7 @@ public:
 	void TestBlendConstantPixels(void (*check)(bool, const char*));
 	void TestRoadModelParity(void (*check)(bool, const char*));
 	void TestDepthSamplingPolicy(void (*check)(bool, const char*));
+	void TestAdrenoCheapFeedbackPixels(void (*check)(bool, const char*));
 	void TestRenderPassOrdering(void (*check)(bool, const char*), VkPipeline sampled_pipeline,
 		VkSampler sampler, VkRenderPass sampled_pass);
 	void SetTFXPreparationFailureStageForTesting(TFXPreparationFailureStage stage)

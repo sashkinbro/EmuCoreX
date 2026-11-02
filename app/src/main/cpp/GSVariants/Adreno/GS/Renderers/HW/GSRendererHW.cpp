@@ -6269,10 +6269,11 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, DATEOptio
 	// Replace Ad with As, blend flags will be used from As since we are chaging the blend_index value.
 	// Must be done before index calculation, after blending equation optimizations
 	const bool blend_ad = m_conf.ps.blend_c == 1;
-	// Without framebuffer fetch this shortcut turns alpha-masked Ad blends into thousands of
-	// render-target feedback barriers in blend-heavy scenes. Keep it where feedback is ordered
-	// in tile memory, or where the backend already uses the copy-based fallback.
-	const bool fast_ad_alpha_masked_feedback = features.framebuffer_fetch || !features.texture_barrier;
+	// Without framebuffer fetch, this shortcut can add render-target feedback work
+	// in blend-heavy scenes. Keep it when fetch is available or the backend reports
+	// that no-barrier feedback reads are cheap.
+	const bool fast_ad_alpha_masked_feedback = features.framebuffer_fetch ||
+		(!features.texture_barrier && features.cheap_rt_feedback_read);
 	bool blend_ad_alpha_masked = blend_ad && !m_conf.colormask.wa && fast_ad_alpha_masked_feedback;
 	const bool is_basic_blend = GSConfig.AccurateBlendingUnit != AccBlendLevel::Minimum;
 	if (blend_ad_alpha_masked && ((is_basic_blend || (COLCLAMP.CLAMP == 0) || m_conf.require_one_barrier)))
@@ -11042,4 +11043,5 @@ void GSRendererHW::CleanupDepthAsRTFeedback()
 #include "GSFeedbackBlendStageTests.inl"
 #include "GSBlendCarryRendererTests.inl"
 #include "GSProvokingFallbackTests.inl"
+#include "GSAdrenoCheapFeedbackStageTests.inl"
 #endif

@@ -3487,6 +3487,9 @@ bool GSDeviceVK::CheckFeatures()
 	// In-tile reads cannot serve a sampler read of another pixel.
 	m_features.texture_feedback_requires_copy = !texture_barrier ||
 		GSOffsetSelfReadNeedsCopy(GSGetDrawRoadDevice(m_features));
+	// Vulkan's no-barrier road snapshots the render target; it is not a cheap
+	// live framebuffer read even when rasterization-order attachment access exists.
+	m_features.cheap_rt_feedback_read = false;
 	m_features.dual_source_blend = m_device_features.dualSrcBlend;
 
 	// geometryShader is needed because gl_PrimitiveID is part of the Geometry SPIR-V Execution Model.
@@ -10215,4 +10218,5 @@ void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, 
 #include "GSBlendConstantPixelTests.inl"
 #include "GSRoadModelTests.inl"
 #include "GSDepthSamplingTests.inl"
+#include "GSAdrenoCheapFeedbackPixelTests.inl"
 #endif

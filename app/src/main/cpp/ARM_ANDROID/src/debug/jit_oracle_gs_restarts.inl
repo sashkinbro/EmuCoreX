@@ -1,12 +1,25 @@
 // SPDX-License-Identifier: GPL-3.0+
+#if defined(EMUCOREX_GS_FAMILY_ADRENO)
+extern "C" void EmuCoreXOracleAdrenoCheapFeedbackStage(void (*check)(bool, const char*));
+#endif
+
 void GSRestartTests()
 {
     cpuinfo_initialize();
     Check(!g_gs_device, "GS restart oracle starts without a VM device");
     if (g_gs_device) return;
+#if defined(EMUCOREX_GS_FAMILY_ADRENO)
+    EmuCoreXOracleAdrenoCheapFeedbackStage(Check);
+#endif
+    const auto saved_resources = EmuFolders::Resources;
+    EmuFolders::Resources = "resources";
     const auto source = FileSystem::ReadFileToString("resources/shaders/vulkan/tfx.glsl");
     Check(source && !source->empty(), "GS restart oracle reads its canonical shader source");
-    if (!source || source->empty()) return;
+    if (!source || source->empty())
+    {
+        EmuFolders::Resources = saved_resources;
+        return;
+    }
     const auto saved = GSConfig;
     const auto saved_cache = EmuFolders::Cache;
     GSConfig = Pcsx2Config::GSOptions();
@@ -28,4 +41,5 @@ void GSRestartTests()
     g_gs_device.reset();
     GSConfig = saved;
     EmuFolders::Cache = saved_cache;
+    EmuFolders::Resources = saved_resources;
 }

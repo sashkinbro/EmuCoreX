@@ -13,6 +13,12 @@
 #include "GS/MultiISA.h"
 
 class GSRendererHW;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+namespace GSAdrenoCheapFeedbackTest
+{
+	struct DrawInput;
+}
+#endif
 MULTI_ISA_DEF(class GSRendererHWFunctions;)
 MULTI_ISA_DEF(void GSRendererHWPopulateFunctions(GSRendererHW& renderer);)
 
@@ -256,6 +262,11 @@ private:
 	bool EmulateDATEEarlyFail(DATEOptions& date, GSTextureCache::Target* rt);
 	void EmulateDATESelectMethod(DATEOptions& date, GSTextureCache::Target* rt, int& blend_alpha_min, int& blend_alpha_max);
 	void EmulateDATEGetConfig(DATEOptions& date, bool scale_rt_alpha, GSDevice::RecycledTexture& temp_ds);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	static bool PrepareAdrenoCheapFeedbackStage(GSTexture* target, GSTexture* depth,
+		const GSAdrenoCheapFeedbackTest::DrawInput& input, GSHWDrawConfig* output,
+		AccBlendLevel* actual_accuracy = nullptr, bool* date_enabled_after_stages = nullptr);
+#endif
 
 	void EmulateDither();
 
@@ -365,6 +376,10 @@ public:
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	static void TestDepthFloor(void (*check)(bool, const char*));
 	static void TestFeedbackBlendStages(void (*check)(bool, const char*));
+	static void TestAdrenoCheapFeedbackStage(void (*check)(bool, const char*));
+	static bool PrepareAdrenoCheapFeedbackDraw(GSTexture* target, GSTexture* depth, const GSVertex* vertices,
+		const u16* indices, GSHWDrawConfig* output, u32 frame_mask, u32 target_alpha, u32 overlap, bool date,
+		bool alpha_test, bool alpha_test_pass, u32 alpha_reference);
 	static void TestBlendCarry(void (*check)(bool, const char*));
 	static void TestProvokingFallback(void (*check)(bool, const char*));
 	static bool PrepareBlendCarryGPU(GSTexture* target, const GSVertex* vertices, const u16* indices,

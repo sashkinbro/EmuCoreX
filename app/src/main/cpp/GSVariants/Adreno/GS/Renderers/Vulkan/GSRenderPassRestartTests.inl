@@ -20,6 +20,9 @@ void GSDeviceVK::TestRenderPassRestarts(void (*check)(bool, const char*))
     ScopedGuard cleanup = [&]() {
         EndRenderPass();
         vkDeviceWaitIdle(m_device);
+        // Purging can queue deferred VMA releases in the frame resources, so do
+        // it before draining those callbacks below.
+        PurgePool();
         m_null_texture.reset();
         m_texture_stream_buffer.Destroy(false);
         m_index_stream_buffer.Destroy(false);
@@ -306,4 +309,5 @@ void main(){color=texelFetch(source,ivec2(0),0)*params.factor;})");
     TestRoadModelParity(check);
     TestDepthSamplingPolicy(check);
     TestBlendCarryPixels(check);
+    TestAdrenoCheapFeedbackPixels(check);
 }

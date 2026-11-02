@@ -1458,6 +1458,7 @@ public:
 		GSFeedbackCarry feedback_carry = GSFeedbackCarry::None;
 		bool framebuffer_fetch    : 1; ///< Can sample from the framebuffer without texture barriers.
 		bool texture_feedback_requires_copy : 1; ///< Framebuffer fetch cannot make ordinary sampler reads of attached textures safe (Haunting Ground-only workaround).
+		bool cheap_rt_feedback_read : 1; ///< Feedback reads the live RT cheaply; missing barriers alone does not imply this.
 		bool stencil_buffer       : 1; ///< Supports stencil buffer, and can use for DATE.
 		bool cas_sharpening       : 1; ///< Supports sufficient functionality for contrast adaptive sharpening.
 		bool test_and_sample_depth: 1; ///< Supports concurrently binding the depth-stencil buffer for sampling and depth testing.
