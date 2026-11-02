@@ -3435,6 +3435,30 @@ void GSDeviceVK::FinalizeDriverCapabilities(bool depth_ready)
 	}
 }
 
+bool GSDeviceVK::PreferCachedStreamRings() const
+{
+	return m_road_facts.adreno && m_road_facts.model == 610 &&
+		m_road_facts.driver == GSVulkanRoad::Driver::Turnip;
+}
+
+void GSDeviceVK::SelectStreamRingMemory(const VkPhysicalDeviceMemoryProperties& properties)
+{
+	static_assert(GS_MEMORY_PROPERTY_DEVICE_LOCAL == VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	static_assert(GS_MEMORY_PROPERTY_HOST_VISIBLE == VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+	static_assert(GS_MEMORY_PROPERTY_HOST_COHERENT == VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	static_assert(GS_MEMORY_PROPERTY_HOST_CACHED == VK_MEMORY_PROPERTY_HOST_CACHED_BIT);
+
+	u32 type_flags[VK_MAX_MEMORY_TYPES] = {};
+	for (u32 i = 0; i < properties.memoryTypeCount; i++)
+		type_flags[i] = static_cast<u32>(properties.memoryTypes[i].propertyFlags);
+
+	GSStreamRingMemoryInputs inputs;
+	inputs.type_flags = type_flags;
+	inputs.type_count = properties.memoryTypeCount;
+	inputs.prefer_cached_over_write_combined = PreferCachedStreamRings();
+	m_stream_ring_memory = GSDecideStreamRingMemory(inputs);
+}
+
 bool GSDeviceVK::CheckFeatures()
 {
 	const VkPhysicalDeviceLimits& limits = m_device_properties.limits;
@@ -3524,20 +3548,7 @@ bool GSDeviceVK::CheckFeatures()
 		VkPhysicalDeviceMemoryProperties memory_properties = {};
 		vkGetPhysicalDeviceMemoryProperties(m_physical_device, &memory_properties);
 
-		static_assert(GS_MEMORY_PROPERTY_DEVICE_LOCAL == VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		static_assert(GS_MEMORY_PROPERTY_HOST_VISIBLE == VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-		static_assert(GS_MEMORY_PROPERTY_HOST_COHERENT == VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-		static_assert(GS_MEMORY_PROPERTY_HOST_CACHED == VK_MEMORY_PROPERTY_HOST_CACHED_BIT);
-
-		u32 type_flags[VK_MAX_MEMORY_TYPES] = {};
-		for (u32 i = 0; i < memory_properties.memoryTypeCount; i++)
-			type_flags[i] = static_cast<u32>(memory_properties.memoryTypes[i].propertyFlags);
-
-		GSStreamRingMemoryInputs inputs;
-		inputs.type_flags = type_flags;
-		inputs.type_count = memory_properties.memoryTypeCount;
-		inputs.prefer_cached_over_write_combined = false;
-		m_stream_ring_memory = GSDecideStreamRingMemory(inputs);
+		SelectStreamRingMemory(memory_properties);
 	}
 
 	// whether we can do point/line expand depends on the range of the device

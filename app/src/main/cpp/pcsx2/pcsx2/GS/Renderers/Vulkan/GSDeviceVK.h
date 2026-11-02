@@ -782,6 +782,8 @@ private:
 	bool CreateVulkanInstanceAndDevice(bool force_surfaceless, VkSurfaceKHR* surface,
 		bool enable_debug_utils, bool enable_validation_layer);
 	bool CheckFeatures();
+	bool PreferCachedStreamRings() const;
+	void SelectStreamRingMemory(const VkPhysicalDeviceMemoryProperties& properties);
 	void ResolveDepthSamplingFeatures();
 	bool CreateNullTexture();
 	bool CreateBuffers();
@@ -865,6 +867,7 @@ public:
 	void TestRenderPassRestarts(void (*check)(bool, const char*));
 	void TestBlendCarryCapability(void (*check)(bool, const char*));
 	void TestDriverSafety(void (*check)(bool, const char*));
+	void TestStreamRingActivation(void (*check)(bool, const char*));
 	void TestBlendCarryPixels(void (*check)(bool, const char*));
 	void TestDrawRoad(void (*check)(bool, const char*));
 	void TestRoadFamilies(void (*check)(bool, const char*));
