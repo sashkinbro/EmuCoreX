@@ -377,6 +377,7 @@ public:
 	static void TestDepthFloor(void (*check)(bool, const char*));
 	static void TestFeedbackBlendStages(void (*check)(bool, const char*));
 	static void TestAdrenoCheapFeedbackStage(void (*check)(bool, const char*));
+	static void TestAdrenoDirtyRectUnion(void (*check)(bool, const char*));
 	static bool PrepareAdrenoCheapFeedbackDraw(GSTexture* target, GSTexture* depth, const GSVertex* vertices,
 		const u16* indices, GSHWDrawConfig* output, u32 frame_mask, u32 target_alpha, u32 overlap, bool date,
 		bool alpha_test, bool alpha_test_pass, u32 alpha_reference);

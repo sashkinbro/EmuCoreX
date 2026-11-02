@@ -5,6 +5,7 @@
 #include "GSDriverSafetyTests.inl"
 #include "GSStreamRingAllocationTests.inl"
 #include "GSBlendCarryPixelTests.inl"
+#include "GS/Renderers/HW/GSRendererHW.h"
 void GSDeviceVK::TestRenderPassRestarts(void (*check)(bool, const char*))
 {
     check(m_tfx_preparation_device && !m_allocator, "GS restart fixture starts on an isolated preparation device");
@@ -310,4 +311,5 @@ void main(){color=texelFetch(source,ivec2(0),0)*params.factor;})");
     TestDepthSamplingPolicy(check);
     TestBlendCarryPixels(check);
     TestAdrenoCheapFeedbackPixels(check);
+    GSRendererHW::TestAdrenoDirtyRectUnion(check);
 }

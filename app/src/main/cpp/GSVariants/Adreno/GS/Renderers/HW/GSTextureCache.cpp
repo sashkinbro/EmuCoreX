@@ -19,6 +19,9 @@
 #include "fmt/format.h"
 
 #include <cinttypes>
+#include <algorithm>
+#include <bit>
+#include <cstring>
 #include <math.h>
 
 #ifdef __APPLE__
@@ -312,6 +315,177 @@ bool GSTextureCache::FullRectDirty(Target* target)
 	return FullRectDirty(target, GSUtil::GetChannelMask(target->m_TEX0.PSM));
 }
 
+bool GSTextureCache::DirtyRectsCover(const GSDirtyRectList& list, u32 psm, u32 bw, u32 rgba_mask,
+	const GSVector4i& area_v, GSVector2i* hole)
+{
+	// Large lists conservatively keep the target. The common GS dirty list is much smaller.
+	static constexpr size_t MAX_RECTS = 128;
+	struct IRect
+	{
+		int x, y, z, w;
+	};
+	const IRect area = {area_v.x, area_v.y, area_v.z, area_v.w};
+	if (area.z <= area.x || area.w <= area.y)
+		return false;
+
+	const u32 bw1 = std::max(bw, 1u);
+	const auto counts = [&](const GSDirtyRect& d) {
+		return d.psm == psm && std::max(d.bw, 1u) == bw1 && (d.rgba._u32 & rgba_mask) == rgba_mask;
+	};
+
+	// Revalidate the previous uncovered pixel against the current list. A stale hint can only miss a shortcut.
+	if (hole && hole->x >= area.x && hole->x < area.z && hole->y >= area.y && hole->y < area.w)
+	{
+		const int hx = hole->x, hy = hole->y;
+		bool hit = false;
+		for (const GSDirtyRect& d : list)
+		{
+			if (hx >= d.r.x && hx < d.r.z && hy >= d.r.y && hy < d.r.w && counts(d))
+			{
+				hit = true;
+				break;
+			}
+		}
+		if (!hit)
+			return false;
+	}
+
+	IRect rects[MAX_RECTS];
+	size_t n = 0;
+	s64 area_sum = 0;
+	bool on_grid = ((area.x | area.y | area.z | area.w) & 7) == 0;
+	for (const GSDirtyRect& d : list)
+	{
+		if (!counts(d))
+			continue;
+
+		const IRect r = {std::max(d.r.x, area.x), std::max(d.r.y, area.y),
+			std::min(d.r.z, area.z), std::min(d.r.w, area.w)};
+		if (r.z <= r.x || r.w <= r.y)
+			continue;
+		if (r.x == area.x && r.y == area.y && r.z == area.z && r.w == area.w)
+			return true;
+		if (n == MAX_RECTS)
+			return false;
+
+		rects[n++] = r;
+		area_sum += static_cast<s64>(r.z - r.x) * (r.w - r.y);
+		on_grid &= ((r.x | r.y | r.z | r.w) & 7) == 0;
+	}
+
+	if (area_sum < static_cast<s64>(area.z - area.x) * (area.w - area.y))
+		return false;
+
+	if (on_grid)
+	{
+		static constexpr size_t MAX_WORDS = 1024;
+		const int cells_x = (area.z - area.x) >> 3;
+		const int cells_y = (area.w - area.y) >> 3;
+		const size_t row_words = static_cast<size_t>(cells_x + 63) >> 6;
+		if (row_words * static_cast<size_t>(cells_y) <= MAX_WORDS)
+		{
+			u64 cells[MAX_WORDS];
+			std::memset(cells, 0, row_words * static_cast<size_t>(cells_y) * sizeof(u64));
+			for (size_t i = 0; i < n; i++)
+			{
+				const int x0 = (rects[i].x - area.x) >> 3, x1 = (rects[i].z - area.x) >> 3;
+				const int y0 = (rects[i].y - area.y) >> 3, y1 = (rects[i].w - area.y) >> 3;
+				const int w0 = x0 >> 6, w1 = (x1 - 1) >> 6;
+				if (w0 == w1)
+				{
+					const int lo = x0 & 63, count = x1 - x0;
+					const u64 mask = (count == 64 ? ~u64(0) : ((u64(1) << count) - 1)) << lo;
+					for (int y = y0; y < y1; y++)
+						cells[static_cast<size_t>(y) * row_words + static_cast<size_t>(w0)] |= mask;
+				}
+				else
+				{
+					for (int y = y0; y < y1; y++)
+					{
+						u64* const row = &cells[static_cast<size_t>(y) * row_words];
+						for (int w = w0; w <= w1; w++)
+						{
+							const int lo = std::max(x0 - w * 64, 0);
+							const int hi = std::min(x1 - w * 64, 64);
+							row[w] |= (hi == 64 ? ~u64(0) : ((u64(1) << hi) - 1)) & ~((u64(1) << lo) - 1);
+						}
+					}
+				}
+			}
+
+			for (int y = 0; y < cells_y; y++)
+			{
+				const u64* const row = &cells[static_cast<size_t>(y) * row_words];
+				for (size_t w = 0; w < row_words; w++)
+				{
+					const int left = cells_x - static_cast<int>(w) * 64;
+					const u64 want = left >= 64 ? ~u64(0) : ((u64(1) << left) - 1);
+					const u64 missing = want & ~row[w];
+					if (missing != 0)
+					{
+						if (hole)
+						{
+							const int cx = static_cast<int>(w) * 64 + std::countr_zero(missing);
+							*hole = GSVector2i(area.x + cx * 8, area.y + y * 8);
+						}
+						return false;
+					}
+				}
+			}
+			return true;
+		}
+	}
+
+	// Sweep distinct horizontal edges. Every rectangle spanning a strip contributes a vertical interval.
+	std::sort(rects, rects + n, [](const IRect& a, const IRect& b) { return a.y < b.y; });
+	int xs[2 * MAX_RECTS + 2];
+	size_t m = 0;
+	xs[m++] = area.x;
+	xs[m++] = area.z;
+	for (size_t i = 0; i < n; i++)
+	{
+		xs[m++] = rects[i].x;
+		xs[m++] = rects[i].z;
+	}
+	std::sort(xs, xs + m);
+	m = static_cast<size_t>(std::unique(xs, xs + m) - xs);
+
+	for (size_t i = 0; i + 1 < m; i++)
+	{
+		const int x0 = xs[i], x1 = xs[i + 1];
+		int reach = area.y;
+		for (size_t k = 0; k < n && reach < area.w; k++)
+		{
+			const IRect& r = rects[k];
+			if (r.x > x0 || r.z < x1)
+				continue;
+			if (r.y > reach)
+			{
+				if (hole)
+					*hole = GSVector2i(x0, reach);
+				return false;
+			}
+			reach = std::max(reach, r.w);
+		}
+		if (reach < area.w)
+		{
+			if (hole)
+				*hole = GSVector2i(x0, reach);
+			return false;
+		}
+	}
+	return true;
+}
+
+bool GSTextureCache::FullRectDirtyByUnion(Target* target)
+{
+	if (target->m_dirty.size() < 2 || target->m_dirty_revision == target->m_dirty_cover_checked)
+		return false;
+	target->m_dirty_cover_checked = target->m_dirty_revision;
+	return DirtyRectsCover(target->m_dirty, target->m_TEX0.PSM, target->m_TEX0.TBW,
+		GSUtil::GetChannelMask(target->m_TEX0.PSM), target->m_valid, &target->m_dirty_hole);
+}
+
 void GSTextureCache::AddDirtyRectTarget(Target* target, GSVector4i rect, u32 psm, u32 bw, RGBAMask rgba, bool req_linear)
 {
 	bool skipdirty = false;
@@ -354,6 +528,7 @@ void GSTextureCache::AddDirtyRectTarget(Target* target, GSVector4i rect, u32 psm
 	{
 		GL_INS("TC: Dirty rect added for BP %x rect %d,%d->%d->%d", target->m_TEX0.TBP0, rect.x, rect.y, rect.z, rect.w);
 		target->m_dirty.push_back(GSDirtyRect(rect, psm, bw, rgba, req_linear));
+		target->DirtyListChanged();
 
 		if (!target->m_drawn_since_read.rempty())
 		{
@@ -2695,6 +2870,7 @@ GSTextureCache::Target* GSTextureCache::LookupTarget(GIFRegTEX0 TEX0, const GSVe
 									// clear materialization. Force raw upload even if normal preload
 									// heuristics recognized that older clear.
 									reloaded->m_dirty.clear();
+									reloaded->DirtyListChanged();
 									RGBAMask channels;
 									channels._u32 = GSUtil::GetChannelMask(TEX0.PSM);
 									AddDirtyRectTarget(reloaded, GSVector4i::loadh(size), TEX0.PSM, TEX0.TBW, channels, true);
@@ -3371,7 +3547,10 @@ GSTextureCache::Target* GSTextureCache::LookupTarget(GIFRegTEX0 TEX0, const GSVe
 					for (s32 i = static_cast<s32>(dst->m_dirty.size()) - 1; i >= 0; i--)
 					{
 						if (!dst->m_dirty[i].rgba.c.a)
+						{
 							dst->m_dirty.erase(dst->m_dirty.begin() + static_cast<size_t>(i));
+							dst->DirtyListChanged();
+						}
 					}
 				}
 			}
@@ -3381,6 +3560,7 @@ GSTextureCache::Target* GSTextureCache::LookupTarget(GIFRegTEX0 TEX0, const GSVe
 				{
 					GL_INS("TC: Clearing dirty list for %s[%x] because we're overwriting the whole target.", to_string(type), dst->m_TEX0.TBP0);
 					dst->m_dirty.clear();
+					dst->DirtyListChanged();
 				}
 
 				// And invalidate the target, we're drawing over it so we don't care what's there.
@@ -3575,6 +3755,8 @@ GSTextureCache::Target* GSTextureCache::LookupTarget(GIFRegTEX0 TEX0, const GSVe
 
 				dst->m_dirty = std::move(dst_match->m_dirty);
 				dst_match->m_dirty = {};
+				dst->DirtyListChanged();
+				dst_match->DirtyListChanged();
 				dst->m_alpha_max = dst_match->m_alpha_max;
 				dst->m_alpha_min = dst_match->m_alpha_min;
 
@@ -3716,6 +3898,7 @@ GSTextureCache::Target* GSTextureCache::CreateTarget(GIFRegTEX0 TEX0, const GSVe
 		{
 			GL_INS("TC: Clear dirty list on new target %x, because it was a zero clear", TEX0.TBP0);
 			dst->m_dirty.clear();
+			dst->DirtyListChanged();
 		}
 	}
 
@@ -4049,9 +4232,14 @@ bool GSTextureCache::PreloadTarget(GIFRegTEX0 TEX0, const GSVector2i& size, cons
 							old_dst->Update();
 
 							if (dst->m_valid.rintersect(copy_rect - GSVector4i(0, new_valid.w).xyxy()).eq(dst->m_valid))
+							{
 								dst->m_dirty.clear();
+								dst->DirtyListChanged();
+							}
 							else
+							{
 								dst->Update();
+							}
 
 							dst->m_valid_rgb = old_dst->m_valid_rgb;
 							dst->m_valid_alpha_low = old_dst->m_valid_alpha_low;
@@ -4582,11 +4770,18 @@ bool GSTextureCache::CopyRGBFromDepthToColor(Target* dst, Target* depth_src)
 		const GSVector4i drc = dr.GetDirtyRect(dst->m_TEX0, false);
 		if (!drc.rintersect(clear_dirty_rc).rempty())
 		{
-			if ((dr.rgba._u32 &= ~0x7) == 0)
+			const u32 previous_mask = dr.rgba._u32;
+			dr.rgba._u32 &= ~0x7;
+			if (dr.rgba._u32 == 0)
 			{
 				GL_CACHE("TC: Remove dirty rect (%d,%d=>%d,%d) from %s[%x, %s] due to incoming depth.", drc.left,
 					drc.top, drc.right, drc.bottom, to_string(dst->m_type), dst->m_TEX0.TBP0, GSUtil::GetPSMName(dst->m_TEX0.PSM));
 				dst->m_dirty.erase(dst->m_dirty.begin() + i);
+				dst->DirtyListChanged();
+			}
+			else if (dr.rgba._u32 != previous_mask)
+			{
+				dst->DirtyListChanged();
 			}
 		}
 	}
@@ -5168,7 +5363,7 @@ void GSTextureCache::InvalidateVideoMem(const GSOffset& off, const GSVector4i& r
 						else
 							AddDirtyRectTarget(t, r, psm, bw, rgba);
 
-						if (FullRectDirty(t))
+						if (FullRectDirty(t) || FullRectDirtyByUnion(t))
 						{
 							InvalidateSourcesFromTarget(t);
 							i = list.erase(j);
@@ -5186,7 +5381,7 @@ void GSTextureCache::InvalidateVideoMem(const GSOffset& off, const GSVector4i& r
 					// Try the hard way for partial invalidation.
 					DirtyRectByPage(bp, psm, bw, t, r);
 
-					if (FullRectDirty(t, rgba._u32))
+					if (FullRectDirty(t, rgba._u32) || FullRectDirtyByUnion(t))
 					{
 						InvalidateSourcesFromTarget(t);
 						i = list.erase(j);
@@ -7773,6 +7968,7 @@ bool GSTextureCache::UploadClearPattern(Target* dst, const GIFRegTEX0& old_tex0,
 	// replaces that metadata with the exact raw pattern. RGB5A1 alpha is only
 	// 0/128, so correction is exact and avoids a later ScaleRTAlpha copy.
 	dst->m_dirty.clear();
+	dst->DirtyListChanged();
 	dst->m_rt_alpha_scale = !depth;
 	dst->m_valid_rgb = dst->m_valid_alpha_low = dst->m_valid_alpha_high = true;
 	dst->UpdateValidity(GSVector4i(0, 0, width, height));
@@ -8506,6 +8702,7 @@ void GSTextureCache::Target::Update(bool cannot_scale)
 		// do the most likely thing a direct write would do, clear it
 		GL_INS("TC: ERROR: Update DepthStencil dummy");
 		m_dirty.clear();
+		DirtyListChanged();
 		return;
 	}
 
@@ -8514,6 +8711,7 @@ void GSTextureCache::Target::Update(bool cannot_scale)
 	{
 		GL_INS("TC: ERROR: Nothing to update?");
 		m_dirty.clear();
+		DirtyListChanged();
 		return;
 	}
 
@@ -8672,6 +8870,7 @@ void GSTextureCache::Target::Update(bool cannot_scale)
 	}
 
 	m_dirty.clear();
+	DirtyListChanged();
 }
 
 void GSTextureCache::Target::UpdateIfDirtyIntersects(const GSVector4i& rc)
