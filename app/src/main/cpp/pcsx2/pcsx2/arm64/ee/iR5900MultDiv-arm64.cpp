@@ -6,6 +6,11 @@
 #include "arm64/OaknutHelpers-arm64.h"
 #include "arm64/ee/iR5900-arm64.h"
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+extern "C" bool EmuCoreXOracleCaptureMaddRange;
+extern "C" void EmuCoreXOracleRecordMaddRange(const u32* words, size_t count);
+#endif
+
 #if !defined(__ANDROID__)
 using namespace x86Emitter;
 #endif
@@ -876,21 +881,6 @@ static void addConstantAndWriteBackToHiLoRd(u64 constant)
 	writeBackMAddToHiLoRd<HiloID>();
 }
 
-template <int HiloID>
-static void addEaxEdxAndWriteBackToHiLoRd()
-{
-	recBeginOaknutEmit();
-
-	oakLoad32(oak::util::W4, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.LO.UL[HiloID * 2]))});
-	oakAsm->ADDS(oak::util::W0, oak::util::W0, oak::util::W4);
-	oakLoad32(oak::util::W4, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.HI.UL[HiloID * 2]))});
-	oakAsm->ADC(oak::util::W2, oak::util::W2, oak::util::W4);
-
-	recEndOaknutEmit();
-
-	writeBackMAddToHiLoRd<HiloID>();
-}
-
 template <bool Signed, int HiloID>
 static void recMADDExact_emit_oaknut()
 {
@@ -905,21 +895,35 @@ static void recMADDExact_emit_oaknut()
 
 	_deleteEEreg(XMMGPR_LO, 1);
 	_deleteEEreg(XMMGPR_HI, 1);
+	#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+	u8* const emitted_range_begin = oakGetCurrentCodePointer();
+	#endif
 
 	recBeginOaknutEmit();
 
 	recMoveGPRtoOakW(oak::util::W0, _Rs_);
 	recMoveGPRtoOakW(oak::util::W4, _Rt_);
+	oakLoad32(oak::util::W2, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.LO.UL[HiloID * 2]))});
+	oakLoad32(oak::util::W5, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.HI.UL[HiloID * 2]))});
+	oakAsm->ORR(oak::util::X2, oak::util::X2, oak::util::X5, oak::LogShift::LSL, 32);
 
 	if constexpr (Signed)
-		oakAsm->SMULL(oak::util::X0, oak::util::W0, oak::util::W4);
+		oakAsm->SMADDL(oak::util::X0, oak::util::W0, oak::util::W4, oak::util::X2);
 	else
-		oakAsm->UMULL(oak::util::X0, oak::util::W0, oak::util::W4);
+		oakAsm->UMADDL(oak::util::X0, oak::util::W0, oak::util::W4, oak::util::X2);
 	oakAsm->LSR(oak::util::X2, oak::util::X0, 32);
 
 	recEndOaknutEmit();
 
-	addEaxEdxAndWriteBackToHiLoRd<HiloID>();
+	writeBackMAddToHiLoRd<HiloID>();
+	#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+	if (EmuCoreXOracleCaptureMaddRange)
+	{
+		const u8* const emitted_range_end = oakGetCurrentCodePointer();
+		EmuCoreXOracleRecordMaddRange(reinterpret_cast<const u32*>(emitted_range_begin),
+			static_cast<size_t>(emitted_range_end - emitted_range_begin) / sizeof(u32));
+	}
+	#endif
 }
 
 static void recMADD_emit_oaknut()

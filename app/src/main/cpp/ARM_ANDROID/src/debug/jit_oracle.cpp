@@ -75,6 +75,42 @@ extern "C" void EmuCoreXOracleBlendCarry(void (*check)(bool, const char*));
 #include <android/log.h>
 #include <cerrno>
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+extern "C" bool EmuCoreXOracleCaptureMaddRange = false;
+namespace
+{
+constexpr size_t EMUCOREX_MADD_CAPTURE_MAX_WORDS = 64;
+u32 s_maddCaptureWords[EMUCOREX_MADD_CAPTURE_MAX_WORDS]{};
+size_t s_maddCaptureWordCount = 0;
+bool s_maddCaptureOverflow = false;
+}
+extern "C" void EmuCoreXOracleResetMaddRange()
+{
+    s_maddCaptureWordCount = 0;
+    s_maddCaptureOverflow = false;
+}
+extern "C" void EmuCoreXOracleRecordMaddRange(const u32* words, size_t count)
+{
+    if (!EmuCoreXOracleCaptureMaddRange)
+        return;
+    if (count > EMUCOREX_MADD_CAPTURE_MAX_WORDS)
+    {
+        s_maddCaptureOverflow = true;
+        count = EMUCOREX_MADD_CAPTURE_MAX_WORDS;
+    }
+    std::memcpy(s_maddCaptureWords, words, count * sizeof(u32));
+    s_maddCaptureWordCount = count;
+}
+extern "C" size_t EmuCoreXOracleGetMaddRange(u32* words, size_t capacity, bool* overflow)
+{
+    const size_t count = std::min(capacity, s_maddCaptureWordCount);
+    std::memcpy(words, s_maddCaptureWords, count * sizeof(u32));
+    if (overflow)
+        *overflow = s_maddCaptureOverflow;
+    return s_maddCaptureWordCount;
+}
+#endif
+
 #include "jit_oracle_semaphore.inl"
 #include "jit_oracle_ir_policy.h"
 
@@ -4171,6 +4207,7 @@ void EECoverageCop2Spec2()
 #include "jit_oracle_ee_fastmem_abi.inl"
 #include "jit_oracle_ee_fastmem_exit.inl"
 #include "jit_oracle_ee_fastmem_cold.inl"
+#include "jit_oracle_ee_madd.inl"
 
 void EEVuAbsSharedTests()
 {
@@ -10064,6 +10101,11 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
         EEUnalignedStoreTests();
         return;
     }
+    if (direct_suite && std::strcmp(direct_suite, "ee-madd") == 0)
+    {
+        EeMaddNativeOracleTests();
+        return;
+    }
     if (direct_suite && std::strcmp(direct_suite, "ee-unaligned-word-stores") == 0)
     {
         EEUnalignedWordStoreTests();
@@ -12575,7 +12617,7 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
     else if (std::strcmp(suite, "ee-branch-immediates") == 0)
         EETests(false, false, false, false, false, false, false, false, false,
             false, false, false, false, false, false, 0, false, false, false, true);
-    else if (std::strcmp(suite, "ee-direct") == 0 || std::strcmp(suite, "ee-direct-stores") == 0 ||
+    else if (std::strcmp(suite, "ee-madd") == 0 || std::strcmp(suite, "ee-direct") == 0 || std::strcmp(suite, "ee-direct-stores") == 0 ||
         std::strcmp(suite, "ee-unaligned-stores") == 0 || std::strcmp(suite, "ee-unaligned-word-stores") == 0 ||
         std::strcmp(suite, "ee-vu-local") == 0 || std::strcmp(suite, "ee-vu-status") == 0 ||
         std::strcmp(suite, "ee-vu-local-clip") == 0 || std::strcmp(suite, "ee-vu-local-identity") == 0 || std::strcmp(suite, "ee-vu-zero-tail") == 0 || std::strcmp(suite, "ee-vu-lower-zero-tail") == 0)
