@@ -113,24 +113,24 @@ object GameLaunchShortcut {
             bootBios = bootBios,
             bootSmokeProbe = bootSmokeProbe,
             autotestMode = autotestMode,
-            enableEeRecompiler = optionalBooleanExtra(intent, EXTRA_ENABLE_EE_RECOMPILER)
-                ?: optionalBooleanQuery(data, "enableEeRecompiler"),
-            enableIopRecompiler = optionalBooleanExtra(intent, EXTRA_ENABLE_IOP_RECOMPILER)
-                ?: optionalBooleanQuery(data, "enableIopRecompiler"),
-            enableVu0Recompiler = optionalBooleanExtra(intent, EXTRA_ENABLE_VU0_RECOMPILER)
-                ?: optionalBooleanQuery(data, "enableVu0Recompiler"),
-            enableVu1Recompiler = optionalBooleanExtra(intent, EXTRA_ENABLE_VU1_RECOMPILER)
-                ?: optionalBooleanQuery(data, "enableVu1Recompiler"),
-            enableFastmem = optionalBooleanExtra(intent, EXTRA_ENABLE_FASTMEM)
-                ?: optionalBooleanQuery(data, "enableFastmem"),
-            enableMtvu = optionalBooleanExtra(intent, EXTRA_ENABLE_MTVU)
-                ?: optionalBooleanQuery(data, "enableMtvu"),
-            enableIopThread = optionalBooleanExtra(intent, EXTRA_ENABLE_IOP_THREAD)
-                ?: optionalBooleanQuery(data, "enableIopThread"),
-            enableVUAot = optionalBooleanExtra(intent, EXTRA_ENABLE_VU_AOT)
-                ?: optionalBooleanQuery(data, "enableVUAot"),
-            renderer = optionalIntExtra(intent, EXTRA_RENDERER)
-                ?: optionalIntQuery(data, "renderer"),
+            enableEeRecompiler = if (BuildConfig.DEBUG) optionalBooleanExtra(intent, EXTRA_ENABLE_EE_RECOMPILER)
+                ?: optionalBooleanQuery(data, "enableEeRecompiler") else null,
+            enableIopRecompiler = if (BuildConfig.DEBUG) optionalBooleanExtra(intent, EXTRA_ENABLE_IOP_RECOMPILER)
+                ?: optionalBooleanQuery(data, "enableIopRecompiler") else null,
+            enableVu0Recompiler = if (BuildConfig.DEBUG) optionalBooleanExtra(intent, EXTRA_ENABLE_VU0_RECOMPILER)
+                ?: optionalBooleanQuery(data, "enableVu0Recompiler") else null,
+            enableVu1Recompiler = if (BuildConfig.DEBUG) optionalBooleanExtra(intent, EXTRA_ENABLE_VU1_RECOMPILER)
+                ?: optionalBooleanQuery(data, "enableVu1Recompiler") else null,
+            enableFastmem = if (BuildConfig.DEBUG) optionalBooleanExtra(intent, EXTRA_ENABLE_FASTMEM)
+                ?: optionalBooleanQuery(data, "enableFastmem") else null,
+            enableMtvu = if (BuildConfig.DEBUG) optionalBooleanExtra(intent, EXTRA_ENABLE_MTVU)
+                ?: optionalBooleanQuery(data, "enableMtvu") else null,
+            enableIopThread = if (BuildConfig.DEBUG) optionalBooleanExtra(intent, EXTRA_ENABLE_IOP_THREAD)
+                ?: optionalBooleanQuery(data, "enableIopThread") else null,
+            enableVUAot = if (BuildConfig.DEBUG) optionalBooleanExtra(intent, EXTRA_ENABLE_VU_AOT)
+                ?: optionalBooleanQuery(data, "enableVUAot") else null,
+            renderer = if (BuildConfig.DEBUG) optionalIntExtra(intent, EXTRA_RENDERER)
+                ?: optionalIntQuery(data, "renderer") else null,
             gsDumpFrames = if (BuildConfig.DEBUG) (optionalIntExtra(intent, EXTRA_GS_DUMP_FRAMES)
                 ?: optionalIntQuery(data, "gsDumpFrames")) else null,
             gsDumpDelayMs = if (BuildConfig.DEBUG) (optionalIntExtra(intent, EXTRA_GS_DUMP_DELAY_MS)
