@@ -3034,4 +3034,16 @@
     <string name="settings_help_vu_aot">Kann bei aktiviertem VU1-Recompiler die Geschwindigkeit verbessern. Nicht unterstützter Code wird automatisch mit dem normalen Compiler verarbeitet.</string>
     <string name="bios_formats_label">Formate: %1$s</string>
     <string name="bios_archives_label">Archive (automatisch entpackt): %1$s</string>
+    <string name="onboarding_drive_title">Google Drive-Backup</string>
+    <string name="onboarding_drive_subtitle">Deine Spielstände und Einstellungen – sicher in deinem eigenen Drive.</string>
+    <string name="onboarding_drive_included">Gesichert: Einstellungen und Steuerung, Speicherkarten, Spielstände, Cheats, Patches, Texturpakete und Gestaltung.</string>
+    <string name="onboarding_drive_excluded">Nie hochgeladen: Spiele, BIOS-Dateien, Caches und Anmeldedaten.</string>
+    <string name="onboarding_drive_schedule">Automatische Kopien nach dem Schließen eines Spiels oder alle paar Stunden – nur über WLAN, beim Laden, mit den neuesten Kopien.</string>
+    <string name="onboarding_drive_note">Zu finden unter Einstellungen → Google Drive.</string>
+    <string name="onboarding_account_title">Dein EmuCoreX-Profil</string>
+    <string name="onboarding_account_subtitle">Ein Konto für Cloud-Einstellungen, Statistiken und die Community.</string>
+    <string name="onboarding_account_cloud">Bis zu 5 Emulator-Einstellungsprofile in der Cloud speichern und auf jedem Gerät wiederherstellen.</string>
+    <string name="onboarding_account_community">Spielzeit verfolgen, in die Bestenliste kommen, Freunde hinzufügen und Erfolge freischalten.</string>
+    <string name="onboarding_account_privacy">Cloud-Profile speichern nur Einstellungen. Spiele, BIOS, Spielstände und Speicherkarten bleiben auf diesem Gerät; jedes Gerät nutzt eine zufällige ID, die du zeigen oder ausblenden kannst.</string>
+    <string name="onboarding_account_note">Die Anmeldung ist optional – öffne einfach den Profil-Tab.</string>
 </resources>

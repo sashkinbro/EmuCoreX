@@ -3034,4 +3034,16 @@
     <string name="settings_help_vu_aot">Peut améliorer la vitesse lorsque le recompilateur VU1 est activé. Le code non pris en charge utilise automatiquement le compilateur normal.</string>
     <string name="bios_formats_label">Formats : %1$s</string>
     <string name="bios_archives_label">Archives (décompressées automatiquement) : %1$s</string>
+    <string name="onboarding_drive_title">Sauvegarde Google Drive</string>
+    <string name="onboarding_drive_subtitle">Vos sauvegardes et réglages, à l\'abri dans votre propre Drive.</string>
+    <string name="onboarding_drive_included">Sauvegardés : réglages et commandes, cartes mémoire, états, codes de triche, correctifs, packs de textures et apparence.</string>
+    <string name="onboarding_drive_excluded">Jamais envoyés : jeux, fichiers BIOS, caches et données de connexion.</string>
+    <string name="onboarding_drive_schedule">Copies automatiques après la fermeture d\'un jeu ou toutes les quelques heures — Wi-Fi uniquement, pendant la charge, en conservant les copies récentes.</string>
+    <string name="onboarding_drive_note">À retrouver dans Réglages → Google Drive.</string>
+    <string name="onboarding_account_title">Votre profil EmuCoreX</string>
+    <string name="onboarding_account_subtitle">Un compte pour les réglages cloud, les statistiques et la communauté.</string>
+    <string name="onboarding_account_cloud">Conservez jusqu\'à 5 profils de réglages de l\'émulateur dans le cloud et restaurez-les sur n\'importe quel appareil.</string>
+    <string name="onboarding_account_community">Suivez votre temps de jeu, entrez dans le classement, ajoutez des amis et débloquez des succès.</string>
+    <string name="onboarding_account_privacy">Les profils cloud ne stockent que les réglages. Jeux, BIOS, sauvegardes et cartes mémoire restent sur cet appareil ; chaque appareil utilise un identifiant aléatoire que vous pouvez afficher ou masquer.</string>
+    <string name="onboarding_account_note">La connexion est facultative — ouvrez l\'onglet Profil quand vous voulez.</string>
 </resources>

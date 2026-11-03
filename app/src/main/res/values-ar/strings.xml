@@ -3036,4 +3036,16 @@
     <string name="settings_help_vu_aot">قد يحسن السرعة عند تفعيل إعادة الترجمة لـ VU1. ستستخدم الشيفرة غير المدعومة المترجم العادي تلقائيًا.</string>
     <string name="bios_formats_label">الصيغ: %1$s</string>
     <string name="bios_archives_label">الأرشيفات (تُستخرج تلقائيًا): %1$s</string>
+    <string name="onboarding_drive_title">نسخ احتياطي على Google Drive</string>
+    <string name="onboarding_drive_subtitle">حفظاتك وإعداداتك في أمان داخل Drive الخاص بك.</string>
+    <string name="onboarding_drive_included">يُنسخ احتياطيًا: الإعدادات وأدوات التحكم، وبطاقات الذاكرة، وحالات الحفظ، والغش، والتعديلات، وحزم الملمس، والمظهر.</string>
+    <string name="onboarding_drive_excluded">لا يُرفع أبدًا: الألعاب وملفات BIOS وذاكرة التخزين المؤقت وبيانات تسجيل الدخول.</string>
+    <string name="onboarding_drive_schedule">نسخ تلقائية بعد إغلاق اللعبة أو كل بضع ساعات — عبر Wi-Fi فقط، وأثناء الشحن، مع الاحتفاظ بأحدث النسخ.</string>
+    <string name="onboarding_drive_note">تجده في الإعدادات → Google Drive.</string>
+    <string name="onboarding_account_title">ملفك الشخصي في EmuCoreX</string>
+    <string name="onboarding_account_subtitle">حساب واحد لإعدادات السحابة والإحصاءات والمجتمع.</string>
+    <string name="onboarding_account_cloud">احفظ حتى 5 ملفات تعريف لإعدادات المحاكي في السحابة واستعدها على أي جهاز.</string>
+    <string name="onboarding_account_community">تابع وقت اللعب، وانضم إلى لوحة المتصدرين، وأضف أصدقاء، وافتح الإنجازات.</string>
+    <string name="onboarding_account_privacy">ملفات التعريف السحابية تحفظ الإعدادات فقط. الألعاب وBIOS والحفظات وبطاقات الذاكرة تبقى على هذا الجهاز؛ ولكل جهاز معرّف عشوائي يمكنك إظهاره أو إخفاؤه.</string>
+    <string name="onboarding_account_note">تسجيل الدخول اختياري — افتح علامة التبويب «الملف الشخصي» وقتما تشاء.</string>
 </resources>

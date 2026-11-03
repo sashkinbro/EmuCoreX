@@ -3052,4 +3052,16 @@
     <string name="settings_help_vu_aot">Může zvýšit rychlost při zapnutém rekompilátoru VU1. Nepodporovaný kód automaticky použije běžný kompilátor.</string>
     <string name="bios_formats_label">Formáty: %1$s</string>
     <string name="bios_archives_label">Archivy (rozbalí se automaticky): %1$s</string>
+    <string name="onboarding_drive_title">Záloha na Google Drive</string>
+    <string name="onboarding_drive_subtitle">Vaše uložené pozice a nastavení v bezpečí na vašem vlastním Drive.</string>
+    <string name="onboarding_drive_included">Zálohuje se: nastavení a ovládání, paměťové karty, stavy her, cheaty, patche, texturové balíčky a vzhled.</string>
+    <string name="onboarding_drive_excluded">Nikdy se nenahrává: hry, soubory BIOS, mezipaměti a přihlašovací údaje.</string>
+    <string name="onboarding_drive_schedule">Automatické kopie po zavření hry nebo každých pár hodin — jen přes Wi-Fi, při nabíjení, s uchováním nejnovějších kopií.</string>
+    <string name="onboarding_drive_note">Najdete to v Nastavení → Google Drive.</string>
+    <string name="onboarding_account_title">Váš profil EmuCoreX</string>
+    <string name="onboarding_account_subtitle">Jeden účet pro cloudová nastavení, statistiky a komunitu.</string>
+    <string name="onboarding_account_cloud">Uložte až 5 profilů nastavení emulátoru do cloudu a obnovte je na jakémkoli zařízení.</string>
+    <string name="onboarding_account_community">Sledujte čas hraní, dostávejte se do žebříčku, přidávejte přátele a odemykejte achievementy.</string>
+    <string name="onboarding_account_privacy">Cloudové profily ukládají pouze nastavení. Hry, BIOS, uložené pozice a paměťové karty zůstávají v tomto zařízení; každé zařízení používá náhodné ID, které můžete zobrazit nebo skrýt.</string>
+    <string name="onboarding_account_note">Přihlášení je dobrovolné — záložku Profil otevřete, kdykoli chcete.</string>
 </resources>

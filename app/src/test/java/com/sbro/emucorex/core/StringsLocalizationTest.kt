@@ -71,7 +71,19 @@ class StringsLocalizationTest {
         "settings_keyboard_mouse_source_keyboard",
         "settings_keyboard_mouse_source_mouse",
         "bios_formats_label",
-        "bios_archives_label"
+        "bios_archives_label",
+        "onboarding_drive_title",
+        "onboarding_drive_subtitle",
+        "onboarding_drive_included",
+        "onboarding_drive_excluded",
+        "onboarding_drive_schedule",
+        "onboarding_drive_note",
+        "onboarding_account_title",
+        "onboarding_account_subtitle",
+        "onboarding_account_cloud",
+        "onboarding_account_community",
+        "onboarding_account_privacy",
+        "onboarding_account_note"
     )
 
     @Test

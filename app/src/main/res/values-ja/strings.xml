@@ -3031,4 +3031,16 @@
     <string name="settings_help_vu_aot">VU1 リコンパイラーが有効な場合、速度が向上することがあります。非対応コードでは自動的に通常のコンパイラーが使われます。</string>
     <string name="bios_formats_label">対応形式: %1$s</string>
     <string name="bios_archives_label">アーカイブ（自動展開）: %1$s</string>
+    <string name="onboarding_drive_title">Google Drive バックアップ</string>
+    <string name="onboarding_drive_subtitle">セーブデータと設定を、自分の Drive に安全に保存します。</string>
+    <string name="onboarding_drive_included">バックアップ対象: 設定と操作、メモリーカード、ステートセーブ、チート、パッチ、テクスチャパック、外観。</string>
+    <string name="onboarding_drive_excluded">アップロードされないもの: ゲーム、BIOS ファイル、キャッシュ、ログイン情報。</string>
+    <string name="onboarding_drive_schedule">ゲームを閉じた後、または数時間ごとに自動でコピーします。Wi-Fi のみ、充電中に実行し、新しいコピーを保持します。</string>
+    <string name="onboarding_drive_note">設定 → Google Drive から利用できます。</string>
+    <string name="onboarding_account_title">EmuCoreX プロフィール</string>
+    <string name="onboarding_account_subtitle">クラウド設定・統計・コミュニティのための 1 つのアカウント。</string>
+    <string name="onboarding_account_cloud">エミュレーター設定のプロフィールを最大 5 件クラウドに保存し、どの端末でも復元できます。</string>
+    <string name="onboarding_account_community">プレイ時間を記録し、ランキングに参加し、フレンドを追加して実績を解除できます。</string>
+    <string name="onboarding_account_privacy">クラウドに保存されるのは設定だけです。ゲーム、BIOS、セーブデータ、メモリーカードはこの端末に残ります。端末はランダムな ID で識別され、表示・非表示を選べます。</string>
+    <string name="onboarding_account_note">サインインは任意です。プロフィールタブからいつでもどうぞ。</string>
 </resources>

@@ -52,12 +52,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.LibraryBooks
+import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Leaderboard
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.SmartDisplay
 import androidx.compose.material.icons.rounded.Star
 import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
@@ -470,11 +476,25 @@ fun OnboardingScreen(
                                     showSubtitle = false,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
-                                page == 3 -> OnboardingHeroPro(
+                                page == 3 -> OnboardingHeroFeature(
+                                    icon = Icons.Rounded.Cloud,
+                                    title = stringResource(R.string.onboarding_drive_title),
+                                    subtitle = stringResource(R.string.onboarding_drive_subtitle),
                                     showSubtitle = false,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
-                                page == 4 -> OnboardingHeroArcade(
+                                page == 4 -> OnboardingHeroFeature(
+                                    icon = Icons.Rounded.Person,
+                                    title = stringResource(R.string.onboarding_account_title),
+                                    subtitle = stringResource(R.string.onboarding_account_subtitle),
+                                    showSubtitle = false,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                                page == 5 -> OnboardingHeroPro(
+                                    showSubtitle = false,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                                page == 6 -> OnboardingHeroArcade(
                                     showSubtitle = false,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
@@ -524,6 +544,30 @@ fun OnboardingScreen(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center
                                 ) {
+                                    OnboardingDriveContent(modifier = Modifier.padding(horizontal = 32.dp))
+                                }
+                            } else if (page == 4) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState())
+                                        .statusBarsPadding()
+                                        .padding(top = 24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    OnboardingAccountContent(modifier = Modifier.padding(horizontal = 32.dp))
+                                }
+                            } else if (page == 5) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState())
+                                        .statusBarsPadding()
+                                        .padding(top = 24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
                                     OnboardingProContent(
                                         isProUnlocked = uiState.isProUnlocked,
                                         proPrice = uiState.proPrice,
@@ -540,7 +584,7 @@ fun OnboardingScreen(
                                         modifier = Modifier.padding(horizontal = 32.dp)
                                     )
                                 }
-                            } else if (page == 4) {
+                            } else if (page == 6) {
                                 Text(
                                     text = stringResource(R.string.namco_guide_subtitle),
                                     style = MaterialTheme.typography.bodyLarge.copy(
@@ -679,6 +723,24 @@ fun OnboardingScreen(
                         when (page) {
                             0, 1, 2 -> OnboardingHero(page = page)
                             3 -> {
+                                OnboardingHeroFeature(
+                                    icon = Icons.Rounded.Cloud,
+                                    title = stringResource(R.string.onboarding_drive_title),
+                                    subtitle = stringResource(R.string.onboarding_drive_subtitle)
+                                )
+                                Spacer(modifier = Modifier.height(32.dp))
+                                OnboardingDriveContent()
+                            }
+                            4 -> {
+                                OnboardingHeroFeature(
+                                    icon = Icons.Rounded.Person,
+                                    title = stringResource(R.string.onboarding_account_title),
+                                    subtitle = stringResource(R.string.onboarding_account_subtitle)
+                                )
+                                Spacer(modifier = Modifier.height(32.dp))
+                                OnboardingAccountContent()
+                            }
+                            5 -> {
                                 OnboardingHeroPro()
                                 Spacer(modifier = Modifier.height(32.dp))
                                 OnboardingProContent(
@@ -696,8 +758,8 @@ fun OnboardingScreen(
                                     contentFocusRequester = pageContentFocusRequesters[page]
                                 )
                             }
-                            4 -> OnboardingHeroArcade()
-                            5 -> {
+                            6 -> OnboardingHeroArcade()
+                            7 -> {
                                 OnboardingHeroSetup()
                                 Spacer(modifier = Modifier.height(32.dp))
                                 OnboardingSetupContent(
@@ -1571,6 +1633,131 @@ private fun OnboardingSetupScrollHint(
 }
 
 
+
+@Composable
+private fun OnboardingHeroFeature(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    showSubtitle: Boolean = true
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.widthIn(max = 480.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(112.dp)
+                .clip(neonShape(32.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(56.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(28.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.displaySmall.copy(
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.5).sp
+            ),
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center
+        )
+        if (showSubtitle) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 24.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+        }
+    }
+}
+
+private data class OnboardingFact(
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val text: String
+)
+
+@Composable
+private fun OnboardingInfoCard(
+    facts: List<OnboardingFact>,
+    note: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .widthIn(max = 520.dp),
+        shape = neonShape(24.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+        tonalElevation = 4.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            facts.forEach { fact ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        imageVector = fact.icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = fact.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Text(
+                text = note,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun OnboardingDriveContent(modifier: Modifier = Modifier) {
+    OnboardingInfoCard(
+        facts = listOf(
+            OnboardingFact(Icons.Rounded.CheckCircle, stringResource(R.string.onboarding_drive_included)),
+            OnboardingFact(Icons.Rounded.Block, stringResource(R.string.onboarding_drive_excluded)),
+            OnboardingFact(Icons.Rounded.Schedule, stringResource(R.string.onboarding_drive_schedule))
+        ),
+        note = stringResource(R.string.onboarding_drive_note),
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun OnboardingAccountContent(modifier: Modifier = Modifier) {
+    OnboardingInfoCard(
+        facts = listOf(
+            OnboardingFact(Icons.Rounded.Cloud, stringResource(R.string.onboarding_account_cloud)),
+            OnboardingFact(Icons.Rounded.Leaderboard, stringResource(R.string.onboarding_account_community)),
+            OnboardingFact(Icons.Rounded.Lock, stringResource(R.string.onboarding_account_privacy))
+        ),
+        note = stringResource(R.string.onboarding_account_note),
+        modifier = modifier
+    )
+}
 
 @Composable
 @Suppress("unused")

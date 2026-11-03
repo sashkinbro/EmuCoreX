@@ -3033,4 +3033,16 @@
     <string name="settings_help_vu_aot">启用 VU1 重编译器后可能提升速度。不支持的代码会自动使用常规编译器。</string>
     <string name="bios_formats_label">格式：%1$s</string>
     <string name="bios_archives_label">压缩包（自动解压）：%1$s</string>
+    <string name="onboarding_drive_title">Google Drive 备份</string>
+    <string name="onboarding_drive_subtitle">把你的存档和设置安全地保存在自己的 Drive 中。</string>
+    <string name="onboarding_drive_included">备份内容：设置与操作、记忆卡、即时存档、金手指、补丁、纹理包和外观。</string>
+    <string name="onboarding_drive_excluded">不会上传：游戏、BIOS 文件、缓存和登录数据。</string>
+    <string name="onboarding_drive_schedule">关闭游戏后或每隔几小时自动备份——仅限 Wi-Fi、充电时，并保留最新的副本。</string>
+    <string name="onboarding_drive_note">可在 设置 → Google Drive 中使用。</string>
+    <string name="onboarding_account_title">你的 EmuCoreX 个人资料</string>
+    <string name="onboarding_account_subtitle">一个账户，管理云端设置、统计和社区。</string>
+    <string name="onboarding_account_cloud">最多可在云端保存 5 个模拟器设置配置，并在任何设备上恢复。</string>
+    <string name="onboarding_account_community">记录游戏时长，登上排行榜，添加好友并解锁成就。</string>
+    <string name="onboarding_account_privacy">云端配置只保存设置。游戏、BIOS、存档和记忆卡仍保留在本设备；每台设备使用随机 ID，你可以选择显示或隐藏。</string>
+    <string name="onboarding_account_note">登录是可选的——随时打开「个人资料」标签页即可。</string>
 </resources>

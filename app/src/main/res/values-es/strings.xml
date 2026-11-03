@@ -3034,4 +3034,16 @@
     <string name="settings_help_vu_aot">Puede mejorar la velocidad si el recompilador de VU1 está activado. El código no compatible usa automáticamente el compilador normal.</string>
     <string name="bios_formats_label">Formatos: %1$s</string>
     <string name="bios_archives_label">Archivos comprimidos (se descomprimen solos): %1$s</string>
+    <string name="onboarding_drive_title">Copia de seguridad en Google Drive</string>
+    <string name="onboarding_drive_subtitle">Tus partidas y ajustes, a salvo en tu propio Drive.</string>
+    <string name="onboarding_drive_included">Se copian: ajustes y controles, tarjetas de memoria, estados, trucos, parches, paquetes de texturas y apariencia.</string>
+    <string name="onboarding_drive_excluded">Nunca se suben: juegos, archivos BIOS, cachés y datos de inicio de sesión.</string>
+    <string name="onboarding_drive_schedule">Copias automáticas al cerrar un juego o cada pocas horas: solo por Wi-Fi, mientras se carga y conservando las copias recientes.</string>
+    <string name="onboarding_drive_note">Está en Ajustes → Google Drive.</string>
+    <string name="onboarding_account_title">Tu perfil de EmuCoreX</string>
+    <string name="onboarding_account_subtitle">Una cuenta para ajustes en la nube, estadísticas y comunidad.</string>
+    <string name="onboarding_account_cloud">Guarda hasta 5 perfiles de ajustes del emulador en la nube y restáuralos en cualquier dispositivo.</string>
+    <string name="onboarding_account_community">Sigue tu tiempo de juego, entra en la clasificación, añade amigos y desbloquea logros.</string>
+    <string name="onboarding_account_privacy">Los perfiles en la nube solo guardan ajustes. Los juegos, BIOS, estados y tarjetas de memoria se quedan en este dispositivo; cada dispositivo usa un ID aleatorio que puedes mostrar u ocultar.</string>
+    <string name="onboarding_account_note">Iniciar sesión es opcional: abre la pestaña Perfil cuando quieras.</string>
 </resources>

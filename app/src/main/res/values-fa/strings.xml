@@ -3047,4 +3047,16 @@
     <string name="settings_help_vu_aot">ممکن است با فعال بودن کامپایلر مجدد VU1 سرعت را افزایش دهد. کد پشتیبانی‌نشده به‌طور خودکار از کامپایلر عادی استفاده می‌کند.</string>
     <string name="bios_formats_label">قالب‌ها: %1$s</string>
     <string name="bios_archives_label">بایگانی‌ها (خودکار استخراج می‌شوند): %1$s</string>
+    <string name="onboarding_drive_title">پشتیبان‌گیری در Google Drive</string>
+    <string name="onboarding_drive_subtitle">ذخیره‌ها و تنظیمات شما در Drive خودتان امن است.</string>
+    <string name="onboarding_drive_included">پشتیبان‌گیری می‌شود: تنظیمات و کنترل‌ها، کارت‌های حافظه، وضعیت‌های ذخیره، تقلب‌ها، وصله‌ها، بسته‌های بافت و ظاهر.</string>
+    <string name="onboarding_drive_excluded">هرگز بارگذاری نمی‌شود: بازی‌ها، فایل‌های BIOS، حافظه نهان و داده‌های ورود.</string>
+    <string name="onboarding_drive_schedule">نسخه‌های خودکار پس از بستن بازی یا هر چند ساعت — فقط با Wi-Fi، هنگام شارژ، با نگه‌داشتن تازه‌ترین نسخه‌ها.</string>
+    <string name="onboarding_drive_note">آن را در تنظیمات → Google Drive پیدا می‌کنید.</string>
+    <string name="onboarding_account_title">پروفایل EmuCoreX شما</string>
+    <string name="onboarding_account_subtitle">یک حساب برای تنظیمات ابری، آمار و جامعه.</string>
+    <string name="onboarding_account_cloud">تا ۵ پروفایل تنظیمات شبیه‌ساز را در ابر نگه دارید و روی هر دستگاهی بازیابی کنید.</string>
+    <string name="onboarding_account_community">زمان بازی را پیگیری کنید، به جدول رده‌بندی برسید، دوست اضافه کنید و دستاوردها را باز کنید.</string>
+    <string name="onboarding_account_privacy">پروفایل‌های ابری فقط تنظیمات را ذخیره می‌کنند. بازی‌ها، BIOS، ذخیره‌ها و کارت‌های حافظه روی این دستگاه می‌مانند؛ هر دستگاه شناسه تصادفی دارد که می‌توانید نمایش دهید یا پنهان کنید.</string>
+    <string name="onboarding_account_note">ورود اختیاری است — هر وقت خواستید زبانه «پروفایل» را باز کنید.</string>
 </resources>

@@ -3037,4 +3037,16 @@
     <string name="settings_help_vu_aot">Может повысить скорость при включённом рекомпиляторе VU1. Неподдерживаемый код автоматически обрабатывается обычным компилятором.</string>
     <string name="bios_formats_label">Форматы: %1$s</string>
     <string name="bios_archives_label">Архивы (распаковываются автоматически): %1$s</string>
+    <string name="onboarding_drive_title">Резервные копии в Google Drive</string>
+    <string name="onboarding_drive_subtitle">Ваши сохранения и настройки — в безопасности в вашем собственном Drive.</string>
+    <string name="onboarding_drive_included">Копируются: настройки и управление, карты памяти, сохранения, читы, патчи, наборы текстур и оформление.</string>
+    <string name="onboarding_drive_excluded">Никогда не загружаются: игры, файлы BIOS, кеш и данные входа.</string>
+    <string name="onboarding_drive_schedule">Автоматические копии после закрытия игры или каждые несколько часов — только по Wi-Fi, во время зарядки, с сохранением последних копий.</string>
+    <string name="onboarding_drive_note">Найти можно в настройках → Google Drive.</string>
+    <string name="onboarding_account_title">Ваш профиль EmuCoreX</string>
+    <string name="onboarding_account_subtitle">Один аккаунт для облачных настроек, статистики и сообщества.</string>
+    <string name="onboarding_account_cloud">Храните до 5 профилей настроек эмулятора в облаке и восстанавливайте их на любом устройстве.</string>
+    <string name="onboarding_account_community">Отслеживайте время игры, попадайте в таблицу лидеров, добавляйте друзей и открывайте достижения.</string>
+    <string name="onboarding_account_privacy">Облачные профили хранят только настройки. Игры, BIOS, сохранения и карты памяти остаются на этом устройстве; каждое устройство имеет случайный ID, который можно показывать или скрывать.</string>
+    <string name="onboarding_account_note">Вход необязателен — откройте вкладку «Профиль», когда захотите.</string>
 </resources>

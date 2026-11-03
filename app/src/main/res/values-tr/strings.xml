@@ -3032,4 +3032,16 @@
     <string name="settings_help_vu_aot">VU1 yeniden derleyicisi etkinken hızı artırabilir. Desteklenmeyen kod otomatik olarak normal derleyiciyi kullanır.</string>
     <string name="bios_formats_label">Biçimler: %1$s</string>
     <string name="bios_archives_label">Arşivler (otomatik açılır): %1$s</string>
+    <string name="onboarding_drive_title">Google Drive yedeği</string>
+    <string name="onboarding_drive_subtitle">Kayıtlarınız ve ayarlarınız kendi Drive\'ınızda güvende.</string>
+    <string name="onboarding_drive_included">Yedeklenenler: ayarlar ve kontroller, bellek kartları, kayıt durumları, hileler, yamalar, doku paketleri ve görünüm.</string>
+    <string name="onboarding_drive_excluded">Hiç yüklenmeyenler: oyunlar, BIOS dosyaları, önbellekler ve oturum verileri.</string>
+    <string name="onboarding_drive_schedule">Oyun kapandıktan sonra veya birkaç saatte bir otomatik kopya — yalnızca Wi-Fi ile, şarj sırasında, en yeni kopyalar saklanarak.</string>
+    <string name="onboarding_drive_note">Ayarlar → Google Drive bölümünde bulabilirsiniz.</string>
+    <string name="onboarding_account_title">EmuCoreX profiliniz</string>
+    <string name="onboarding_account_subtitle">Bulut ayarları, istatistikler ve topluluk için tek hesap.</string>
+    <string name="onboarding_account_cloud">En fazla 5 emülatör ayar profilini bulutta saklayın ve her cihazda geri yükleyin.</string>
+    <string name="onboarding_account_community">Oyun sürenizi takip edin, sıralamaya girin, arkadaş ekleyin ve başarımların kilidini açın.</string>
+    <string name="onboarding_account_privacy">Bulut profilleri yalnızca ayarları saklar. Oyunlar, BIOS, kayıtlar ve bellek kartları bu cihazda kalır; her cihaz gösterip gizleyebileceğiniz rastgele bir kimlik kullanır.</string>
+    <string name="onboarding_account_note">Giriş isteğe bağlıdır — istediğinizde Profil sekmesini açın.</string>
 </resources>

@@ -3031,4 +3031,16 @@
     <string name="settings_help_vu_aot">VU1 재컴파일러가 활성화되어 있으면 속도가 향상될 수 있습니다. 지원되지 않는 코드는 자동으로 일반 컴파일러를 사용합니다.</string>
     <string name="bios_formats_label">지원 형식: %1$s</string>
     <string name="bios_archives_label">압축 파일(자동 압축 해제): %1$s</string>
+    <string name="onboarding_drive_title">Google Drive 백업</string>
+    <string name="onboarding_drive_subtitle">세이브와 설정을 내 Drive에 안전하게 보관하세요.</string>
+    <string name="onboarding_drive_included">백업 항목: 설정과 조작, 메모리 카드, 저장 상태, 치트, 패치, 텍스처 팩, 외관.</string>
+    <string name="onboarding_drive_excluded">업로드되지 않는 항목: 게임, BIOS 파일, 캐시, 로그인 정보.</string>
+    <string name="onboarding_drive_schedule">게임을 닫은 뒤 또는 몇 시간마다 자동으로 복사합니다. Wi-Fi에서만, 충전 중에 실행하며 최신 사본을 유지합니다.</string>
+    <string name="onboarding_drive_note">설정 → Google Drive에서 사용할 수 있습니다.</string>
+    <string name="onboarding_account_title">EmuCoreX 프로필</string>
+    <string name="onboarding_account_subtitle">클라우드 설정, 통계, 커뮤니티를 위한 하나의 계정.</string>
+    <string name="onboarding_account_cloud">에뮬레이터 설정 프로필을 최대 5개까지 클라우드에 저장하고 어느 기기에서든 복원하세요.</string>
+    <string name="onboarding_account_community">플레이 시간을 기록하고 순위표에 오르고 친구를 추가하며 업적을 해제하세요.</string>
+    <string name="onboarding_account_privacy">클라우드 프로필에는 설정만 저장됩니다. 게임, BIOS, 세이브, 메모리 카드는 이 기기에 남습니다. 기기는 표시하거나 숨길 수 있는 무작위 ID로 식별됩니다.</string>
+    <string name="onboarding_account_note">로그인은 선택 사항입니다 — 원할 때 프로필 탭을 여세요.</string>
 </resources>

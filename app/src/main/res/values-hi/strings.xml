@@ -3032,4 +3032,16 @@
     <string name="settings_help_vu_aot">VU1 री-कंपाइलर चालू होने पर गति बेहतर हो सकती है। असमर्थित कोड अपने आप सामान्य कंपाइलर का उपयोग करेगा।</string>
     <string name="bios_formats_label">फ़ॉर्मैट: %1$s</string>
     <string name="bios_archives_label">आर्काइव (अपने-आप एक्सट्रैक्ट होते हैं): %1$s</string>
+    <string name="onboarding_drive_title">Google Drive बैकअप</string>
+    <string name="onboarding_drive_subtitle">आपके सेव और सेटिंग्स आपके अपने Drive में सुरक्षित।</string>
+    <string name="onboarding_drive_included">बैकअप होता है: सेटिंग्स और कंट्रोल, मेमोरी कार्ड, सेव स्टेट, चीट, पैच, टेक्सचर पैक और रूप-रंग।</string>
+    <string name="onboarding_drive_excluded">कभी अपलोड नहीं होता: गेम, BIOS फ़ाइलें, कैश और साइन-इन डेटा।</string>
+    <string name="onboarding_drive_schedule">गेम बंद करने के बाद या हर कुछ घंटों में अपने-आप कॉपी — केवल Wi-Fi पर, चार्जिंग के दौरान, नई कॉपियाँ सहेजकर।</string>
+    <string name="onboarding_drive_note">यह सेटिंग्स → Google Drive में मिलेगा।</string>
+    <string name="onboarding_account_title">आपकी EmuCoreX प्रोफ़ाइल</string>
+    <string name="onboarding_account_subtitle">क्लाउड सेटिंग्स, आँकड़ों और कम्युनिटी के लिए एक अकाउंट।</string>
+    <string name="onboarding_account_cloud">एमुलेटर सेटिंग्स की 5 प्रोफ़ाइल तक क्लाउड में रखें और किसी भी डिवाइस पर बहाल करें।</string>
+    <string name="onboarding_account_community">खेलने का समय देखें, लीडरबोर्ड में पहुँचें, दोस्त जोड़ें और उपलब्धियाँ अनलॉक करें।</string>
+    <string name="onboarding_account_privacy">क्लाउड प्रोफ़ाइल केवल सेटिंग्स रखती हैं। गेम, BIOS, सेव और मेमोरी कार्ड इसी डिवाइस पर रहते हैं; हर डिवाइस एक यादृच्छिक ID से पहचाना जाता है जिसे आप दिखा या छिपा सकते हैं।</string>
+    <string name="onboarding_account_note">साइन इन करना ज़रूरी नहीं — जब चाहें प्रोफ़ाइल टैब खोलें।</string>
 </resources>
