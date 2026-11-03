@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.core.AppAnalytics
+import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.EmulatorDataLocation
 import com.sbro.emucorex.core.EmulatorStorage
@@ -38,7 +39,7 @@ data class OnboardingUiState(
     val gamePathValid: Boolean = false,
     val canContinue: Boolean = false,
     val currentPage: Int = 0,
-    val totalPages: Int = 7,
+    val totalPages: Int = 6,
     val isProUnlocked: Boolean = false,
     val proPrice: String? = null,
     val proProducts: List<ProProductOffer> = emptyList(),
@@ -127,6 +128,9 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch(Dispatchers.IO) {
             val previousPath = preferences.biosPath.first()
             StorageAccess.takePersistableReadPermission(application, uri)
+            // Import before persisting: folders that only hold an archive are unpacked here, and
+            // the BIOS validation collector below must see the prepared result on its first pass.
+            DocumentPathResolver.prepareBiosSelection(application, uri.toString())
             preferences.setBiosPath(uri.toString())
             if (previousPath != uri.toString()) {
                 StorageAccess.releasePersistedPermission(application, previousPath)
@@ -253,8 +257,8 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
             biosValid = biosValid,
             gamePathValid = gamePathValid,
             canContinue = biosValid && gamePathValid,
-            currentPage = currentPage.coerceIn(0, 6),
-            totalPages = 7,
+            currentPage = currentPage.coerceIn(0, 5),
+            totalPages = 6,
             isProUnlocked = isProUnlocked,
             proPrice = proPrice,
             proProducts = proProducts,

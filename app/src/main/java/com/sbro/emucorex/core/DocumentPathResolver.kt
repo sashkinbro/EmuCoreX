@@ -29,6 +29,11 @@ object DocumentPathResolver {
     private const val MAX_IMPORTED_BIOS_BYTES = 8L * 1024L * 1024L
     private const val MAX_IMPORTED_ELF_BYTES = 256L * 1024L * 1024L
 
+    // BIOS archives are downloaded tmp copies; a real BIOS archive is a few megabytes.
+    private const val MAX_ARCHIVE_IMPORT_BYTES = 64L * 1024L * 1024L
+    private const val MAX_ARCHIVES_PER_SELECTION = 4
+    private const val STALE_ARCHIVE_MILLIS = 10 * 60 * 1000L
+
     fun resolveFilePath(context: Context, rawPath: String): String? {
         if (!rawPath.startsWith("content://")) return rawPath
 
@@ -131,7 +136,13 @@ object DocumentPathResolver {
             prepareFlatStagingDirectory(stagingDir)
             if (DocumentsContract.isTreeUri(uri)) {
                 val root = DocumentFile.fromTreeUri(context, uri) ?: return@runCatching null
-                copyBiosFilesRecursive(context, root, stagingDir, ImportBudget())
+                val archiveUris = mutableListOf<Uri>()
+                copyBiosFilesRecursive(context, root, stagingDir, ImportBudget(), archiveUris)
+                // A folder that only holds an archive is a supported source as well; unpack it
+                // instead of failing the selection outright.
+                if (findPreferredBiosFileName(stagingDir.absolutePath) == null) {
+                    extractFirstUsableArchive(context, archiveUris, stagingDir)
+                }
                 val preferred = findPreferredBiosFileName(stagingDir.absolutePath)
                     ?: return@runCatching null
                 writeBiosSourceMarker(stagingDir, rawPath)
@@ -142,9 +153,12 @@ object DocumentPathResolver {
                 val displayName = runCatching { single.name }.getOrNull().orEmpty().ifBlank {
                     getDisplayName(context, rawPath)
                 }
-                val copiedPath = copySingleBiosFile(context, single, displayName, stagingDir)
-                    ?: return@runCatching null
-                val preferred = File(copiedPath).name
+                val importedFileName = if (BiosArchiveExtractor.isArchiveName(displayName)) {
+                    importBiosArchive(context, single.uri, displayName, stagingDir)
+                } else {
+                    copySingleBiosFile(context, single, displayName, stagingDir)?.let { File(it).name }
+                }
+                val preferred = importedFileName ?: return@runCatching null
                 writeBiosSourceMarker(stagingDir, rawPath)
                 if (!replaceImportedBiosDirectory(targetDir, stagingDir)) return@runCatching null
                 PreparedBiosSelection(targetDir.absolutePath, preferred)
@@ -431,7 +445,8 @@ object DocumentPathResolver {
         context: Context,
         root: DocumentFile,
         targetDir: File,
-        budget: ImportBudget
+        budget: ImportBudget,
+        archiveUris: MutableList<Uri>
     ) {
         if (!budget.tryEnterDirectory()) return
         for (child in runCatching { root.listFiles() }.getOrDefault(emptyArray())) {
@@ -440,15 +455,68 @@ object DocumentPathResolver {
                 getDisplayName(context, child.uri.toString())
             }
             if (mimeType == DocumentsContract.Document.MIME_TYPE_DIR) {
-                copyBiosFilesRecursive(context, child, targetDir, budget)
+                copyBiosFilesRecursive(context, child, targetDir, budget, archiveUris)
             } else if (isLikelyImportedBiosName(displayName)) {
                 if (!budget.tryCopyFile()) return
                 val targetFile = File(targetDir, sanitizeFileName(displayName))
                 copyUriToFile(context, child.uri, targetFile)
+            } else if (BiosArchiveExtractor.isArchiveName(displayName)) {
+                // Collected first, unpacked only when the folder has no plain BIOS image.
+                if (archiveUris.size < MAX_ARCHIVES_PER_SELECTION) archiveUris += child.uri
             } else if (mimeType == null) {
-                copyBiosFilesRecursive(context, child, targetDir, budget)
+                copyBiosFilesRecursive(context, child, targetDir, budget, archiveUris)
             }
         }
+    }
+
+    /**
+     * Packs the selection's archive into the staging directory and returns the preferred BIOS file
+     * name, or null when the archive holds nothing usable. Everything else stays untouched, so a
+     * failed archive import leaves the previous BIOS selection intact.
+     */
+    private fun importBiosArchive(
+        context: Context,
+        uri: Uri,
+        displayName: String,
+        stagingDir: File
+    ): String? {
+        val archiveCopy = copyArchiveToCache(context, uri, displayName) ?: return null
+        return try {
+            BiosArchiveExtractor.extractBiosFiles(archiveCopy, stagingDir)
+            findPreferredBiosFileName(stagingDir.absolutePath)
+        } finally {
+            archiveCopy.delete()
+        }
+    }
+
+    private fun extractFirstUsableArchive(
+        context: Context,
+        archiveUris: List<Uri>,
+        stagingDir: File
+    ) {
+        for (archiveUri in archiveUris) {
+            val displayName = getDisplayName(context, archiveUri.toString())
+            val archiveCopy = copyArchiveToCache(context, archiveUri, displayName) ?: continue
+            try {
+                BiosArchiveExtractor.extractBiosFiles(archiveCopy, stagingDir)
+            } finally {
+                archiveCopy.delete()
+            }
+            if (findPreferredBiosFileName(stagingDir.absolutePath) != null) return
+        }
+    }
+
+    private fun copyArchiveToCache(context: Context, uri: Uri, displayName: String): File? {
+        val cacheDir = File(context.cacheDir, "bios-archive-import")
+        if (!cacheDir.exists() && !cacheDir.mkdirs()) return null
+        // Drop copies left behind by a killed process, but never a copy another import is using.
+        val staleCutoff = System.currentTimeMillis() - STALE_ARCHIVE_MILLIS
+        cacheDir.listFiles().orEmpty().forEach { stale ->
+            if (stale.lastModified() < staleCutoff) stale.delete()
+        }
+
+        val target = File(cacheDir, sanitizeFileName(displayName).ifBlank { "bios-archive" })
+        return copyUriToFile(context, uri, target, MAX_ARCHIVE_IMPORT_BYTES)?.let(::File)
     }
 
     private fun copySingleBiosFile(
@@ -468,7 +536,12 @@ object DocumentPathResolver {
         return copiedPath
     }
 
-    private fun copyUriToFile(context: Context, uri: Uri, targetFile: File): String? {
+    private fun copyUriToFile(
+        context: Context,
+        uri: Uri,
+        targetFile: File,
+        maxBytes: Long = MAX_IMPORTED_BIOS_BYTES
+    ): String? {
         return runCatching {
             targetFile.parentFile?.mkdirs()
             val descriptor = context.contentResolver.openFileDescriptor(uri, "r") ?: return null
@@ -480,8 +553,8 @@ object DocumentPathResolver {
                         val read = input.read(buffer)
                         if (read < 0) break
                         copied += read
-                        if (copied > MAX_IMPORTED_BIOS_BYTES) {
-                            throw IOException("BIOS import exceeds $MAX_IMPORTED_BIOS_BYTES bytes")
+                        if (copied > maxBytes) {
+                            throw IOException("BIOS import exceeds $maxBytes bytes")
                         }
                         output.write(buffer, 0, read)
                     }

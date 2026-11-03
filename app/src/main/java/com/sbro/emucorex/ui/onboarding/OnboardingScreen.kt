@@ -18,6 +18,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
@@ -56,11 +57,7 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Memory
-import androidx.compose.material.icons.rounded.RadioButtonChecked
-import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.SmartDisplay
 import androidx.compose.material.icons.rounded.Star
 import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
@@ -86,10 +83,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -106,13 +106,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
+import com.sbro.emucorex.core.BiosArchiveExtractor
+import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.LocalTvUiEnvironment
 import com.sbro.emucorex.core.TvUiMetrics
 import com.sbro.emucorex.core.availableProSupportOffers
 
-import com.sbro.emucorex.core.PerformanceProfiles
 import com.sbro.emucorex.ui.common.EmulatorDataLocationDialog
 import com.sbro.emucorex.ui.common.GamepadFocusHighlightMode
 import com.sbro.emucorex.ui.common.ProSupportOptionsDialog
@@ -410,11 +411,10 @@ fun OnboardingScreen(
                     )
                 )
             )
-            .padding(top = appScreenTopPadding())
     ) {
         Box(
             modifier = Modifier
-                .padding(start = 28.dp)
+                .padding(start = 28.dp, top = appScreenTopPadding())
                 .size(180.dp)
                 .graphicsLayer {
                     translationX = orbOneOffsetX
@@ -426,7 +426,7 @@ fun OnboardingScreen(
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = 96.dp, end = 20.dp)
+                .padding(top = 96.dp + appScreenTopPadding(), end = 20.dp)
                 .size(140.dp)
                 .graphicsLayer {
                     translationX = orbTwoOffsetX
@@ -470,15 +470,11 @@ fun OnboardingScreen(
                                     showSubtitle = false,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
-                                page == 3 -> OnboardingHeroProfile(
+                                page == 3 -> OnboardingHeroPro(
                                     showSubtitle = false,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
-                                page == 4 -> OnboardingHeroPro(
-                                    showSubtitle = false,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-                                page == 5 -> OnboardingHeroArcade(
+                                page == 4 -> OnboardingHeroArcade(
                                     showSubtitle = false,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
@@ -522,23 +518,9 @@ fun OnboardingScreen(
                                 Column(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .verticalScroll(rememberScrollState()),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    OnboardingPerformanceProfileContent(
-                                        selectedProfile = uiState.performanceProfile,
-                                        onSelectProfile = viewModel::setPerformanceProfile,
-                                        requestInitialFocus = tvUiEnabled && pagerState.currentPage == page,
-                                        contentFocusRequester = pageContentFocusRequesters[page],
-                                        modifier = Modifier.padding(horizontal = 32.dp)
-                                    )
-                                }
-                            } else if (page == 4) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .verticalScroll(rememberScrollState()),
+                                        .verticalScroll(rememberScrollState())
+                                        .statusBarsPadding()
+                                        .padding(top = 24.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center
                                 ) {
@@ -558,7 +540,7 @@ fun OnboardingScreen(
                                         modifier = Modifier.padding(horizontal = 32.dp)
                                     )
                                 }
-                            } else if (page == 5) {
+                            } else if (page == 4) {
                                 Text(
                                     text = stringResource(R.string.namco_guide_subtitle),
                                     style = MaterialTheme.typography.bodyLarge.copy(
@@ -697,16 +679,6 @@ fun OnboardingScreen(
                         when (page) {
                             0, 1, 2 -> OnboardingHero(page = page)
                             3 -> {
-                                OnboardingHeroProfile()
-                                Spacer(modifier = Modifier.height(32.dp))
-                                OnboardingPerformanceProfileContent(
-                                    selectedProfile = uiState.performanceProfile,
-                                    onSelectProfile = viewModel::setPerformanceProfile,
-                                    requestInitialFocus = tvUiEnabled && pagerState.currentPage == page,
-                                    contentFocusRequester = pageContentFocusRequesters[page]
-                                )
-                            }
-                            4 -> {
                                 OnboardingHeroPro()
                                 Spacer(modifier = Modifier.height(32.dp))
                                 OnboardingProContent(
@@ -724,8 +696,8 @@ fun OnboardingScreen(
                                     contentFocusRequester = pageContentFocusRequesters[page]
                                 )
                             }
-                            5 -> OnboardingHeroArcade()
-                            6 -> {
+                            4 -> OnboardingHeroArcade()
+                            5 -> {
                                 OnboardingHeroSetup()
                                 Spacer(modifier = Modifier.height(32.dp))
                                 OnboardingSetupContent(
@@ -910,36 +882,7 @@ private fun OnboardingHeroSetup(
     }
 }
 
-@Composable
-private fun OnboardingHeroProfile(
-    modifier: Modifier = Modifier,
-    showSubtitle: Boolean = true
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier.widthIn(max = 480.dp)
-    ) {
-        Text(
-            text = stringResource(R.string.onboarding_profile_title),
-            style = MaterialTheme.typography.displaySmall.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.5).sp
-            ),
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center
-        )
-        if (showSubtitle) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = stringResource(R.string.onboarding_profile_subtitle),
-                style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 24.sp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            )
-        }
-    }
-}
+
 
 @Composable
 private fun OnboardingHeroPro(
@@ -1413,7 +1356,11 @@ private fun OnboardingSetupContent(
                     else -> MaterialTheme.colorScheme.error
                 },
                 onClick = launchBiosPicker,
-                modifier = Modifier.focusRequester(firstSetupFocusRequester)
+                modifier = Modifier.focusRequester(firstSetupFocusRequester),
+                caption = listOf(
+                    stringResource(R.string.bios_formats_label, BiosValidator.displayImageFormats),
+                    stringResource(R.string.bios_archives_label, BiosArchiveExtractor.displayArchiveFormats)
+                )
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -1528,6 +1475,39 @@ private fun OnboardingSetupContent(
     }
 }
 
+/** Crisp chevron that fills its bounds, unlike the tiny Material keyboard-arrow glyphs. */
+@Composable
+private fun NeonChevron(
+    expanded: Boolean,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary
+) {
+    val rotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = tween(durationMillis = 200),
+        label = "neon-chevron-rotation"
+    )
+    Canvas(modifier = modifier.rotate(rotation)) {
+        val strokeWidth = size.minDimension * 0.18f
+        val topY = size.height * 0.32f
+        val bottomY = size.height * 0.68f
+        drawLine(
+            color = color,
+            start = Offset(size.width * 0.16f, topY),
+            end = Offset(size.width * 0.5f, bottomY),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = color,
+            start = Offset(size.width * 0.5f, bottomY),
+            end = Offset(size.width * 0.84f, topY),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round
+        )
+    }
+}
+
 @Composable
 private fun OnboardingSetupScrollHint(
     visible: Boolean,
@@ -1581,53 +1561,16 @@ private fun OnboardingSetupScrollHint(
                         .clip(neonShape(2.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
                 )
-                Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(30.dp)
+                NeonChevron(
+                    expanded = false,
+                    modifier = Modifier.size(26.dp)
                 )
             }
         }
     }
 }
 
-@Composable
-private fun OnboardingPerformanceProfileContent(
-    selectedProfile: Int,
-    onSelectProfile: (Int) -> Unit,
-    requestInitialFocus: Boolean = false,
-    contentFocusRequester: FocusRequester? = null,
-    modifier: Modifier = Modifier
-) {
-    val fallbackFocusRequester = remember { FocusRequester() }
-    val firstProfileFocusRequester = contentFocusRequester ?: fallbackFocusRequester
-    LaunchedEffect(requestInitialFocus) {
-        if (requestInitialFocus) {
-            delay(100.milliseconds)
-            runCatching { firstProfileFocusRequester.requestFocus() }
-        }
-    }
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        ProfileCard(
-            title = stringResource(R.string.onboarding_profile_safe_title),
-            description = stringResource(R.string.onboarding_profile_safe_desc),
-            selected = selectedProfile == PerformanceProfiles.SAFE,
-            onClick = { onSelectProfile(PerformanceProfiles.SAFE) },
-            modifier = Modifier.focusRequester(firstProfileFocusRequester)
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        ProfileCard(
-            title = stringResource(R.string.onboarding_profile_fast_title),
-            description = stringResource(R.string.onboarding_profile_fast_desc),
-            selected = selectedProfile == PerformanceProfiles.FAST,
-            onClick = { onSelectProfile(PerformanceProfiles.FAST) }
-        )
-    }
-}
+
 
 @Composable
 @Suppress("unused")
@@ -1717,107 +1660,9 @@ private fun ChipsetInfoRow(
     }
 }
 
-@Composable
-@Suppress("unused")
-private fun CompactProfileCard(
-    title: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape = neonShape(20.dp),
-        color = if (selected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.11f)
-        } else {
-            MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
-        },
-        tonalElevation = if (selected) 5.dp else 1.dp,
-        border = androidx.compose.foundation.BorderStroke(
-            if (selected) 2.dp else 1.dp,
-            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)
-            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)
-        ),
-        onClick = onClick
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
-                contentDescription = null,
-                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp)
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-        }
-    }
-}
 
-@Composable
-private fun ProfileCard(
-    title: String,
-    description: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .gamepadFocusableCard(
-                shape = neonShape(32.dp),
-                interactionSource = interactionSource,
-                addFocusTarget = false,
-                focusHighlightMode = GamepadFocusHighlightMode.Always
-            ),
-        shape = neonShape(32.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-        tonalElevation = if (selected) 6.dp else 2.dp,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-        ),
-        interactionSource = interactionSource,
-        onClick = onClick
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = if (selected) Icons.Rounded.RadioButtonChecked else Icons.Rounded.RadioButtonUnchecked,
-                contentDescription = null,
-                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
+
+
 
 
 @Composable
@@ -1828,7 +1673,8 @@ private fun SetupCard(
     status: String,
     statusColor: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    caption: List<String> = emptyList()
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     Surface(
@@ -1883,6 +1729,14 @@ private fun SetupCard(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    caption.forEach { line ->
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = line,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f)
+                        )
+                    }
                 }
             }
 
@@ -1967,10 +1821,14 @@ internal fun SupportedConsolesCard() {
                     1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
                 )
             ) {
-                Text(stringResource(R.string.formats_title))
-                Icon(
-                    if (showFormats) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = null
+                Text(
+                    text = stringResource(R.string.formats_title),
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                NeonChevron(
+                    expanded = showFormats,
+                    modifier = Modifier.size(16.dp)
                 )
             }
             AnimatedVisibility(visible = showFormats) {

@@ -3029,4 +3029,6 @@
     <string name="settings_vu_aot">VU1 AOT 컴파일러</string>
     <string name="settings_vu_aot_desc">자주 사용하는 VU1 코드 최적화</string>
     <string name="settings_help_vu_aot">VU1 재컴파일러가 활성화되어 있으면 속도가 향상될 수 있습니다. 지원되지 않는 코드는 자동으로 일반 컴파일러를 사용합니다.</string>
+    <string name="bios_formats_label">지원 형식: %1$s</string>
+    <string name="bios_archives_label">압축 파일(자동 압축 해제): %1$s</string>
 </resources>

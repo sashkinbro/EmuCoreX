@@ -353,6 +353,10 @@ dependencies {
     }
     ksp(libs.androidx.room.compiler)
     implementation(libs.android.youtube.player.core)
+    // BIOS archive import (.zip via java.util.zip, .7z via commons-compress + XZ, .rar via junrar).
+    implementation(libs.commons.compress)
+    implementation(libs.tukaani.xz)
+    implementation(libs.junrar)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.firestore)

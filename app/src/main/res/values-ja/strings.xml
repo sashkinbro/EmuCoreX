@@ -3029,4 +3029,6 @@
     <string name="settings_vu_aot">VU1 AOT コンパイラー</string>
     <string name="settings_vu_aot_desc">頻繁に使用される VU1 コードを最適化</string>
     <string name="settings_help_vu_aot">VU1 リコンパイラーが有効な場合、速度が向上することがあります。非対応コードでは自動的に通常のコンパイラーが使われます。</string>
+    <string name="bios_formats_label">対応形式: %1$s</string>
+    <string name="bios_archives_label">アーカイブ（自動展開）: %1$s</string>
 </resources>

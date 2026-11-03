@@ -3045,4 +3045,6 @@
     <string name="settings_vu_aot">کامپایلر AOT برای VU1</string>
     <string name="settings_vu_aot_desc">بهینه‌سازی کد پراستفادهٔ VU1</string>
     <string name="settings_help_vu_aot">ممکن است با فعال بودن کامپایلر مجدد VU1 سرعت را افزایش دهد. کد پشتیبانی‌نشده به‌طور خودکار از کامپایلر عادی استفاده می‌کند.</string>
+    <string name="bios_formats_label">قالب‌ها: %1$s</string>
+    <string name="bios_archives_label">بایگانی‌ها (خودکار استخراج می‌شوند): %1$s</string>
 </resources>

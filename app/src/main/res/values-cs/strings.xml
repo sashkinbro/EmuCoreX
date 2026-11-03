@@ -3050,4 +3050,6 @@
     <string name="settings_vu_aot">Kompilátor VU1 AOT</string>
     <string name="settings_vu_aot_desc">Optimalizovat často používaný kód VU1</string>
     <string name="settings_help_vu_aot">Může zvýšit rychlost při zapnutém rekompilátoru VU1. Nepodporovaný kód automaticky použije běžný kompilátor.</string>
+    <string name="bios_formats_label">Formáty: %1$s</string>
+    <string name="bios_archives_label">Archivy (rozbalí se automaticky): %1$s</string>
 </resources>

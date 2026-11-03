@@ -132,6 +132,14 @@
 # prebuilt WebRTC runtime, but JniZero.setJniClassLoader references it.
 -dontwarn org.jni_zero.JniZeroJni
 
+# BIOS archive import. commons-compress and junrar are plain Java readers, but they reference
+# optional codecs and bindings that are not present on Android (XZ providers, SLF4J bindings,
+# JCE factories). Only warnings are suppressed; the reader classes themselves stay untouched.
+-dontwarn org.slf4j.**
+-dontwarn org.tukaani.xz.**
+-dontwarn org.apache.commons.compress.**
+-dontwarn com.github.junrar.**
+
 # Remove routine diagnostics and their pure formatting from optimized Release.
 # Keep warning/error reporting and uncaught-crash handling available.
 -assumenosideeffects class android.util.Log {

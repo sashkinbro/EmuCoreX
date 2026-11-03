@@ -1421,7 +1421,15 @@ class AppPreferences(private val context: Context) {
     }
 
     suspend fun setPerformanceProfile(value: Int) {
-        context.dataStore.edit { it[PERFORMANCE_PROFILE] = PerformanceProfiles.normalize(value) }
+        val normalized = PerformanceProfiles.normalize(value)
+        val config = PerformanceProfiles.configFor(normalized)
+        context.dataStore.edit {
+            it[PERFORMANCE_PROFILE] = normalized
+            // A profile is a full preset: its speedhacks must win over earlier manual values,
+            // otherwise switching to Fast would keep the old EE cycle settings.
+            it[EE_CYCLE_RATE] = config.eeCycleRate
+            it[EE_CYCLE_SKIP] = config.eeCycleSkip
+        }
     }
 
     private fun normalizeRendererPreference(value: Int?): Int {

@@ -3030,4 +3030,6 @@
     <string name="settings_vu_aot">VU1 AOT कंपाइलर</string>
     <string name="settings_vu_aot_desc">अक्सर उपयोग होने वाले VU1 कोड को ऑप्टिमाइज़ करें</string>
     <string name="settings_help_vu_aot">VU1 री-कंपाइलर चालू होने पर गति बेहतर हो सकती है। असमर्थित कोड अपने आप सामान्य कंपाइलर का उपयोग करेगा।</string>
+    <string name="bios_formats_label">फ़ॉर्मैट: %1$s</string>
+    <string name="bios_archives_label">आर्काइव (अपने-आप एक्सट्रैक्ट होते हैं): %1$s</string>
 </resources>

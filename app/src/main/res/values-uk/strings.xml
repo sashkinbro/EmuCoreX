@@ -3035,4 +3035,6 @@
     <string name="settings_vu_aot">AOT-компілятор VU1</string>
     <string name="settings_vu_aot_desc">Оптимізувати код VU1, який часто використовується</string>
     <string name="settings_help_vu_aot">Може підвищити швидкість, якщо рекомпілятор VU1 увімкнено. Непідтримуваний код автоматично використовує звичайний компілятор.</string>
+    <string name="bios_formats_label">Формати: %1$s</string>
+    <string name="bios_archives_label">Архіви (розпаковуються автоматично): %1$s</string>
 </resources>

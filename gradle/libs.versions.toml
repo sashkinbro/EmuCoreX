@@ -28,6 +28,9 @@ webrtc = "150.7871.04"
 credentials = "1.6.0"
 googleId = "1.2.1"
 googleAuth = "22.0.0"
+commonsCompress = "1.28.0"
+tukaaniXz = "1.10"
+junrar = "8.1.2"
 
 [libraries]
 androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
@@ -72,6 +75,9 @@ coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref 
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
 webrtc-android = { group = "io.github.webrtc-sdk", name = "android", version.ref = "webrtc" }
+commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
+tukaani-xz = { group = "org.tukaani", name = "xz", version.ref = "tukaaniXz" }
+junrar = { group = "com.github.junrar", name = "junrar", version.ref = "junrar" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

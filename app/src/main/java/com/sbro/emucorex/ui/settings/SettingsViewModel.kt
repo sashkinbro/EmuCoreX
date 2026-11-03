@@ -2425,6 +2425,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch(Dispatchers.IO) {
             val previousPath = preferences.biosPath.first()
             StorageAccess.takePersistableReadPermission(application, uri)
+            // Import before persisting: folders that only hold an archive are unpacked here, and
+            // the BIOS validation pass must see the prepared result straight away.
+            DocumentPathResolver.prepareBiosSelection(application, uri.toString())
             preferences.setBiosPath(uri.toString())
             if (previousPath != uri.toString()) {
                 StorageAccess.releasePersistedPermission(application, previousPath)
@@ -2457,6 +2460,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 enableVu0Recompiler = _uiState.value.enableVu0Recompiler,
                 enableVu1Recompiler = _uiState.value.enableVu1Recompiler,
                 enableFastmem = _uiState.value.enableFastmem,
+                fpuCorrectAddSub = PerformanceProfiles.configFor(_uiState.value.performanceProfile)
+                    .fpuCorrectAddSub,
                 eeFpuRoundMode = _uiState.value.eeFpuRoundMode,
                 vu0RoundMode = _uiState.value.vu0RoundMode,
                 vu1RoundMode = _uiState.value.vu1RoundMode,

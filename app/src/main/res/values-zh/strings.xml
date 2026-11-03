@@ -3031,4 +3031,6 @@
     <string name="settings_vu_aot">VU1 AOT 编译器</string>
     <string name="settings_vu_aot_desc">优化频繁使用的 VU1 代码</string>
     <string name="settings_help_vu_aot">启用 VU1 重编译器后可能提升速度。不支持的代码会自动使用常规编译器。</string>
+    <string name="bios_formats_label">格式：%1$s</string>
+    <string name="bios_archives_label">压缩包（自动解压）：%1$s</string>
 </resources>

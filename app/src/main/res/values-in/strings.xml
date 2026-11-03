@@ -3044,4 +3044,6 @@
     <string name="settings_vu_aot">Kompiler AOT VU1</string>
     <string name="settings_vu_aot_desc">Optimalkan kode VU1 yang sering digunakan</string>
     <string name="settings_help_vu_aot">Dapat meningkatkan kecepatan saat rekompiler VU1 aktif. Kode yang tidak didukung otomatis menggunakan kompiler normal.</string>
+    <string name="bios_formats_label">Format: %1$s</string>
+    <string name="bios_archives_label">Arsip (diekstrak otomatis): %1$s</string>
 </resources>

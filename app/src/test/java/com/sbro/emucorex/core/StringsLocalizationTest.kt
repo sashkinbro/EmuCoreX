@@ -69,7 +69,9 @@ class StringsLocalizationTest {
         "settings_keyboard_mouse_use_global",
         "settings_keyboard_mouse_use_global_desc",
         "settings_keyboard_mouse_source_keyboard",
-        "settings_keyboard_mouse_source_mouse"
+        "settings_keyboard_mouse_source_mouse",
+        "bios_formats_label",
+        "bios_archives_label"
     )
 
     @Test

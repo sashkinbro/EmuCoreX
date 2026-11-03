@@ -3032,4 +3032,6 @@
     <string name="settings_vu_aot">VU1-AOT-Compiler</string>
     <string name="settings_vu_aot_desc">Häufig verwendeten VU1-Code optimieren</string>
     <string name="settings_help_vu_aot">Kann bei aktiviertem VU1-Recompiler die Geschwindigkeit verbessern. Nicht unterstützter Code wird automatisch mit dem normalen Compiler verarbeitet.</string>
+    <string name="bios_formats_label">Formate: %1$s</string>
+    <string name="bios_archives_label">Archive (automatisch entpackt): %1$s</string>
 </resources>

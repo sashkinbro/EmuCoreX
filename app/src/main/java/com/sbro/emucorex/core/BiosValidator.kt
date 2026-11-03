@@ -13,6 +13,10 @@ object BiosValidator {
     // Namco System 246/256 COH-H ROM dumps use their board-position suffixes rather
     // than a conventional .bin extension (r27v1602f.7d / r27v1602f.8g).
     private val biosImageExtensions = setOf("bin", "rom", "7d", "8g")
+
+    /** Main BIOS image types shown in the UI hint; kept in sync with the validation above. */
+    val displayImageFormats: String = biosImageExtensions.joinToString(" · ") { ".$it" }
+
     private val biosLibraryExtensions = biosImageExtensions + setOf("mec", "nvm", "elf")
     private val fileNameHints = listOf("scph", "ps2", "bios", "rom", "r27v1602f")
     private val extraArtifactHints = listOf("rom0", "rom1", "rom2", "erom", "dvdpl", "cdvd")

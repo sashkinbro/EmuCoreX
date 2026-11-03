@@ -3034,4 +3034,6 @@
     <string name="settings_vu_aot">مترجم AOT لـ VU1</string>
     <string name="settings_vu_aot_desc">تحسين الشيفرة المستخدمة كثيرًا في VU1</string>
     <string name="settings_help_vu_aot">قد يحسن السرعة عند تفعيل إعادة الترجمة لـ VU1. ستستخدم الشيفرة غير المدعومة المترجم العادي تلقائيًا.</string>
+    <string name="bios_formats_label">الصيغ: %1$s</string>
+    <string name="bios_archives_label">الأرشيفات (تُستخرج تلقائيًا): %1$s</string>
 </resources>

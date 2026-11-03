@@ -3030,4 +3030,6 @@
     <string name="settings_vu_aot">VU1 AOT Derleyicisi</string>
     <string name="settings_vu_aot_desc">Sık kullanılan VU1 kodunu optimize et</string>
     <string name="settings_help_vu_aot">VU1 yeniden derleyicisi etkinken hızı artırabilir. Desteklenmeyen kod otomatik olarak normal derleyiciyi kullanır.</string>
+    <string name="bios_formats_label">Biçimler: %1$s</string>
+    <string name="bios_archives_label">Arşivler (otomatik açılır): %1$s</string>
 </resources>
