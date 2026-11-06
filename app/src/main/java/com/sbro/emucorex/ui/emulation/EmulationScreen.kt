@@ -195,6 +195,7 @@ import com.sbro.emucorex.data.DisplayCrop
 import com.sbro.emucorex.data.OverlayControlLayout
 import com.sbro.emucorex.data.OverlayLayoutSnapshot
 import com.sbro.emucorex.data.PerformanceOverlayMetrics
+import com.sbro.emucorex.data.RemoteCheatPack
 import com.sbro.emucorex.data.RetroAchievementEntry
 import com.sbro.emucorex.data.RetroAchievementGameData
 import com.sbro.emucorex.data.RetroAchievementsRepository
@@ -717,6 +718,7 @@ fun EmulationScreen(
     viewModel: EmulationViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val cheatPackBrowserState by viewModel.cheatPackBrowser.collectAsState()
     val shaderPreparationState by viewModel.shaderPreparationUiState.collectAsState()
     val activePatchNotice by viewModel.activePatchNotice.collectAsState()
     val retroAchievementsState by RetroAchievementsLiveStateManager.state.collectAsState()
@@ -2169,6 +2171,12 @@ fun EmulationScreen(
                     onSetCheatGroupEnabled = { ids, enabled -> viewModel.setCheatGroupEnabled(ids, enabled) },
                     onSetAllCheatsEnabled = { viewModel.setAllCheatsEnabled(it) },
                     onRefreshCheats = { viewModel.refreshAvailableCheats() },
+                    cheatPackBrowserState = cheatPackBrowserState,
+                    onLoadCheatPacks = { forceRefresh -> viewModel.loadCheatPacks(forceRefresh) },
+                    onInstallCheatPack = { pack -> viewModel.installCheatPack(pack) },
+                    onImportCheatPack = { contents, fallbackName ->
+                        viewModel.importCheatPackText(contents, fallbackName)
+                    },
                     onSetHwDownloadMode = { viewModel.setHwDownloadMode(it) },
                     onSetEeCycleRate = { viewModel.setEeCycleRate(it) },
                     onSetEeCycleSkip = { viewModel.setEeCycleSkip(it) },
@@ -3908,6 +3916,10 @@ private fun EmulationSidebarMenu(
     onSetCheatGroupEnabled: (List<String>, Boolean) -> Unit,
     onSetAllCheatsEnabled: (Boolean) -> Unit,
     onRefreshCheats: () -> Unit,
+    cheatPackBrowserState: CheatPackBrowserState,
+    onLoadCheatPacks: (Boolean) -> Unit,
+    onInstallCheatPack: (RemoteCheatPack) -> Unit,
+    onImportCheatPack: (String, String?) -> Unit,
     onSetHwDownloadMode: (Int) -> Unit,
     onSetEeCycleRate: (Int) -> Unit,
     onSetEeCycleSkip: (Int) -> Unit,
@@ -4014,9 +4026,13 @@ private fun EmulationSidebarMenu(
         railFocusRequesters[selectedMenuTab]?.requestFocus()
     }
     // Cheats can be toggled or installed from the cheat manager; re-read the
-    // installed list every time the tab is opened so both stay in sync.
+    // installed list every time the tab is opened so both stay in sync. The
+    // pack catalog is fetched at the same time (cached by the repository).
     LaunchedEffect(selectedMenuTab) {
-        if (selectedMenuTab == EmulationMenuTab.Cheats) onRefreshCheats()
+        if (selectedMenuTab == EmulationMenuTab.Cheats) {
+            onRefreshCheats()
+            onLoadCheatPacks(false)
+        }
     }
     val menuTabs = remember(uiState.gameMenuTabOrder, uiState.hiddenGameMenuTabs) {
         uiState.gameMenuTabOrder
@@ -5075,6 +5091,14 @@ private fun EmulationSidebarMenu(
                             onCheckedChange = onSetEnableCheats,
                             helpText = stringResource(R.string.settings_help_cheats),
                             onResetToDefault = { onSetEnableCheats(globalDefaults.enableCheats) }
+                        )
+
+                        EmulationCheatPacksSection(
+                            state = cheatPackBrowserState,
+                            hasInstalledCheats = uiState.availableCheats.isNotEmpty(),
+                            onLoad = onLoadCheatPacks,
+                            onInstallPack = onInstallCheatPack,
+                            onImportText = onImportCheatPack
                         )
 
                         EmulationCheatsSection(

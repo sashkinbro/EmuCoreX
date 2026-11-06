@@ -3,25 +3,29 @@ package com.sbro.emucorex.ui.emulation
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
 import com.sbro.emucorex.data.CheatBlock
 import com.sbro.emucorex.ui.cheats.CheatCategory
 import com.sbro.emucorex.ui.cheats.groupCheatBlocks
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 import com.sbro.emucorex.ui.theme.neon.neonShape
 
 /**
@@ -73,18 +77,16 @@ internal fun EmulationCheatsSection(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            TextButton(
+            CheatBulkActionButton(
+                text = stringResource(R.string.emulation_cheats_enable_all),
                 onClick = { onSetAllEnabled(true) },
                 modifier = Modifier.weight(1f)
-            ) {
-                Text(stringResource(R.string.emulation_cheats_enable_all))
-            }
-            TextButton(
+            )
+            CheatBulkActionButton(
+                text = stringResource(R.string.emulation_cheats_disable_all),
                 onClick = { onSetAllEnabled(false) },
                 modifier = Modifier.weight(1f)
-            ) {
-                Text(stringResource(R.string.emulation_cheats_disable_all))
-            }
+            )
         }
         groups.forEach { (category, categoryBlocks) ->
             CheatGroupSection(
@@ -94,6 +96,32 @@ internal fun EmulationCheatsSection(
                 onGroupToggle = onGroupToggle
             )
         }
+    }
+}
+
+@Composable
+private fun CheatBulkActionButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier,
+        shape = neonButtonShape(),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.32f)),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)
+        ),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
