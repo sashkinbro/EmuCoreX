@@ -76,6 +76,7 @@ import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.Gamepad
+import androidx.compose.material.icons.rounded.Gradient
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Mouse
 import androidx.compose.material.icons.rounded.LockOpen
@@ -118,6 +119,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -308,6 +310,7 @@ private enum class EmulationMenuTab {
     Controls,
     Emulation,
     Cheats,
+    Shaders,
     Graphics,
     Fixes,
     Achievements
@@ -719,6 +722,7 @@ fun EmulationScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val cheatPackBrowserState by viewModel.cheatPackBrowser.collectAsState()
+    val shaderBrowserState by viewModel.shaderBrowser.collectAsState()
     val shaderPreparationState by viewModel.shaderPreparationUiState.collectAsState()
     val activePatchNotice by viewModel.activePatchNotice.collectAsState()
     val retroAchievementsState by RetroAchievementsLiveStateManager.state.collectAsState()
@@ -2078,6 +2082,11 @@ fun EmulationScreen(
             }
         }
 
+        // The menu is removed from composition while it is closed. Keep its
+        // saveable state (selected tab and per-tab scroll positions) so opening
+        // it again resumes exactly where the player left it.
+        val gameMenuStateHolder = rememberSaveableStateHolder()
+
         // Sidebar Menu
         AnimatedVisibility(
             visible = uiState.showMenu && !showControlsEditor,
@@ -2085,6 +2094,7 @@ fun EmulationScreen(
             exit = androidx.compose.animation.slideOutHorizontally(targetOffsetX = { fullWidth -> fullWidth }) + fadeOut(tween(250)),
             modifier = Modifier.fillMaxHeight()
         ) {
+            gameMenuStateHolder.SaveableStateProvider("emulation_game_menu") {
             Box(
                 modifier = Modifier.fillMaxSize()
             ) {
@@ -2177,6 +2187,13 @@ fun EmulationScreen(
                     onImportCheatPack = { contents, fallbackName ->
                         viewModel.importCheatPackText(contents, fallbackName)
                     },
+                    shaderBrowserState = shaderBrowserState,
+                    onRefreshShaders = { viewModel.refreshShaderBrowser() },
+                    onDownloadShaderPack = { viewModel.downloadOfficialShaderPack() },
+                    onImportShaderPack = { viewModel.importShaderPack(it) },
+                    onSelectShaderPreset = { viewModel.selectShaderPreset(it) },
+                    onUseGlobalShader = { viewModel.useGlobalShaderSettings() },
+                    onSetInGameShadersEnabled = { viewModel.setInGameShadersEnabled(it) },
                     onSetHwDownloadMode = { viewModel.setHwDownloadMode(it) },
                     onSetEeCycleRate = { viewModel.setEeCycleRate(it) },
                     onSetEeCycleSkip = { viewModel.setEeCycleSkip(it) },
@@ -2238,6 +2255,7 @@ fun EmulationScreen(
                 if (LocalNeonTheme.current) {
                     NeonCrtOverlay()
                 }
+            }
             }
         }
     }
@@ -2601,6 +2619,7 @@ private fun GameMenuTabId.toEmulationMenuTab(): EmulationMenuTab = when (this) {
     GameMenuTabId.CONTROLS -> EmulationMenuTab.Controls
     GameMenuTabId.EMULATION -> EmulationMenuTab.Emulation
     GameMenuTabId.CHEATS -> EmulationMenuTab.Cheats
+    GameMenuTabId.SHADERS -> EmulationMenuTab.Shaders
     GameMenuTabId.GRAPHICS -> EmulationMenuTab.Graphics
     GameMenuTabId.FIXES -> EmulationMenuTab.Fixes
     GameMenuTabId.ACHIEVEMENTS -> EmulationMenuTab.Achievements
@@ -3920,6 +3939,13 @@ private fun EmulationSidebarMenu(
     onLoadCheatPacks: (Boolean) -> Unit,
     onInstallCheatPack: (RemoteCheatPack) -> Unit,
     onImportCheatPack: (String, String?) -> Unit,
+    shaderBrowserState: ShaderBrowserState,
+    onRefreshShaders: () -> Unit,
+    onDownloadShaderPack: () -> Unit,
+    onImportShaderPack: (android.net.Uri) -> Unit,
+    onSelectShaderPreset: (String) -> Unit,
+    onUseGlobalShader: () -> Unit,
+    onSetInGameShadersEnabled: (Boolean) -> Unit,
     onSetHwDownloadMode: (Int) -> Unit,
     onSetEeCycleRate: (Int) -> Unit,
     onSetEeCycleSkip: (Int) -> Unit,
@@ -4010,6 +4036,7 @@ private fun EmulationSidebarMenu(
     val controlsScrollState = rememberScrollState()
     val emulationScrollState = rememberScrollState()
     val cheatsScrollState = rememberScrollState()
+    val shadersScrollState = rememberScrollState()
     val graphicsScrollState = rememberScrollState()
     val fixesScrollState = rememberScrollState()
     val achievementsScrollState = rememberScrollState()
@@ -4018,6 +4045,7 @@ private fun EmulationSidebarMenu(
         EmulationMenuTab.Controls -> controlsScrollState
         EmulationMenuTab.Emulation -> emulationScrollState
         EmulationMenuTab.Cheats -> cheatsScrollState
+        EmulationMenuTab.Shaders -> shadersScrollState
         EmulationMenuTab.Graphics -> graphicsScrollState
         EmulationMenuTab.Fixes -> fixesScrollState
         EmulationMenuTab.Achievements -> achievementsScrollState
@@ -4032,6 +4060,14 @@ private fun EmulationSidebarMenu(
         if (selectedMenuTab == EmulationMenuTab.Cheats) {
             onRefreshCheats()
             onLoadCheatPacks(false)
+        }
+    }
+    // The app-wide shader or the game manager can change the selected preset
+    // while the game is running, so re-resolve the effective selection whenever
+    // the Shaders tab is opened.
+    LaunchedEffect(selectedMenuTab) {
+        if (selectedMenuTab == EmulationMenuTab.Shaders) {
+            onRefreshShaders()
         }
     }
     val menuTabs = remember(uiState.gameMenuTabOrder, uiState.hiddenGameMenuTabs) {
@@ -5107,6 +5143,34 @@ private fun EmulationSidebarMenu(
                             onGroupToggle = onSetCheatGroupEnabled,
                             onSetAllEnabled = onSetAllCheatsEnabled
                         )
+                                    }
+
+                                    else -> Unit
+                                }
+                            }
+                    }
+
+                    EmulationMenuTab.Shaders -> {
+                        gameMenuSectionsForTab(GameMenuTabId.SHADERS, uiState.gameMenuSectionOrder)
+                            .filterNot(uiState.hiddenGameMenuSections::contains)
+                            .forEach { section ->
+                                when (section) {
+                                    GameMenuSectionId.SHADERS_LIBRARY -> {
+                                        SidebarSectionTitle(
+                                            text = stringResource(R.string.emulation_shaders_tab).uppercase(),
+                                            color = sectionTitleColor,
+                                            topPadding = sectionLabelTopPadding,
+                                            horizontalInset = sectionLabelInset
+                                        )
+
+                                        EmulationShadersSection(
+                                            state = shaderBrowserState,
+                                            onDownloadPack = onDownloadShaderPack,
+                                            onImportPack = onImportShaderPack,
+                                            onSelectPreset = onSelectShaderPreset,
+                                            onUseGlobal = onUseGlobalShader,
+                                            onSetEnabled = onSetInGameShadersEnabled
+                                        )
                                     }
 
                                     else -> Unit
@@ -6386,6 +6450,7 @@ private fun gameMenuTabIcon(tab: EmulationMenuTab): ImageVector = when (tab) {
     EmulationMenuTab.Controls -> Icons.Rounded.Gamepad
     EmulationMenuTab.Emulation -> Icons.Rounded.SettingsSuggest
     EmulationMenuTab.Cheats -> Icons.Rounded.AutoFixHigh
+    EmulationMenuTab.Shaders -> Icons.Rounded.Gradient
     EmulationMenuTab.Graphics -> Icons.Rounded.Fullscreen
     EmulationMenuTab.Fixes -> Icons.Rounded.Star
     EmulationMenuTab.Achievements -> Icons.Rounded.LockOpen
@@ -6397,6 +6462,7 @@ private fun gameMenuTabLabel(tab: EmulationMenuTab): String = when (tab) {
     EmulationMenuTab.Controls -> stringResource(R.string.settings_controls_tab)
     EmulationMenuTab.Emulation -> stringResource(R.string.settings_emulation_tab)
     EmulationMenuTab.Cheats -> stringResource(R.string.emulation_cheats_title)
+    EmulationMenuTab.Shaders -> stringResource(R.string.emulation_shaders_tab)
     EmulationMenuTab.Graphics -> stringResource(R.string.settings_graphics_tab)
     EmulationMenuTab.Fixes -> stringResource(R.string.settings_fixes_tab)
     EmulationMenuTab.Achievements -> stringResource(R.string.emulation_achievements_tab)
