@@ -17,7 +17,9 @@ data class RemoteGpuDriver(
     val downloadUrl: String,
     val sourceUrl: String,
     val credits: String,
-    val sizeBytes: Long?
+    val sizeBytes: Long?,
+    /** Catalog-declared Mali models ("G57", "G78AE", ...); empty when the entry predates the field. */
+    val supportedGpuModels: List<String> = emptyList()
 )
 
 class GpuDriverCatalogRepository(private val context: Context) {
@@ -108,7 +110,17 @@ class GpuDriverCatalogRepository(private val context: Context) {
                         downloadUrl = downloadUrl,
                         sourceUrl = item.optString("sourceUrl"),
                         credits = item.optString("credits"),
-                        sizeBytes = item.optLong("sizeBytes").takeIf { it > 0L }
+                        sizeBytes = item.optLong("sizeBytes").takeIf { it > 0L },
+                        supportedGpuModels = item.optJSONArray("supportedGpuModels")
+                            ?.let { models ->
+                                buildList {
+                                    for (modelIndex in 0 until models.length()) {
+                                        val value = models.optString(modelIndex).trim()
+                                        if (value.isNotEmpty()) add(value)
+                                    }
+                                }
+                            }
+                            .orEmpty()
                     )
                 )
             }

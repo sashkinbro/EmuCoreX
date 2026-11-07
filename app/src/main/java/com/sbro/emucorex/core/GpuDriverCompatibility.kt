@@ -202,8 +202,20 @@ object GpuDriverCompatibility {
     private const val DRIVER_VENDOR_METADATA = "driver_vendor.txt"
     private const val MALI_SX2_CATALOG_ID_PREFIX = "mali-sx2-"
     private const val MALI_SX2_LIBRARY_NAME = "libvulkan_malisx2.so"
+    /**
+     * Fallback model list for catalog entries that predate `supportedGpuModels` and
+     * for already-installed libraries, which carry no version context. It matches
+     * the models the current package supports, so an installed 0.4.0 is not refused
+     * at launch on a Mali-G52 or Mali-G76.
+     */
     private val MALI_SX2_SUPPORTED_MODEL = Regex(
-        """^(?:mali|immortalis)-g(?:57|68|77|78(?:ae)?|615|715)(?:\s+(?:mc|mp)\s*\d{1,2})?$""",
+        """^(?:mali|immortalis)-g(?:52|57|68|76|77|78(?:ae)?|615|715)(?:\s+(?:mc|mp)\s*\d{1,2})?$""",
+        RegexOption.IGNORE_CASE
+    )
+
+    /** "Mali-G57 MC4" / "Immortalis-G715" / "Mali-G78AE MC4" -> the catalog token ("G57", "G715", "G78AE"). */
+    private val MALI_SX2_MODEL_TOKEN = Regex(
+        """^(?:mali|immortalis)-g(\d{2,3}[a-z]*)(?:\s+(?:mc|mp)\s*\d{1,2})?$""",
         RegexOption.IGNORE_CASE
     )
 
@@ -239,7 +251,8 @@ object GpuDriverCompatibility {
         deviceVendor: GpuDriverVendor,
         deviceGpu: DeviceGpuSnapshot?
     ): Boolean = isVendorCompatible(driver.vendor, deviceVendor) &&
-        (!driver.id.startsWith(MALI_SX2_CATALOG_ID_PREFIX, ignoreCase = true) || supportsMaliSx2Gpu(deviceGpu))
+        (!driver.id.startsWith(MALI_SX2_CATALOG_ID_PREFIX, ignoreCase = true) ||
+            supportsMaliSx2Gpu(deviceGpu, driver.supportedGpuModels))
 
     internal fun isInstalledDriverCompatible(
         mainLibraryName: String,
@@ -250,10 +263,37 @@ object GpuDriverCompatibility {
         (!mainLibraryName.substringAfterLast('/').substringAfterLast('\\')
             .equals(MALI_SX2_LIBRARY_NAME, ignoreCase = true) || supportsMaliSx2Gpu(deviceGpu))
 
-    internal fun supportsMaliSx2Gpu(deviceGpu: DeviceGpuSnapshot?): Boolean {
+    internal fun supportsMaliSx2Gpu(
+        deviceGpu: DeviceGpuSnapshot?,
+        supportedModels: List<String> = emptyList()
+    ): Boolean {
         val model = deviceGpu?.model?.takeIf { deviceGpu.source == GpuInfoSource.GL_RENDERER } ?: return false
         if (model.vendor != GpuVendor.MALI) return false
+        // Entries that declare their models are authoritative: 0.1.x shipped before
+        // Mali-G52 support and 0.3.0 before Mali-G76, so the catalog list decides.
+        if (supportedModels.isNotEmpty()) {
+            val token = maliSx2ModelToken(model) ?: return false
+            return supportedModels.any { declared -> maliSx2ModelMatches(declared, token) }
+        }
+        // Entries without the field keep the fallback list.
         return MALI_SX2_SUPPORTED_MODEL.matches(model.displayName.trim())
+    }
+
+    /**
+     * Compares a catalog model ("G57", "G78AE") with the renderer token. The GPU parser
+     * drops the "AE" suffix, so a G78 renderer cannot be told apart from G78AE and the
+     * declared G78AE entry must stay available to it.
+     */
+    private fun maliSx2ModelMatches(declared: String, token: String): Boolean {
+        val normalized = declared.trim().uppercase(Locale.US)
+        return normalized == token || normalized == token + "AE"
+    }
+
+    /** Catalog model token for a detected Mali renderer, or null when it is not a Mali model. */
+    internal fun maliSx2ModelToken(model: GpuModelInfo?): String? {
+        if (model?.vendor != GpuVendor.MALI) return null
+        val match = MALI_SX2_MODEL_TOKEN.matchEntire(model.displayName.trim()) ?: return null
+        return "G" + match.groupValues[1].uppercase(Locale.US)
     }
 
     /** Adreno-only helper kept for callers that explicitly need Turnip support. */
