@@ -504,16 +504,16 @@ private fun GameDbEntryCard(
                     if (!graphicsFixesEnabled) {
                         GameDbInlineNote(stringResource(R.string.gamedb_browser_graphics_globally_off))
                     }
-                    state.settings.groupBy { it.category }.forEach { (category, settings) ->
+                    state.sections.forEach { section ->
                         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                             GameDbCategoryHeader(
-                                category = category,
-                                enabledCount = settings.count { it.enabled },
-                                totalCount = settings.size,
-                                canAdd = GameDbFixCatalog.supportsAdding(category.section),
-                                onAdd = { onAddFix(category) }
+                                category = section.category,
+                                enabledCount = section.settings.count { it.enabled },
+                                totalCount = section.settings.size,
+                                canAdd = GameDbFixCatalog.supportsAdding(section.category.section),
+                                onAdd = { onAddFix(section.category) }
                             )
-                            settings.forEach { setting ->
+                            section.settings.forEach { setting ->
                                 GameDbSettingRow(
                                     setting = setting,
                                     compact = false,
@@ -989,7 +989,8 @@ private fun GameDbValuePickerDialog(
                     }
                 )
             }
-            if (target.setting.valueEdited) {
+            // An added line has no bundled value to fall back to; long-press removes it instead.
+            if (target.setting.valueEdited && !target.setting.added) {
                 GameDbChoiceRow(
                     label = stringResource(R.string.gamedb_browser_value_use_gamedb),
                     selected = false,

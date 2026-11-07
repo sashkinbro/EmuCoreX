@@ -170,7 +170,14 @@ object GameDbOverrideRenderer {
 
         val builder = StringBuilder("  ").append(section.yamlName).append(":\n")
         edits.forEach { (id, override) ->
-            val value = if (override.enabled) override.value ?: return@forEach else DISABLED_MODE
+            val value = when {
+                !override.enabled -> DISABLED_MODE
+                override.value != null -> override.value
+                // A line added from the browser has no bundled value to fall back to. Without this
+                // default the section would be emitted empty instead of applying the line.
+                override.added -> DEFAULT_ADDED_VALUE
+                else -> return@forEach
+            }
             builder.append("    ").append(GameDbFixId.keyOf(id)).append(": ").append(value).append('\n')
         }
         return builder.toString()

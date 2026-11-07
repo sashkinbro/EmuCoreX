@@ -78,6 +78,33 @@ class GameDbOverrideRendererTest {
     }
 
     @Test
+    fun anAddedClampModeIsWrittenWithoutRestatingTheBundledOnes() {
+        val yaml = render(
+            baseline = listOf(clampMode("eeClampMode", "3")),
+            override = overrideOf(
+                "clampModes|vu1ClampMode" to GameDbFixOverride(value = "2", added = true)
+            )
+        )
+
+        assertTrue(yaml.contains("  clampModes:"))
+        assertTrue(yaml.contains("    vu1ClampMode: 2"))
+        assertFalse(yaml.contains("eeClampMode"))
+    }
+
+    @Test
+    fun anAddedClampModeWithoutAStoredValueStillWritesANormalClamp() {
+        val yaml = render(
+            baseline = emptyList(),
+            override = overrideOf(
+                "clampModes|vu0ClampMode" to GameDbFixOverride(added = true)
+            )
+        )
+
+        assertTrue(yaml.contains("  clampModes:"))
+        assertTrue(yaml.contains("    vu0ClampMode: 1"))
+    }
+
+    @Test
     fun anEditedRoundModeOnlyEmitsThatKey() {
         val yaml = render(
             baseline = listOf(roundMode("eeRoundMode", "1"), roundMode("vuRoundMode", "1")),

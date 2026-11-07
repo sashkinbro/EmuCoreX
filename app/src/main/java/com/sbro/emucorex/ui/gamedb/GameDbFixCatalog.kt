@@ -13,6 +13,9 @@ data class GameDbAddableFix(val key: String, val defaultValue: String)
  *
  * Handler-style graphics fixes (`getSkipCount`, `beforeDraw`, `moveHandler`) are deliberately absent:
  * they take a function name rather than a number, so they cannot be added without a dedicated picker.
+ *
+ * Clamp modes are safe to add because the core merges that section per key: an added line only
+ * changes the one clamp it names and keeps every clamp the game already declares.
  */
 object GameDbFixCatalog {
     val coreFixes: List<GameDbAddableFix> = listOf(
@@ -76,14 +79,27 @@ object GameDbFixCatalog {
         "copyRoadMaximumBlendingLevel"
     ).map { GameDbAddableFix(it, "1") }
 
+    /**
+     * "Normal" is the same value the emulator uses by default, so a line added only to change one
+     * clamp starts from a known state and can be fine-tuned from its value badge.
+     */
+    val clampModeFixes: List<GameDbAddableFix> = listOf(
+        "eeClampMode",
+        "vu0ClampMode",
+        "vu1ClampMode"
+    ).map { GameDbAddableFix(it, "1") }
+
     fun addable(section: GameDbFixSection): List<GameDbAddableFix> = when (section) {
         GameDbFixSection.GAME_FIXES -> coreFixes
         GameDbFixSection.GS_HW_FIXES -> graphicsFixes
+        GameDbFixSection.CLAMP_MODES -> clampModeFixes
         else -> emptyList()
     }
 
     fun supportsAdding(section: GameDbFixSection): Boolean =
-        section == GameDbFixSection.GAME_FIXES || section == GameDbFixSection.GS_HW_FIXES
+        section == GameDbFixSection.GAME_FIXES ||
+            section == GameDbFixSection.GS_HW_FIXES ||
+            section == GameDbFixSection.CLAMP_MODES
 
     fun defaultValue(section: GameDbFixSection, key: String): String =
         addable(section).firstOrNull { it.key == key }?.defaultValue ?: ""
