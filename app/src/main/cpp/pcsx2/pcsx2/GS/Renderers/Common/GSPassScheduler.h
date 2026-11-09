@@ -46,11 +46,10 @@ public:
 	__fi u32 GetCount() const { return m_queued; }
 	__fi bool IsEmpty() const { return m_queued == 0; }
 
-	/// True when a draw is a plain write to its target: no barrier, no feedback loop, no
-	/// destination alpha test, no colclip, no second pass. Those all either read the target
-	/// they write or carry state across draws, and holding them back would change what they
-	/// see. Anything rejected here renders immediately, so a game that never ping-pongs
-	/// simply behaves as it did before.
+	/// True when a draw uses only ordinary attachment/sampler accesses: no barrier,
+	/// feedback, destination alpha test, colclip or ROV. Ordinary auxiliary alpha/blend
+	/// passes travel atomically with the record into the same attachments. Their own
+	/// selectors and barriers must qualify too; local stencil/logic-op modes stay immediate.
 	static bool IsDeferrable(const GSHWDrawConfig& config);
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	static bool TestQueueSafety();

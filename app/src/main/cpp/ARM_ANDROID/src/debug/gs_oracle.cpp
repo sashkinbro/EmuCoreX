@@ -612,6 +612,13 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunGSOracle(int ar
                 << "hwDownload=" << static_cast<u32>(config.HWDownloadMode) << '\n';
             Require(effective.good(), "Cannot record effective game fixes");
         }
+        config.CoalesceRenderPasses = integer_option("EMUCOREX_GS_ORACLE_COALESCE",
+            config.CoalesceRenderPasses ? 1 : 0, 1) != 0;
+        {
+            std::ofstream effective(output + "/scheduler-settings.txt");
+            effective << "coalesceRenderPasses=" << config.CoalesceRenderPasses << '\n';
+            Require(effective.good(), "Cannot record GS scheduler mode");
+        }
         if (const char* draw_frame = std::getenv("EMUCOREX_GS_ORACLE_DRAW_FRAME"))
         {
             config.DumpGSData = true;
