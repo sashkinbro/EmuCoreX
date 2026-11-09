@@ -1523,6 +1523,7 @@ public:
 		bool rov                 : 1; ///< Supports rasterizer ordered views for both depth and color.
 		bool dual_source_blend   : 1; ///< Supports a second fragment output as a hardware blend factor.
 		bool rgba16_unorm        : 1; ///< Supports RGBA16 normalized color attachments (ColorClip); otherwise RGBA32F is used.
+		u8 sub_texel_precision_bits; ///< Sampler coordinate fractional bits; 0 = unknown, conservatively use 4.
 		DepthFeedbackSupport depth_feedback : 2; ///< Support for depth feedback loops.
 		FeatureSupport()
 		{

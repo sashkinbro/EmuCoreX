@@ -3575,6 +3575,7 @@ void GSDeviceVK::SelectStreamRingMemory(const VkPhysicalDeviceMemoryProperties& 
 bool GSDeviceVK::CheckFeatures()
 {
 	const VkPhysicalDeviceLimits& limits = m_device_properties.limits;
+	m_features.sub_texel_precision_bits = static_cast<u8>(std::min<u32>(limits.subTexelPrecisionBits, 16));
 
 	const bool has_framebuffer_fetch_extension = m_optional_extensions.vk_ext_rasterization_order_attachment_access;
 	const std::string_view driver_info = m_optional_extensions.vk_khr_driver_properties ?

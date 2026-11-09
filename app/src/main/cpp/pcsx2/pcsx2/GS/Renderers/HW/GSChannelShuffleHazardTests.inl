@@ -29,7 +29,7 @@ void GSRendererHW::TestChannelShuffleHazards(void (*check)(bool, const char*))
     });
     auto& renderer = *GSRendererHW::GetInstance();
     auto& device = *static_cast<CoherenceDevice*>(g_gs_device.get());
-    device.allow_stretch = true;
+    device.allow_stretch = device.allow_copy = true;
     GSDevice::FeatureSupport features = {};
     features.texture_feedback_requires_copy = true;
     features.texture_barrier = false;
@@ -75,7 +75,7 @@ void GSRendererHW::TestChannelShuffleHazards(void (*check)(bool, const char*))
         renderer.ResetStates();
         renderer.m_conf = GSHWDrawConfig{};
         device.PurgePool();
-        device.allocations = 0;
+        device.allocations = device.copies = device.invalid_copies = 0;
         device.stretches.clear();
         renderer.m_channel_shuffle = true;
         renderer.m_texture_shuffle = false;
@@ -130,7 +130,7 @@ void GSRendererHW::TestChannelShuffleHazards(void (*check)(bool, const char*))
             "GS unrelated offset shuffle addresses source row y+160");
         check(!target_region && source_region.bits == 0,
             "GS unrelated offset shuffle consumes the region after setting shader offset");
-        check(device.allocations == 0 && device.stretches.empty(),
+        check(device.allocations == 0 && device.copies == 0 && device.stretches.empty(),
             "GS unrelated offset shuffle requires no snapshot allocation or blit");
         check(!renderer.m_conf.require_one_barrier && !renderer.m_conf.require_full_barrier,
             "GS unrelated offset shuffle creates no feedback barrier requirement");
@@ -150,8 +150,8 @@ void GSRendererHW::TestChannelShuffleHazards(void (*check)(bool, const char*))
             source_region, target_region, unscaled_size, scale, snapshot);
         check(snapshot && renderer.m_conf.tex == snapshot.get() && renderer.m_conf.tex != &source_texture,
             "GS offset shuffle snapshots a source attached as the current render target");
-        check(device.allocations == 1 && device.stretches.size() == 1,
-            "GS attached offset shuffle executes one snapshot allocation and blit");
+        check(device.allocations == 1 && device.copies + device.stretches.size() == 1,
+            "GS attached offset shuffle executes one snapshot allocation and copy or blit");
         check(unscaled_size == GSVector2i(512, 448) &&
                 renderer.m_conf.cb_ps.ChannelShuffleOffset.y == 160.0f,
             "GS attached offset shuffle snapshot preserves source dimensions and shader offset");
@@ -170,14 +170,15 @@ void GSRendererHW::TestChannelShuffleHazards(void (*check)(bool, const char*))
             source_region, target_region, unscaled_size, scale, snapshot);
         check(renderer.m_conf.ps.tex_is_fb && !renderer.m_conf.tex && !snapshot,
             "GS non-offset self shuffle retains the tex-is-fb route");
-        check(device.allocations == 0 && device.stretches.empty(),
+        check(device.allocations == 0 && device.copies == 0 && device.stretches.empty(),
             "GS non-offset tex-is-fb shuffle allocates no snapshot");
     }
-    check(device.unexpected_calls == 0,
+    check(device.unexpected_calls == 0 && device.invalid_copies == 0,
         "GS shuffle hazard fixture performs no GPU submission, present, or readback calls");
 }
 
 extern "C" void EmuCoreXOracleTestChannelShuffleHazards(void (*check)(bool, const char*))
 {
     GSRendererHW::TestChannelShuffleHazards(check);
+    GSRendererHW::TestHazardCopyCoverage(check);
 }

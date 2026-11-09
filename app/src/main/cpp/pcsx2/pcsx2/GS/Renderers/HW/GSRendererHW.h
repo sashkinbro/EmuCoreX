@@ -270,6 +270,9 @@ private:
 	void HandleTextureHazards(const GSTextureCache::Target* rt, const GSTextureCache::Target* ds,
 		const GSTextureCache::Source* tex, const TextureMinMaxResult& tmm, GSTextureCache::SourceRegion& source_region,
 		bool& target_region, GSVector2i& unscaled_size, float& scale, GSDevice::RecycledTexture& src_copy);
+	bool HazardCopyCoversSampling(const GSTextureCache::Target* rt, const GSTextureCache::Target* ds,
+		const GSTextureCache::Source* tex, const GSVector4& copied_rect, const GSVector2i& copy_size,
+		const GSVector2i& scaled_copy_size, float scale);
 	bool CanUseTexIsFB(const GSTextureCache::Target* rt, const GSTextureCache::Source* tex,
 		const TextureMinMaxResult& tmm);
 
@@ -415,6 +418,7 @@ public:
 	static void TestLargeST(void (*check)(bool, const char*));
 	static void TestChannelShuffleGeometry(void (*check)(bool, const char*));
 	static void TestTextureShuffleParity(void (*check)(bool, const char*));
+	static void TestHazardCopyCoverage(void (*check)(bool, const char*));
 	static void TestChannelShuffleHazards(void (*check)(bool, const char*));
 	static void TestMaliDirtyRectUnion(void (*check)(bool, const char*));
 	static bool PrepareBlendCarryGPU(GSTexture* target, const GSVertex* vertices, const u16* indices,
@@ -440,6 +444,8 @@ public:
 	void SnapPointsToNativePixel();
 	bool GetAgreedSpriteTexelSteps(GSNativeTexelStep& step_u, GSNativeTexelStep& step_v) const;
 	GSVector4 RealignTargetTextureCoordinate(const GSTextureCache::Source* tex);
+	void ApplyNativeWTexOffset(const GSTextureCache::Source* tex, const GSTextureCache::Target* rt,
+		const GSTextureCache::Target* ds, GSVector2& texture_offset);
 	GSVector4i ComputeBoundingBoxRT(const GSVector2i& rtsize, float rtscale);
 	GSVector4i ComputeBoundingBoxTex(const GSVector2i& texsize, const GSVector4i& coverage, const GSVector4i& region, float texscale);
 	void MergeSprite(GSTextureCache::Source* tex);
