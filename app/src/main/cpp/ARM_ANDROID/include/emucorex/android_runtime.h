@@ -5,6 +5,7 @@
 #include "emucorex/tfx_preparation_job.h"
 
 #include <condition_variable>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -69,6 +70,8 @@ public:
 	std::string GetGameSerial() const;
 	std::string GetSaveStatePathForFile(const std::string& path, int slot) const;
 	bool SaveStateToSlot(int slot);
+	uint64_t BeginSaveStateToSlot(int slot);
+	bool AwaitSaveStateSave(uint64_t ticket);
 	bool LoadStateFromSlot(int slot);
 	void WaitForSaveStateFlush();
 	std::string ListMemoryCards() const;
@@ -106,6 +109,10 @@ private:
 	void NotifyVmStartup(bool succeeded);
 	static void NotifyVmStartupThunk(void* userdata, bool succeeded);
 
+	// Completion records survive VM shutdown until their owning caller consumes them.
+	std::mutex save_state_tickets_mutex_;
+	std::unordered_map<uint64_t, std::shared_future<bool>> save_state_tickets_;
+	uint64_t next_save_state_ticket_ = 0;
 	mutable std::mutex mutex_;
 	std::condition_variable startup_cv_;
 	RuntimePaths paths_;

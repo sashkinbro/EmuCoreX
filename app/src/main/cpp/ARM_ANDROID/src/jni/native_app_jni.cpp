@@ -944,6 +944,8 @@ extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_refreshB
 extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_hasValidVm(JNIEnv*, jclass) { return AndroidRuntime::Instance().HasValidVm() ? JNI_TRUE : JNI_FALSE; }
 extern "C" JNIEXPORT jstring JNICALL Java_com_sbro_emucorex_core_NativeApp_getGameSerial(JNIEnv* env, jclass) { return StringToJString(env, AndroidRuntime::Instance().GetGameSerial()); }
 extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_saveStateToSlot(JNIEnv*, jclass, jint slot) { return AndroidRuntime::Instance().SaveStateToSlot(slot) ? JNI_TRUE : JNI_FALSE; }
+extern "C" JNIEXPORT jlong JNICALL Java_com_sbro_emucorex_core_NativeApp_beginSaveStateToSlot(JNIEnv*, jclass, jint slot) { return static_cast<jlong>(AndroidRuntime::Instance().BeginSaveStateToSlot(slot)); }
+extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_awaitSaveStateSave(JNIEnv*, jclass, jlong ticket) { return AndroidRuntime::Instance().AwaitSaveStateSave(static_cast<uint64_t>(ticket)) ? JNI_TRUE : JNI_FALSE; }
 extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_loadStateFromSlot(JNIEnv*, jclass, jint slot) { return AndroidRuntime::Instance().LoadStateFromSlot(slot) ? JNI_TRUE : JNI_FALSE; }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_waitForSaveStateFlush(JNIEnv*, jclass) { AndroidRuntime::Instance().WaitForSaveStateFlush(); }
 extern "C" JNIEXPORT jstring JNICALL Java_com_sbro_emucorex_core_NativeApp_getSaveStatePathForFile(JNIEnv* env, jclass, jstring path, jint slot) { return StringToJString(env, AndroidRuntime::Instance().GetSaveStatePathForFile(JStringToString(env, path), slot)); }

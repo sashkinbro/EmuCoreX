@@ -44,6 +44,7 @@ object EmulatorBridge {
     private val aspectRatioSettingValues = GSAspectRatioSettings.settingValues
 
     private val serialDispatcher = Dispatchers.IO.limitedParallelism(1)
+    private val saveStateCoordinator = SaveStateCoordinator()
     private val serialScope = CoroutineScope(SupervisorJob() + serialDispatcher)
     private val inputScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -1175,19 +1176,15 @@ object EmulatorBridge {
 
     suspend fun saveState(slot: Int): Boolean {
         if (!isNativeLoaded || !isVmActive) return false
-        return runSerial {
-            try {
-                val started = NativeApp.saveStateToSlot(slot)
-                if (started) {
-                    // The archive is zipped on a background thread. Wait for the
-                    // flush so callers never report success (or load it) while the
-                    // file is still being written.
-                    runCatching { NativeApp.waitForSaveStateFlush() }
-                }
-                started
-            } catch (_: Exception) {
-                false
-            }
+        return try {
+            saveStateCoordinator.save(
+                snapshot = { runSerial { NativeApp.beginSaveStateToSlot(slot) } },
+                awaitCompletion = NativeApp::awaitSaveStateSave
+            )
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            false
         }
     }
 

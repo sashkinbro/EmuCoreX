@@ -185,7 +185,10 @@ namespace VMManager
 		std::function<void(const std::string&)> error_callback);
 
 	/// Saves state to the specified slot.
-	void SaveStateToSlot(s32 slot, bool zip_on_thread, std::function<void(const std::string&)> error_callback);
+	// completion_callback runs exactly once, including snapshot/validation failures, and
+	// on success only after this archive has finished writing. It may run on the ZIP worker.
+	void SaveStateToSlot(s32 slot, bool zip_on_thread, std::function<void(const std::string&)> error_callback,
+		std::function<void(bool)> completion_callback = {});
 
 	/// Waits until all compressing save states have finished saving to disk.
 	void WaitForSaveStateFlush();

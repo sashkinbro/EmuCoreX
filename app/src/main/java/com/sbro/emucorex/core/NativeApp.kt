@@ -402,6 +402,9 @@ object NativeApp {
     @Suppress("unused") // Exported JNI entry point retained for native game metadata.
     @JvmStatic external fun getGameSerial(): String?
     @JvmStatic external fun saveStateToSlot(slot: Int): Boolean
+    // Snapshot on the control lane; wait for this exact archive off the control lane.
+    @JvmStatic external fun beginSaveStateToSlot(slot: Int): Long
+    @JvmStatic external fun awaitSaveStateSave(ticket: Long): Boolean
     @JvmStatic external fun loadStateFromSlot(slot: Int): Boolean
     @JvmStatic external fun waitForSaveStateFlush()
     @JvmStatic external fun getSaveStatePathForFile(path: String, slot: Int): String?

@@ -1525,25 +1525,56 @@ std::string AndroidRuntime::GetSaveStatePathForFile(const std::string& path, int
 
 bool AndroidRuntime::SaveStateToSlot(int slot)
 {
-	if (!HasValidVm())
-		return false;
+    const uint64_t ticket = BeginSaveStateToSlot(slot);
+    return ticket != 0 && AwaitSaveStateSave(ticket);
+}
 
-	auto result = std::make_shared<bool>(false);
-	auto failed = std::make_shared<std::atomic_bool>(false);
-	Host::RunOnCPUThread([slot, result, failed]() {
-		if (!VMManager::HasValidVM())
-			return;
+uint64_t AndroidRuntime::BeginSaveStateToSlot(int slot)
+{
+    if (!HasValidVm())
+        return 0;
 
-		VMManager::SaveStateToSlot(slot, true, [slot, failed](const std::string& message) {
-			failed->store(true);
-			__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "save state slot %d failed: %s", slot, message.c_str());
-		});
-		*result = true;
-	}, true);
-	// The error callback may run on the ZIP worker. Wait before reporting
-	// success so an old slot file cannot hide a failed asynchronous save.
-	VMManager::WaitForSaveStateFlush();
-	return *result && !failed->load();
+    auto completion = std::make_shared<std::promise<bool>>();
+    uint64_t ticket;
+    {
+        std::lock_guard lock(save_state_tickets_mutex_);
+        // Bound abandoned/foreign callers, independently of VM lifecycle.
+        if (save_state_tickets_.size() >= 32)
+            return 0;
+        do {
+            next_save_state_ticket_ = (next_save_state_ticket_ + 1) & 0x7fffffffffffffffULL;
+        } while (next_save_state_ticket_ == 0 || save_state_tickets_.contains(next_save_state_ticket_));
+        ticket = next_save_state_ticket_;
+        save_state_tickets_.emplace(ticket, completion->get_future().share());
+    }
+
+    Host::RunOnCPUThread([slot, completion]() {
+        if (!VMManager::HasValidVM())
+        {
+            completion->set_value(false);
+            return;
+        }
+        VMManager::SaveStateToSlot(slot, true, [slot](const std::string& message) {
+            __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "save state slot %d failed: %s", slot, message.c_str());
+        }, [completion](bool success) { completion->set_value(success); });
+    }, true);
+    return ticket;
+}
+
+bool AndroidRuntime::AwaitSaveStateSave(uint64_t ticket)
+{
+    std::shared_future<bool> completion;
+    {
+        std::lock_guard lock(save_state_tickets_mutex_);
+        const auto it = save_state_tickets_.find(ticket);
+        if (it == save_state_tickets_.end())
+            return false;
+        completion = std::move(it->second);
+        save_state_tickets_.erase(it);
+    }
+    // This waiter owns its future even if load/shutdown joins the ZIP worker.
+    // It never removes a thread from the global flush list or holds a runtime lock.
+    return completion.get();
 }
 
 void AndroidRuntime::WaitForSaveStateFlush()
