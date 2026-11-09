@@ -673,6 +673,22 @@ GSTexture* GSDevice::FetchSurface(GSTexture::Usage usage, int width, int height,
 {
 	const GSVector2i size(std::clamp(width, 1, static_cast<int>(g_gs_device->GetMaxTextureSize())),
 		std::clamp(height, 1, static_cast<int>(g_gs_device->GetMaxTextureSize())));
+	// A queued reader can keep an otherwise reusable surface out of the pool.
+	// Drain only an exact match which this caller allows to be reused this frame;
+	// Recycle() stamps it with the current frame when the queued reader completes.
+	if (prefer_reuse && !m_deferred_recycle.empty() && !m_flushing)
+	{
+		for (const GSTexture* held : m_deferred_recycle)
+		{
+			if (held->GetUsage() == usage && held->GetFormat() == format && held->GetSize() == size &&
+				held->GetMipmapLevels() == levels)
+			{
+				FlushDeferredDraws();
+				break;
+			}
+		}
+	}
+
 	FastList<GSTexture*>& pool = m_pool[!GSTexture::IsTexture(usage)];
 
 	GSTexture* t = nullptr;
