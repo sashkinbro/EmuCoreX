@@ -20,6 +20,7 @@
 #include "imgui.h"
 
 #include <algorithm>
+#include <functional>
 #include <cmath>
 #include <limits>
 #include <ostream>
@@ -1162,7 +1163,10 @@ void GSDevice::SortMultiStretchRects(MultiStretchRect* rects, u32 num_rects)
 {
 	// Depending on num_rects, insertion sort may be better here.
 	std::sort(rects, rects + num_rects, [](const MultiStretchRect& lhs, const MultiStretchRect& rhs) {
-		return lhs.src < rhs.src || lhs.filter < rhs.filter;
+		// Sort source first; filter only breaks ties within a source group.
+		if (lhs.src != rhs.src)
+			return std::less<GSTexture*>{}(lhs.src, rhs.src);
+		return lhs.filter < rhs.filter;
 	});
 }
 
