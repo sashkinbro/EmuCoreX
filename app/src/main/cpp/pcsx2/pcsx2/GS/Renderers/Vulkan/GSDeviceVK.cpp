@@ -229,9 +229,62 @@ GSDeviceVK::GSDeviceVK()
 #endif
 
 	std::memset(&m_pipeline_selector, 0, sizeof(m_pipeline_selector));
+#if defined(__ANDROID__) && !defined(NDEBUG)
+	// Startup-only controls for a fixed-scene A/B experiment. Release always uses
+	// the readback-armed default, including on mobile tile-based GPUs.
+	char overlap_mode[PROP_VALUE_MAX] = {};
+	if (__system_property_get("debug.emucorex.gs_overlap", overlap_mode) > 0)
+	{
+		if (std::strcmp(overlap_mode, "off") == 0)
+			m_readback_kick_mode = GSVKReadbackKickPolicy::Mode::Disabled;
+		else if (std::strcmp(overlap_mode, "boundary") == 0)
+			m_readback_kick_mode = GSVKReadbackKickPolicy::Mode::PassBoundary;
+	}
+	char overlap_passes[PROP_VALUE_MAX] = {};
+	if (__system_property_get("debug.emucorex.gs_overlap_passes", overlap_passes) > 0)
+	{
+		u32 passes = 0;
+		bool valid = true;
+		for (const char* p = overlap_passes; *p; ++p)
+		{
+			if (*p < '0' || *p > '9' || passes > MAX_DRAW_CALLS_PER_FRAME / 10)
+			{
+				valid = false;
+				break;
+			}
+			passes = passes * 10 + static_cast<u32>(*p - '0');
+		}
+		if (valid && passes > 0 && passes <= MAX_DRAW_CALLS_PER_FRAME)
+			m_readback_kick_passes = passes;
+	}
+	char overlap_trace[PROP_VALUE_MAX] = {};
+	m_trace_submission_overlap = __system_property_get("debug.emucorex.gs_overlap_trace", overlap_trace) == 1 &&
+		overlap_trace[0] == '1';
+	if (overlap_mode[0] || overlap_passes[0] || m_trace_submission_overlap)
+		Console.WriteLn("GS submission overlap control: mode=%u interval=%u trace=%u (Debug only)",
+			static_cast<u32>(m_readback_kick_mode), m_readback_kick_passes, m_trace_submission_overlap);
+#endif
 }
 
-GSDeviceVK::~GSDeviceVK() = default;
+GSDeviceVK::~GSDeviceVK()
+{
+#if !defined(NDEBUG)
+	TraceSubmissionOverlap();
+#endif
+}
+
+#if !defined(NDEBUG)
+void GSDeviceVK::TraceSubmissionOverlap()
+{
+	if (!m_trace_submission_overlap)
+		return;
+	SubmissionOverlapTrace& t = m_submission_overlap_trace;
+	Console.WriteLn("GS submission overlap: frames=%u mode=%u interval=%u draws=%u boundaries=%u "
+			"eligible=%u offers=%u kicks=%u busy=%u readbacks=%u submits=%u safety=%u max_draws=%u max_passes=%u",
+			m_frame, static_cast<u32>(m_readback_kick_mode), m_readback_kick_passes, t.draws, t.boundaries,
+			t.eligible, t.offers, t.kicks, t.busy, t.readbacks, t.submits, t.safety, t.max_draws, t.max_passes);
+}
+#endif
 
 bool GSDeviceVK::IsMaliSX2() const
 {
@@ -1646,6 +1699,17 @@ void GSDeviceVK::WaitForCommandBufferCompletion(u32 index)
 
 void GSDeviceVK::SubmitCommandBuffer(VKSwapChain* present_swap_chain)
 {
+	// All submission paths (present, readback, stream exhaustion and safety cap)
+	// start a new cadence. EndRenderPass itself must never change command buffers:
+	// its callers may still hold the old VkCommandBuffer handle.
+	m_readback_kick.Submitted();
+#if !defined(NDEBUG)
+	if (m_trace_submission_overlap)
+	{
+		++m_submission_overlap_trace.submits;
+		m_submission_overlap_trace.max_draws = std::max(m_submission_overlap_trace.max_draws, m_draws_in_command_buffer);
+	}
+#endif
 	FrameResources& resources = m_frame_resources[m_current_frame];
 
 	// This counter describes the command buffer being submitted, not the lifetime of
@@ -9035,6 +9099,13 @@ void GSDeviceVK::ExecuteCommandBufferAndRestartPresent(bool wait_for_completion,
 
 void GSDeviceVK::ExecuteCommandBufferForReadback()
 {
+	m_readback_kick.ReadbackRequested(m_frame);
+#if !defined(NDEBUG)
+	if (m_trace_submission_overlap)
+	{
+		++m_submission_overlap_trace.readbacks;
+	}
+#endif
 	ExecuteCommandBuffer(true);
 	if (m_spinning_supported && GSConfig.HWSpinGPUForReadbacks)
 	{
@@ -9359,6 +9430,7 @@ void GSDeviceVK::EndRenderPass()
 		return;
 
 	m_current_render_pass = VK_NULL_HANDLE;
+	m_readback_kick.RenderPassEnded();
 	m_render_pass_serial++;
 	m_date_copy.valid = false;
 	m_loop_declared_in_pass = false;
@@ -10023,22 +10095,71 @@ bool GSDeviceVK::DateCopyLive(const GSHWDrawConfig& config)
 
 void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 {
+	// Offer an early GPU start only before this draw stages streams or descriptors.
+	// A recent synchronous readback arms the offer for three GS frames; titles
+	// without readbacks retain their current mobile submission policy.
+	const bool kick_armed = m_readback_kick.IsArmed(m_frame, m_readback_kick_mode);
+	bool inspect_boundary = kick_armed;
+#if !defined(NDEBUG)
+	if (m_trace_submission_overlap)
+	{
+		++m_submission_overlap_trace.draws;
+		inspect_boundary = true;
+	}
+#endif
+	bool readback_offer = false;
+	if (inspect_boundary)
+	{
+		// Sharing either attachment continues the pass. ROV and colour-clip draws
+		// can bind a different image, so predict no target-switch boundary for them.
+		const bool natural_boundary = !InRenderPass() ||
+			(!config.ps.HasColorROV() && !config.ps.HasDepthROV() && !GetColorClipTexture() &&
+				!(config.rt && config.rt == m_current_render_target) && !(config.ds && config.ds == m_current_depth_target));
+		const bool eligible = m_readback_kick.AtCadence(natural_boundary, InRenderPass(), m_readback_kick_passes);
+		readback_offer = kick_armed && eligible;
+#if !defined(NDEBUG)
+		if (m_trace_submission_overlap)
+		{
+			m_submission_overlap_trace.boundaries += natural_boundary;
+			m_submission_overlap_trace.eligible += eligible;
+			m_submission_overlap_trace.max_passes = std::max(m_submission_overlap_trace.max_passes,
+				m_readback_kick.UnsubmittedPasses(InRenderPass()));
+		}
+#endif
+	}
 
-
-	// Bound a HW-draw batch even when presentation is skipped or the GPU stays
-	// busy. A fence-gated offer is not a bound: it can leave tens of thousands of
-	// draws and render passes in a single mobile-driver submission. Recycle the
-	// next buffer normally, before staging this draw's vertices or descriptors.
+	// Preserve the unconditional safety bound, including when presentation is
+	// skipped or no buffer has retired. It is deliberately not fence gated.
 	if (m_draws_in_command_buffer >= MAX_DRAW_CALLS_PER_FRAME)
 	{
+#if !defined(NDEBUG)
+		if (m_trace_submission_overlap)
+			++m_submission_overlap_trace.safety;
+#endif
 		ExecuteCommandBuffer(false);
 	}
-	else if (!HasMobileGPUProfile() && m_draws_in_command_buffer >= 4000)
+	else if (!m_last_submit_failed &&
+		(readback_offer || (!HasMobileGPUProfile() && m_draws_in_command_buffer >= 4000)))
 	{
+		// Android Adreno vkQueueSubmit can sleep in the driver; frequent submits
+		// can also lower the GS thread's governor clock. Keep the pass cadence and
+		// readback arming rather than forcing every boundary or a mobile draw count.
+		// Cycling to an in-flight buffer would make ActivateCommandBuffer wait.
+		// Poll and retire fences without waiting; a busy next buffer defers the
+		// offer until a later natural boundary. The desktop offer keeps its cadence.
 		ScanForCommandBufferCompletion();
 		const u32 next_buffer = (m_current_frame + 1) % NUM_COMMAND_BUFFERS;
-		if (m_frame_resources[next_buffer].fence_counter <= m_completed_fence_counter)
-			ExecuteCommandBuffer(false);
+		const bool ready = m_frame_resources[next_buffer].fence_counter <= m_completed_fence_counter;
+#if !defined(NDEBUG)
+		if (m_trace_submission_overlap && readback_offer)
+		{
+			++m_submission_overlap_trace.offers;
+			m_submission_overlap_trace.kicks += ready;
+			m_submission_overlap_trace.busy += !ready;
+		}
+#endif
+		if (ready)
+			ExecuteCommandBuffer(false); // Closes the pass and reapplies state via dirty flags.
 	}
 	++m_draws_in_command_buffer;
 

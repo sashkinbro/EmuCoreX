@@ -13,6 +13,7 @@
 #include "GS/Renderers/Vulkan/VKLoader.h"
 #include "GS/Renderers/Vulkan/VKStreamBuffer.h"
 #include "GS/Renderers/Vulkan/VulkanFeedbackPolicy.h"
+#include "GS/Renderers/Vulkan/GSVKReadbackKickPolicy.h"
 
 #include "common/HashCombine.h"
 #include "common/ReadbackSpinManager.h"
@@ -451,6 +452,21 @@ private:
 	u32 m_spin_queue_family_index = 0;
 	u32 m_command_buffer_render_passes = 0;
 	u32 m_draws_in_command_buffer = 0;
+	GSVKReadbackKickPolicy m_readback_kick;
+#if !defined(NDEBUG)
+	GSVKReadbackKickPolicy::Mode m_readback_kick_mode = GSVKReadbackKickPolicy::Mode::Readback;
+	u32 m_readback_kick_passes = GSVKReadbackKickPolicy::DEFAULT_PASS_INTERVAL;
+	struct SubmissionOverlapTrace
+	{
+		u32 draws = 0, boundaries = 0, eligible = 0, offers = 0, kicks = 0, busy = 0;
+		u32 readbacks = 0, submits = 0, safety = 0, max_draws = 0, max_passes = 0;
+	} m_submission_overlap_trace;
+	bool m_trace_submission_overlap = false;
+	void TraceSubmissionOverlap();
+#else
+	static constexpr GSVKReadbackKickPolicy::Mode m_readback_kick_mode = GSVKReadbackKickPolicy::Mode::Readback;
+	static constexpr u32 m_readback_kick_passes = GSVKReadbackKickPolicy::DEFAULT_PASS_INTERVAL;
+#endif
 	u32 m_spin_timer = 0;
 	bool m_spinning_supported = false;
 	bool m_spin_queue_is_graphics_queue = false;
