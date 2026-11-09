@@ -1,3 +1,4 @@
+#include "common/AndroidLatencyTrace.h"
 #include "common/AndroidLogging.h"
 #include "emucorex/android_runtime.h"
 #include "emucorex/upstream_vm_bridge.h"
@@ -686,6 +687,7 @@ void AndroidRuntime::ReloadPatches()
 
 void AndroidRuntime::SetNativeSurface(void* window, int width, int height, float refresh_rate)
 {
+	const EmuCoreXLatency::Span span("native.surface.rebind");
 	const float safe_refresh_rate =
 		(std::isfinite(refresh_rate) && refresh_rate > 0.0f) ? std::min(refresh_rate, 240.0f) : 0.0f;
 	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_DEBUG, LOG_TAG, "SetNativeSurface: window=%p size=%dx%d rate=%.2f",
@@ -725,14 +727,16 @@ void AndroidRuntime::SetNativeSurface(void* window, int width, int height, float
 			if (value)
 				ANativeWindow_release(value);
 		});
-		Host::RunOnCPUThread([old_window_ref = std::move(old_window_ref)]() {
+		EmuCoreXLatency::Event(EmuCoreXLatency::Current(), "surface.update.enqueue");
+		Host::RunOnCPUThread(EmuCoreXLatency::Carry([old_window_ref = std::move(old_window_ref)]() {
+			const EmuCoreXLatency::Span display_span("surface.update.gs_wait");
 			(void)old_window_ref;
 			if (MTGS::IsOpen())
 			{
 				MTGS::UpdateDisplayWindow();
 				MTGS::WaitGS(false, false, false);
 			}
-		}, false);
+		}), false);
 		return;
 	}
 
@@ -1362,6 +1366,7 @@ bool AndroidRuntime::ChangeDisc(std::string path)
 
 void AndroidRuntime::Pause()
 {
+	const EmuCoreXLatency::Span native_span("native.pause");
 	bool active = false;
 	bool already_paused = false;
 	{
@@ -1377,15 +1382,18 @@ void AndroidRuntime::Pause()
 	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "VM pause requested");
 	if (Cpu)
 		Cpu->ExitExecution();
-	Host::RunOnCPUThread([]() {
+	EmuCoreXLatency::Event(EmuCoreXLatency::Current(), "cpu.enqueue");
+	Host::RunOnCPUThread(EmuCoreXLatency::Carry([]() {
+		const EmuCoreXLatency::Span cpu_span("cpu.pause");
 		if (Cpu)
 			Cpu->ExitExecution();
 		VMManager::SetPaused(true);
-	}, false);
+	}), false);
 }
 
 void AndroidRuntime::Resume()
 {
+	const EmuCoreXLatency::Span native_span("native.resume");
 	{
 		std::lock_guard lock(mutex_);
 		if (!vm_active_)
@@ -1394,9 +1402,11 @@ void AndroidRuntime::Resume()
 	}
 
 	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "VM resume requested");
-	Host::RunOnCPUThread([]() {
+	EmuCoreXLatency::Event(EmuCoreXLatency::Current(), "cpu.enqueue");
+	Host::RunOnCPUThread(EmuCoreXLatency::Carry([]() {
+		const EmuCoreXLatency::Span cpu_span("cpu.resume");
 		VMManager::SetPaused(false);
-	}, false);
+	}), false);
 }
 
 void AndroidRuntime::Shutdown()
@@ -1531,6 +1541,7 @@ bool AndroidRuntime::SaveStateToSlot(int slot)
 
 uint64_t AndroidRuntime::BeginSaveStateToSlot(int slot)
 {
+    const EmuCoreXLatency::Span native_span("native.save.begin");
     if (!HasValidVm())
         return 0;
 
@@ -1548,7 +1559,10 @@ uint64_t AndroidRuntime::BeginSaveStateToSlot(int slot)
         save_state_tickets_.emplace(ticket, completion->get_future().share());
     }
 
-    Host::RunOnCPUThread([slot, completion]() {
+    EmuCoreXLatency::Event(EmuCoreXLatency::Current(), "save.ticket.created", "I", ticket);
+    EmuCoreXLatency::Event(EmuCoreXLatency::Current(), "cpu.enqueue");
+    Host::RunOnCPUThread(EmuCoreXLatency::Carry([slot, completion]() {
+        const EmuCoreXLatency::Span cpu_span("cpu.save");
         if (!VMManager::HasValidVM())
         {
             completion->set_value(false);
@@ -1557,12 +1571,14 @@ uint64_t AndroidRuntime::BeginSaveStateToSlot(int slot)
         VMManager::SaveStateToSlot(slot, true, [slot](const std::string& message) {
             __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "save state slot %d failed: %s", slot, message.c_str());
         }, [completion](bool success) { completion->set_value(success); });
-    }, true);
+    }), true);
     return ticket;
 }
 
 bool AndroidRuntime::AwaitSaveStateSave(uint64_t ticket)
 {
+    const EmuCoreXLatency::Span native_span("native.save.await");
+    EmuCoreXLatency::Event(EmuCoreXLatency::Current(), "save.ticket.await", "I", ticket);
     std::shared_future<bool> completion;
     {
         std::lock_guard lock(save_state_tickets_mutex_);
@@ -1574,7 +1590,11 @@ bool AndroidRuntime::AwaitSaveStateSave(uint64_t ticket)
     }
     // This waiter owns its future even if load/shutdown joins the ZIP worker.
     // It never removes a thread from the global flush list or holds a runtime lock.
-    return completion.get();
+    EmuCoreXLatency::Span wait_span("save.zip.wait");
+    const bool result = completion.get();
+    wait_span.Finish();
+    EmuCoreXLatency::Event(EmuCoreXLatency::Current(), "save.ticket.result", "I", result);
+    return result;
 }
 
 void AndroidRuntime::WaitForSaveStateFlush()
@@ -1587,15 +1607,20 @@ void AndroidRuntime::WaitForSaveStateFlush()
 
 bool AndroidRuntime::LoadStateFromSlot(int slot)
 {
+	const EmuCoreXLatency::Span native_span("native.load");
 	if (!HasValidVm())
 		return false;
 
 	// Never load a state whose background zip is still running: the archive would
 	// be read half-written.
+	EmuCoreXLatency::Span zip_wait("load.prior_save.wait");
 	VMManager::WaitForSaveStateFlush();
+	zip_wait.Finish();
 
 	auto result = std::make_shared<bool>(false);
-	Host::RunOnCPUThread([slot, result]() {
+	EmuCoreXLatency::Event(EmuCoreXLatency::Current(), "cpu.enqueue");
+	Host::RunOnCPUThread(EmuCoreXLatency::Carry([slot, result]() {
+		const EmuCoreXLatency::Span cpu_span("cpu.load");
 		if (!VMManager::HasValidVM())
 			return;
 
@@ -1609,9 +1634,12 @@ bool AndroidRuntime::LoadStateFromSlot(int slot)
 
 		Error error;
 		*result = VMManager::LoadStateFromSlot(slot, false, &error);
+		EmuCoreXLatency::Event(EmuCoreXLatency::Current(), "load.result", "I", *result);
+		if (*result)
+			EmuCoreXLatency::ArmFirstPresent(EmuCoreXLatency::Current());
 		if (!*result)
 			__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "load state slot %d failed: %s", slot, error.GetDescription().c_str());
-	}, true);
+	}), true);
 	return *result;
 }
 

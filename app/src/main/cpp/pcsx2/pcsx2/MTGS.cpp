@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "common/AndroidLatencyTrace.h"
 #include "GS.h"
 #include "Gif_Unit.h"
 #include "MTGS.h"
@@ -1127,9 +1128,11 @@ bool MTGS::SaveMemorySnapshot(u32 window_width, u32 window_height, bool apply_as
 	u32* width, u32* height, std::vector<u32>* pixels)
 {
 	bool result = false;
-	RunOnGSThread([window_width, window_height, apply_aspect, crop_borders, width, height, pixels, &result]() {
+	EmuCoreXLatency::Event(EmuCoreXLatency::Current(), "save.screenshot.gs.enqueue");
+	RunOnGSThread(EmuCoreXLatency::Carry([window_width, window_height, apply_aspect, crop_borders, width, height, pixels, &result]() {
+		const EmuCoreXLatency::Span gs_span("save.screenshot.gs");
 		result = GSSaveSnapshotToMemory(window_width, window_height, apply_aspect, crop_borders, width, height, pixels);
-	});
+	}));
 	WaitGS(false, false, false);
 	return result;
 }

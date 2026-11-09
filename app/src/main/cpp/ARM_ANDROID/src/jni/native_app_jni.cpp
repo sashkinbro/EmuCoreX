@@ -1,3 +1,4 @@
+#include "common/AndroidLatencyTrace.h"
 #include "common/AndroidLogging.h"
 #include "emucorex/android_runtime.h"
 #include "emucorex/android_crash_diagnostics.h"
@@ -51,6 +52,46 @@
 using emucorex::android::AndroidRuntime;
 using emucorex::android::JStringToString;
 using emucorex::android::StringToJString;
+
+#if defined(__ANDROID__) && !defined(NDEBUG)
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_sbro_emucorex_core_NativeApp_latencyTrace(JNIEnv*, jclass, jint event, jlong token)
+{
+    using namespace EmuCoreXLatency;
+    if (event >= static_cast<int>(Operation::Pause) && event <= static_cast<int>(Operation::Load))
+    {
+        const Token started = Begin(static_cast<Operation>(event));
+        Event(started, "bridge.enqueue");
+        return static_cast<jlong>(started);
+    }
+    if (event == 10)
+    {
+        SetCurrent(static_cast<Token>(token));
+        Event(Current(), "bridge.serial.start");
+    }
+    else if (event == 11)
+    {
+        Event(static_cast<Token>(token), "bridge.native.return");
+        SetCurrent(0);
+    }
+    else if (event == 12)
+    {
+        SetCurrent(static_cast<Token>(token));
+        Event(Current(), "bridge.save.await.start");
+    }
+    else if (event == 13)
+    {
+        Event(static_cast<Token>(token), "bridge.save.await.return");
+        SetCurrent(0);
+    }
+    else if (event == 14)
+    {
+        Event(static_cast<Token>(token), "bridge.save.snapshot.enqueue");
+    }
+    return 0;
+}
+#endif
+
 
 extern "C" JNIEXPORT jfloat JNICALL
 Java_com_sbro_emucorex_core_NativeApp_getNominalFrameRate(JNIEnv*, jclass)

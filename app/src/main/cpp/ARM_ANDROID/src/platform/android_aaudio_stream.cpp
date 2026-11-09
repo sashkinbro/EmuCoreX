@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+#include "common/AndroidLatencyTrace.h"
 #include "common/AndroidLogging.h"
 
 #include "Host/AudioStream.h"
@@ -53,7 +54,9 @@ public:
 
 	void SetPaused(bool paused) override
 	{
+		EmuCoreXLatency::Span mutex_span("audio.mutex.wait");
 		const std::lock_guard lock(m_device_mutex);
+		mutex_span.Finish();
 		if (m_shutdown)
 			return;
 		const bool was_paused = m_paused;
@@ -92,7 +95,10 @@ public:
 			}
 		}
 
+		EmuCoreXLatency::Span request_span("audio.pause_start.request");
 		const aaudio_result_t result = paused ? AAudioStream_requestPause(m_stream) : AAudioStream_requestStart(m_stream);
+		request_span.Finish();
+		EmuCoreXLatency::Event(EmuCoreXLatency::Current(), "audio.request.result", "I", result);
 		if (result != AAUDIO_OK)
 		{
 			__android_log_print(ANDROID_LOG_WARN, LOG_TAG, "AAudio pause/start failed: %s", AAudio_convertResultToText(result));
@@ -138,6 +144,7 @@ public:
 private:
 	bool OpenAAudioDevice(Error* error)
 	{
+		const EmuCoreXLatency::Span span("audio.open");
 		pxAssert(!m_stream);
 		BeginCallbackGeneration();
 		m_callback_context = std::make_unique<CallbackContext>(CallbackContext{this, m_generation});
@@ -186,6 +193,7 @@ private:
 
 	bool StartAAudioDevice(Error* error)
 	{
+		const EmuCoreXLatency::Span span("audio.start");
 		const aaudio_result_t result = AAudioStream_requestStart(m_stream);
 		if (result != AAUDIO_OK)
 		{
@@ -206,6 +214,8 @@ private:
 
 	bool ReopenDevice(Error* error)
 	{
+		const EmuCoreXLatency::Bind trace(EmuCoreXLatency::Begin(EmuCoreXLatency::Operation::AudioRecovery));
+		const EmuCoreXLatency::Span span("audio.recovery");
 		CloseDevice();
 		if (!OpenAAudioDevice(error) || !StartAAudioDevice(error))
 			return false;
@@ -291,6 +301,7 @@ private:
 
 	bool WaitForPendingPause()
 	{
+		const EmuCoreXLatency::Span span("audio.pending_pause.wait");
 		aaudio_stream_state_t state = AAudioStream_getState(m_stream);
 		while (state == AAUDIO_STREAM_STATE_PAUSING)
 		{
@@ -321,6 +332,7 @@ private:
 
 	void CloseDevice()
 	{
+		const EmuCoreXLatency::Span span("audio.close");
 		// Invalidate the old generation before stop/close can deliver a late
 		// callback. Its context stays alive until AAudio_close has completed.
 		BeginCallbackGeneration();

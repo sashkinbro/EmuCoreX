@@ -394,6 +394,19 @@ object NativeApp {
     @JvmStatic external fun runEeFpuDivRoundingSelfTest(): String
     @JvmStatic external fun bootElf(path: String): Boolean
     @JvmStatic external fun bootIrx(path: String): Boolean
+    // Debug native property only; no settings/UI and Release calls are compiled out.
+    internal object LatencyEvent {
+        const val PAUSE = 1
+        const val RESUME = 2
+        const val SAVE = 3
+        const val LOAD = 4
+        const val SERIAL_START = 10
+        const val SERIAL_DONE = 11
+        const val SAVE_WAIT_START = 12
+        const val SAVE_WAIT_DONE = 13
+        const val SAVE_SNAPSHOT_ENQUEUE = 14
+    }
+    @JvmStatic external fun latencyTrace(event: Int, token: Long): Long
     @JvmStatic external fun pause()
     @JvmStatic external fun resume()
     @JvmStatic external fun shutdown()

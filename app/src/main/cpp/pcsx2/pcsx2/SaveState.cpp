@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "common/AndroidLatencyTrace.h"
 #include "Achievements.h"
 #include "BuildVersion.h"
 #include "CDVD/CDVD.h"
@@ -52,6 +53,7 @@ static tlbs s_tlb_backup[std::size(tlb)];
 
 static void PreLoadPrep()
 {
+	const EmuCoreXLatency::Span span("load.prep");
 	// ensure everything is in sync before we start overwriting stuff.
 	if (THREAD_VU1)
 		vu1Thread.WaitVU();
@@ -68,6 +70,7 @@ static void PreLoadPrep()
 
 static void PostLoadPrep()
 {
+	const EmuCoreXLatency::Span span("load.postprep");
 	resetCache();
 //	WriteCP0Status(cpuRegs.CP0.n.Status.val);
 	RestoreTLBMappings(s_tlb_backup);
@@ -1325,6 +1328,7 @@ bool SaveState_UnzipFromDisk(const std::string& filename, Error* error)
 	IopThread::VmHold iop_hold;
 
 	PreLoadPrep();
+	EmuCoreXLatency::Span deserialize_span("load.deserialize");
 
 	if (!LoadInternalStructuresState(zf.get(), internal_index, savever, error))
 	{
@@ -1371,6 +1375,7 @@ bool SaveState_UnzipFromDisk(const std::string& filename, Error* error)
 		}
 	}
 
+	deserialize_span.Finish();
 	PostLoadPrep();
 	if (legacy)
 	{

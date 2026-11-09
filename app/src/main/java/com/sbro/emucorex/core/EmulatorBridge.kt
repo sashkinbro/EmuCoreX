@@ -45,6 +45,7 @@ object EmulatorBridge {
 
     private val serialDispatcher = Dispatchers.IO.limitedParallelism(1)
     private val saveStateCoordinator = SaveStateCoordinator()
+    @Volatile private var optionalLatencyTraceAvailable = true
     private val serialScope = CoroutineScope(SupervisorJob() + serialDispatcher)
     private val inputScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -203,6 +204,33 @@ object EmulatorBridge {
     )
 
     private suspend fun <T> runSerial(block: () -> T): T = withContext(serialDispatcher) { block() }
+
+    private fun traceLatency(event: Int, token: Long): Long {
+        if (!BuildConfig.DEBUG || !optionalLatencyTraceAvailable) return 0L
+        return try {
+            NativeApp.latencyTrace(event, token)
+        } catch (_: UnsatisfiedLinkError) {
+            // Debug APKs also package the Release 16 KiB core, whose optional
+            // diagnostic JNI exports are deliberately absent.
+            optionalLatencyTraceAvailable = false
+            0L
+        }
+    }
+
+    private suspend fun <T> runTimedSerial(operation: Int, existingToken: Long? = null, block: () -> T): T {
+        if (!BuildConfig.DEBUG) return runSerial(block)
+        val token = existingToken ?: traceLatency(operation, 0L)
+        if (token == 0L) return runSerial(block)
+        return runSerial {
+            traceLatency(NativeApp.LatencyEvent.SERIAL_START, token)
+            try {
+                block()
+            } finally {
+                traceLatency(NativeApp.LatencyEvent.SERIAL_DONE, token)
+            }
+        }
+    }
+
 
     suspend fun startShaderPreparation(): Boolean {
         if (!isNativeLoaded) return false
@@ -979,7 +1007,7 @@ object EmulatorBridge {
 
     suspend fun pause() {
         if (!isNativeLoaded || !isVmActive) return
-        runSerial {
+        runTimedSerial(NativeApp.LatencyEvent.PAUSE) {
             try {
                 NativeApp.pause()
             } catch (_: Exception) { }
@@ -988,7 +1016,7 @@ object EmulatorBridge {
 
     suspend fun resume() {
         if (!isNativeLoaded || !isVmActive) return
-        runSerial {
+        runTimedSerial(NativeApp.LatencyEvent.RESUME) {
             try {
                 rebindSurface()
                 NativeApp.resume()
@@ -1176,10 +1204,27 @@ object EmulatorBridge {
 
     suspend fun saveState(slot: Int): Boolean {
         if (!isNativeLoaded || !isVmActive) return false
+        val token = if (BuildConfig.DEBUG) traceLatency(NativeApp.LatencyEvent.SAVE, 0L) else 0L
         return try {
             saveStateCoordinator.save(
-                snapshot = { runSerial { NativeApp.beginSaveStateToSlot(slot) } },
-                awaitCompletion = NativeApp::awaitSaveStateSave
+                snapshot = {
+                    if (BuildConfig.DEBUG && token != 0L) {
+                        traceLatency(NativeApp.LatencyEvent.SAVE_SNAPSHOT_ENQUEUE, token)
+                    }
+                    runTimedSerial(NativeApp.LatencyEvent.SAVE, token) { NativeApp.beginSaveStateToSlot(slot) }
+                },
+                awaitCompletion = { ticket ->
+                    if (BuildConfig.DEBUG && token != 0L) {
+                        traceLatency(NativeApp.LatencyEvent.SAVE_WAIT_START, token)
+                    }
+                    try {
+                        NativeApp.awaitSaveStateSave(ticket)
+                    } finally {
+                        if (BuildConfig.DEBUG && token != 0L) {
+                            traceLatency(NativeApp.LatencyEvent.SAVE_WAIT_DONE, token)
+                        }
+                    }
+                }
             )
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
@@ -1190,7 +1235,7 @@ object EmulatorBridge {
 
     suspend fun loadState(slot: Int): Boolean {
         if (!isNativeLoaded || !isVmActive) return false
-        return runSerial {
+        return runTimedSerial(NativeApp.LatencyEvent.LOAD) {
             try {
                 val success = NativeApp.loadStateFromSlot(slot)
                 if (success) {

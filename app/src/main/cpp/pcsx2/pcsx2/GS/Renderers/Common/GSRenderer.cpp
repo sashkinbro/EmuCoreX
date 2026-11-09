@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "common/AndroidLatencyTrace.h"
 #include "ImGui/FullscreenUI.h"
 #include "ImGui/ImGuiManager.h"
 #include "GS/Renderers/Common/GSRenderer.h"
@@ -1273,6 +1274,8 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 			}
 
 			EndPresentFrame();
+			if (current && !blank_frame)
+				EmuCoreXLatency::FirstPresent();
 
 			const float gpu_time = g_gs_device->GetAndResetAccumulatedGPUTime();
 			GPUPipelineStatistics gpu_stats = g_gs_device->GetAndResetAccumulatedGPUPipelineStatistics();
@@ -1684,7 +1687,9 @@ bool GSRenderer::SaveSnapshotToMemory(u32 window_width, u32 window_height, bool 
 			const GSVector4i rc(0, 0, draw_width, draw_height);
 			g_gs_device->StretchRect(current, src_uv, rt, GSVector4(rc), ShaderConvert::TRANSPARENCY_FILTER, Biln);
 			dl->CopyFromTexture(rc, rt, rc, 0);
+			EmuCoreXLatency::Span readback_span("save.screenshot.readback");
 			dl->Flush();
+			readback_span.Finish();
 
 			if (dl->Map(rc))
 			{

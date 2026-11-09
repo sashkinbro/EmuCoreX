@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "common/AndroidLatencyTrace.h"
 #include "Achievements.h"
 #include "BuildVersion.h"
 #include "CDVD/CDVD.h"
@@ -339,21 +340,35 @@ void VMManager::SetState(VMState state)
 	if (state != VMState::Stopping && (state == VMState::Paused || old_state == VMState::Paused))
 	{
 		const bool paused = (state == VMState::Paused);
-		if (paused) IopThread::OnVmPaused(true);
+		if (paused)
+		{
+			const EmuCoreXLatency::Span span("pause.iop");
+			IopThread::OnVmPaused(true);
+		}
 		if (paused)
 		{
 			// Stop consuming audio before the CPU waits for VU/GS to drain. Otherwise
 			// the producer gap can underrun the output and disturb the stretcher on resume.
-			SPU2::SetOutputPaused(true);
+			{
+				const EmuCoreXLatency::Span span("pause.audio");
+				SPU2::SetOutputPaused(true);
+			}
 			if (THREAD_VU1)
+			{
+				const EmuCoreXLatency::Span span("pause.vu.wait");
 				vu1Thread.WaitVU();
-			MTGS::WaitGS(false);
+			}
+			{
+				const EmuCoreXLatency::Span span("pause.gs.wait");
+				MTGS::WaitGS(false);
+			}
 			InputManager::PauseVibration();
 		}
 		else
 		{
 			PerformanceMetrics::Reset();
 			ResetFrameLimiter();
+			const EmuCoreXLatency::Span span("resume.audio");
 			SPU2::SetOutputPaused(false);
 		}
 
@@ -2479,7 +2494,9 @@ void VMManager::DoSaveState(const char* filename, s32 slot_for_message, bool zip
 	IopThread::VmHold iop_hold;
 
 	Error error;
+	EmuCoreXLatency::Span snapshot_span("save.snapshot");
 	std::unique_ptr<ArchiveEntryList> elist = SaveState_DownloadState(&error);
+	snapshot_span.Finish();
 	if (!elist)
 	{
 		error_callback(error.GetDescription());
@@ -2488,7 +2505,9 @@ void VMManager::DoSaveState(const char* filename, s32 slot_for_message, bool zip
 		return;
 	}
 
+	EmuCoreXLatency::Span screenshot_span("save.screenshot");
 	std::unique_ptr<SaveStateScreenshotData> screenshot = SaveState_SaveScreenshot();
+	screenshot_span.Finish();
 
 	if (FileSystem::FileExists(filename) && backup_old_state)
 	{
@@ -2509,7 +2528,7 @@ void VMManager::DoSaveState(const char* filename, s32 slot_for_message, bool zip
 	{
 		// lock order here is important; the thread could exit before we resume here.
 		std::unique_lock lock(s_save_state_threads_mutex);
-		s_save_state_threads.emplace_back(&VMManager::ZipSaveStateOnThread, std::move(elist), std::move(screenshot),
+		s_save_state_threads.emplace_back(EmuCoreXLatency::Carry(&VMManager::ZipSaveStateOnThread), std::move(elist), std::move(screenshot),
 			std::string(filename), slot_for_message, std::move(error_callback), std::move(completion_callback));
 	}
 	else
@@ -2527,6 +2546,7 @@ void VMManager::ZipSaveState(std::unique_ptr<ArchiveEntryList> elist,
 	std::unique_ptr<SaveStateScreenshotData> screenshot, const char* filename,
 	s32 slot_for_message, std::function<void(const std::string&)> error_callback, std::function<void(bool)> completion_callback)
 {
+	const EmuCoreXLatency::Span zip_span("save.zip.worker");
 	Common::Timer timer;
 
 	Error error;
