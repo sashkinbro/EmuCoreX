@@ -7,6 +7,8 @@ internal fun PerGameSettings.withOnlyOverridesComparedWith(
 ): PerGameSettings {
     val interfaceOverrides = interfaceSettings?.overridesComparedWith(defaults.interfaceSettings ?: PerGameInterfaceSettings())
     val keys = buildSet {
+        // Explicit enabled/disabled must survive even when equal to today's global.
+        if (achievementsHardcore != null) add("achievementsHardcore")
         if (renderer != defaults.renderer) add("renderer")
         if (gpuDriverType != defaults.gpuDriverType) add("gpuDriverType")
         if (customDriverPath != null && customDriverPath != defaults.customDriverPath) add("customDriverPath")

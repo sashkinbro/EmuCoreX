@@ -11,6 +11,7 @@ import com.sbro.emucorex.network.NetPlaySession
 import com.sbro.emucorex.network.RemotePlaySession
 import com.sbro.emucorex.data.DisplayCrop
 import com.sbro.emucorex.core.utils.NetworkAdapterCollector
+import com.sbro.emucorex.core.utils.RetroAchievementsStateManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -575,7 +576,9 @@ object EmulatorBridge {
             ?: OpcodeFamiliesModel.maskOf(opcodeSettings.disabledVu0OpcodeFamilies, OpcodeFamiliesModel.VU)
         val vu1Mask = vu1FamilyMaskOverride?.takeIf { BuildConfig.DEBUG && it in 0..1023 }?.toLong()
             ?: OpcodeFamiliesModel.maskOf(opcodeSettings.disabledVu1OpcodeFamilies, OpcodeFamiliesModel.VU)
-        val achievementsHardcore = prefs.getAchievementsHardcoreSync()
+        val achievementsHardcore = RetroAchievementsStateManager.effectiveHardcoreForCurrentGame(
+            prefs.getAchievementsHardcoreSync()
+        )
         val effectiveEnableCheats = enableCheats && !achievementsHardcore
         val effectiveFrameLimitEnabled = frameLimitEnabled || achievementsHardcore
         val padVibrationEnabled = prefs.padVibration.first()
@@ -589,6 +592,8 @@ object EmulatorBridge {
 
         performRuntimeOps(
             buildList {
+                // Establish the effective request before sanitizing cheats for this launch.
+                add(settingOp("Achievements", "ChallengeMode", "bool", achievementsHardcore.toString()))
                 add(settingOp("EmuCore/GS", "Renderer", "int", resolvedRenderer.toString()))
                 // Reload persisted exclusions on every launch, including cold
                 // starts which have never opened a settings screen. Debug intent
@@ -800,7 +805,6 @@ object EmulatorBridge {
                 add(settingOp("EmuCore", "WarnAboutUnsafeSettings", "bool", "false"))
                 add(settingOp("InputSources", "PadVibration", "bool", padVibrationEnabled.toString()))
                 add(settingOp("Achievements", "Enabled", "bool", prefs.getAchievementsEnabledSync().toString()))
-                add(settingOp("Achievements", "ChallengeMode", "bool", achievementsHardcore.toString()))
                 add(settingOp("Achievements", "Notifications", "bool", prefs.getAchievementsNotificationsSync().toString()))
                 add(settingOp("Achievements", "LeaderboardNotifications", "bool", prefs.getAchievementsLeaderboardNotificationsSync().toString()))
                 add(settingOp("Achievements", "Overlays", "bool", prefs.getAchievementsIndicatorsSync().toString()))
@@ -1001,6 +1005,7 @@ object EmulatorBridge {
                 NativeApp.shutdown()
             } catch (_: Exception) { }
             isVmActive = false
+            RetroAchievementsStateManager.setActiveGame(null)
             shutdownRequested = false
             DocumentPathResolver.releasePreparedLaunchHandles()
         }

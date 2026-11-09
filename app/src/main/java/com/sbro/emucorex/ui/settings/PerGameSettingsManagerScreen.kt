@@ -1313,6 +1313,7 @@ private fun GameSettingsTabContent(
                         helpText = stringResource(R.string.settings_help_fps_overlay_mode),
                         onResetToDefault = { onDraftChange(draft.copy(fpsOverlayMode = defaultProfile.fpsOverlayMode)) }
                     )
+                    HardcoreOverrideRow(draft.achievementsHardcore) { onDraftChange(draft.copy(achievementsHardcore = it)) }
                     ToggleRow(
                         title = stringResource(R.string.settings_frame_limiter),
                         checked = draft.frameLimitEnabled,
@@ -2614,6 +2615,7 @@ private fun GameSettingsEditorDialog(
                                 helpText = stringResource(R.string.settings_help_fps_overlay_mode),
                                 onResetToDefault = { draft = draft.copy(fpsOverlayMode = defaultProfile.fpsOverlayMode) }
                             )
+                            HardcoreOverrideRow(draft.achievementsHardcore) { draft = draft.copy(achievementsHardcore = it) }
                             ToggleRow(
                                 title = stringResource(R.string.settings_frame_limiter),
                                 checked = draft.frameLimitEnabled,
@@ -3495,6 +3497,22 @@ private fun GpuBackendProfileControls(
             }
         )
     }
+}
+
+@Composable
+private fun HardcoreOverrideRow(value: Boolean?, onChanged: (Boolean?) -> Unit) {
+    SelectionRow(
+        title = stringResource(R.string.settings_ra_hardcore),
+        options = listOf(
+            -1 to stringResource(R.string.settings_use_global),
+            1 to stringResource(R.string.gamedb_browser_enabled),
+            0 to stringResource(R.string.settings_disabled_short)
+        ),
+        selectedValue = when (value) { true -> 1; false -> 0; null -> -1 },
+        onSelected = { onChanged(when (it) { 1 -> true; 0 -> false; else -> null }) },
+        helpText = stringResource(R.string.settings_ra_hardcore_pending_desc),
+        onResetToDefault = { onChanged(null) }
+    )
 }
 
 @Composable
@@ -5129,6 +5147,7 @@ private fun PerGameSettings.resolveAgainst(defaultProfile: PerGameSettings): Per
         gameKey = gameKey,
         gameTitle = gameTitle,
         gameSerial = gameSerial,
+        achievementsHardcore = achievementsHardcore,
         keyboardMouse = pick("keyboardMouse", keyboardMouse, defaultProfile.keyboardMouse),
         renderer = pick("renderer", renderer, defaultProfile.renderer),
         gpuDriverType = pick("gpuDriverType", gpuDriverType, defaultProfile.gpuDriverType),

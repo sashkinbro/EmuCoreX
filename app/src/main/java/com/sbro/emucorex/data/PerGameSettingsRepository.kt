@@ -14,6 +14,8 @@ data class PerGameSettings(
     val gameKey: String,
     val gameTitle: String,
     val gameSerial: String? = null,
+    /** Null inherits the global Hardcore request, including future global changes. */
+    val achievementsHardcore: Boolean? = null,
     val renderer: Int = EmulatorBridge.AUTO_RENDERER,
     val gpuDriverType: Int = 0,
     val customDriverPath: String? = null,
@@ -298,6 +300,7 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         gameKey = optString("gameKey"),
         gameTitle = optString("gameTitle"),
         gameSerial = optString("gameSerial").takeIf { it.isNotBlank() },
+        achievementsHardcore = opt("achievementsHardcore") as? Boolean,
         renderer = optInt("renderer", RendererDefaults.AUTO).let(::sanitizeRendererValue),
         gpuDriverType = optInt("gpuDriverType", 0).let { if (it == 1) 1 else 0 },
         customDriverPath = optString("customDriverPath").takeIf { it.isNotBlank() },
@@ -571,6 +574,7 @@ private fun PerGameSettings.toJson(): JSONObject {
         interfaceSettings?.let { put("interfaceSettings", JSONObject(it.encode())) }
         val keys = providedKeys
         fun shouldWrite(key: String): Boolean = keys == null || key in keys
+        if (shouldWrite("achievementsHardcore")) achievementsHardcore?.let { put("achievementsHardcore", it) }
         if (shouldWrite("renderer")) put("renderer", sanitizeRendererValue(renderer))
         if (shouldWrite("gpuDriverType")) put("gpuDriverType", if (gpuDriverType == 1) 1 else 0)
         if (shouldWrite("customDriverPath")) put("customDriverPath", customDriverPath)

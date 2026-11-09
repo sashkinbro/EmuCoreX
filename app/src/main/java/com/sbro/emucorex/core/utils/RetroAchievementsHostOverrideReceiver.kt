@@ -75,72 +75,52 @@ class RetroAchievementsHostOverrideReceiver : BroadcastReceiver() {
             }
         }
 
+        // Older builds temporarily wrote false into DataStore and kept the request
+        // here. Restore that request once when upgrading, then leave it untouched.
+        private suspend fun migrateSavedHardcore(context: Context, prefs: SharedPreferences) {
+            readSavedHardcore(prefs)?.let { saved ->
+                AppPreferences(context).setAchievementsHardcore(saved)
+                prefs.edit(commit = true) { remove(KEY_SAVED_HARDCORE) }
+            }
+        }
+
         private suspend fun applySet(context: Context, host: String) {
             val prefs = preferences(context)
-            val appPreferences = AppPreferences(context)
-            if (!prefs.contains(KEY_SAVED_HARDCORE)) {
-                prefs.edit(commit = true) {
-                    putBoolean(KEY_SAVED_HARDCORE, appPreferences.getAchievementsHardcoreSync())
-                }
-            }
+            migrateSavedHardcore(context, prefs)
             prefs.edit(commit = true) {
                 putString(KEY_ACTIVE_HOST, host)
                 remove(KEY_PENDING_CLEAR)
             }
-
-            appPreferences.setAchievementsHardcore(false)
             runCatching { NativeApp.setAchievementsHostOverride(host) }
         }
 
         private suspend fun applyClear(context: Context) {
             val prefs = preferences(context)
-            val savedHardcore = readSavedHardcore(prefs)
+            migrateSavedHardcore(context, prefs)
             prefs.edit(commit = true) {
                 remove(KEY_ACTIVE_HOST)
                 putBoolean(KEY_PENDING_CLEAR, true)
             }
-
-            if (savedHardcore != null) {
-                AppPreferences(context).setAchievementsHardcore(savedHardcore)
-            }
-            val cleared = runCatching {
-                NativeApp.clearAchievementsHostOverride(
-                    RetroAchievementsHostOverridePolicy.hardcoreRestoreMode(savedHardcore)
-                )
-            }.getOrDefault(false)
-            if (cleared) {
-                prefs.edit(commit = true) {
-                    remove(KEY_PENDING_CLEAR)
-                    remove(KEY_SAVED_HARDCORE)
-                }
-            }
+            applyDesiredState(context)
         }
 
         private suspend fun applyDesiredState(context: Context) {
             val prefs = preferences(context)
+            migrateSavedHardcore(context, prefs)
             val host = prefs.getString(KEY_ACTIVE_HOST, null)
             if (!host.isNullOrBlank()) {
-                val appPreferences = AppPreferences(context)
-                if (!prefs.contains(KEY_SAVED_HARDCORE)) {
-                    prefs.edit(commit = true) {
-                        putBoolean(KEY_SAVED_HARDCORE, appPreferences.getAchievementsHardcoreSync())
-                    }
-                }
-                appPreferences.setAchievementsHardcore(false)
                 NativeApp.setAchievementsHostOverride(host)
             } else if (prefs.getBoolean(KEY_PENDING_CLEAR, false)) {
-                val savedHardcore = readSavedHardcore(prefs)
-                if (savedHardcore != null) {
-                    AppPreferences(context).setAchievementsHardcore(savedHardcore)
-                }
+                // Restore the current request (including the current game's override),
+                // so a preference changed while testing is not replaced by an old copy.
+                val requested = RetroAchievementsStateManager.requestedHardcoreForCurrentGame(
+                    AppPreferences(context).getAchievementsHardcoreSync()
+                )
                 if (NativeApp.clearAchievementsHostOverride(
-                        RetroAchievementsHostOverridePolicy.hardcoreRestoreMode(savedHardcore)
+                        RetroAchievementsHostOverridePolicy.hardcoreRestoreMode(requested)
                     )
                 ) {
-                    prefs.edit(commit = true) {
-                        remove(KEY_PENDING_CLEAR)
-                        remove(KEY_SAVED_HARDCORE)
-                    }
+                    prefs.edit(commit = true) { remove(KEY_PENDING_CLEAR) }
                 }
             }
         }

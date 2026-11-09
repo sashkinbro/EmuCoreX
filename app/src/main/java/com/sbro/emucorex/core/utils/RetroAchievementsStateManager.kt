@@ -3,6 +3,7 @@ package com.sbro.emucorex.core.utils
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.data.AchievementsProfileCache
 import com.sbro.emucorex.data.AppPreferences
+import com.sbro.emucorex.data.PerGameSettingsRepository
 import com.sbro.emucorex.data.RetroAchievementsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,6 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.util.concurrent.atomic.AtomicLong
 
 enum class RetroAchievementsLoginRequestReason {
     USER_INITIATED,
@@ -51,6 +53,7 @@ data class RetroAchievementsUiState(
     val isAuthenticating: Boolean = false,
     val enabled: Boolean = false,
     val hardcorePreference: Boolean = false,
+    val hardcoreSessionPreference: Boolean = false,
     val hardcoreActive: Boolean = false,
     val notifications: Boolean = true,
     val leaderboardNotifications: Boolean = true,
@@ -69,6 +72,32 @@ data class RetroAchievementsUiState(
 object RetroAchievementsStateManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val presentationSettingsMutex = Mutex()
+    private val preferenceSettingsMutex = Mutex()
+    private val enabledPreferenceRevision = AtomicLong()
+    private val hardcorePreferenceRevision = AtomicLong()
+
+    @Volatile
+    private var activeGameKey: String? = null
+
+    fun setActiveGame(gameKey: String?) {
+        activeGameKey = gameKey
+    }
+
+    fun requestedHardcoreForCurrentGame(globalDefault: Boolean = loadStoredHardcore()): Boolean {
+        val context = EmulatorBridge.getContext()
+        val override = if (context != null) activeGameKey
+            ?.let { PerGameSettingsRepository(context).get(it)?.achievementsHardcore } else null
+        return RetroAchievementsHardcorePolicy.resolve(globalDefault, override, hostOverrideActive = false)
+    }
+
+    fun effectiveHardcoreForCurrentGame(globalDefault: Boolean = loadStoredHardcore()): Boolean {
+        val context = EmulatorBridge.getContext()
+        return RetroAchievementsHardcorePolicy.resolve(
+            requestedHardcoreForCurrentGame(globalDefault),
+            gameOverride = null,
+            hostOverrideActive = context?.let(RetroAchievementsHostOverrideReceiver::isOverrideActive) == true
+        )
+    }
     private val _state = MutableStateFlow(RetroAchievementsUiState())
     val state: StateFlow<RetroAchievementsUiState> = _state.asStateFlow()
 
@@ -87,6 +116,7 @@ object RetroAchievementsStateManager {
                 user = loadStoredProfile(),
                 enabled = prefsEnabled,
                 hardcorePreference = prefsHardcore,
+                hardcoreSessionPreference = effectiveHardcoreForCurrentGame(prefsHardcore),
                 notifications = loadStoredNotifications(),
                 leaderboardNotifications = loadStoredLeaderboardNotifications(),
                 achievementIndicators = loadStoredAchievementIndicators(),
@@ -134,8 +164,11 @@ object RetroAchievementsStateManager {
             runCatching {
                 // A cold-started Android hub has no VM to initialize rcheevos for us.
                 // Recreate the persistent client whenever the stored feature is enabled.
-                if (loadStoredEnabled()) RetroAchievementsBridge.nativeSetEnabled(true)
-                else RetroAchievementsBridge.nativeRequestState()
+                preferenceSettingsMutex.withLock {
+                    // Hydrate the request before initializing rcheevos in a cold hub.
+                    RetroAchievementsBridge.nativeSetHardcore(effectiveHardcoreForCurrentGame())
+                    RetroAchievementsBridge.nativeSetEnabled(loadStoredEnabled())
+                }
             }
                 .onFailure { handleNativeFailure(it) }
         }
@@ -173,7 +206,10 @@ object RetroAchievementsStateManager {
             // Login against the persistent client, not the disposable client used
             // while RA is disabled. Roll the preference back if authentication fails.
             preferences?.setAchievementsEnabled(true)
-            runCatching { RetroAchievementsBridge.nativeSetEnabled(true) }
+            runCatching {
+                RetroAchievementsBridge.nativeSetHardcore(effectiveHardcoreForCurrentGame())
+                RetroAchievementsBridge.nativeSetEnabled(true)
+            }
                 .onFailure {
                     preferences?.setAchievementsEnabled(wasEnabled)
                     handleNativeFailure(it)
@@ -247,6 +283,7 @@ object RetroAchievementsStateManager {
     }
 
     fun setEnabled(enabled: Boolean) {
+        val revision = enabledPreferenceRevision.incrementAndGet()
         RetroAchievementsRepository.invalidateUnlockedAchievementsCache()
         _state.update {
             it.copy(
@@ -257,32 +294,36 @@ object RetroAchievementsStateManager {
         }
         scope.launch(Dispatchers.IO) {
             runCatching {
-                EmulatorBridge.getContext()
-                    ?.let { AppPreferences(it).setAchievementsEnabled(enabled) }
-                RetroAchievementsBridge.nativeSetEnabled(enabled)
+                preferenceSettingsMutex.withLock {
+                    // IO launches can arrive out of order after rapid UI toggles.
+                    if (revision != enabledPreferenceRevision.get()) return@withLock
+                    EmulatorBridge.getContext()?.let { AppPreferences(it).setAchievementsEnabled(enabled) }
+                    RetroAchievementsBridge.nativeSetHardcore(effectiveHardcoreForCurrentGame())
+                    RetroAchievementsBridge.nativeSetEnabled(enabled)
+                }
             }
                 .onFailure { handleNativeFailure(it) }
         }
     }
 
     fun setHardcore(enabled: Boolean) {
-        val context = EmulatorBridge.getContext()
-        val effectiveEnabled = RetroAchievementsHostOverridePolicy.effectiveHardcore(
-            requested = enabled,
-            overrideActive = context?.let(RetroAchievementsHostOverrideReceiver::isOverrideActive) == true
-        )
+        val revision = hardcorePreferenceRevision.incrementAndGet()
         _state.update {
             it.copy(
-                hardcorePreference = effectiveEnabled,
+                hardcorePreference = enabled,
                 isLoading = true,
                 errorMessage = null
             )
         }
         scope.launch(Dispatchers.IO) {
             runCatching {
-                EmulatorBridge.getContext()
-                    ?.let { AppPreferences(it).setAchievementsHardcore(effectiveEnabled) }
-                RetroAchievementsBridge.nativeSetHardcore(effectiveEnabled)
+                preferenceSettingsMutex.withLock {
+                    if (revision != hardcorePreferenceRevision.get()) return@withLock
+                    // Persist the user's request, independently of runtime suspension,
+                    // per-game overrides, or the temporary loopback test host.
+                    EmulatorBridge.getContext()?.let { AppPreferences(it).setAchievementsHardcore(enabled) }
+                    RetroAchievementsBridge.nativeSetHardcore(effectiveHardcoreForCurrentGame(enabled))
+                }
             }
                 .onFailure { handleNativeFailure(it) }
         }
@@ -454,6 +495,7 @@ object RetroAchievementsStateManager {
         points: Int,
         scPoints: Int,
         unreadMessages: Int,
+        hardcorePreference: Boolean,
         hardcoreActive: Boolean,
         haveGame: Boolean,
         gameTitle: String?,
@@ -502,6 +544,7 @@ object RetroAchievementsStateManager {
                 isAuthenticating = current.isAuthenticating,
                 enabled = storedEnabled,
                 hardcorePreference = storedHardcore,
+                hardcoreSessionPreference = hardcorePreference,
                 notifications = loadStoredNotifications(),
                 leaderboardNotifications = loadStoredLeaderboardNotifications(),
                 achievementIndicators = loadStoredAchievementIndicators(),

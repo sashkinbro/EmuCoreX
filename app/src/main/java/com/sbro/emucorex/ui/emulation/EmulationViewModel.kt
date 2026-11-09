@@ -33,6 +33,7 @@ import com.sbro.emucorex.core.PerformanceProfiles
 import com.sbro.emucorex.core.PerformancePresets
 import com.sbro.emucorex.core.resolveAndroidGamePhase
 import com.sbro.emucorex.core.utils.RetroAchievementsLiveStateManager
+import com.sbro.emucorex.core.utils.RetroAchievementsStateManager
 import com.sbro.emucorex.core.normalizeUpscale
 import com.sbro.emucorex.data.ActivePatchNotice
 import com.sbro.emucorex.data.AppPreferences
@@ -2159,6 +2160,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
         currentGamePath = if (bootToBios) null else path?.takeIf { it.isNotBlank() }
+        RetroAchievementsStateManager.setActiveGame(currentGamePath)
         // Read the per-game touch profile synchronously so the very first rendered frame
         // already uses it; otherwise the global layout flashes while the game is starting.
         val launchProfile = if (!bootToBios && !autotestMode) {
@@ -2348,6 +2350,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 if (bootToBios) {
                     currentGameTitle = "PlayStation 2 BIOS"
                     currentGamePath = null
+                    RetroAchievementsStateManager.setActiveGame(null)
                     currentGameSerial = ""
                     currentGameCoverArtPath = null
                     currentGameCrc = ""
@@ -6065,6 +6068,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         DiscordIntegration.clearGame()
         currentGameTitle = ""
         currentGamePath = null
+        RetroAchievementsStateManager.setActiveGame(null)
         currentTouchControlsLayoutProfile = null
         currentCustomTouchControlsProfile = null
         currentGameSerial = ""

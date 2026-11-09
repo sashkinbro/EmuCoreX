@@ -3,9 +3,7 @@ package com.sbro.emucorex.core.utils
 import com.sbro.emucorex.core.NativeApp
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.data.AppPreferences
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 object RetroAchievementsBridge {
@@ -97,6 +95,7 @@ object RetroAchievementsBridge {
             points = points,
             scPoints = scPoints,
             unreadMessages = unreadMessages,
+            hardcorePreference = hardcorePreference,
             hardcoreActive = hardcoreActive,
             haveGame = haveGame,
             gameTitle = gameTitle,
@@ -147,14 +146,9 @@ object RetroAchievementsBridge {
             return
         }
 
-        CoroutineScope(Dispatchers.IO).launch {
-            if (section == "Achievements") {
-                when (key) {
-                    "Enabled" -> prefs.setAchievementsEnabled(value.toBoolean())
-                    "ChallengeMode" -> prefs.setAchievementsHardcore(value.toBoolean())
-                }
-            }
-        }
+        // Enabled/ChallengeMode are Android-owned user preferences. Native commits
+        // include defaults during startup and effective per-game/session values;
+        // neither may write back into the global DataStore preferences.
     }
 }
 

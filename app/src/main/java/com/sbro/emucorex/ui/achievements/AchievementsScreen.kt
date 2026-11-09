@@ -717,7 +717,7 @@ private fun AchievementToggleCard(retroState: RetroAchievementsUiState) {
                 checked = retroState.hardcorePreference,
                 onCheckedChange = RetroAchievementsStateManager::setHardcore
             )
-            if (retroState.hardcorePreference && !retroState.hardcoreActive) {
+            if (retroState.hardcoreSessionPreference && !retroState.hardcoreActive) {
                 NoticeCard(
                     text = androidx.compose.ui.res.stringResource(R.string.settings_ra_hardcore_pending_desc),
                     isError = false
@@ -1099,7 +1099,7 @@ private fun AchievementAccountCard(
     onLogin: () -> Unit,
     onOpenUnlockedAchievements: (() -> Unit)? = null
 ) {
-    val hardcorePending = retroState.hardcorePreference && !retroState.hardcoreActive
+    val hardcorePending = retroState.hardcoreSessionPreference && !retroState.hardcoreActive
     val hardcoreStatusColor = when {
         retroState.hardcoreActive -> Color(0xFFF27121)
         hardcorePending -> Color(0xFFFFB020)

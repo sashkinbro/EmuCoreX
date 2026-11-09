@@ -296,13 +296,11 @@ void Host::CommitBaseSettingChanges()
 {
 	std::string username = Host::GetStringSettingValue("Achievements", "Username");
 	std::string token = Host::GetStringSettingValue("Achievements", "Token");
-	bool enabled = Host::GetBoolSettingValue("Achievements", "Enabled", false);
-	bool hardcore = Host::GetBoolSettingValue("Achievements", "ChallengeMode", false);
 
 	NotifySettingsChanged("Achievements", "Username", username.c_str());
 	NotifySettingsChanged("Achievements", "Token", token.c_str());
-	NotifySettingsChanged("Achievements", "Enabled", enabled ? "true" : "false");
-	NotifySettingsChanged("Achievements", "ChallengeMode", hardcore ? "true" : "false");
+	// Android DataStore owns user preferences. Native defaults, per-game values,
+	// and runtime Hardcore suspension must never overwrite those requests.
 }
 
 void Host::LoadSettings(SettingsInterface&, std::unique_lock<std::mutex>&)
