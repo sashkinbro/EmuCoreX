@@ -18,8 +18,14 @@ internal class ShaderPackStore(private val root: File, private val cache: File) 
         private val assignment = Regex("^([\\w]+)\\s*=\\s*(.*)$")
         private val reference = Regex("^#reference\\s+[\"'](.+)[\"']\\s*(?://.*)?$")
         private val include = Regex("^\\s*#include\\s+\"([^\"]+)\"")
-        private data class FileStamp(val file: File, val size: Long, val modified: Long) {
-            fun unchanged() = file.exists() && file.length() == size && file.lastModified() == modified
+        private data class FileStamp(
+            val file: File, val size: Long, val modified: Long,
+            val children: Set<String>? = if (file.isDirectory) file.list()?.toSet() else null
+        ) {
+            // Directory timestamps can share the same millisecond after adding a file.
+            // Compare membership too, otherwise an empty catalog can hide new presets.
+            fun unchanged() = file.exists() && file.length() == size && file.lastModified() == modified &&
+                (if (children != null) file.list()?.toSet() == children else !file.isDirectory)
         }
         private data class Catalog(val presets: List<File>, val stamps: List<FileStamp>)
         private val catalogs = object : LinkedHashMap<String, Catalog>(8, 0.75f, true) {

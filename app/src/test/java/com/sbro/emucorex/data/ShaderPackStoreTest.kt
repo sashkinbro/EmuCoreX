@@ -9,6 +9,16 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ShaderPackStoreTest {
+    @Test fun cachedCatalogDetectsNewPresetWhenDirectoryTimestampDoesNotAdvance() = fixture { f ->
+        val nested = File(f.root, "crt").apply { mkdirs() }
+        File(nested, "shared.slang").writeText(shader)
+        assertTrue(f.store.listPresets().isEmpty())
+        val timestamp = nested.lastModified()
+        File(nested, "preset.SLANGP").writeText(preset)
+        assertTrue(nested.setLastModified(timestamp))
+        assertEquals(setOf("preset.SLANGP"), f.names())
+    }
+
     @Test fun multipleReferencesMayIncludeParameterOnlyFiles() = fixture { f ->
         f.store.installArchive(f.archive(mapOf(
             "base.slangp" to preset,
