@@ -11228,7 +11228,21 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 	{
 		m_conf.colclip_native_scale = rt->GetScale();
 	}
+	// A known final alpha bit can be mirrored into a live DATE stencil copy in
+	// the same draw. Unknown output transformations keep the normal setup path.
+	m_conf.date_stencil_alpha = GSDateStencilAlpha::Unknown;
+	if (g_gs_device->GetRenderAPI() == RenderAPI::Vulkan && features.stencil_buffer && !features.texture_barrier &&
+		rt && m_conf.ds && rt->GetTexture()->GetFormat() == GSTexture::Format::Color &&
+		m_cached_ctx.FRAME.PSM == PSMCT32 && !(m_cached_ctx.FRAME.FBMSK & 0x80000000u) && m_conf.colormask.wa &&
+		!m_texture_shuffle && !m_channel_shuffle && !m_conf.ps.shuffle && !PRIM->AA1 && !IsCoverageAlpha() &&
+		(!m_cached_ctx.TEST.ATE || m_cached_ctx.TEST.AFAIL == AFAIL_KEEP) &&
+		GSCanMirrorDateStencilAlpha(m_conf))
+	{
+		const auto& alpha = GetAlphaMinMax();
+		m_conf.date_stencil_alpha = GSClassifyDateStencilAlpha(alpha.min, alpha.max, m_context->FBA.FBA, true);
+	}
 	SubmitDrawPrims(rt, ds, blend_identity);
+
 
 	CleanupDepthAsRTFeedback();
 }

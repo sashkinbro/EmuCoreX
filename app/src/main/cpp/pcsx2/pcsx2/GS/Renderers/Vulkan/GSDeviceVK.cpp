@@ -1654,6 +1654,10 @@ void GSDeviceVK::SubmitCommandBuffer(VKSwapChain* present_swap_chain)
 	// across frames. The 4000-draw safety kick would then split an otherwise small
 	// frame at a deterministic but arbitrary draw, which caused one-frame texture
 	// corruption on strict mobile Vulkan drivers.
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+	const u32 submitted_draws = m_draws_in_command_buffer;
+	const u32 submitted_render_passes = m_command_buffer_render_passes;
+#endif
 	m_draws_in_command_buffer = 0;
 
 	// End the current command buffer.
@@ -1774,6 +1778,17 @@ void GSDeviceVK::SubmitCommandBuffer(VKSwapChain* present_swap_chain)
 	if (res != VK_SUCCESS)
 	{
 		LOG_VULKAN_ERROR(res, "vkQueueSubmit failed: ");
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+		Console.Error("Vulkan rejected submission: frame=%u fence=%llu completed=%llu draws=%u passes=%u "
+			"init=%u present=%u descriptor_pools=%zu streams_KiB=%u/%u/%u/%u/%u/%u",
+			m_current_frame, static_cast<unsigned long long>(resources.fence_counter),
+			static_cast<unsigned long long>(m_completed_fence_counter), submitted_draws, submitted_render_passes,
+			resources.init_buffer_used ? 1u : 0u, present_swap_chain ? 1u : 0u,
+			resources.extra_descriptor_pools.size() + 1,
+			m_vertex_stream_buffer.GetCurrentSize() >> 10, m_index_stream_buffer.GetCurrentSize() >> 10,
+			m_expand_index_stream_buffer.GetCurrentSize() >> 10, m_vertex_uniform_stream_buffer.GetCurrentSize() >> 10,
+			m_fragment_uniform_stream_buffer.GetCurrentSize() >> 10, m_texture_stream_buffer.GetCurrentSize() >> 10);
+#endif
 		m_last_submit_failed = true;
 		return;
 	}
@@ -10008,32 +10023,33 @@ bool GSDeviceVK::DateCopyLive(const GSHWDrawConfig& config)
 void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 {
 
-	m_draws_in_command_buffer++;
 
-	// Mid-frame command-buffer kick.
-	// While a frame records, submit accumulated work to keep the GPU busy
-	// so it runs concurrently with GS-thread recording instead of only starting
-	// when the readback fence-waits on it. This fixes massive slowdowns on tilers.
-	// On mobile tile GPUs, mid-frame submits are very expensive because they break tile
-	// binning. Use a much higher threshold on the mobile path.
+	// Bound a HW-draw batch even when presentation is skipped or the GPU stays
+	// busy. A fence-gated offer is not a bound: it can leave tens of thousands of
+	// draws and render passes in a single mobile-driver submission. Recycle the
+	// next buffer normally, before staging this draw's vertices or descriptors.
+	if (m_draws_in_command_buffer >= MAX_DRAW_CALLS_PER_FRAME)
 	{
-		constexpr u32 kick_threshold_desktop = 4000;
-		constexpr u32 kick_threshold_mobile = 40000;
-		const u32 kick_threshold = HasMobileGPUProfile() ? kick_threshold_mobile : kick_threshold_desktop;
-		if (m_draws_in_command_buffer >= kick_threshold)
-		{
-			ScanForCommandBufferCompletion();
-			const u32 next_buffer = (m_current_frame + 1) % NUM_COMMAND_BUFFERS;
-			if (m_frame_resources[next_buffer].fence_counter <= m_completed_fence_counter)
-			{
-				ExecuteCommandBuffer(false);
-				m_draws_in_command_buffer = 0;
-			}
-		}
+		ExecuteCommandBuffer(false);
 	}
+	else if (!HasMobileGPUProfile() && m_draws_in_command_buffer >= 4000)
+	{
+		ScanForCommandBufferCompletion();
+		const u32 next_buffer = (m_current_frame + 1) % NUM_COMMAND_BUFFERS;
+		if (m_frame_resources[next_buffer].fence_counter <= m_completed_fence_counter)
+			ExecuteCommandBuffer(false);
+	}
+	++m_draws_in_command_buffer;
 
 	m_pipeline_selector.vs.expand = config.vs.expand;
-	if (m_date_copy.valid && config.date_copy==GSAlphaBitLogicOp::NoDateCopy &&
+	const bool tracks_date_one = !m_features.texture_barrier &&
+		config.destination_alpha == GSHWDrawConfig::DestinationAlphaMode::StencilOne &&
+		config.date_stencil_alpha != GSDateStencilAlpha::Unknown &&
+		((config.date_stencil_alpha == GSDateStencilAlpha::Set) != ((static_cast<u32>(config.datm) & 1u) != 0));
+	const bool reuses_date_one = tracks_date_one && DateCopyLive(config) && m_date_copy.datm == config.datm;
+	const bool mirrors_date_alpha = config.date_stencil_alpha != GSDateStencilAlpha::Unknown &&
+		config.destination_alpha == GSHWDrawConfig::DestinationAlphaMode::Off && DateCopyLive(config);
+	if (m_date_copy.valid && config.date_copy==GSAlphaBitLogicOp::NoDateCopy && !mirrors_date_alpha && !reuses_date_one &&
 		config.colormask.logic_op==GSAlphaBitLogicOp::Off &&
 		(config.colormask.wa || (config.alpha_second_pass.enable && config.alpha_second_pass.colormask.wa)))
 		m_date_copy.valid=false;
@@ -10113,6 +10129,11 @@ void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 	// figure out the pipeline
 	PipelineSelector& pipe = m_pipeline_selector;
 	UpdateHWPipelineSelector(config, pipe);
+	if (mirrors_date_alpha)
+	{
+		const bool writes_high_bit = config.date_stencil_alpha == GSDateStencilAlpha::Set;
+		pipe.dss.alpha_bit_stencil = (writes_high_bit == ((static_cast<u32>(m_date_copy.datm) & 1u) != 0)) ? 2 : 1;
+	}
 
 	// If the current pass was not created as a feedback loop, end it before sampling an attachment.
 	// Setting require_one_barrier here is too late: UpdateHWPipelineSelector() has already selected
@@ -10178,6 +10199,8 @@ void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 		}
 	}
 
+	// A StencilOne draw clears the passing stencil bit exactly where it writes
+	// the opposite alpha bit. Keep that full-target copy through known writers.
 	// Destination Alpha Setup
 	switch (config.destination_alpha)
 	{
@@ -10190,7 +10213,9 @@ void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 			// we only need to do the setup here if we don't have barriers, in which case do full DATE.
 			if (!m_features.texture_barrier)
 			{
-				SetupDATE(draw_rt, config.ds, config.datm, config.drawarea);
+				if (!tracks_date_one || !DateCopyLive(config) || m_date_copy.datm != config.datm)
+					SetupDATE(draw_rt, config.ds, config.datm,
+						tracks_date_one ? GSVector4i::loadh(rtsize) : config.drawarea);
 				config.destination_alpha = GSHWDrawConfig::DestinationAlphaMode::Stencil;
 			}
 		}
@@ -10443,7 +10468,8 @@ void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 		}
 	}
 
-	if (config.date_copy != GSAlphaBitLogicOp::NoDateCopy && config.destination_alpha == GSHWDrawConfig::DestinationAlphaMode::Stencil)
+	if ((config.date_copy != GSAlphaBitLogicOp::NoDateCopy || tracks_date_one) &&
+		config.destination_alpha == GSHWDrawConfig::DestinationAlphaMode::Stencil)
 		m_date_copy = {true,config.rt,config.ds,config.datm,m_render_pass_serial};
 	if (config.destination_alpha == GSHWDrawConfig::DestinationAlphaMode::StencilOne && m_features.stencil_buffer)
 	{
@@ -10876,6 +10902,7 @@ void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, 
 #ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
 #include "GSPlatformParityTests.inl"
 #include "VKAlphaBitTests.inl"
+#include "VKDateStencilPixelTests.inl"
 #endif
 
 namespace {

@@ -918,6 +918,7 @@ public:
 	static void TestAlphaBitPipelines(void (*check)(bool,const char*));
 	void TestAlphaBitPixels(void (*check)(bool,const char*));
 	void TestStencilCounterPixels(void (*check)(bool,const char*));
+	void TestDateStencilPixels(void(*check)(bool,const char*));
 	void TestStreamRingActivation(void (*check)(bool, const char*));
 	void TestBlendCarryPixels(void (*check)(bool, const char*));
 	void TestDrawRoad(void (*check)(bool, const char*));

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
+#include "GS/Renderers/Common/GSDateStencilAlpha.h"
 
 #define GS_PRESENT_GEOMETRY_PARITY 1
 #include "GS/Renderers/Common/GSInterlaceModePolicy.h"
@@ -1320,6 +1321,7 @@ struct alignas(16) GSHWDrawConfig
 	AlphaTestMode alpha_test;
 
 	DestinationAlphaMode destination_alpha;
+	GSDateStencilAlpha date_stencil_alpha = GSDateStencilAlpha::Unknown;
 	SetDATM datm : 2;
 	bool line_expand : 1;
 

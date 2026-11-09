@@ -274,6 +274,7 @@ void CheckBits(bool pass, u32 actual, u32 expected, const char* name)
 #include "jit_oracle_gs_sprite_pair_quad.inl"
 #include "jit_oracle_gs_uploads.inl"
 #include "jit_oracle_gs_restarts.inl"
+#include "jit_oracle_date_stencil.inl"
 #include "jit_oracle_gif_copy.inl"
 
 void GSPreparationDeviceTests()
@@ -12729,6 +12730,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         EmuCoreXOracleBlendCarry(Check);
     else if (std::strcmp(suite, "gs-gl-fetch") == 0)
         GSDeviceOGL::TestFramebufferFetch(Check);
+    else if (std::strcmp(suite, "gs-date-stencil") == 0)
+        GSDateStencilTests();
     else if (std::strcmp(suite, "gs-restarts") == 0)
         GSRestartTests();
     else if (std::strcmp(suite, "gs-gl-cache-packs") == 0)

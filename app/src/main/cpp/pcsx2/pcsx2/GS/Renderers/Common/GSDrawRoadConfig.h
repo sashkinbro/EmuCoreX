@@ -4,6 +4,20 @@
 #pragma once
 #include "GS/Renderers/Common/GSDevice.h"
 
+// A mirrored DATE bit must describe the alpha actually stored by one draw.
+// Replacements can snap alpha across 128, so their pre-snap range is insufficient.
+inline bool GSCanMirrorDateStencilAlpha(const GSHWDrawConfig& conf)
+{
+    return conf.colormask.wa && !conf.ps.shuffle && !conf.ps.colclip && !conf.ps.colclip_hw &&
+        !conf.ps.quantize_color && !conf.ps.substitute_alpha && !conf.ps.replacement_alpha_snap &&
+        !conf.ps.blend_factor_in_alpha && !conf.ps.stencil_counter && !conf.ps.no_color && !conf.ps.fbmask &&
+        !conf.ps.HasColorROV() && !conf.ps.HasDepthROV() && conf.ps.afail == GSHWDrawConfig::PS_AFAIL_KEEP &&
+        !conf.alpha_second_pass.enable && !conf.blend_multi_pass.enable && !conf.stencil_counter.enable &&
+        conf.colormask.logic_op == 0 &&
+        (!conf.blend.enable || (conf.blend.src_factor_alpha == GSDevice::CONST_ONE &&
+            conf.blend.dst_factor_alpha == GSDevice::CONST_ZERO));
+}
+
 inline GSDrawRoadDevice GSGetDrawRoadDevice(const GSDevice::FeatureSupport& f)
 {
     return {.texture_barrier = f.texture_barrier,
