@@ -3487,7 +3487,7 @@ GSTextureCache::Target* GSTextureCache::LookupTarget(GIFRegTEX0 TEX0, const GSVe
 					// 2. Preserved data will be in the correct place (in most cases)
 					// 3. Less deleting sources/targets
 					// 4. We can basically do clears in hardware, if they aren't insane ones
-					bool dirtied_area = t->m_dirty.size() >= 1;
+					bool dirtied_area = !t->m_dirty.empty();
 
 					// Check it covers the whole area of the new draw
 					if (!is_shuffle && dirtied_area)
@@ -3705,7 +3705,7 @@ GSTextureCache::Target* GSTextureCache::LookupTarget(GIFRegTEX0 TEX0, const GSVe
 						const GSVector4i dirty_rect = t->m_dirty.GetTotalRect(t->m_TEX0, t->m_unscaled_size);
 						// It's dirty with the data we want at the right width, so just change it to that.
 						// Prince of Persia - Sands of Time
-						if (t->m_dirty.size() == 1 && t->m_dirty[0].bw == TEX0.TBW)
+						if (GSDirtyRect single; t->m_dirty.Single(&single) && single.bw == TEX0.TBW)
 						{
 							t->m_TEX0.TBW = TEX0.TBW;
 							t->m_valid = dirty_rect;
