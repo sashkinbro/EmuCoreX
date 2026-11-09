@@ -337,4 +337,21 @@ void GSDeviceOGL::TestFramebufferFetch(void (*check)(bool, const char*))
     device.TestFramebufferFetchPlanProof(check);
     device.TestFramebufferFetchPixelProof(check);
     device.TestFramebufferFetchPlannerProof(check);
+    GLint previous_uniform_buffer = 0;
+    glGetIntegerv(GL_UNIFORM_BUFFER_BINDING, &previous_uniform_buffer);
+    {
+        auto stream = GLStreamBuffer::Create(GL_UNIFORM_BUFFER, 4096);
+        bool visible = stream != nullptr;
+        if (stream)
+        {
+            stream->Bind();
+            GLint access = 0;
+            glGetBufferParameteriv(GL_UNIFORM_BUFFER, GL_BUFFER_ACCESS_FLAGS, &access);
+            visible = !(access & GL_MAP_PERSISTENT_BIT) || (access & GL_MAP_COHERENT_BIT);
+            if (!visible)
+                std::fprintf(stderr, "GL_STREAM_MAPPING access=0x%x: persistent writes lack coherent visibility\n", access);
+        }
+        check(visible, "GL persistent stream mappings make CPU writes visible without explicit flushes");
+    }
+    glBindBuffer(GL_UNIFORM_BUFFER, static_cast<GLuint>(previous_uniform_buffer));
 }
