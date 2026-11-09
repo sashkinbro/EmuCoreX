@@ -689,14 +689,16 @@ bool VKSwapChain::CreateSwapChain()
 			LOG_VULKAN_ERROR(res, "vkCreateSemaphore failed: ");
 			return false;
 		}
+	}
 
-		res = vkCreateSemaphore(
-			GSDeviceVK::GetInstance()->GetDevice(), &semaphore_info, nullptr, &sema.rendering_finished_semaphore);
+	m_present_semaphores.resize(image_count, VK_NULL_HANDLE);
+	for (VkSemaphore& semaphore : m_present_semaphores)
+	{
+		const VkSemaphoreCreateInfo semaphore_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, nullptr, 0};
+		res = vkCreateSemaphore(GSDeviceVK::GetInstance()->GetDevice(), &semaphore_info, nullptr, &semaphore);
 		if (res != VK_SUCCESS)
 		{
 			LOG_VULKAN_ERROR(res, "vkCreateSemaphore failed: ");
-			vkDestroySemaphore(GSDeviceVK::GetInstance()->GetDevice(), sema.available_semaphore, nullptr);
-			sema.available_semaphore = VK_NULL_HANDLE;
 			return false;
 		}
 	}
@@ -728,12 +730,16 @@ void VKSwapChain::DestroySwapChainImages()
 	m_images.clear();
 	for (auto& it : m_semaphores)
 	{
-		if (it.rendering_finished_semaphore != VK_NULL_HANDLE)
-			vkDestroySemaphore(GSDeviceVK::GetInstance()->GetDevice(), it.rendering_finished_semaphore, nullptr);
 		if (it.available_semaphore != VK_NULL_HANDLE)
 			vkDestroySemaphore(GSDeviceVK::GetInstance()->GetDevice(), it.available_semaphore, nullptr);
 	}
 	m_semaphores = {};
+	for (VkSemaphore semaphore : m_present_semaphores)
+	{
+		if (semaphore != VK_NULL_HANDLE)
+			vkDestroySemaphore(GSDeviceVK::GetInstance()->GetDevice(), semaphore, nullptr);
+	}
+	m_present_semaphores.clear();
 
 	m_image_acquire_result.reset();
 }
@@ -769,7 +775,8 @@ VkResult VKSwapChain::AcquireNextImage()
 		return VK_ERROR_SURFACE_LOST_KHR;
 	}
 
-	// Use a different semaphore for each image.
+	// Acquire synchronization follows the bounded in-flight frame ring. Presentation
+	// synchronization is indexed separately by the image returned from this acquire.
 	m_current_semaphore = (m_current_semaphore + 1) % static_cast<u32>(m_semaphores.size());
 
 	// Android presentation is compositor-driven; if the compositor stops returning images

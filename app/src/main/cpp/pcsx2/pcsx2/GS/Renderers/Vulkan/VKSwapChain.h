@@ -68,11 +68,11 @@ public:
 	}
 	__fi VkSemaphore GetRenderingFinishedSemaphore() const
 	{
-		return m_semaphores[m_current_semaphore].rendering_finished_semaphore;
+		return m_present_semaphores[m_current_image];
 	}
 	__fi const VkSemaphore* GetRenderingFinishedSemaphorePtr() const
 	{
-		return &m_semaphores[m_current_semaphore].rendering_finished_semaphore;
+		return &m_present_semaphores[m_current_image];
 	}
 
 	VkFormat GetTextureFormat() const;
@@ -103,7 +103,6 @@ private:
 	struct ImageSemaphores
 	{
 		VkSemaphore available_semaphore;
-		VkSemaphore rendering_finished_semaphore;
 	};
 
 	WindowInfo m_window_info;
@@ -116,6 +115,9 @@ private:
 	std::vector<std::unique_ptr<GSTextureVK>> m_images;
 	u32 m_extra_acquirable_images = 0;
 	std::array<ImageSemaphores, NUM_SEMAPHORES> m_semaphores = {};
+	// A submit fence does not cover presentation. Re-acquiring the same image and
+	// waiting on its acquire semaphore makes its previous present semaphore reusable.
+	std::vector<VkSemaphore> m_present_semaphores;
 
 	u32 m_current_image = 0;
 	u32 m_current_semaphore = 0;
