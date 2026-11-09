@@ -78,6 +78,7 @@ GSTextureCache::HashCacheStats GSTextureCache::GetHashCacheStats()
 	return s_hash_cache_stats;
 }
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 static GSTextureCache::HashMemoVerifyReport s_hash_memo_verify_report;
 static constexpr u64 HASH_MEMO_VERIFY_PRINT_LIMIT = 20; // lines printed per kind of finding
 
@@ -125,6 +126,12 @@ void GSTextureCache::VerifyWriteStamps(const GSLocalMemory& mem)
 	sweep.primed = true;
 }
 
+#else
+void GSTextureCache::SetHashMemoVerify(bool) {}
+GSTextureCache::HashMemoVerifyReport GSTextureCache::GetHashMemoVerifyReport() { return {}; }
+void GSTextureCache::VerifyWriteStamps(const GSLocalMemory&) {}
+#endif
+
 struct GSTextureCache::BlockHashCache
 {
 	/// GSLocalMemory::Id() of the memory the hashes describe. 0, which no memory has, before the first use.
@@ -134,12 +141,14 @@ struct GSTextureCache::BlockHashCache
 };
 
 static GSTextureCache::BlockHashStats s_block_hash_stats;
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 static GSTextureCache::BlockHashVerifyReport s_block_hash_verify_report;
 static constexpr u64 BLOCK_HASH_VERIFY_PRINT_LIMIT = 20; // lines printed per kind of finding
 
 /// Levels keyed through the cache so far; a counter that HashCacheKey::Create reads before and after a key to
 /// tell whether the key used the cache at all.
 static u64 s_block_hash_levels_cached = 0;
+#endif
 
 /// The block hashes of the level being keyed, in the order they are fed to the hash. Sized for a level of 1024
 /// texels each way with the smallest block (the 32-bit formats', 8 x 8 texels), plus one block each way for a
@@ -148,6 +157,7 @@ static u64 s_block_hash_levels_cached = 0;
 static constexpr u32 BLOCK_HASH_GATHER_MAX = (1024 / 8 + 1) * (1024 / 8 + 1);
 static u64 s_block_hash_gather[BLOCK_HASH_GATHER_MAX];
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 /// What verify mode has seen of the keys of both forms: the key without the cache to the key with it, and back.
 /// Two lookups have the same window if and only if both maps keep one answer for the key.
 static std::unordered_map<GSTextureCache::HashCacheKey, u64, GSTextureCache::HashCacheKeyHash> s_block_hash_verify_forward;
@@ -165,6 +175,11 @@ GSTextureCache::BlockHashVerifyReport GSTextureCache::GetBlockHashVerifyReport()
 {
 	return s_block_hash_verify_report;
 }
+
+#else
+void GSTextureCache::SetBlockHashVerify(bool) {}
+GSTextureCache::BlockHashVerifyReport GSTextureCache::GetBlockHashVerifyReport() { return {}; }
+#endif
 
 GSTextureCache::BlockHashStats GSTextureCache::GetBlockHashStats()
 {
@@ -202,6 +217,7 @@ u64 GSTextureCache::BlockHash(GSLocalMemory& mem, u32 block)
 	return cache.hash[block];
 }
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 /// Verify mode, one lookup: the key the cache gave the window (`cached`, whose TEX0Hash is the cached form) and
 /// the hash it has without the cache. Checks that the two forms agree on which windows are one.
 static void VerifyBlockHashKey(const GSTextureCache::HashCacheKey& cached, u64 uncached_hash)
@@ -243,6 +259,7 @@ static bool VerifyHashMemoHit(const GIFRegTEX0& TEX0, u64 memo, u64 fresh)
 	}
 	return false;
 }
+#endif
 
 #ifdef PCSX2_DEVBUILD
 // We can only set one texture name per command buffer, which would break our fancy texture cache RT/DS/texture naming.
@@ -10695,11 +10712,14 @@ static u32 HashTextureLevel(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA, GSTe
 		const u64 count = static_cast<u64>(out - s_block_hash_gather);
 		BlockHashAccumulate(hash_st, reinterpret_cast<const u8*>(s_block_hash_gather), static_cast<u32>(count * sizeof(u64)));
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 		s_block_hash_levels_cached++;
+#endif
 		s_block_hash_stats.levels++;
 		s_block_hash_stats.blocks += count;
 		s_block_hash_stats.rehashed += rehashed;
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 		if (GSTextureCache::IsBlockHashVerify()) [[unlikely]]
 		{
 			// Each block of the full-mask formats, hashed afresh, against the hash the key was made from. A
@@ -10731,6 +10751,7 @@ static u32 HashTextureLevel(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA, GSTe
 				}
 			}
 		}
+#endif
 
 		return static_cast<u32>(rect.left - block_rect.left) | (static_cast<u32>(rect.top - block_rect.top) << 8);
 	}
@@ -10971,6 +10992,7 @@ GSTextureCache::HashCacheKey GSTextureCache::HashCacheKey::Create(const GIFRegTE
 	// so they would push the large textures that do hit out of the 32-entry memo.
 	const int base_blocks = (base_geometry.block_rect.width() / psm.bs.x) * (base_geometry.block_rect.height() / psm.bs.y);
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	// Verify mode of the block hash cache: every lookup, memo or not, is keyed both ways and the two are compared.
 	if (s_block_hash_verify && block_hashes) [[unlikely]]
 	{
@@ -10980,6 +11002,7 @@ GSTextureCache::HashCacheKey GSTextureCache::HashCacheKey::Create(const GIFRegTE
 			VerifyBlockHashKey(ret, hash_levels(nullptr));
 		return ret;
 	}
+#endif
 
 	if (!tc || levels > HASH_MEMO_MAX_LEVELS || base_blocks < HASH_MEMO_MIN_BLOCKS)
 	{
@@ -11022,6 +11045,7 @@ GSTextureCache::HashCacheKey GSTextureCache::HashCacheKey::Create(const GIFRegTE
 			memo.stats.hits++;
 			ret.TEX0Hash = entry.hash;
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 			if (s_hash_memo_verify) [[unlikely]]
 			{
 				const HashType fresh = hash_levels(block_hashes);
@@ -11031,6 +11055,8 @@ GSTextureCache::HashCacheKey GSTextureCache::HashCacheKey::Create(const GIFRegTE
 					entry.levels = 0;
 				}
 			}
+#endif
+
 			return ret;
 		}
 

@@ -1057,12 +1057,16 @@ namespace GSCacheFile
 			if (!pack->HasPendingWrites())
 				continue;
 			const Pack::WriteResult res = pack->Write(deadline);
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 			if (res.records > 0 || res.deadline_hit)
 			{
 				DevCon.WriteLn("GS cache: wrote %u records (%llu KB) to '%s'%s%s", res.records,
 					static_cast<unsigned long long>(res.bytes / 1024), pack->GetPath().c_str(),
 					res.rewrote ? ", whole" : "", res.deadline_hit ? ", stopped at the deadline" : "");
 			}
+#else
+			(void)res;
+#endif
 		}
 		if (m_extra)
 			m_extra(deadline, asked);

@@ -40,11 +40,13 @@ GSDrawScanline::GSDrawScanline()
 
 GSDrawScanline::~GSDrawScanline()
 {
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	if (SysMemory::HasCodeMemory())
 	{
 		if (const size_t used = GSCodeReserve::GetMemoryUsed(); used > 0)
 			DevCon.WriteLn("SW JIT generated %zu bytes of code", used);
 	}
+#endif
 }
 
 #ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS

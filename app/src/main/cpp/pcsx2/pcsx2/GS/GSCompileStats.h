@@ -34,6 +34,7 @@ namespace GSCompileStats
 		Count
 	};
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	inline std::atomic<u64> s_counters[Count] = {};
 
 	inline void Add(Counter c, u64 v) { s_counters[c].fetch_add(v, std::memory_order_relaxed); }
@@ -57,4 +58,15 @@ namespace GSCompileStats
 		ScopedTimer(const ScopedTimer&) = delete;
 		ScopedTimer& operator=(const ScopedTimer&) = delete;
 	};
+#else
+	inline void Add(Counter, u64) {}
+	inline u64 Get(Counter) { return 0; }
+
+	struct ScopedTimer
+	{
+		explicit ScopedTimer(Counter) {}
+		ScopedTimer(const ScopedTimer&) = delete;
+		ScopedTimer& operator=(const ScopedTimer&) = delete;
+	};
+#endif
 } // namespace GSCompileStats

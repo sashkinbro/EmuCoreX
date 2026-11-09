@@ -2034,6 +2034,7 @@ void GSDevice::FSR1Upscale(GSTexture*& tex, GSVector4i& src_rect, GSVector4& src
 	if (dst_width <= 0 || dst_height <= 0)
 		return;
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	// Anchored inside FSR1Upscale explicitly: the first attempt at this matched an identical
 	// "GSTexture* src_tex = tex;" line in GSDevice::CAS, which FSR REPLACES, so the log could
 	// never fire and made a working pass look dead.
@@ -2045,6 +2046,7 @@ void GSDevice::FSR1Upscale(GSTexture*& tex, GSVector4i& src_rect, GSVector4& src
 		Console.WriteLnFmt("@@ANDROID_FSR1@@ upscaling {}x{} -> {}x{} (sharpness {})",
 			tex->GetWidth(), tex->GetHeight(), dst_width, dst_height, GSConfig.FSR_Sharpness);
 	}
+#endif
 
 	GSTexture* src_tex = tex;
 
@@ -2116,6 +2118,7 @@ void GSDevice::SGSRUpscale(GSTexture*& tex, GSVector4i& src_rect, GSVector4& src
 
 	GSTexture* src_tex = tex;
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	static int s_logged_w = 0, s_logged_h = 0;
 	if (s_logged_w != dst_width || s_logged_h != dst_height)
 	{
@@ -2125,6 +2128,7 @@ void GSDevice::SGSRUpscale(GSTexture*& tex, GSVector4i& src_rect, GSVector4& src
 			src_rect.width(), src_rect.height(), dst_width, dst_height, GSConfig.SGSR_Sharpness,
 			edge_direction ? ", edge-direction" : "");
 	}
+#endif
 
 	// One target, unlike FSR1: SGSR is a single pass, so there is no intermediate to hand on.
 	if (!m_sgsr_output || m_sgsr_output->GetWidth() != dst_width || m_sgsr_output->GetHeight() != dst_height)

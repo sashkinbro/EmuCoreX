@@ -108,9 +108,13 @@ private:
 	int m_waited_frames = 0;
 	/// Pairs discarded for same parity or a gap between fields. Explains a probe round that
 	/// ends undecided.
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	int m_unusable_pairs = 0;
+#endif
 	GSFieldShiftTally m_tally;
 
 	/// GS-thread time spent up to the decision; reported once.
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	u64 m_cpu_ticks = 0;
+#endif
 };

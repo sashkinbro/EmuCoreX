@@ -596,15 +596,20 @@ protected:
 	};
 	HashMemo m_hash_memo;
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	static inline bool s_hash_memo_verify = false;
 	struct HashMemoSweep;
 	std::unique_ptr<HashMemoSweep> m_hash_memo_sweep;
+#endif
 
 	/// The block hash cache of this texture cache, made at the first lookup that needs it.
 	std::unique_ptr<BlockHashCache> m_block_hash_cache;
 	BlockHashCache& SyncBlockHashCache(GSLocalMemory& mem);
 	static inline bool s_block_hash_cache_enabled = true;
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	static inline bool s_block_hash_verify = false;
+#endif
+
 
 	FastList<Target*> m_dst[2];
 	FastList<TargetHeightElem> m_target_heights;
@@ -738,7 +743,11 @@ public:
 	/// While it is on, every memo hit also hashes the texture afresh and compares, and VerifyWriteStamps()
 	/// finds stores into local memory that nothing marked. Neither changes what the renderer does.
 	static void SetHashMemoVerify(bool enable);
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	static bool IsHashMemoVerify() { return s_hash_memo_verify; }
+#else
+	static constexpr bool IsHashMemoVerify() { return false; }
+#endif
 	static HashMemoVerifyReport GetHashMemoVerifyReport();
 	/// Hashes every page of `mem` and reports each page whose bytes changed since the previous call while
 	/// its stamp did not, which is a store that was not marked. Call at a frame boundary, on the thread that
@@ -762,7 +771,11 @@ public:
 	/// one. The memo of texture hashes is not consulted, so every lookup is checked. Neither changes what
 	/// the renderer does.
 	static void SetBlockHashVerify(bool enable);
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	static bool IsBlockHashVerify() { return s_block_hash_verify; }
+#else
+	static constexpr bool IsBlockHashVerify() { return false; }
+#endif
 	static BlockHashVerifyReport GetBlockHashVerifyReport();
 	static BlockHashStats GetBlockHashStats();
 

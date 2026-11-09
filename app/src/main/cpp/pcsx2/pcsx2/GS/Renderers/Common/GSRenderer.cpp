@@ -1011,7 +1011,9 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 			(now - m_last_surface_reattach_time) >= (GetTickFrequency() * 2))
 		{
 			m_last_surface_reattach_time = now;
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 			Console.Warning("GS: no presentable surface, retrying display window attach");
+#endif
 			GSUpdateDisplayWindow();
 		}
 	}

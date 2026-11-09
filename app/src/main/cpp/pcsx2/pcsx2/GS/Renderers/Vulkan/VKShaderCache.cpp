@@ -814,7 +814,9 @@ void VKShaderCache::WritePipelineCache(GSCacheFile::Clock::time_point deadline, 
 		m_pipeline_cache_dirty.store(true, std::memory_order_relaxed);
 		return;
 	}
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	DevCon.WriteLn("Vulkan: wrote %zu bytes of pipeline cache", data_size);
+#endif
 	m_pipeline_cache_file_hash = hash;
 }
 

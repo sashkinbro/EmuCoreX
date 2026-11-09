@@ -405,8 +405,12 @@ namespace GSLsfgNative
 		/// The OSD is one font texture; running out only makes that frame use the finished screen.
 		constexpr u32 kOverlaySets = 256;
 		/// What frame generation last ran on, for the log: the game's image, or the finished screen.
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 		VkExtent2D s_last_run_extent = {};
+#endif
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 		bool s_last_run_game = false;
+#endif
 		/// LSFG's own GPU time: a timestamp at each end of a frame's command buffer, read back once
 		/// the slot's fence has signalled so it never waits on the GPU. Averaged over the display-rate
 		/// window.
@@ -415,7 +419,9 @@ namespace GSLsfgNative
 		u64 s_tick_mask = 0;
 		double s_gpu_ns_sum = 0.0;
 		u32 s_gpu_samples = 0;
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 		u32 s_gpu_log_windows = 0;
+#endif
 
 		u64 s_frame_index = 0;
 
@@ -449,6 +455,7 @@ namespace GSLsfgNative
 			s_gpu_ms.store(gpu_ms, std::memory_order_relaxed);
 			s_gpu_ns_sum = 0.0;
 			s_gpu_samples = 0;
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 			// In the log every ten seconds, so a session can be measured without the overlay.
 			if (gpu_ms > 0.0f && ++s_gpu_log_windows >= 10)
 			{
@@ -457,6 +464,7 @@ namespace GSLsfgNative
 					s_last_run_extent.height, s_last_run_game ? "game image" : "screen",
 					s_fp16_active.load(std::memory_order_relaxed) ? ", fp16" : "");
 			}
+#endif
 			s_fps_window_start = now;
 			s_fps_real = 0;
 			s_fps_generated = 0;
@@ -1158,7 +1166,9 @@ namespace GSLsfgNative
 				VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT);
 			s_frame_gen->Process(*s_device, cmdbuf, *s_capture.image, s_gen_images[0].view, s_capture_extent,
 				s_format, s_capture_extent);
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 			s_last_run_extent = s_capture_extent;
+#endif
 		}
 		else
 		{
@@ -1178,9 +1188,13 @@ namespace GSLsfgNative
 				guest_extent = {static_cast<u32>(current->GetWidth()), static_cast<u32>(current->GetHeight())};
 			s_frame_gen->Process(*s_device, cmdbuf, real_image, s_gen_images[0].view, s_extent, s_format,
 				guest_extent);
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 			s_last_run_extent = s_extent;
+#endif
 		}
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 		s_last_run_game = game_res;
+#endif
 		s_fp16_active.store(s_frame_gen->UsingFp16(), std::memory_order_relaxed);
 
 		// Frame generation turned itself off: its shaders could not be loaded or built. Say why, once,

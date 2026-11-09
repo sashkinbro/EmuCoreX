@@ -495,11 +495,15 @@ void GSState::BackThreadLoop()
 	// registration applies that placement now, including replacing the MTGS thread's mask this
 	// thread inherited, which may be a single core and would re-serialize the split.
 	const u64 placed = VMManager::Internal::RegisterGSBackThread(&handle);
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 #if defined(__linux__)
 	Console.WriteLn("GS: back thread starts on CPU mask 0x%llx (0 = any; re-placed when thread affinities are applied); first ran on CPU %d.",
 		static_cast<unsigned long long>(placed), sched_getcpu());
 #else
 	Console.WriteLn("GS: back thread starts on CPU mask 0x%llx (0 = any; re-placed when thread affinities are applied).", static_cast<unsigned long long>(placed));
+#endif
+#else
+	(void)placed;
 #endif
 
 	// Half the GS work runs here under the split, and the OSD's "GS" figure is the MTGS

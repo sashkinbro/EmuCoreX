@@ -15,16 +15,24 @@ namespace GSShaderCompileIndicator
 	inline std::atomic<u32> s_count{0};
 	inline std::atomic<u64> s_time_ns{0};
 	inline std::atomic<u64> s_last_time{0};
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	inline std::atomic<u32> s_baked_hits{0};
+#endif
 
 	inline void RecordBakedHit()
 	{
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 		s_baked_hits.fetch_add(1, std::memory_order_relaxed);
+#endif
 	}
 
 	inline u32 GetBakedHitCount()
 	{
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 		return s_baked_hits.load(std::memory_order_relaxed);
+#else
+		return 0;
+#endif
 	}
 
 	inline u64 GetRecentCompileHold()

@@ -6,7 +6,9 @@
 #include "GS/Renderers/Common/GSTexture.h"
 
 #include "common/Console.h"
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 #include "common/Timer.h"
+#endif
 
 #include <algorithm>
 
@@ -65,9 +67,13 @@ void GSFieldShiftDetector::Reset()
 	m_prev_parity = 0;
 	m_fields_probed = 0;
 	m_waited_frames = 0;
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	m_unusable_pairs = 0;
+#endif
 	m_tally = GSFieldShiftTally();
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	m_cpu_ticks = 0;
+#endif
 }
 
 void GSFieldShiftDetector::StartRound(const GSVector2i& size, int scale)
@@ -85,10 +91,20 @@ void GSFieldShiftDetector::StartRound(const GSVector2i& size, int scale)
 	m_retire_index = 0;
 	m_fields_probed = 0;
 	m_waited_frames = 0;
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	m_unusable_pairs = 0;
+#endif
 	m_tally = GSFieldShiftTally();
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	m_cpu_ticks = 0;
+#endif
 }
+
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
+#define GS_FIELD_SHIFT_REASON(reason) reason
+#else
+#define GS_FIELD_SHIFT_REASON(reason) nullptr
+#endif
 
 void GSFieldShiftDetector::Decide(bool no_shift, const char* why)
 {
@@ -96,10 +112,14 @@ void GSFieldShiftDetector::Decide(bool no_shift, const char* why)
 	m_probing = false;
 	m_fields_since_decision = 0;
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	DevCon.WriteLn("GS: field shift detector: %s after %d fields (%d shift / %d no-shift votes, "
 				   "%d unusable pairs), %s, %.3f ms of GS thread total",
 		no_shift ? "NO SHIFT" : "SHIFT", m_fields_probed, m_tally.shift, m_tally.noshift,
 		m_unusable_pairs, why, Common::Timer::ConvertValueToMilliseconds(m_cpu_ticks));
+#else
+	(void)why;
+#endif
 
 	ReleaseReadbacks();
 }
@@ -126,7 +146,9 @@ void GSFieldShiftDetector::Update(
 		StartRound(size, scale);
 	}
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	const u64 start = Common::Timer::GetCurrentValue();
+#endif
 
 	// Collect finished readbacks, oldest first, so consecutive signatures really are consecutive
 	// fields. Poll() neither submits nor waits.
@@ -159,7 +181,9 @@ void GSFieldShiftDetector::Update(
 		m_retire_index++;
 		if (!ok || !m_probing)
 		{
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 			m_cpu_ticks += Common::Timer::GetCurrentValue() - start;
+#endif
 			return;
 		}
 	}
@@ -170,8 +194,10 @@ void GSFieldShiftDetector::Update(
 		{
 			// The backend cannot report completion without a flush (D3D, Metal), or the GPU is that
 			// far behind. Never flush here: decide on the votes already in, or the default.
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 			m_cpu_ticks += Common::Timer::GetCurrentValue() - start;
-			Decide(GSFieldShiftTallySaysNoShift(m_tally), "readback did not complete without a flush");
+#endif
+			Decide(GSFieldShiftTallySaysNoShift(m_tally), GS_FIELD_SHIFT_REASON("readback did not complete without a flush"));
 			return;
 		}
 	}
@@ -184,18 +210,24 @@ void GSFieldShiftDetector::Update(
 	{
 		if (m_retire_index >= m_next_index)
 		{
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 			m_cpu_ticks += Common::Timer::GetCurrentValue() - start;
-			Decide(GSFieldShiftTallySaysNoShift(m_tally), "probe budget spent");
+#endif
+			Decide(GSFieldShiftTallySaysNoShift(m_tally), GS_FIELD_SHIFT_REASON("probe budget spent"));
 			return;
 		}
 	}
 	else if (!Probe(merge, applied_offset_rows, field_parity))
 	{
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 		m_cpu_ticks += Common::Timer::GetCurrentValue() - start;
+#endif
 		return;
 	}
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	m_cpu_ticks += Common::Timer::GetCurrentValue() - start;
+#endif
 }
 
 bool GSFieldShiftDetector::Probe(GSTexture* merge, int applied_offset_rows, int field_parity)
@@ -223,7 +255,7 @@ bool GSFieldShiftDetector::Probe(GSTexture* merge, int applied_offset_rows, int 
 		m_probe = g_gs_device->CreateRenderTarget(m_cols, m_rows, GSTexture::Format::Color, false);
 		if (!m_probe)
 		{
-			Decide(false, "no probe target");
+			Decide(false, GS_FIELD_SHIFT_REASON("no probe target"));
 			return false;
 		}
 	}
@@ -233,7 +265,7 @@ bool GSFieldShiftDetector::Probe(GSTexture* merge, int applied_offset_rows, int 
 		free_slot->download = g_gs_device->CreateDownloadTexture(m_cols, m_rows, GSTexture::Format::Color);
 		if (!free_slot->download)
 		{
-			Decide(false, "backend has no download texture");
+			Decide(false, GS_FIELD_SHIFT_REASON("backend has no download texture"));
 			return false;
 		}
 	}
@@ -259,7 +291,7 @@ bool GSFieldShiftDetector::Retire(ProbeSlot& slot)
 	const GSVector4i rc(0, 0, m_cols, m_rows);
 	if (!slot.download->Map(rc))
 	{
-		Decide(false, "readback could not be mapped");
+		Decide(false, GS_FIELD_SHIFT_REASON("readback could not be mapped"));
 		return false;
 	}
 
@@ -301,7 +333,9 @@ void GSFieldShiftDetector::Compare(const ProbeSlot& slot)
 
 	if (slot.index != m_prev_index + 1 || !GSFieldShiftPairIsComparable(m_prev_parity, slot.parity))
 	{
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 		m_unusable_pairs++;
+#endif
 		return;
 	}
 
@@ -309,10 +343,12 @@ void GSFieldShiftDetector::Compare(const ProbeSlot& slot)
 		m_cur.data(), m_prev.data(), m_cols, m_rows, m_scale, slot.applied - m_prev_applied);
 	const GSFieldShiftVote vote = GSClassifyFieldShiftPair(sample);
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	DevCon.WriteLn("GS: field shift pair %u: applied %+d, aligned %.3f up %.3f down %.3f -> %s", slot.index,
 		slot.applied - m_prev_applied, sample.mad_aligned, sample.mad_up, sample.mad_down,
 		(vote == GSFieldShiftVote::NoShift) ? "no shift" :
 											  ((vote == GSFieldShiftVote::Shift) ? "shift" : "nothing"));
+#endif
 
 	if (vote == GSFieldShiftVote::NoShift)
 	{
@@ -320,10 +356,12 @@ void GSFieldShiftDetector::Compare(const ProbeSlot& slot)
 		// The fields are the same picture by a wide margin. One such pair decides, so a no-shift
 		// game corrects itself as early as possible.
 		if (GSFieldShiftMargin(sample) >= GS_FIELD_SHIFT_DECISIVE_MARGIN)
-			Decide(true, "both fields draw the same picture");
+			Decide(true, GS_FIELD_SHIFT_REASON("both fields draw the same picture"));
 	}
 	else if (vote == GSFieldShiftVote::Shift)
 	{
 		m_tally.shift++;
 	}
 }
+
+#undef GS_FIELD_SHIFT_REASON

@@ -365,11 +365,13 @@ static void GSResolveBackThreadMode(Pcsx2Config::GSOptions& config, GSRendererTy
 	const GSBackThreadDecision decision = GSDecideBackThreadFor(config, renderer);
 	config.BackThreadResolved = decision.on;
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	// Scripts grep the log for the "GS: back thread" wording.
 	if (decision.on != config.BackThread)
 		Console.Warning("GS: back thread off, not pipelined (%s).", GSBackThreadReasonText(decision.reason));
 	else
 		Console.WriteLn("GS: back thread %s (%s).", decision.on ? "pipelined" : "off", GSBackThreadReasonText(decision.reason));
+#endif
 }
 
 // GV7-1d-ii: the front parser object of the two-object split (GSState.h).

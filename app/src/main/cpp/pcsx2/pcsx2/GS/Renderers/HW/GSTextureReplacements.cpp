@@ -270,6 +270,7 @@ namespace GSTextureReplacements
 	static bool s_upscale_stop = false;
 	static u32 s_upscale_busy = 0;
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	static std::atomic<u64> s_upscale_stat_queued{0};
 	static std::atomic<u64> s_upscale_stat_queued_4x{0};
 	static std::atomic<u64> s_upscale_stat_upscaled{0};
@@ -282,6 +283,10 @@ namespace GSTextureReplacements
 	static std::atomic<u64> s_upscale_stat_cpu_mip_jobs{0};
 	static std::atomic<u64> s_upscale_stat_cpu_ns{0};
 	static std::atomic<u64> s_upscale_stat_native_draws{0};
+#define GS_UPSCALE_STAT(name, amount) s_upscale_stat_##name.fetch_add((amount), std::memory_order_relaxed)
+#else
+#define GS_UPSCALE_STAT(name, amount) ((void)0)
+#endif
 }; // namespace GSTextureReplacements
 
 size_t GSTextureReplacements::ReplacementTextureBytes(const ReplacementTexture& tex)
@@ -1205,7 +1210,7 @@ void GSTextureReplacements::ProcessAsyncLoadedTextures()
 		{
 			g_texture_cache->InjectHashCacheTexture(HashCacheKeyFromTextureName(name), tex, it->second.alpha_minmax, it->second.generated);
 			if (it->second.generated)
-				s_upscale_stat_injected.fetch_add(1, std::memory_order_relaxed);
+				GS_UPSCALE_STAT(injected, 1);
 		}
 
 		uploaded_bytes += ReplacementTextureBytes(it->second);
@@ -1421,7 +1426,7 @@ bool GSTextureReplacements::CanUpscaleTexture(int width, int height)
 	// anything over 1024 is rare, costs the most, and is already high resolution.
 	if (width < 8 || height < 8 || width > 1024 || height > 1024)
 	{
-		s_upscale_stat_skipped_size.fetch_add(1, std::memory_order_relaxed);
+		GS_UPSCALE_STAT(skipped_size, 1);
 		return false;
 	}
 
@@ -1430,6 +1435,7 @@ bool GSTextureReplacements::CanUpscaleTexture(int width, int height)
 
 GSTextureReplacements::UpscaleStats GSTextureReplacements::GetUpscaleStats()
 {
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	UpscaleStats stats;
 	stats.queued = s_upscale_stat_queued.load(std::memory_order_relaxed);
 	stats.queued_4x = s_upscale_stat_queued_4x.load(std::memory_order_relaxed);
@@ -1444,15 +1450,19 @@ GSTextureReplacements::UpscaleStats GSTextureReplacements::GetUpscaleStats()
 	stats.cpu_ns = s_upscale_stat_cpu_ns.load(std::memory_order_relaxed);
 	stats.native_draws = s_upscale_stat_native_draws.load(std::memory_order_relaxed);
 	return stats;
+#else
+	return {};
+#endif
 }
 
 void GSTextureReplacements::NoteUpscaleNativeDraw()
 {
-	s_upscale_stat_native_draws.fetch_add(1, std::memory_order_relaxed);
+	GS_UPSCALE_STAT(native_draws, 1);
 }
 
 void GSTextureReplacements::LogUpscaleStats(const char* when)
 {
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	const UpscaleStats stats = GetUpscaleStats();
 	if (stats.queued == 0 && stats.cache_hits == 0 && stats.skipped_size == 0)
 		return;
@@ -1463,10 +1473,14 @@ void GSTextureReplacements::LogUpscaleStats(const char* when)
 		when, stats.queued, stats.queued_4x, stats.guest_mip_jobs, stats.cpu_mip_jobs, stats.upscaled, stats.injected,
 		stats.cache_hits, stats.dropped, stats.failed, stats.skipped_size, static_cast<double>(stats.cpu_ns) / 1000000.0,
 		stats.native_draws);
+#else
+	(void)when;
+#endif
 }
 
 void GSTextureReplacements::ResetUpscaleStats()
 {
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	s_upscale_stat_queued.store(0, std::memory_order_relaxed);
 	s_upscale_stat_queued_4x.store(0, std::memory_order_relaxed);
 	s_upscale_stat_upscaled.store(0, std::memory_order_relaxed);
@@ -1479,6 +1493,7 @@ void GSTextureReplacements::ResetUpscaleStats()
 	s_upscale_stat_cpu_mip_jobs.store(0, std::memory_order_relaxed);
 	s_upscale_stat_cpu_ns.store(0, std::memory_order_relaxed);
 	s_upscale_stat_native_draws.store(0, std::memory_order_relaxed);
+#endif
 }
 
 bool GSTextureReplacements::ReadUpscaleSourceLevel(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA,
@@ -1532,7 +1547,7 @@ GSTexture* GSTextureReplacements::LookupUpscaledTexture(const UpscaleRequest& re
 		{
 			TouchReplacementCacheLocked(name);
 			*alpha_minmax = it->second.alpha_minmax;
-			s_upscale_stat_cache_hits.fetch_add(1, std::memory_order_relaxed);
+			GS_UPSCALE_STAT(cache_hits, 1);
 			return CreateReplacementTexture(it->second, request.mipmap);
 		}
 
@@ -1594,13 +1609,13 @@ GSTexture* GSTextureReplacements::LookupUpscaledTexture(const UpscaleRequest& re
 
 		job.generation = s_upscale_generation.load(std::memory_order_relaxed);
 		job.filters = s_upscale_filters;
-		s_upscale_stat_queued.fetch_add(1, std::memory_order_relaxed);
+		GS_UPSCALE_STAT(queued, 1);
 		if (job.scale == 4)
-			s_upscale_stat_queued_4x.fetch_add(1, std::memory_order_relaxed);
+			GS_UPSCALE_STAT(queued_4x, 1);
 		if (job.levels.size() > 1)
-			s_upscale_stat_guest_mip_jobs.fetch_add(1, std::memory_order_relaxed);
+			GS_UPSCALE_STAT(guest_mip_jobs, 1);
 		if (job.cpu_mip_levels > 1)
-			s_upscale_stat_cpu_mip_jobs.fetch_add(1, std::memory_order_relaxed);
+			GS_UPSCALE_STAT(cpu_mip_jobs, 1);
 
 		std::unique_lock<std::mutex> queue_lock(s_upscale_mutex);
 		s_upscale_queue.Push(std::move(job), cost, &dropped);
@@ -1613,7 +1628,7 @@ GSTexture* GSTextureReplacements::LookupUpscaledTexture(const UpscaleRequest& re
 	}
 
 	if (!dropped.empty())
-		s_upscale_stat_dropped.fetch_add(dropped.size(), std::memory_order_relaxed);
+		GS_UPSCALE_STAT(dropped, dropped.size());
 
 	*pending = true;
 	return nullptr;
@@ -1670,6 +1685,7 @@ void GSTextureReplacements::BuildUpscaledTexture(const UpscaleJob& job, Replacem
 	rtex->generated = true;
 }
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 static u64 GetThreadCpuNanoseconds()
 {
 	const u64 ticks_per_second = Threading::GetThreadTicksPerSecond();
@@ -1679,13 +1695,17 @@ static u64 GetThreadCpuNanoseconds()
 	return static_cast<u64>(static_cast<double>(Threading::GetThreadCpuTime()) * 1.0e9 / static_cast<double>(ticks_per_second));
 }
 
+#endif
+
 void GSTextureReplacements::RunUpscaleJob(UpscaleJob& job)
 {
 	ReplacementTexture rtex;
 
+#if !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 	const u64 cpu_start = GetThreadCpuNanoseconds();
+#endif
 	BuildUpscaledTexture(job, &rtex);
-	s_upscale_stat_cpu_ns.fetch_add(GetThreadCpuNanoseconds() - cpu_start, std::memory_order_relaxed);
+	GS_UPSCALE_STAT(cpu_ns, GetThreadCpuNanoseconds() - cpu_start);
 
 	// The source pixels are not needed past this point, and the cache lock is the busy one.
 	job.levels.clear();
@@ -1696,13 +1716,13 @@ void GSTextureReplacements::RunUpscaleJob(UpscaleJob& job)
 	// remove, and removing one would take a newer job's mark for the same texture.
 	if (job.generation != s_upscale_generation.load(std::memory_order_relaxed))
 	{
-		s_upscale_stat_dropped.fetch_add(1, std::memory_order_relaxed);
+		GS_UPSCALE_STAT(dropped, 1);
 		return;
 	}
 
 	if (s_pending_upscale_textures.erase(job.name) == 0)
 	{
-		s_upscale_stat_dropped.fetch_add(1, std::memory_order_relaxed);
+		GS_UPSCALE_STAT(dropped, 1);
 		return;
 	}
 
@@ -1711,12 +1731,12 @@ void GSTextureReplacements::RunUpscaleJob(UpscaleJob& job)
 	if (s_replacement_texture_cache.find(job.name) != s_replacement_texture_cache.end() ||
 		!InsertReplacementCacheLocked(job.name, rtex))
 	{
-		s_upscale_stat_failed.fetch_add(1, std::memory_order_relaxed);
+		GS_UPSCALE_STAT(failed, 1);
 		return;
 	}
 
 	s_async_loaded_textures.emplace_back(job.name, job.mipmap);
-	s_upscale_stat_upscaled.fetch_add(1, std::memory_order_relaxed);
+	GS_UPSCALE_STAT(upscaled, 1);
 }
 
 void GSTextureReplacements::UpscaleWorkerEntryPoint()
@@ -1810,7 +1830,7 @@ void GSTextureReplacements::ResetUpscaleJobsLocked()
 		s_upscale_queue.Clear(&removed);
 	}
 	if (!removed.empty())
-		s_upscale_stat_dropped.fetch_add(removed.size(), std::memory_order_relaxed);
+		GS_UPSCALE_STAT(dropped, removed.size());
 }
 
 void GSTextureReplacements::DropGeneratedReplacementsLocked()
@@ -1907,3 +1927,5 @@ extern "C" void EmuCoreXOracleTestReplacementWorker(void (*check)(bool,const cha
     StopWorkerThread();
 }
 #endif
+
+#undef GS_UPSCALE_STAT

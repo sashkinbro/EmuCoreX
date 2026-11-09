@@ -3072,7 +3072,7 @@ GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
 	// If we're running surfaceless, kick the command buffer so we don't run out of descriptors.
 	if (!m_swap_chain)
 	{
-#ifdef __ANDROID__
+#if defined(__ANDROID__) && !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 		// The swap chain should recover through UpdateWindow(), but if it does not the
 		// screen stays black while emulation runs with no other evidence. Log rate-limited.
 		const u64 now = GetCPUTicks();
@@ -3113,7 +3113,7 @@ GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
 			// The compositor did not return an image within the bounded Android acquire
 			// window. Retry on the next VSync; this is not an error (and must not raise
 			// the device-lost recovery path), but log it rate-limited in case it persists.
-#ifdef __ANDROID__
+#if defined(__ANDROID__) && !defined(EMUCOREX_DISABLE_GS_DIAGNOSTICS) && !defined(NDEBUG)
 			const u64 now = GetCPUTicks();
 			if (m_last_acquire_timeout_log_time == 0 ||
 				(now - m_last_acquire_timeout_log_time) >= GetTickFrequency())
