@@ -1513,7 +1513,7 @@ public:
 		bool alpha_bit_logic_op : 1;
 		bool ordered_read_costs_per_draw : 1;
 		bool cheap_rt_feedback_read : 1; ///< Backend has evidence voluntary RT feedback reads avoid a costly pass/copy.
-		bool texture_feedback_requires_copy : 1; ///< Framebuffer fetch cannot make ordinary sampler reads of attached textures safe (Haunting Ground-only workaround).
+		bool texture_feedback_requires_copy : 1; ///< Ordinary sampler reads of attached textures require a snapshot; same-pixel framebuffer fetch remains available.
 		bool stencil_buffer       : 1; ///< Supports stencil buffer, and can use for DATE.
 		bool cas_sharpening       : 1; ///< Supports sufficient functionality for contrast adaptive sharpening.
 		bool fsr1 : 1;

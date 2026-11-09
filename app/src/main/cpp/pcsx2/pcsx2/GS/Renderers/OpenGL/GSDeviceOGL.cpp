@@ -1165,11 +1165,10 @@ bool GSDeviceOGL::CheckFeatures()
 
 	m_features.framebuffer_fetch = framebuffer_fetch;
 	m_features.framebuffer_fetch_orders_overlap = FbFetchOrdersOverlappingPrims(fetch.backend);
-	// Framebuffer fetch cannot stand in for a texture barrier when a draw samples its attached
-	// target. Only Haunting Ground performs the offset reads which need the bounded source copy;
-	// every other game keeps the cheap fetch path.
-	m_features.texture_feedback_requires_copy =
-		GSIsHauntingGround() && (!has_texture_barrier_extension || GSConfig.OverrideTextureBarriers == 0);
+	// Framebuffer fetch only reads the current pixel. Sampling another location in an
+	// attached texture still needs a snapshot when native texture barriers are unavailable.
+	// Same-pixel tex-is-fb draws retain the framebuffer-fetch path in HandleTextureHazards.
+	m_features.texture_feedback_requires_copy = !m_features.texture_barrier;
 	m_features.dual_source_blend =
 		!m_is_gles || GLAD_GL_EXT_blend_func_extended || GLAD_GL_ARB_blend_func_extended;
 	// Unsupported ARM formats/MRT and depth reads retain a per-draw copy path.
