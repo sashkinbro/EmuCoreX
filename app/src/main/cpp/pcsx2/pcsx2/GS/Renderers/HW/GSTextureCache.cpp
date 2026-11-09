@@ -5808,6 +5808,17 @@ void GSTextureCache::InvalidateVideoMemType(int type, u32 bp, u32 write_psm, u32
 // Called each time you want to write to the GS memory
 void GSTextureCache::InvalidateVideoMem(const GSOffset& off, const GSVector4i& rect, bool target)
 {
+	// A target-backed source is indexed on every page it covers, but its overlap
+	// answer is independent of the page. Test it once for this invalidation.
+	u64 source_invalidation_stamp = ++m_source_invalidation_stamp;
+	if (source_invalidation_stamp == 0) [[unlikely]]
+	{
+		// Reusing stamp 1 must not match a surviving source from the previous cycle.
+		for (Source* source : m_src.m_surfaces)
+			source->m_source_invalidation_stamp = 0;
+		source_invalidation_stamp = ++m_source_invalidation_stamp;
+	}
+
 	const u32 bp = off.bp();
 	const u32 bw = off.bw();
 	const u32 psm = off.psm();
@@ -5865,7 +5876,7 @@ void GSTextureCache::InvalidateVideoMem(const GSOffset& off, const GSVector4i& r
 	// But this causes rects to be too big, especially in WRC games, I don't think there's any need to align them here.
 	GSVector4i r = rect;
 
-	off.loopPages(rect, [this, &rect, bp, bw, psm, &found](u32 page) {
+	off.loopPages(rect, [this, &rect, bp, bw, psm, &found, source_invalidation_stamp](u32 page) {
 		auto& list = m_src.m_map[page];
 		for (auto i = list.begin(); i != list.end();)
 		{
@@ -5912,6 +5923,13 @@ void GSTextureCache::InvalidateVideoMem(const GSOffset& off, const GSVector4i& r
 				}
 				else
 				{
+					// A nested invalidation advances the cache stamp. If one ever occurs,
+					// stop deduplicating the outer call because its earlier answer may be stale.
+					if (m_source_invalidation_stamp == source_invalidation_stamp &&
+						s->m_source_invalidation_stamp == source_invalidation_stamp)
+						continue;
+					s->m_source_invalidation_stamp = source_invalidation_stamp;
+
 					// render target used as input texture
 					b |= bp == s->m_from_target_TEX0.TBP0;
 

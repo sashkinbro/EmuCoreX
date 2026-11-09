@@ -437,6 +437,7 @@ public:
 		// Deliberately not initialized to save cycles.
 		std::array<u16, GS_MAX_PAGES> m_erase_it;
 		GSOffset::PageLooper m_pages;
+		u64 m_source_invalidation_stamp = 0;
 
 	public:
 		Source(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA);
@@ -564,6 +565,7 @@ protected:
 
 	PaletteMap m_palette_map;
 	SourceMap m_src;
+	u64 m_source_invalidation_stamp = 0;
 	u64 m_source_memory_usage = 0;
 	HashCacheMap m_hash_cache;
 	u64 m_hash_cache_memory_usage = 0;
