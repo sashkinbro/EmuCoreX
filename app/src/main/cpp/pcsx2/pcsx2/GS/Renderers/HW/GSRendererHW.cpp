@@ -9840,8 +9840,13 @@ __ri void GSRendererHW::HandleTextureHazards(const GSTextureCache::Target* rt, c
 	// over the whole texture (Vulkan: a vkCmdClearColorImage and a render pass end). That only
 	// matters if the draw can sample outside what the copy fills; when it provably cannot, the
 	// cleared texels are never read and the clear is skipped.
+	// A full destination overwrite needs no vertex/sampler coverage proof. Keep the
+	// downscale road separate: it does not use dst_rect to populate the snapshot.
+	const bool copy_fills_texture = dst_rect.x == 0.0f && dst_rect.y == 0.0f &&
+		dst_rect.z == static_cast<float>(scaled_copy_size.x) && dst_rect.w == static_cast<float>(scaled_copy_size.y);
 	const bool clear = src_target->m_texture->IsRenderTarget() &&
-					   (m_downscale_source || !HazardCopyCoversSampling(rt, ds, tex, dst_rect, copy_size, scaled_copy_size, scale));
+		(m_downscale_source || (!copy_fills_texture &&
+			!HazardCopyCoversSampling(rt, ds, tex, dst_rect, copy_size, scaled_copy_size, scale)));
 	src_copy.reset(g_gs_device->CreateCompatible(src_target->m_texture, scaled_copy_size, clear));
 	if (!src_copy) [[unlikely]]
 	{
