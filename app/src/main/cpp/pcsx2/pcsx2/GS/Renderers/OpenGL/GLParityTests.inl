@@ -98,3 +98,44 @@
     }
     check(headers,"GL conservative depth core ARB AMD headers enable correct capability before declarations and helpers");
 }
+
+{
+    // A DSA copy must address its explicit destination without disturbing sampler bindings.
+    GLint active=0,unit0=0,unit7=0,readFbo=0;
+    glGetIntegerv(GL_ACTIVE_TEXTURE,&active);
+    glActiveTexture(GL_TEXTURE0);glGetIntegerv(GL_TEXTURE_BINDING_2D,&unit0);
+    glActiveTexture(GL_TEXTURE7);glGetIntegerv(GL_TEXTURE_BINDING_2D,&unit7);
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING,&readFbo);
+    GLuint textures[3]={},fbo=0;
+    glGenTextures(3,textures);glGenFramebuffers(1,&fbo);
+    const ScopedGuard restoreCopy([&](){
+        glBindFramebuffer(GL_READ_FRAMEBUFFER,static_cast<GLuint>(readFbo));
+        glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,static_cast<GLuint>(unit0));
+        glActiveTexture(GL_TEXTURE7);glBindTexture(GL_TEXTURE_2D,static_cast<GLuint>(unit7));
+        glActiveTexture(static_cast<GLenum>(active));
+        glDeleteFramebuffers(1,&fbo);glDeleteTextures(3,textures);
+    });
+    std::array<u8,64> source{};
+    for(u32 i=0;i<source.size();i+=4){source[i]=37;source[i+1]=91;source[i+2]=149;source[i+3]=255;}
+    std::array<u8,64> empty{};
+    for(u32 i=0;i<3;i++){
+        glBindTexture(GL_TEXTURE_2D,textures[i]);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,4,4,0,GL_RGBA,GL_UNSIGNED_BYTE,i==0?source.data():empty.data());
+    }
+    glBindFramebuffer(GL_READ_FRAMEBUFFER,fbo);
+    glFramebufferTexture2D(GL_READ_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,textures[0],0);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
+    glActiveTexture(GL_TEXTURE7);glBindTexture(GL_TEXTURE_2D,textures[0]);
+    glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,textures[1]);
+    Emulate_DSA::CopyTextureSubImage(textures[2],0,0,0,0,0,4,4);
+    GLint afterActive=0,after0=0,after7=0;
+    glGetIntegerv(GL_ACTIVE_TEXTURE,&afterActive);glGetIntegerv(GL_TEXTURE_BINDING_2D,&after0);
+    glActiveTexture(GL_TEXTURE7);glGetIntegerv(GL_TEXTURE_BINDING_2D,&after7);
+    glFramebufferTexture2D(GL_READ_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,textures[2],0);
+    std::array<u8,64> copied{};glReadPixels(0,0,4,4,GL_RGBA,GL_UNSIGNED_BYTE,copied.data());
+    glFramebufferTexture2D(GL_READ_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,textures[1],0);
+    std::array<u8,64> sentinel{};glReadPixels(0,0,4,4,GL_RGBA,GL_UNSIGNED_BYTE,sentinel.data());
+    check(copied==source&&sentinel==empty&&afterActive==GL_TEXTURE0&&
+        after0==static_cast<GLint>(textures[1])&&after7==static_cast<GLint>(textures[0])&&glGetError()==GL_NO_ERROR,
+        "GL DSA copy fallback writes only its explicit destination and restores active sampler bindings");
+}
