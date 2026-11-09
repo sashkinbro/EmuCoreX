@@ -319,6 +319,7 @@ namespace ImGuiFullscreen
 
 	void AddNotification(std::string key, float duration, std::string title, std::string text, std::string image_path);
 	void ClearNotifications();
+	bool HasActiveNotifications();
 
 	void ShowToast(std::string title, std::string message, float duration = 10.0f);
 	void ClearToast();

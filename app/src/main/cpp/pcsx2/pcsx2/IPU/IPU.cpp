@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Common.h"
+#include "GS/GS.h"
 
 #include "IPU.h"
 #include "IPU_MultiISA.h"
@@ -485,12 +486,14 @@ __fi void IPUCMD_WRITE(u32 val)
 			return;
 
 		case SCE_IPU_IDEC:
+			GSNoteVideoDecode();
 			g_BP.Advance(val & 0x3F);
 			ipuIDEC(val);
 			ipuRegs.SetTopBusy();
 			break;
 
 		case SCE_IPU_BDEC:
+			GSNoteVideoDecode();
 			g_BP.Advance(val & 0x3F);
 			ipuBDEC(val);
 			ipuRegs.SetTopBusy();

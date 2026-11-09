@@ -9,6 +9,8 @@
 
 #include <limits>
 
+class GSDeviceVK;
+
 class GSTextureVK final : public GSTexture
 {
 public:
@@ -42,6 +44,7 @@ public:
 
 	__fi VkImage GetImage() const { return m_image; }
 	__fi VkImageView GetView() const { return m_view; }
+	VkImageView GetStencilView();
 	__fi Layout GetLayout() const { return m_layout; }
 	bool IsShaderWriteMode() const override { return GetLayout() == Layout::ReadWriteImage; }
 
@@ -96,6 +99,7 @@ private:
 	VkImage m_image = VK_NULL_HANDLE;
 	VmaAllocation m_allocation = VK_NULL_HANDLE;
 	VkImageView m_view = VK_NULL_HANDLE;
+	VkImageView m_stencil_view = VK_NULL_HANDLE;
 	VkFormat m_vk_format = VK_FORMAT_UNDEFINED;
 	Layout m_layout = Layout::Undefined;
 
@@ -117,6 +121,7 @@ public:
 	~GSDownloadTextureVK() override;
 
 	static std::unique_ptr<GSDownloadTextureVK> Create(u32 width, u32 height, GSTexture::Format format);
+	static VkMemoryPropertyFlags GetReadbackMemoryPreference(const GSDeviceVK& device);
 
 	void DoCopyFromTexture(
 		const GSVector4i& drc, GSTexture* stex, const GSVector4i& src, u32 src_level, bool use_transfer_pitch) override;

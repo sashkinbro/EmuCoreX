@@ -1186,7 +1186,7 @@
     <string name="texture_manager_loading">Cargando paquetes de texturas…</string>
     <string name="texture_manager_options">Opciones de ejecución</string>
     <string name="texture_manager_enable_replacements">Cargar texturas de reemplazo</string>
-    <string name="texture_manager_enable_replacements_desc">Usar archivos PNG y DDS / KTX2 de la carpeta serial de cada juego.</string>
+    <string name="texture_manager_enable_replacements_desc">Usar archivos PNG y DDS / KTX2 / ASTC / KTX de la carpeta serial de cada juego.</string>
     <string name="texture_manager_async_loading">Carga asíncrona</string>
     <string name="texture_manager_async_loading_desc">Cargar texturas de reemplazo en un hilo de trabajo mientras se ejecuta el juego.</string>
     <string name="texture_manager_precache">Pre-cachear reemplazos</string>

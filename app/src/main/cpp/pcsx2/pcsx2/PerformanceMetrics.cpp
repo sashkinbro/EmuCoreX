@@ -64,6 +64,19 @@ static bool s_cpu_thread_usage_active = DEFAULT_OPTIONAL_METRICS_ENABLED;
 
 static double s_cpu_thread_usage = 0.0f;
 static double s_cpu_thread_time = 0.0f;
+static std::mutex s_gs_back_thread_mutex;
+static Threading::ThreadHandle s_gs_back_thread_handle;
+static std::atomic<bool> s_has_gs_back_thread{false};
+static u64 s_last_gs_back_time=0;
+static float s_gs_back_thread_usage=0.0f,s_gs_back_thread_time=0.0f;
+static u64 SampleGSBackThreadCPUTime()
+{
+	if(!s_has_gs_back_thread.load(std::memory_order_relaxed))return 0;
+	std::lock_guard lock(s_gs_back_thread_mutex);
+	const u64 now=s_gs_back_thread_handle?s_gs_back_thread_handle.GetCPUTime():s_last_gs_back_time;
+	const u64 delta=now>s_last_gs_back_time?now-s_last_gs_back_time:0;
+	s_last_gs_back_time=now;return delta;
+}
 static float s_gs_thread_usage = 0.0f;
 static float s_gs_thread_time = 0.0f;
 static float s_vu_thread_usage = 0.0f;
@@ -134,6 +147,7 @@ void PerformanceMetrics::Clear()
 
 void PerformanceMetrics::Reset()
 {
+	s_gs_back_thread_usage=0.0f;s_gs_back_thread_time=0.0f;
 	s_frames_since_last_update = 0;
 	s_unskipped_frames_since_last_update = 0;
 	s_frame_time_samples_since_last_update = 0;
@@ -146,6 +160,7 @@ void PerformanceMetrics::Reset()
 	s_accumulated_gpu_time = 0.0f;
 	s_presents_since_last_update = 0;
 
+	SampleGSBackThreadCPUTime();
 	s_last_update_time.Reset();
 	s_last_frame_time.Reset();
 
@@ -276,6 +291,7 @@ void PerformanceMetrics::Update(bool gs_register_write, bool fb_blit, bool is_sk
 	{
 		const u64 ticks = GetCPUTicks();
 		const u64 cpu_time = s_cpu_thread_handle.GetCPUTime();
+		const u64 gs_back_delta=SampleGSBackThreadCPUTime();
 		const u64 gs_time = MTGS::GetThreadHandle().GetCPUTime();
 		const u64 vu_time = THREAD_VU1 ? vu1Thread.GetThreadHandle().GetCPUTime() : 0;
 		u64 iop_time = 0;
@@ -291,6 +307,8 @@ void PerformanceMetrics::Update(bool gs_register_write, bool fb_blit, bool is_sk
 				(1.0 / static_cast<double>(s_frames_since_last_update));
 
 			s_cpu_thread_usage = static_cast<double>(cpu_time - s_last_cpu_time) * pct_divider;
+			s_gs_back_thread_usage=static_cast<double>(gs_back_delta)*pct_divider;
+			s_gs_back_thread_time=static_cast<double>(gs_back_delta)*time_divider;
 			s_gs_thread_usage = static_cast<double>(gs_time - s_last_gs_time) * pct_divider;
 			s_vu_thread_usage = static_cast<double>(vu_time - s_last_vu_time) * pct_divider;
 			s_capture_thread_usage = static_cast<double>(capture_time - s_last_capture_time) * pct_divider;
@@ -516,12 +534,12 @@ bool PerformanceMetrics::GetIOPThreadMetrics(float& usage, float& average_time)
 
 float PerformanceMetrics::GetGSThreadUsage()
 {
-	return s_gs_thread_usage;
+	return s_gs_thread_usage+s_gs_back_thread_usage;
 }
 
 float PerformanceMetrics::GetGSThreadAverageTime()
 {
-	return s_gs_thread_time;
+	return s_gs_thread_time+s_gs_back_thread_time;
 }
 
 float PerformanceMetrics::GetVUThreadUsage()
@@ -588,3 +606,15 @@ u32 PerformanceMetrics::GetFrameTimeHistoryPos()
 {
 	return s_frame_time_history_pos;
 }
+
+void PerformanceMetrics::SetGSBackThread(Threading::ThreadHandle thread)
+{
+	std::lock_guard lock(s_gs_back_thread_mutex);
+	s_last_gs_back_time=thread?thread.GetCPUTime():0;
+	s_gs_back_thread_handle=std::move(thread);
+	s_has_gs_back_thread.store(bool(s_gs_back_thread_handle),std::memory_order_relaxed);
+	if(!s_gs_back_thread_handle){s_gs_back_thread_usage=0.0f;s_gs_back_thread_time=0.0f;}
+}
+bool PerformanceMetrics::HasGSBackThread(){return s_has_gs_back_thread.load(std::memory_order_relaxed);}
+float PerformanceMetrics::GetGSBackThreadUsage(){return s_gs_back_thread_usage;}
+float PerformanceMetrics::GetGSBackThreadAverageTime(){return s_gs_back_thread_time;}

@@ -1,4 +1,13 @@
+extern void EmuCoreXOracleFrameGen(void(*check)(bool,const char*),const char* filename);
+extern void EmuCoreXOraclePresentUpscalers(void(*check)(bool,const char*));
 // SPDX-License-Identifier: GPL-3.0+
+extern "C" void EmuCoreXOracleCommonComposition(void(*check)(bool,const char*));
+extern "C" void EmuCoreXOracleGSOverlayContent(void(*check)(bool,const char*));
+extern "C" void EmuCoreXOracleGSWrappedMemory(void(*check)(bool,const char*));
+extern "C" void EmuCoreXOracleFrameGenGeometry(void(*check)(bool,const char*));
+extern "C" void EmuCoreXOraclePresentationGeometry(void(*check)(bool,const char*));
+extern "C" void EmuCoreXOracleVKPresentRotation(void(*check)(bool,const char*));
+extern "C" void EmuCoreXOracleVKSurfaceRotation(void(*check)(bool,const char*));
 #include "Common.h"
 #include <GS/GSUtil.h>
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
@@ -52,6 +61,7 @@
 #include <GS/Renderers/Vulkan/GSDeviceVK.h>
 #include <GS/Renderers/OpenGL/GSDeviceOGL.h>
 extern "C" void EmuCoreXOracleBlendCarry(void (*check)(bool, const char*));
+extern "C" void EmuCoreXOracleHWSoftwareCopies(void (*check)(bool, const char*), bool jit);
 #include <GS/Renderers/Vulkan/VKShaderCache.h>
 #include <GS/Renderers/Vulkan/VKSwapchainCreate.h>
 #include <GS/Renderers/HW/GSSpriteEdgeSnap.h>
@@ -12681,6 +12691,38 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         IOPTests(false, false, false, true);
     else if (std::strcmp(suite, "gif-copy") == 0)
         GifCopyTests();
+    else if (std::strcmp(suite, "gs-framegen") == 0)
+        EmuCoreXOracleFrameGen(Check,"/data/local/tmp/emucorex-hitman-gs/lsfg-fixture.dll");
+    else if (std::strcmp(suite, "gs-present-upscalers") == 0)
+        EmuCoreXOraclePresentUpscalers(Check);
+    else if (std::strcmp(suite, "gs-back-queue") == 0)
+        GSState::TestBackQueue(Check);
+    else if (std::strcmp(suite, "gs-cull-grid") == 0)
+        GSState::TestCullGrid(Check);
+    else if (std::strcmp(suite, "gs-alpha-bit-pipelines") == 0)
+        GSDeviceVK::TestAlphaBitPipelines(Check);
+    else if (std::strcmp(suite, "gs-sw-texture-reuse") == 0)
+        EmuCoreXOracleSWTextureReuse(Check);
+    else if (std::strcmp(suite, "gs-sw-fixed-lod") == 0)
+        EmuCoreXOracleSWFixedLOD(Check);
+    else if (std::strcmp(suite, "gs-sw-depth-walk") == 0)
+        EmuCoreXOracleSWDepthWalk(Check);
+    else if (std::strcmp(suite, "gs-sw-walkers") == 0)
+        EmuCoreXOracleSWWalkers(Check);
+    else if (std::strcmp(suite, "gs-sw-walker-extended") == 0)
+        EmuCoreXOracleSWWalkerExtended(Check);
+    else if (std::strcmp(suite, "gs-sw-filter-trace") == 0)
+        EmuCoreXOracleSWFilterTrace(Check);
+    else if (std::strcmp(suite, "gs-wrapped-memory") == 0)
+        EmuCoreXOracleGSWrappedMemory(Check);
+    else if (std::strcmp(suite, "gs-hw-software-copies") == 0)
+        EmuCoreXOracleHWSoftwareCopies(Check, false);
+    else if (std::strcmp(suite, "gs-hw-software-copies-jit") == 0)
+        EmuCoreXOracleHWSoftwareCopies(Check, true);
+    else if (std::strcmp(suite, "gs-sw-paletted-block") == 0)
+        EmuCoreXOracleSWPalettedBlockRead(Check);
+    else if (std::strcmp(suite, "gs-stencil-counter") == 0)
+        GSRendererHW::TestStencilCounter(Check);
     else if (std::strcmp(suite, "gs-depth-floor") == 0)
         GSRendererHW::TestDepthFloor(Check);
     else if (std::strcmp(suite, "gs-blend-carry") == 0)
@@ -12689,6 +12731,50 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         GSDeviceOGL::TestFramebufferFetch(Check);
     else if (std::strcmp(suite, "gs-restarts") == 0)
         GSRestartTests();
+    else if (std::strcmp(suite, "gs-gl-cache-packs") == 0)
+        EmuCoreXOracleGLGamePackStorage(Check, "/data/local/tmp/emucorex-hitman-gs/gl-cache-pack-fixture");
+    else if (std::strcmp(suite, "gs-framegen-geometry") == 0)
+        EmuCoreXOracleFrameGenGeometry(Check);
+    else if (std::strcmp(suite, "gs-presentation-geometry") == 0)
+        EmuCoreXOraclePresentationGeometry(Check);
+    else if (std::strcmp(suite, "gs-vk-present-rotation") == 0)
+        EmuCoreXOracleVKPresentRotation(Check);
+    else if (std::strcmp(suite, "gs-vk-surface-rotation") == 0)
+        EmuCoreXOracleVKSurfaceRotation(Check);
+    else if (std::strcmp(suite, "gs-common-composition") == 0)
+        EmuCoreXOracleCommonComposition(Check);
+    else if (std::strcmp(suite, "gs-overlay-content") == 0)
+        EmuCoreXOracleGSOverlayContent(Check);
+    else if (std::strcmp(suite, "gs-movie-comb") == 0)
+        EmuCoreXOracleMovieComb(Check);
+    else if (std::strcmp(suite, "gs-cache-packs") == 0)
+        EmuCoreXOracleGamePackStorage(Check, "/data/local/tmp/emucorex-hitman-gs/cache-pack-fixture");
+    else if (std::strcmp(suite, "gs-target-coherence") == 0)
+    {
+        const auto resources = EmuFolders::Resources;
+        EmuFolders::Resources = "resources";
+        EmuCoreXOracleTestTargetCoherence(Check);
+        EmuFolders::Resources = resources;
+    }
+    else if (std::strcmp(suite, "gs-presentation-parity") == 0)
+        GSRenderer::TestPresentationParity(Check);
+    else if (std::strcmp(suite, "gs-platform-parity") == 0)
+    {
+        GSDeviceVK device;
+        device.TestPlatformParity(Check);
+    }
+    else if (std::strcmp(suite, "gs-native-geometry") == 0)
+        GSRendererHW::TestNativeGeometry(Check);
+    else if (std::strcmp(suite, "gs-exact-alpha") == 0)
+        GSRendererHW::TestExactAlphaMask(Check);
+    else if (std::strcmp(suite, "gs-texture-shuffle") == 0)
+        GSRendererHW::TestTextureShuffleParity(Check);
+    else if (std::strcmp(suite, "gs-large-st") == 0)
+        GSRendererHW::TestLargeST(Check);
+    else if (std::strcmp(suite, "gs-channel-shuffle") == 0)
+        EmuCoreXOracleChannelShuffleGeometry(Check);
+    else if (std::strcmp(suite, "gs-channel-shuffle-hazards") == 0)
+        EmuCoreXOracleTestChannelShuffleHazards(Check);
     else if (std::strcmp(suite, "gs-uploads") == 0)
         GSUploadTests();
     else if (std::strcmp(suite, "gs-vertices") == 0)

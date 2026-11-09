@@ -490,6 +490,8 @@ static const char* s_gs_hw_fix_names[] = {
 	"hwDownloadMode",
 	"coalesceRenderPasses",
 	"copyRoadMaximumBlendingLevel",
+	"rewriteLargeST",
+	"nativeCounterDraws",
 };
 static_assert(std::size(s_gs_hw_fix_names) == static_cast<u32>(GameDatabaseSchema::GSHWFixId::Count), "HW fix name lookup is correct size");
 
@@ -500,6 +502,8 @@ const char* GameDatabaseSchema::getHWFixName(GSHWFixId id)
 
 static std::optional<GameDatabaseSchema::GSHWFixId> GameDatabaseSchema::parseHWFixName(const std::string_view name)
 {
+	if (name == "rewriteLargeSTCoords")
+		return GSHWFixId::RewriteLargeSTCoords;
 	// ARMSX2 names the same existing dirty-target sampling policy explicitly.
 	if (name == "bilinearDirtyUpscale")
 		return GSHWFixId::BilinearUpscale;
@@ -714,6 +718,11 @@ bool GameDatabaseSchema::GameEntry::configMatchesHWFix(const Pcsx2Config::GSOpti
 
 		case GSHWFixId::EstimateTextureRegion:
 			return (static_cast<int>(config.UserHacks_EstimateTextureRegion) == value);
+
+		case GSHWFixId::NativeCounterDraws:
+			return config.UpscaleMultiplier <= 1.0f || static_cast<int>(config.UserHacks_NativeCounterDraws) == value;
+		case GSHWFixId::RewriteLargeSTCoords:
+			return (static_cast<int>(config.UserHacks_RewriteLargeSTCoords) == value);
 
 		case GSHWFixId::DrawBuffering:
 			return (static_cast<int>(config.UserHacks_DrawBuffering) == value);
@@ -1049,6 +1058,13 @@ void GameDatabaseSchema::GameEntry::applyGSHardwareFixes(Pcsx2Config::GSOptions&
 
 			case GSHWFixId::EstimateTextureRegion:
 				config.UserHacks_EstimateTextureRegion = (value > 0);
+				break;
+
+			case GSHWFixId::NativeCounterDraws:
+				config.UserHacks_NativeCounterDraws = (value > 0);
+				break;
+			case GSHWFixId::RewriteLargeSTCoords:
+				config.UserHacks_RewriteLargeSTCoords = (value > 0);
 				break;
 
 			case GSHWFixId::DrawBuffering:

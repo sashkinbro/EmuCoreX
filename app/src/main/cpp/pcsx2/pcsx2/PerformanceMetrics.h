@@ -36,6 +36,10 @@ namespace PerformanceMetrics
 	void SetFrameTimeHistoryEnabled(bool enabled);
 
 	/// Sets the EE thread for CPU usage calculations.
+	void SetGSBackThread(Threading::ThreadHandle thread);
+	bool HasGSBackThread();
+	float GetGSBackThreadUsage();
+	float GetGSBackThreadAverageTime();
 	void SetCPUThread(Threading::ThreadHandle thread);
 	/// Sets the IOP worker handle on the CPU thread; clear it before joining/stopping the worker.
 	void SetIOPThread(Threading::ThreadHandle thread);

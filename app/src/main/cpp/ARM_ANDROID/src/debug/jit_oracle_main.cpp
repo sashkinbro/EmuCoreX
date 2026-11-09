@@ -6,8 +6,10 @@
 #include <dlfcn.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "OracleProcessGuard.h"
+#include "OracleProcessGuardTests.h"
 
-int main(int argc, char** argv)
+static int RunOraclePayload(int argc, char** argv)
 {
     const bool fallback = argc == 4 && std::strcmp(argv[2], "replay-vu1-fallback") == 0;
     const bool replay = argc == 4 && (fallback || std::strcmp(argv[2], "replay-vu1") == 0);
@@ -25,9 +27,6 @@ int main(int argc, char** argv)
         return 2;
     }
     mkdir("artifacts", 0700);
-    // A broken guest branch must not leave a device process running forever.
-    // The expanded CPU corpora need more than the original minute.
-    alarm(300);
     void* library = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
     if (!library)
     {
@@ -59,8 +58,37 @@ int main(int argc, char** argv)
             return 2;
         }
     }
+    // Android's framework dependencies briefly hold hundreds of ELF descriptors
+    // while dlopen resolves them. Tighten the hard limit after that loader phase.
+    if (std::strncmp(argv[2], "gs-", 3) == 0 || std::strcmp(argv[2], "classifier") == 0)
+    {
+        const rlimit descriptors{256, 256};
+        if (setrlimit(RLIMIT_NOFILE, &descriptors) != 0)
+        { std::perror("oracle descriptor limit"); return 2; }
+    }
     const int result = run(replay ? argv[3] : argv[2]);
     std::fflush(nullptr);
     // Process owns all emulator globals; avoid unrelated application teardown.
     _exit(result);
+}
+
+int main(int argc, char** argv)
+{
+    setvbuf(stdout, nullptr, _IONBF, 0);
+    if (argc == 2 && std::strcmp(argv[1], "--guard-self-test") == 0)
+        return TestOracleProcessGuard();
+    const bool gs = argc >= 3 && (std::strncmp(argv[2], "gs-", 3) == 0 ||
+        std::strcmp(argv[2], "classifier") == 0);
+    if (!gs)
+    {
+        alarm(300);
+        return RunOraclePayload(argc, argv);
+    }
+    struct Arguments { int argc; char** argv; } arguments{argc, argv};
+    auto run = +[](void* value) -> int {
+        auto& arguments = *static_cast<Arguments*>(value);
+        return RunOraclePayload(arguments.argc, arguments.argv);
+    };
+    const OracleGuard::Limits limits = OracleGuard::LimitsForGSSuite(argv[2]);
+    return OracleGuard::Run(run, &arguments, limits).code;
 }

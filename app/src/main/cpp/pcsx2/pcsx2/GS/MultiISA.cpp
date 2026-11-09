@@ -102,5 +102,6 @@ const ProcessorFeatures g_cpu = getProcessorFeatures();
 #include "GSXXH.h"
 
 u64 (&MultiISAFunctions::GSXXH3_64_Long)(const void* data, size_t len) = MULTI_ISA_SELECT(GSXXH3_64_Long);
+void (&MultiISAFunctions::GSXXH3_64_Block)(void* hasher, const void* block) = MULTI_ISA_SELECT(GSXXH3_64_Block);
 u32 (&MultiISAFunctions::GSXXH3_64_Update)(void* state, const void* data, size_t len) = MULTI_ISA_SELECT(GSXXH3_64_Update);
 u64 (&MultiISAFunctions::GSXXH3_64_Digest)(void* state) = MULTI_ISA_SELECT(GSXXH3_64_Digest);

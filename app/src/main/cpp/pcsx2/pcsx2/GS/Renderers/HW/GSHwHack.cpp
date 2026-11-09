@@ -328,6 +328,8 @@ bool GSHwHack::GSC_DTGames(GSRendererHW& r, int& skip)
 
 			rt->m_alpha_min = 0;
 			rt->m_alpha_max = 255;
+			rt->m_alpha_known = GSAlphaKnownBits::Known::Nothing();
+			rt->m_alpha_known_via_union = false;
 			skip = 69;
 		}
 	}
@@ -430,6 +432,8 @@ bool GSHwHack::GSC_SandGrainGames(GSRendererHW& r, int& skip)
 
 			rt->m_alpha_min = 0;
 			rt->m_alpha_max = 128;
+			rt->m_alpha_known = GSAlphaKnownBits::Known::Nothing();
+			rt->m_alpha_known_via_union = false;
 			rt->m_rt_alpha_scale = false;
 			rt->ScaleRTAlpha();
 
@@ -678,30 +682,19 @@ bool GSHwHack::GSC_NFSUndercover(GSRendererHW& r, int& skip)
 	// NFS Undercover does a weird texture shuffle by page, which really isn't supported by our TC.
 	// This causes it to spam creating new sources, severely destroying the speed.
 	// The CRC hack bypasses the entire shuffle and does it in one go.
+	// This is detected as a GappedSwizzle shuffle in texture shuffle detection.
 	const GIFRegTEX0& Texture = RTEX0;
 	const GIFRegFRAME& Frame = RFRAME;
 
 	if (RPRIM->TME && Frame.PSM == PSMCT16S && Frame.FBMSK != 0 && Frame.FBW == 10 && Texture.TBW == 1 && Texture.TBP0 == 0x02800 && Texture.PSM == PSMZ16S)
 	{
-		GSVertex* v = &r.m_vertex.buff[1];
-		v[0].XYZ.X = static_cast<u16>(RCONTEXT->XYOFFSET.OFX + ((r.m_r.z * 2) << 4));
-		v[0].XYZ.Y = static_cast<u16>(RCONTEXT->XYOFFSET.OFY + (r.m_r.w << 4));
-		v[0].U = r.m_r.z << 4;
-		v[0].V = r.m_r.w << 4;
-		RCONTEXT->scissor.in.z = r.m_r.z * 2;
-		RCONTEXT->scissor.in.w = r.m_r.w;
-		r.m_vt.m_max.p.x = r.m_r.z * 2;
-		r.m_vt.m_max.p.y = r.m_r.w;
-		r.m_vt.m_max.t.x = r.m_r.z;
-		r.m_vt.m_max.t.y = r.m_r.w;
-		r.m_vertex.head = r.m_vertex.tail = r.m_vertex.next = 2;
-		r.m_index.tail = 2;
 		skip = 79;
+		return false;
 	}
 	else
+	{
 		return skip > 0;
-
-	return false;
+	}
 }
 
 bool GSHwHack::GSC_PolyphonyDigitalGames(GSRendererHW& r, int& skip)
@@ -806,6 +799,8 @@ bool GSHwHack::GSC_PolyphonyDigitalGames(GSRendererHW& r, int& skip)
 			// Alpha is unknown, since it comes from RGB.
 			dst->m_alpha_min = 0;
 			dst->m_alpha_max = 255;
+			dst->m_alpha_known = GSAlphaKnownBits::Known::Nothing();
+			dst->m_alpha_known_via_union = false;
 			dst->m_alpha_range = true;
 			dst->UpdateValidChannels(PSMCT32, fbmsk);
 			dst->UpdateValidity(GSVector4i::loadh(size));
@@ -1042,6 +1037,7 @@ bool GSHwHack::OI_PointListPalette(GSRendererHW& r, GSTexture* rt, GSTexture* ds
 			const u32 c = vi.RGBAQ.U32[0];
 			r.m_mem.WritePixel32(x, y, c, FBP, FBW);
 		}
+		r.m_mem.MarkPagesWritten(r.m_mem.GetOffset(FBP, FBW, PSMCT32), GSVector4i(r.m_r.x, r.m_r.y, r.m_r.z + 1, r.m_r.w + 1));
 		g_texture_cache->InvalidateVideoMem(r.m_context->offset.fb, r.m_r);
 		return false;
 	}
@@ -1089,6 +1085,8 @@ bool GSHwHack::OI_RozenMaidenGebetGarden(GSRendererHW& r, GSTexture* rt, GSTextu
 				tmp_rt->UpdateDrawn(tmp_rt->m_valid);
 				tmp_rt->m_alpha_max = 0;
 				tmp_rt->m_alpha_min = 0;
+				tmp_rt->m_alpha_known = GSAlphaKnownBits::Known::All(0);
+				tmp_rt->m_alpha_known_via_union = false;
 				tmp_rt->m_alpha_range = false;
 			}
 
@@ -1434,6 +1432,8 @@ bool GSHwHack::MV_Ico(GSRendererHW& r)
 	dst->UnscaleRTAlpha();
 	dst->m_alpha_min = 0;
 	dst->m_alpha_max = 255;
+	dst->m_alpha_known = GSAlphaKnownBits::Known::Nothing();
+	dst->m_alpha_known_via_union = false;
 
 	GSHWDrawConfig& config = GSRendererHW::GetInstance()->BeginHLEHardwareDraw(
 		dst->GetTexture(), nullptr, dst->GetScale(), src->GetTexture(), src->GetScale(), draw_rc);
@@ -1550,6 +1550,7 @@ void GSRendererHW::UpdateRenderFixes()
 	GSRenderer::UpdateRenderFixes();
 
 	m_nativeres = (GSConfig.UpscaleMultiplier == 1.0f);
+	SetCullGrid(EngineCullGrid());
 	s_nativeres = m_nativeres;
 
 	m_gsc = nullptr;
@@ -1576,6 +1577,11 @@ void GSRendererHW::UpdateRenderFixes()
 			m_mv = GSHwHack::s_move_handler_functions[GSConfig.MoveHandlerFunctionId].ptr;
 		}
 	}
+}
+
+bool GSRendererHW::DrawClearsScanMask() const
+{
+	return m_gsc == &GSHwHack::GSC_IRem;
 }
 
 bool GSRendererHW::IsBadFrame()

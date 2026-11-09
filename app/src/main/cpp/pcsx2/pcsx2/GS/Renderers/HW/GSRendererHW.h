@@ -2,11 +2,14 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
+#include "GS/Renderers/Common/GSNativeTexelGridPolicy.h"
 
 #include "GSTextureCache.h"
+#include "GS/Renderers/HW/GSDrawAlphaMask.h"
 #include "GS/Renderers/Common/GSFunctionMap.h"
 #include "GS/Renderers/Common/GSBlendCarry.h"
 #include "GS/Renderers/Common/GSRenderer.h"
+#include "GS/Renderers/Common/GSSwPrimRender.h"
 #include "GS/Renderers/Common/GSShaderEnums.h"
 #include "GS/Renderers/SW/GSTextureCacheSW.h"
 #include "GS/GSState.h"
@@ -97,7 +100,6 @@ private:
 	bool IsDiscardingDstRGB();
 	bool IsDiscardingDstAlpha() const;
 	bool TextureCoversWithoutGapsNotEqual();
-	bool Is8PixelReverseSprite(const GSVertex& v0, const GSVertex& v1);
 
 	using PS_ATST = GSShader::PS_ATST;
 	using PS_AFAIL = GSShader::PS_AFAIL;
@@ -215,8 +217,16 @@ private:
 
 	void ResetStates();
 	void HandleFlatShadedVertices();
-	void SetupIA(float target_scale, float sx, float sy, bool req_vert_backup, const bool no_rt);
+	bool SetupIA(float target_scale, float sx, float sy, bool req_vert_backup, const bool no_rt);
 	void EmulateTextureShuffleAndFbmask(GSTextureCache::Target* rt, GSTextureCache::Source* tex);
+	u8 DecideExactAlphaMaskDrop(const GSTextureCache::Target* rt, u32 fbmask);
+	void ResolveHeldAlphaMask();
+	u32 RequestedAlphaFbMask() const
+	{
+		return GSDrawAlphaMask::AsRequested(m_exact_alpha_drop_fbmask_a, m_conf.ps.fbmask != 0,
+			static_cast<u32>(m_conf.cb_ps.FbMask.a));
+	}
+	bool AllDepthTestsPassOnClearedTarget(const GSTextureCache::Target* ds);
 	u32 EmulateChannelShuffle(GSTextureCache::Target* src, bool test_only, GSTextureCache::Target* rt = nullptr);
 	void EmulateBlending(int rt_alpha_min, int rt_alpha_max, DATEOptions& date_options, GSTextureCache::Target* rt,
 		bool can_scale_rt_alpha, bool& new_rt_alpha_scale);
@@ -226,6 +236,27 @@ private:
 	__fi void InvalidateBlendCarry();
 	__fi void SubmitHardwareDraw();
 	__fi void SubmitDrawPrims(GSTextureCache::Target* rt, GSTextureCache::Target* ds, bool identity);
+	int m_exact_alpha_drop_fbmask_a = GSDrawAlphaMask::NothingDropped;
+
+	// An exact alpha-mask decision held over the blend selection. While fbmask is non-zero the
+	// shader has no mask but the blend decisions read the barrier that mask would have required,
+	// so the blend road cannot move because of the decision. ResolveHeldAlphaMask() settles it.
+	// Reset per draw by ResetStates().
+	struct HeldAlphaMask
+	{
+		u32 fbmask = 0; ///< FBMSK as the draw asked for it; zero means nothing is held
+		u32 ps_fbmask = 0; ///< the shader's four-channel nibble for that mask
+		bool substitute = false; ///< what is held is the substitution, not the drop
+		/// The two constants a standing substitution hands the shader. Applied in
+		/// ResolveHeldAlphaMask() rather than at the framebuffer-mask site, so a substitution
+		/// that gets put back leaves the constant buffer exactly as it found it.
+		GSDrawAlphaMask::Substitution substitution;
+	};
+	HeldAlphaMask m_held_alpha_mask;
+
+	GSTexture* m_date_chain_rt = nullptr;
+	u8 m_date_chain_datm = 0;
+	bool m_date_draw_shares_copy = false;
 	GSBlendCarry::Donor m_blend_carry;
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	void (*m_blend_carry_capture)(const GSHWDrawConfig&,void*) = nullptr;
@@ -233,7 +264,8 @@ private:
 #endif
 	void CleanupDraw(bool invalidate_temp_src);
 
-	void EmulateTextureSampler(const GSTextureCache::Target* rt, const GSTextureCache::Target* ds,
+	bool DrawReadsTexelsAsColours() const;
+    void EmulateTextureSampler(const GSTextureCache::Target* rt, const GSTextureCache::Target* ds,
 		GSTextureCache::Source* tex, const TextureMinMaxResult& tmm, GSDevice::RecycledTexture& src_copy);
 	void HandleTextureHazards(const GSTextureCache::Target* rt, const GSTextureCache::Target* ds,
 		const GSTextureCache::Source* tex, const TextureMinMaxResult& tmm, GSTextureCache::SourceRegion& source_region,
@@ -242,14 +274,14 @@ private:
 		const TextureMinMaxResult& tmm);
 
 	void EmulateZbuffer(const GSTextureCache::Target* ds);
-	void EmulateAA1();
+	void EmulateAA1(float target_scale);
 	static void GetAlphaTestConfigPS(const u32 atst, const u8 aref, const bool invert_test, PS_ATST& ps_atst_out, float& aref_out);
 	void EmulateAlphaTest(DATEOptions& date_options);
 	void EmulateAlphaTestSecondPass();
 	void ConfigureDepthFeedback(bool rov_depth = false);
 
 	void CalculateAlphaRange(GSTextureCache::Target* rt, GSTextureCache::Target* ds, DATEOptions& date_options,
-		int& blend_alpha_min, int& blend_alpha_max, int& rt_new_alpha_min, int& rt_new_alpha_max);
+		int& blend_alpha_min, int& blend_alpha_max, int& rt_new_alpha_min, int& rt_new_alpha_max, GSAlphaKnownBits::Known& rt_new_alpha_known, bool& rt_new_alpha_via_union);
 	void DetermineAlphaScaling(GSTextureCache::Target* rt, GSTextureCache::Source* tex,
 		bool req_source_update, int rt_new_alpha_max, bool& can_scale_rt_alpha, bool& new_scale_rt_alpha);
 
@@ -258,6 +290,11 @@ private:
 	void EmulateDATEGetConfig(DATEOptions& date, bool scale_rt_alpha, GSDevice::RecycledTexture& temp_ds);
 
 	void EmulateDither();
+	u32 GetDitherPhase(const GIFRegDIMX& DIMX, float scale);
+	u64 m_dither_phase_dimx = 0;
+    bool m_source_is_native_texels = false;
+	float m_dither_phase_scale = -1.0f;
+	u32 m_dither_phase = 0;
 
 	void DetermineVSConfig(GSTextureCache::Target* rt, float rtscale, const GSVector2i& rtsize,
 		const GSVector2i& unscaled_size, float& vs_scale_x, float& vs_scale_y);
@@ -270,6 +307,12 @@ private:
 	void ConvertTextureTypeROVSingle(GSTextureCache::Target* tgt, bool shader_write);
 
 	void SetTCOffset();
+	bool IsFastStencilShadowDraw() const;
+	bool m_fast_stencil_shadow = false;
+	bool IsColClipCounterDraw() const;
+	bool SetupStencilCounterDraw(GSTextureCache::Target* rt);
+	std::vector<u16> m_stencil_counter_indices;
+	std::vector<u8> m_stencil_counter_signs;
 	bool NextDrawColClip() const;
 	bool IsPossibleChannelShuffle() const;
 	bool IsPageCopy() const;
@@ -281,6 +324,7 @@ private:
 	u32 GetEffectiveTextureShuffleFbmsk() const;
 	template<u32 primclass, bool fst>
 	TextureShuffleInfo DetectTextureShuffleImpl();
+	void SyncTextureShuffleCompatibility();
 	void DetectTextureShuffle();
 	void DetectTextureShuffleSecondPass(GSTextureCache::Target* rt, GSTextureCache::Source* tex);
 	template<u32 primclass, bool fst>
@@ -355,9 +399,7 @@ private:
 	HWCachedCtx m_cached_ctx;
 
 	// software sprite renderer state
-	std::vector<GSVertexSW> m_sw_vertex_buffer;
-	std::unique_ptr<GSTextureCacheSW::Texture> m_sw_texture[7 + 1];
-	std::unique_ptr<GSVirtualAlignedClass<32>> m_sw_rasterizer;
+	GSSwPrimRenderState m_sw_prim;
 
 public:
 	GSRendererHW();
@@ -367,12 +409,20 @@ public:
 	static void TestFeedbackBlendStages(void (*check)(bool, const char*));
 	static void TestBlendCarry(void (*check)(bool, const char*));
 	static void TestProvokingFallback(void (*check)(bool, const char*));
+	static void TestStencilCounter(void (*check)(bool,const char*));
+	static void TestNativeGeometry(void (*check)(bool, const char*));
+	static void TestExactAlphaMask(void (*check)(bool, const char*));
+	static void TestLargeST(void (*check)(bool, const char*));
+	static void TestChannelShuffleGeometry(void (*check)(bool, const char*));
+	static void TestTextureShuffleParity(void (*check)(bool, const char*));
+	static void TestChannelShuffleHazards(void (*check)(bool, const char*));
 	static void TestMaliDirtyRectUnion(void (*check)(bool, const char*));
 	static bool PrepareBlendCarryGPU(GSTexture* target, const GSVertex* vertices, const u16* indices,
 		GSHWDrawConfig* legacy, GSHWDrawConfig* carried, bool interpolate);
 #endif
 
 	__fi static GSRendererHW* GetInstance() { return static_cast<GSRendererHW*>(g_gs_renderer.get()); }
+	GSSwPrimRenderState& GetSwPrimState() { return m_sw_prim; }
 	__fi HWCachedCtx* GetCachedCtx() { return &m_cached_ctx; }
 	__fi u32 GetLastChannelShuffleFBP() { return m_last_channel_shuffle_fbp; }
 	void Destroy() override;
@@ -384,7 +434,11 @@ public:
 	void Lines2Sprites();
 	bool VerifyIndices();
 	void ExpandLineIndices();
-	void ConvertSpriteTextureShuffle(u32& process_rg, u32& process_ba, bool& shuffle_across, GSTextureCache::Target* rt, GSTextureCache::Source* tex);
+	enum class LineRunResult { Converted, NothingLit, Refused };
+	LineRunResult LinesToPixelRuns(bool aa1);
+	bool AA1LineExpandsAboveNative(float target_scale);
+	void SnapPointsToNativePixel();
+	bool GetAgreedSpriteTexelSteps(GSNativeTexelStep& step_u, GSNativeTexelStep& step_v) const;
 	GSVector4 RealignTargetTextureCoordinate(const GSTextureCache::Source* tex);
 	GSVector4i ComputeBoundingBoxRT(const GSVector2i& rtsize, float rtscale);
 	GSVector4i ComputeBoundingBoxTex(const GSVector2i& texsize, const GSVector4i& coverage, const GSVector4i& region, float texscale);
@@ -402,6 +456,8 @@ public:
 	void InvalidateVideoMem(const GIFRegBITBLTBUF& BITBLTBUF, const GSVector4i& r) override;
 	void InvalidateLocalMem(const GIFRegBITBLTBUF& BITBLTBUF, const GSVector4i& r, bool clut = false) override;
 	void Move() override;
+	bool HasMoveHook() const override { return m_mv != nullptr; }
+	bool DrawClearsScanMask() const override;
 	void Draw() override;
 
 	void PurgeTextureCache(bool sources, bool targets, bool hash_cache) override;

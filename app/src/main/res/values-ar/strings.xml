@@ -1184,7 +1184,7 @@
     <string name="texture_manager_loading">جاري تحميل حزم الإكساءات…</string>
     <string name="texture_manager_options">خيارات التشغيل</string>
     <string name="texture_manager_enable_replacements">تحميل إكساءات الاستبدال</string>
-    <string name="texture_manager_enable_replacements_desc">استخدام ملفات PNG و DDS / KTX2 من مجلد كل رقم تسلسلي للعبة.</string>
+    <string name="texture_manager_enable_replacements_desc">استخدام ملفات PNG و DDS / KTX2 / ASTC / KTX من مجلد كل رقم تسلسلي للعبة.</string>
     <string name="texture_manager_async_loading">تحميل غير متزامن</string>
     <string name="texture_manager_async_loading_desc">تحميل إكساءات الاستبدال في مسار عمل خلفي أثناء تشغيل اللعبة.</string>
     <string name="texture_manager_precache">تخزين مسبق للاستبدالات</string>

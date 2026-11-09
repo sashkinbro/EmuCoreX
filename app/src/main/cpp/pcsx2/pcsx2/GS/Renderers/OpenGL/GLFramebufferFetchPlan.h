@@ -8,6 +8,8 @@ struct GLFramebufferFetchCaps
 {
     GSFramebufferFetchBackend preferred = GSFramebufferFetchBackend::None;
     bool ext = false, arm_depth = false, arm_mrt = false, adreno = false;
+    // Observed physical restriction, independent of coarse/forced GPU profile.
+    bool ext_single_rgba8 = false;
 };
 struct GLFramebufferFetchPlan
 {
@@ -19,7 +21,7 @@ struct GLFramebufferFetchPlan
 
 // Draw facts, not extension advertisement, decide whether a builtin is legal.
 constexpr GLFramebufferFetchPlan DecideGLFramebufferFetchPlan(const GLFramebufferFetchCaps& caps,
-    bool reads_color, bool reads_depth, bool depth_as_rt, bool color0_unorm, bool mrt)
+    bool reads_color, bool reads_depth, bool depth_as_rt, bool color0_unorm, bool mrt, bool color0_rgba8 = true)
 {
     auto color = GSFramebufferFetchBackend::None;
     auto depth = GLDepthFetch::Sampler;
@@ -32,13 +34,16 @@ constexpr GLFramebufferFetchPlan DecideGLFramebufferFetchPlan(const GLFramebuffe
             // ineligible ARM draw: that is precisely its broken driver path.
         }
         else if (caps.preferred == GSFramebufferFetchBackend::EXT)
-            color = GSFramebufferFetchBackend::EXT;
+        {
+            if (!caps.ext_single_rgba8 || (color0_rgba8 && !mrt))
+                color = GSFramebufferFetchBackend::EXT;
+        }
     }
     if (reads_depth && caps.preferred != GSFramebufferFetchBackend::None)
     {
         if (!depth_as_rt && caps.arm_depth) depth = GLDepthFetch::ARM;
         else if (depth_as_rt && caps.ext && caps.preferred == GSFramebufferFetchBackend::EXT &&
-            !(caps.adreno && color == GSFramebufferFetchBackend::EXT))
+            !(caps.adreno && color == GSFramebufferFetchBackend::EXT) && !(caps.ext_single_rgba8 && mrt))
             depth = GLDepthFetch::EXT;
     }
     return {static_cast<unsigned char>(static_cast<unsigned>(color) | (static_cast<unsigned>(depth) << 2))};

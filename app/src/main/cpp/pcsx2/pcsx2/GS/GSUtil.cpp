@@ -184,6 +184,8 @@ const char* GSUtil::GetACName(u32 ac)
 
 const char* GSUtil::GetPerfMonCounterName(GSPerfMon::counter_t counter, bool hw)
 {
+	if (counter == GSPerfMon::SwPaletteBlockCopies)
+		return "SwPaletteBlockCopies";
 	if (hw)
 	{
 		static constexpr const char* names_hw[GSPerfMon::CounterLastHW] = {

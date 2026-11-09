@@ -1296,3 +1296,8 @@ bool EEMemoryInterface::CompareBytes(u32 address, const void* src, u32 size)
 {
 	return vtlb_memSafeCmpBytes(address, src, size) == 0;
 }
+
+bool SysMemory::HasCodeMemory()
+{
+	return s_code_memory != nullptr;
+}

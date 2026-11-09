@@ -1187,7 +1187,7 @@
     <string name="texture_manager_loading">Загрузка пакетов текстур…</string>
     <string name="texture_manager_options">Настройки выполнения</string>
     <string name="texture_manager_enable_replacements">Загружать текстуры для замены</string>
-    <string name="texture_manager_enable_replacements_desc">Использовать файлы PNG и DDS / KTX2 из папки с серийным номером каждой игры.</string>
+    <string name="texture_manager_enable_replacements_desc">Использовать файлы PNG и DDS / KTX2 / ASTC / KTX из папки с серийным номером каждой игры.</string>
     <string name="texture_manager_async_loading">Асинхронная загрузка</string>
     <string name="texture_manager_async_loading_desc">Загружать текстуры для замены в рабочем потоке во время работы игры.</string>
     <string name="texture_manager_precache">Предкэширование замен</string>
@@ -3075,4 +3075,9 @@
     <string name="onboarding_account_community">Отслеживайте время игры, попадайте в таблицу лидеров, добавляйте друзей и открывайте достижения.</string>
     <string name="onboarding_account_privacy">Облачные профили хранят только настройки. Игры, BIOS, сохранения и карты памяти остаются на этом устройстве; каждое устройство имеет случайный ID, который можно показывать или скрывать.</string>
     <string name="onboarding_account_note">Вход необязателен — откройте вкладку «Профиль», когда захотите.</string>
+    <string name="texture_manager_upscale">Улучшение текстур</string>
+    <string name="texture_manager_upscale_desc">Улучшать игровые текстуры в фоне. Требует больше ресурсов процессора и памяти; пакеты текстур имеют приоритет.</string>
+    <string name="texture_manager_upscale_off">Выключено</string>
+    <string name="texture_manager_upscale_2x">RAISR 2×</string>
+    <string name="texture_manager_upscale_4x">RAISR 4×</string>
 </resources>

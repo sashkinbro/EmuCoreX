@@ -89,6 +89,8 @@ namespace GameDatabaseSchema
 		HWDownloadMode,
 		CoalesceRenderPasses,
 		CopyRoadMaximumBlendingLevel,
+		RewriteLargeSTCoords,
+		NativeCounterDraws,
 
 		Count
 	};

@@ -42,18 +42,55 @@ static constexpr std::array<PresentShader, 8> s_tv_shader_indices = {
 	PresentShader::COMPLEX_FILTER, PresentShader::LOTTES_FILTER,
 	PresentShader::SUPERSAMPLE_4xRGSS, PresentShader::SUPERSAMPLE_AUTO};
 
-static void PresentLocalMultiplayerFrame(GSTexture* current, const GSVector4& src_uv,
-	const GSVector4& draw_rect, PresentShader shader, float shader_parameter, bool linear)
+static GSVector4 CalculateDrawDstRect(s32,s32,const GSVector4i&,const GSVector2i&,GSDisplayAlignment,bool,bool);
+
+static void CalculateSideBySideRects(s32 window_width, s32 window_height, const GSVector4i& src_rect,
+	const GSVector2i& src_size, bool flip_y, bool is_progressive, GSVector4* left, GSVector4* right)
+{
+	const float half_w = static_cast<float>(window_width) * 0.5f;
+	const float full_h = static_cast<float>(window_height);
+	const float scale = static_cast<float>(std::clamp(GSConfig.SideBySideVRSize, 30, 100)) / 100.0f;
+	const float box_w = std::max(half_w * scale, 1.0f);
+	const float box_h = std::max(full_h * scale, 1.0f);
+	const float room_x = (half_w - box_w) * 0.5f;
+	const float room_y = (full_h - box_h) * 0.5f;
+	const float apart = room_x * static_cast<float>(std::clamp(GSConfig.SideBySideVRDistance, -100, 100)) / 100.0f;
+	const float box_y = room_y + room_y * static_cast<float>(std::clamp(GSConfig.SideBySideVRHeight, -100, 100)) / 100.0f;
+	const float left_box_x = room_x - apart;
+	const float right_box_x = half_w + room_x + apart;
+
+	const GSVector4 fit = CalculateDrawDstRect(static_cast<s32>(box_w), static_cast<s32>(box_h), src_rect, src_size,
+		GSDisplayAlignment::Center, false, is_progressive);
+	const float fit_w = fit.z - fit.x;
+	const float fit_h = fit.w - fit.y;
+	const float in_x = (box_w - fit_w) * 0.5f;
+	float top = box_y + (box_h - fit_h) * 0.5f;
+	if (flip_y)
+		top = full_h - (top + fit_h);
+	*left = GSVector4(left_box_x + in_x, top, left_box_x + in_x + fit_w, top + fit_h);
+	*right = GSVector4(right_box_x + in_x, top, right_box_x + in_x + fit_w, top + fit_h);
+}
+
+static void PresentLocalMultiplayerFrame(GSTexture* current, const GSVector4i& src_rect,const GSVector4& src_uv,
+	const GSVector4& draw_rect,bool is_progressive,PresentShader shader,float shader_parameter,bool linear)
 {
 	const int mode = std::clamp(GSConfig.LocalMultiplayerMode, 0, 4);
+	if (mode == 0 && GSConfig.SideBySideVR)
+	{
+		const GSVector2i pres=g_gs_device->GetPresentationSize();GSVector4 left,right;
+		CalculateSideBySideRects(pres.x,pres.y,src_rect,current->GetSize(),g_gs_device->UsesLowerLeftOrigin(),is_progressive,&left,&right);
+		g_gs_device->PresentRect(current,src_uv,nullptr,left,shader,shader_parameter,BilnIf(linear));
+		g_gs_device->PresentRect(current,src_uv,nullptr,right,shader,shader_parameter,BilnIf(linear));
+		return;
+	}
 	if (mode == 0)
 	{
 		g_gs_device->PresentRect(current, src_uv, nullptr, draw_rect, shader, shader_parameter, BilnIf(linear));
 		return;
 	}
 
-	const float width = static_cast<float>(g_gs_device->GetWindowWidth());
-	const float height = static_cast<float>(g_gs_device->GetWindowHeight());
+	const float width = static_cast<float>(g_gs_device->GetPresentationWidth());
+	const float height = static_cast<float>(g_gs_device->GetPresentationHeight());
 	const GSVector4 left(0.0f, 0.0f, width * 0.5f, height);
 	const GSVector4 right(width * 0.5f, 0.0f, width, height);
 	const GSVector4 top(0.0f, 0.0f, width, height * 0.5f);
@@ -99,7 +136,27 @@ static GSVector4 CalculateDrawDstRect(s32 window_width, s32 window_height, const
 
 static bool IsSGSRPresentActive()
 {
-	return GSConfig.SGSRMode != GSSGSRMode::Disabled;
+	return GSConfig.Upscaler==GSUpscaler::Off && GSConfig.SGSRMode != GSSGSRMode::Disabled;
+}
+
+template<typename Device> static bool PresentIsUnrotated(const Device& device)
+{
+    if constexpr(requires{device.GetPresentRotation();})
+        return static_cast<unsigned>(device.GetPresentRotation())==0;
+    return true; // Rotation support absent: the current backend presents unrotated.
+}
+template<typename Options> static bool PresentHasNoSBS(const Options& options)
+{
+    if constexpr(requires{options.SideBySideVR;})return !options.SideBySideVR;
+    return true;
+}
+void GSRenderer::NotePresentGeometryForCurrentFrame(const GSVector4i& src_rect,const GSVector4& draw_rect)
+{
+    const bool plain=GSConfig.Upscaler==GSUpscaler::Off&&GSConfig.SGSRMode==GSSGSRMode::Disabled&&
+        GSConfig.CASMode==GSCASMode::Disabled&&s_tv_shader_indices[GSConfig.TVShader]==PresentShader::COPY&&
+        GSConfig.LocalMultiplayerMode==0&&PresentHasNoSBS(GSConfig)&&GSConfig.LinearPresent!=GSPostBilinearMode::BilinearSharp&&
+        PresentIsUnrotated(*g_gs_device)&&!g_gs_device->UsesLowerLeftOrigin();
+    g_gs_device->NotePresentGeometry(src_rect,draw_rect,GSConfig.LinearPresent!=GSPostBilinearMode::Off,plain);
 }
 
 GSRenderer::GSRenderer()
@@ -126,11 +183,13 @@ void GSRenderer::Reset(bool hardware_reset)
 	if (hardware_reset)
 		g_gs_device->ClearCurrent();
 
+	m_field_shift.Reset();
 	GSState::Reset(hardware_reset);
 }
 
 void GSRenderer::Destroy()
 {
+	m_field_shift.Reset();
 	GSCapture::EndCapture();
 }
 
@@ -140,18 +199,34 @@ void GSRenderer::UpdateRenderFixes()
 
 bool GSRenderer::Merge(int field)
 {
+	return Merge<MergeMode::Full>(field);
+}
+
+GSRenderer::MergeMode GSRenderer::SelectMergeModeForVSync(bool cap_created_skip)
+{
+	// The platform must explicitly opt in; capture and guest-memory feedback always retain full composition.
+	bool image_consumer = !m_snapshot.empty() || GSCapture::IsCapturingVideo();
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
+	image_consumer |= m_dump != nullptr || m_dump_frames != 0;
+#endif
+	const bool eligible = cap_created_skip && GSGetPresentCapRenderSkip() && GSIsHardwareRenderer() &&
+		m_regs->EXTWRITE.WRITE == 0 && !image_consumer &&
+		!GSConfig.ShouldDump(s_n, g_perfmon.GetFrame()) && g_gs_device->GetCurrent() != nullptr;
+	if (!eligible)
+		return MergeMode::Full;
+	return isReallyInterlaced() && GSConfig.InterlaceMode != GSInterlaceMode::Off ?
+		MergeMode::InterlaceHistoryOnly : MergeMode::SkipFinalComposition;
+}
+
+template<GSRenderer::MergeMode merge_mode>
+bool GSRenderer::Merge(int field)
+{
 	GSVector2i fs(0, 0);
 	GSTexture* tex[3] = { nullptr, nullptr, nullptr };
 	float tex_scale[3] = { 0.0f, 0.0f, 0.0f };
 	int y_offset[3] = { 0, 0, 0 };
 	const bool feedback_merge = m_regs->EXTWRITE.WRITE == 1;
 	const bool really_interlaced = isReallyInterlaced();
-
-	if (!PCRTCDisplays.PCRTCDisplays[0].enabled && !PCRTCDisplays.PCRTCDisplays[1].enabled)
-	{
-		m_real_size = GSVector2i(0, 0);
-		return false;
-	}
 
 	// Need to do this here, if the user has Anti-Blur enabled, these offsets can get wiped out/changed.
 	const bool game_deinterlacing = (PCRTCDisplays.PCRTCDisplays[0].prevFramebufferOffsets.y != PCRTCDisplays.PCRTCDisplays[0].framebufferOffsets.y) !=
@@ -196,8 +271,6 @@ bool GSRenderer::Merge(int field)
 
 	if (!tex[0] && !tex[1])
 	{
-		m_real_size = GSVector2i(0, 0);
-
 		// Clear out the MAD buffer as some remnants of the previously shown frame came be left over, causing a flash for one frame.
 		if (GSConfig.InterlaceMode == GSInterlaceMode::Automatic || GSConfig.InterlaceMode >= GSInterlaceMode::AdaptiveTFF)
 		{
@@ -209,25 +282,97 @@ bool GSRenderer::Merge(int field)
 				mad_tex = nullptr;
 			}
 		}
-		return false;
+		// Both circuits disabled still output BGCOLOR on the console.
+		if (PCRTCDisplays.PCRTCDisplays[0].enabled || PCRTCDisplays.PCRTCDisplays[1].enabled)
+		{
+			m_real_size = GSVector2i(0, 0);
+			return false;
+		}
 	}
 
 	s_n++;
 
-	GSVector4 src_gs_read[2];
-	GSVector4 dst[3];
+	if constexpr (merge_mode == MergeMode::SkipFinalComposition)
+	{
+		if (m_scanmask_used)
+			m_scanmask_used--;
+		return true;
+	}
+
+	GSVector4 src_gs_read[2] = {};
+	GSVector4 dst[3] = {};
+	// Filled in only for a circuit whose shifted read would fall above its own rect in the texture,
+	// where the sampler's clamp cannot supply the rect's first row (see below).
+	GSDevice::MergeTopBand top_band[2] = {};
+	// Device rows at the top of the merge target each circuit's picture was pushed past. The target
+	// is cleared, so for the field that moved down, nothing drew those rows.
+	GSFieldPadRows top_pad[2] = {};
 
 	// Use offset for bob deinterlacing always, extra offset added later for FFMD mode.
 	const bool scanmask_frame = m_scanmask_used && abs(PCRTCDisplays.PCRTCDisplays[0].displayRect.y - PCRTCDisplays.PCRTCDisplays[1].displayRect.y) != 1;
+
+	// At an integer upscale of 2 or more a field render has that many device rows per field line,
+	// and the s'th of them is the scene at display line 2j+f+s -- so the render already holds EVERY
+	// display line of the screen at that field's moment. A weave can only replace half of them with
+	// lines from a different moment. Present it as it stands instead, and let the FFMD offset be
+	// the only correction (see below). Requires every enabled circuit to actually be at that scale:
+	// a target that was downscaled back to native holds half the lines and still needs the weave.
+	const float upscale = GetUpscaleMultiplier();
+	const int upscale_rows = static_cast<int>(upscale);
+	bool field_render_is_whole_picture =
+		(upscale_rows >= 2) && (static_cast<float>(upscale_rows) == upscale) && !feedback_merge;
+	for (int i = 0; i < 2 && field_render_is_whole_picture; i++)
+	{
+		if (PCRTCDisplays.PCRTCDisplays[i].enabled && tex[i] && tex_scale[i] != upscale)
+			field_render_is_whole_picture = false;
+	}
+	field_render_is_whole_picture &= isReallyInterlaced() && !m_scanmask_used;
+
+    // Exact upstream activity window: IPU IDEC/BDEC command notification, then
+    // thirty completed merges; explicit modes and field-direct retain priority.
+    const u32 video_decodes = GSGetVideoDecodeCount();
+    if (video_decodes != m_video_decode_count) {
+        m_video_decode_count = video_decodes;m_video_merges_left = VIDEO_MERGES;
+    } else if (m_video_merges_left > 0) {
+        --m_video_merges_left;
+    }
+
+	// FFMD (half frames) requires blend deinterlacing, so automatically use that. Same when SCANMSK is used but not blended in the merge circuit (Alpine Racer 3).
+	// Centralised in GSInterlaceModePolicy.h so the progressive pass-through case (shader_mode -1)
+	// is pinned by static_assert and unit tests rather than resting on the sign behaviour of a
+	// shift. Ported from sashkinbro/EmuCoreX.
 	const GSInterlaceModeSelection interlace_selection = SelectGSInterlaceMode(
 		static_cast<int>(GSConfig.InterlaceMode),
 		GSConfig.InterlaceMode == GSInterlaceMode::Automatic,
 		game_deinterlacing,
 		m_regs->SMODE2.FFMD,
-		scanmask_frame);
+		scanmask_frame,
+		field_render_is_whole_picture,
+		GSConfig.MovieCombDeinterlace && m_video_merges_left > 0);
 	const int field2 = interlace_selection.field_offset;
+	const bool present_field_direct = interlace_selection.present_field_direct;
 	int mode = interlace_selection.shader_mode;
 	bool is_bob = GSConfig.InterlaceMode == GSInterlaceMode::BobTFF || GSConfig.InterlaceMode == GSInterlaceMode::BobBFF;
+
+	// Half the field-mode titles move their projection half a display line between fields, so their
+	// consecutive field renders are one native line apart and need the offset to line up; the rest
+	// draw the identical picture on both fields, and giving them the offset is what makes a still
+	// picture jitter a line every frame. The detector watches the frames and says, defaulting to
+	// shift until it has an answer.
+	bool apply_field_shift = false;
+	if (present_field_direct && !GSConfig.DisableInterlaceOffset)
+	{
+		apply_field_shift = m_field_shift.WantsShift();
+	}
+
+	// FastMAD (mode 3) stores four fields in a two-bank history target. Older Mali-G57 Vulkan drivers
+	// can expose stale/alternating banks during reconstruction; Bob isn't a safe fallback (its
+	// alternating field phase makes the whole picture move vertically). Use weave+blend (mode 2)
+	// instead, and suppress the FFMD merge offset so both passes keep a fixed coordinate system.
+	// Ported from sashkinbro/EmuCoreX.
+	const bool stable_mad_fallback = (mode == 3 && g_gs_device->Features().broken_mad_deinterlace);
+	if (stable_mad_fallback)
+		mode = 2;
 
 	for (int i = 0; i < 2; i++)
 	{
@@ -240,13 +385,20 @@ bool GSRenderer::Merge(int field)
 
 		// dst is the final destination rect with offset on the screen.
 		dst[i] = scale * GSVector4(curCircuit.displayRect);
+		const float unshifted_top = dst[i].y;
 
 		// src_gs_read is the size which we're really reading from GS memory.
 		src_gs_read[i] = ((GSVector4(curCircuit.framebufferRect) + GSVector4(0, y_offset[i], 0, y_offset[i])) * scale) / GSVector4(tex[i]->GetSize()).xyxy();
 		
 		float interlace_offset = 0.0f;
-		if (really_interlaced && m_regs->SMODE2.FFMD && !is_bob &&
-			!GSConfig.DisableInterlaceOffset && GSConfig.InterlaceMode != GSInterlaceMode::Off)
+		if (present_field_direct)
+		{
+			// The offset is no longer a nudge before a deinterlace pass; it is the entire
+			// correction, so it is applied only to the games that move between fields.
+			if (apply_field_shift)
+				interlace_offset = (scale.y) * static_cast<float>(field ^ field2);
+		}
+		else if (isReallyInterlaced() && m_regs->SMODE2.FFMD && !is_bob && !stable_mad_fallback && !GSConfig.DisableInterlaceOffset && GSConfig.InterlaceMode != GSInterlaceMode::Off)
 		{
 			interlace_offset = (scale.y) * static_cast<float>(field ^ field2);
 		}
@@ -264,7 +416,59 @@ bool GSRenderer::Merge(int field)
 			}
 		}
 
-		dst[i] += GSVector4(0.0f, interlace_offset, 0.0f, interlace_offset);
+		if (present_field_direct)
+		{
+			// Move what is READ rather than where it is drawn. Screen row r gets the source content
+			// of row r - offset either way, so every drawn pixel is identical; the difference is at
+			// the top edge, where shifting the destination leaves rows the cleared merge target
+			// never drew (AC5's black row 1) and shifting the source asks the sampler for rows
+			// above the rect and gets the clamp -- the first drawn row, repeated, which is the fill
+			// the interlace shaders do by hand. Every backend's merge sampler clamps on both axes.
+			// The bottom is the same under both: the shifted field's last rows of source content
+			// fall off the screen, and no band appears.
+			const float dst_span = dst[i].w - dst[i].y;
+			if (interlace_offset != 0.0f && dst_span > 0.0f)
+			{
+				const float src_per_dst_row = (src_gs_read[i].w - src_gs_read[i].y) / dst_span;
+				const float src_shift = interlace_offset * src_per_dst_row;
+
+				// The clamp is at the TEXTURE's edge, which is the rect's own first row only when
+				// the rect starts at the texture top. When DISPFB.DBY (or a whole-page offset into
+				// the target) puts it lower, the clamp would hand back rows this circuit does not
+				// own, so the merge draws the band itself. Every field-mode title in the corpus
+				// that shifts has DBY = 0, so this costs them nothing and cannot move their pixels.
+				const GSFieldShiftTopBand band = GSComputeFieldShiftTopBand(
+					curCircuit.framebufferRect.y + y_offset[i], src_gs_read[i].y, dst[i].y,
+					interlace_offset, tex[i]->GetHeight());
+				if (band.enabled)
+				{
+					top_band[i].src = GSVector4(src_gs_read[i].x, band.src_v, src_gs_read[i].z, band.src_v);
+					top_band[i].dst = GSVector4(dst[i].x, band.dst_top, dst[i].z, band.dst_bottom);
+					top_band[i].enabled = true;
+				}
+
+				src_gs_read[i] -= GSVector4(0.0f, src_shift, 0.0f, src_shift);
+
+				// The band owns its rows, so the main draw starts below it.
+				const GSFieldShiftMainTop main_top =
+					GSFieldShiftMainDrawBelowBand(band, dst[i].y, src_gs_read[i].y, src_shift);
+				dst[i].y = main_top.dst_top;
+				src_gs_read[i].y = main_top.src_top_v;
+			}
+
+			// The shift here moves what is read, so no destination row is left undrawn above the
+			// picture and there is nothing for the deinterlacer to pad.
+			top_pad[i] = {};
+		}
+		else
+		{
+			dst[i] += GSVector4(0.0f, interlace_offset, 0.0f, interlace_offset);
+
+			// Whole rows, from where this circuit's rect starts: at a fractional scale the offset is
+			// not a whole number of rows, and a rect lower on the screen leaves its hole lower too.
+			// 2 rows at 2x, 1 at 1.5x.
+			top_pad[i] = GSComputeFieldPadRows(unshifted_top, dst[i].y);
+		}
 	}
 
 	if (feedback_merge && tex[2])
@@ -286,7 +490,7 @@ bool GSRenderer::Merge(int field)
 
 	m_real_size = GSVector2i(fs.x, fs.y);
 
-	if ((tex[0] == tex[1]) && (src_gs_read[0] == src_gs_read[1]).alltrue() && (dst[0] == dst[1]).alltrue() &&
+	if ((tex[0] || tex[1]) && (tex[0] == tex[1]) && (src_gs_read[0] == src_gs_read[1]).alltrue() && (dst[0] == dst[1]).alltrue() &&
 		(PCRTCDisplays.PCRTCDisplays[0].displayRect == PCRTCDisplays.PCRTCDisplays[1].displayRect).alltrue() &&
 		(PCRTCDisplays.PCRTCDisplays[0].framebufferRect == PCRTCDisplays.PCRTCDisplays[1].framebufferRect).alltrue() &&
 		!feedback_merge && !m_regs->PMODE.SLBG)
@@ -296,13 +500,41 @@ bool GSRenderer::Merge(int field)
 	}
 
 	const u32 c = (m_regs->BGCOLOR.U32[0] & 0x00FFFFFFu) | (m_regs->PMODE.ALP << 24);
-	g_gs_device->Merge(tex, src_gs_read, dst, fs, m_regs->PMODE, m_regs->EXTBUF, c);
+	g_gs_device->Merge(tex, src_gs_read, dst, top_band, fs, m_regs->PMODE, m_regs->EXTBUF, c);
 
-	if (really_interlaced && GSConfig.InterlaceMode != GSInterlaceMode::Off)
+	// Show the detector this field, offset and all. It is told which offset was applied so it can
+	// take it back out and measure what the GAME did between fields. Costs nothing once decided.
+	if (present_field_direct && (tex[0] || tex[1]) && !GSConfig.DisableInterlaceOffset)
+	{
+		m_field_shift.Update(g_gs_device->GetCurrent(), fs, upscale_rows,
+			apply_field_shift ? (upscale_rows * (field ^ field2)) : 0, field ^ field2);
+	}
+
+	if ((tex[0] || tex[1]) && isReallyInterlaced() && GSConfig.InterlaceMode != GSInterlaceMode::Off)
 	{
 		const float offset = is_bob ? (tex[1] ? tex_scale[1] : tex_scale[0]) : 0.0f;
 
-		g_gs_device->Interlace(fs, field ^ field2, mode, offset);
+		// Device rows at the top of the merge that nothing drew for this field. In FFMD mode the
+		// loop above pushed one field's picture down by a native line, and the merge target is
+		// cleared, so the weave and MAD passes would otherwise read a hole there. Read from the same
+		// circuit the bob offset is taken from.
+		const GSFieldPadRows field_pad = top_pad[tex[1] ? 1 : 0];
+
+		// The comb pass works in the native lines of the circuit's picture. The field on screen shows
+		// the framebuffer lines of its parity, which start at the framebuffer rect's top.
+		const int circuit = tex[1] ? 1 : 0;
+		const int fb_top = PCRTCDisplays.PCRTCDisplays[circuit].framebufferRect.y + y_offset[circuit];
+		const int interlace_field = (mode == 4) ? (field ^ field2 ^ (fb_top & 1)) : (field ^ field2);
+		g_gs_device->Interlace(fs, interlace_field, mode, offset, field_pad, tex_scale[circuit], dst[circuit].y);
+	}
+
+
+	// Temporal history is complete; cap-skipped fields need no optional image filters.
+	if constexpr (merge_mode == MergeMode::InterlaceHistoryOnly)
+	{
+		if (m_scanmask_used)
+			m_scanmask_used--;
+		return true;
 	}
 
 	if (GSConfig.ShadeBoost)
@@ -335,8 +567,8 @@ bool GSRenderer::Merge(int field)
 		if (GSTexture* const pre_chain = g_gs_device->GetCurrent())
 		{
 			const GSVector4i pre_src(CalculateDrawSrcRect(pre_chain, m_real_size));
-			const GSVector4 pre_dst(CalculateDrawDstRect(g_gs_device->GetWindowWidth(),
-				g_gs_device->GetWindowHeight(), pre_src, pre_chain->GetSize(), s_display_alignment,
+			const GSVector4 pre_dst(CalculateDrawDstRect(g_gs_device->GetPresentationWidth(),
+				g_gs_device->GetPresentationHeight(), pre_src, pre_chain->GetSize(), s_display_alignment,
 				g_gs_device->UsesLowerLeftOrigin(), GetVideoMode() == GSVideoMode::SDTV_480P));
 			const GSVector2i on_screen(
 				static_cast<int>(std::floor((pre_dst.z - pre_dst.x) + 0.5f)),
@@ -346,9 +578,9 @@ bool GSRenderer::Merge(int field)
 	}
 
 	// Sharpens biinear at lower resolutions, almost nearest but with more uniform pixels.
-	if (GSConfig.LinearPresent == GSPostBilinearMode::BilinearSharp && (g_gs_device->GetWindowWidth() > fs.x || g_gs_device->GetWindowHeight() > fs.y))
+	if (GSConfig.LinearPresent == GSPostBilinearMode::BilinearSharp && (g_gs_device->GetPresentationWidth() > fs.x || g_gs_device->GetPresentationHeight() > fs.y))
 	{
-		g_gs_device->Resize(g_gs_device->GetWindowWidth(), g_gs_device->GetWindowHeight());
+		g_gs_device->Resize(g_gs_device->GetPresentationWidth(), g_gs_device->GetPresentationHeight());
 	}
 
 	if (m_scanmask_used)
@@ -402,6 +634,15 @@ static float GetCurrentAspectRatioFloat(bool is_progressive)
 			return 16.0f / 9.0f;
 		case AspectRatioType::R10_7:
 			return 10.0f / 7.0f;
+		case AspectRatioType::R21_9:
+			return 21.0f / 9.0f;
+		case AspectRatioType::R20_9:
+			return 20.0f / 9.0f;
+		case AspectRatioType::R19_5_9:
+			return 19.5f / 9.0f;
+		case AspectRatioType::Custom:
+			// Clamped, not trusted: a 0 or negative would divide by zero downstream.
+			return std::clamp(GSConfig.CustomAspectRatio, 0.5f, 5.0f);
 	}
 }
 
@@ -434,6 +675,22 @@ static GSVector4 CalculateDrawDstRect(s32 window_width, s32 window_height, const
 	{
 		targetAr = 10.0f / 7.0f;
 	}
+	else if (EmuConfig.CurrentAspectRatio == AspectRatioType::R21_9)
+	{
+		targetAr = 21.0f / 9.0f;
+	}
+	else if (EmuConfig.CurrentAspectRatio == AspectRatioType::R20_9)
+	{
+		targetAr = 20.0f / 9.0f;
+	}
+	else if (EmuConfig.CurrentAspectRatio == AspectRatioType::R19_5_9)
+	{
+		targetAr = 19.5f / 9.0f;
+	}
+	else if (EmuConfig.CurrentAspectRatio == AspectRatioType::Custom)
+	{
+		targetAr = std::clamp(GSConfig.CustomAspectRatio, 0.5f, 5.0f);
+	}
 
 	const float crop_adjust = (static_cast<float>(src_rect.width()) / static_cast<float>(src_size.x)) /
 		(static_cast<float>(src_rect.height()) / static_cast<float>(src_size.y));
@@ -461,9 +718,10 @@ static GSVector4 CalculateDrawDstRect(s32 window_width, s32 window_height, const
 			const GSVector2i fs = GSVector2i(static_cast<int>(static_cast<float>(resolution.x) * g_gs_renderer->GetUpscaleMultiplier()),
 				static_cast<int>(static_cast<float>(resolution.y) * g_gs_renderer->GetUpscaleMultiplier()));
 
-			if ((g_gs_device->GetWindowWidth() > fs.x || g_gs_device->GetWindowHeight() > fs.y) && fs.x > 0 && fs.y > 0)
+			const GSVector2i pres_size = g_gs_device->GetPresentationSize();
+			if ((pres_size.x > fs.x || pres_size.y > fs.y) && fs.x > 0 && fs.y > 0)
 			{
-				t_width *= static_cast<float>(fs.x) / src_rect.width();
+				t_width *=static_cast<float>(fs.x) / src_rect.width();
 				t_height *= static_cast<float>(fs.y) / src_rect.height();
 			}
 		}
@@ -503,13 +761,30 @@ static GSVector4 CalculateDrawDstRect(s32 window_width, s32 window_height, const
 				break;
 		}
 	}
+	const bool is_portrait_window_outer = window_height > window_width;
 	if (target_height >= f_height)
 	{
-		target_y = -((target_height - f_height) * 0.5f);
+		// The render is TALLER than the window, so the overflow is normally split evenly and the
+		// image is cropped at both edges. Top-align instead when asked: anchor the top edge and let
+		// the crop fall entirely at the bottom.
+		//
+		// ★ This branch is the one landscape actually takes. A 4:3 game on a wide phone fills the
+		// height and pillarboxes the sides, so there is no vertical slack and the `else` below never
+		// runs — which is exactly why the landscape setting appeared to do nothing at first.
+		target_y = (GSConfig.LandscapeRenderTopAlign && !is_portrait_window_outer)
+			? 0.0f
+			: -((target_height - f_height) * 0.5f);
 	}
 	else
 	{
-		switch (alignment)
+		// Android #375: top-align the render in a PORTRAIT window (bottom stays free for
+		// touch controls). Vertical only — horizontal alignment (target_x) is unchanged.
+		const bool is_portrait_window = is_portrait_window_outer;
+		GSDisplayAlignment v_align = alignment;
+		if ((GSConfig.PortraitRenderTopAlign && is_portrait_window) ||
+			(GSConfig.LandscapeRenderTopAlign && !is_portrait_window))
+			v_align = GSDisplayAlignment::LeftOrTop;
+		switch (v_align)
 		{
 			case GSDisplayAlignment::Center:
 				target_y = (f_height - target_height) * 0.5f;
@@ -519,7 +794,12 @@ static GSVector4 CalculateDrawDstRect(s32 window_width, s32 window_height, const
 				break;
 			case GSDisplayAlignment::LeftOrTop:
 			default:
-				target_y = 0.0f;
+				// Push clear of a notch/punch-hole camera when the host asked for it. Only applies
+				// to the top-align case; this branch already knows the render is shorter than the
+				// window, so shifting it down cannot clip the bottom.
+				target_y = (GSConfig.PortraitRenderTopAlign && window_height > window_width)
+					? static_cast<float>(GSConfig.PortraitRenderTopInset)
+					: 0.0f;
 				break;
 		}
 	}
@@ -534,13 +814,9 @@ static GSVector4 CalculateDrawDstRect(s32 window_width, s32 window_height, const
 	}
 
 #ifdef __ANDROID__
-	// Android swapchain sizes often leave a half-pixel offset after aspect-ratio
-	// centering. Keep the final stretch aligned to physical pixels so the clear
-	// color or edge texels do not bleed into the game rectangle.
-	ret = GSVector4(std::floor(ret.x + 0.5f), std::floor(ret.y + 0.5f),
-		std::floor(ret.z + 0.5f), std::floor(ret.w + 0.5f));
+	// Preserve local physical-pixel alignment under aspect fit.
+	ret=GSVector4(std::floor(ret.x+0.5f),std::floor(ret.y+0.5f),std::floor(ret.z+0.5f),std::floor(ret.w+0.5f));
 #endif
-
 	return ret;
 }
 
@@ -550,10 +826,11 @@ static GSVector4i CalculateDrawSrcRect(const GSTexture* src, const GSVector2i re
 	const GSVector2 scale = (real_size.x > 0 && real_size.y > 0) ?
 		(GSVector2(size.x, size.y) / GSVector2(real_size.x, real_size.y)) : GSVector2(1.0f, 1.0f);
 	const float upscale = GSIsHardwareRenderer() ? GSConfig.UpscaleMultiplier : 1;
-	const int left = static_cast<int>(static_cast<float>(GSConfig.Crop[0] * scale.x) * upscale);
-	const int top = static_cast<int>(static_cast<float>(GSConfig.Crop[1] * scale.y) * upscale);
-	const int right =  size.x - static_cast<int>(static_cast<float>(GSConfig.Crop[2] * scale.x) * upscale);
-	const int bottom = size.y - static_cast<int>(static_cast<float>(GSConfig.Crop[3] * scale.y) * upscale);
+	const int trim = GSConfig.TrimUpscaledEdges && upscale >= 2.0f ? 1 : 0;
+	const int left = static_cast<int>(static_cast<float>((GSConfig.Crop[0] + trim) * scale.x) * upscale);
+	const int top = static_cast<int>(static_cast<float>((GSConfig.Crop[1] + trim) * scale.y) * upscale);
+	const int right =  size.x - static_cast<int>(static_cast<float>((GSConfig.Crop[2] + trim) * scale.x) * upscale);
+	const int bottom = size.y - static_cast<int>(static_cast<float>((GSConfig.Crop[3] + trim) * scale.y) * upscale);
 	return GSVector4i(left, top, right, bottom);
 }
 
@@ -812,6 +1089,7 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 		m_manual_frameskip_counter = 0;
 	}
 
+	bool fps_cap_present_skip = false;
 	// Max-FPS cap (Android): hold the *presented* frame rate at/below a target
 	// without slowing emulation (decoupled from the speed limiter / Speed %). The
 	// EE keeps running full speed, only presents are dropped. Set via setFpsCap.
@@ -834,10 +1112,13 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 		else
 		{
 			const u64 now = GetCPUTicks();
-			if (m_fps_cap_next_present == 0)
+			if (m_fps_cap_next_present == 0 || now + cap_interval < m_fps_cap_next_present)
 				m_fps_cap_next_present = now; // first present primes the schedule
 			if (now < m_fps_cap_next_present)
+			{
 				skip_frame = true; // not yet time for the next present → drop it
+				fps_cap_present_skip = true;
+			}
 			else
 			{
 				m_fps_cap_next_present += cap_interval;
@@ -847,15 +1128,28 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 		}
 	}
 
-	const bool blank_frame = !Merge(field);
+	if (GSGetMaxPresentInterval() == 0 || GSGetPresentCapSuspended())
+		m_fps_cap_next_present = 0;
 
-	if (blank_frame)
-		m_consecutive_blank_frames++;
-	else
-		m_consecutive_blank_frames = 0;
+	const MergeMode merge_mode = SelectMergeModeForVSync(fps_cap_present_skip);
+	const bool merged_frame = merge_mode == MergeMode::Full ? Merge<MergeMode::Full>(field) :
+		(merge_mode == MergeMode::InterlaceHistoryOnly ? Merge<MergeMode::InterlaceHistoryOnly>(field) :
+		 Merge<MergeMode::SkipFinalComposition>(field));
+	const bool blank_frame = !merged_frame;
+	if (merge_mode == MergeMode::Full || !merged_frame)
+		m_consecutive_blank_frames = blank_frame ? m_consecutive_blank_frames + 1 : 0;
 
 	m_last_draw_n = s_n;
 	m_last_transfer_n = s_transfer_n;
+
+	// Keep frame age and deferred work ordered even when presentation is skipped.
+	if (!idle_frame)
+	{
+		if (fps_cap_present_skip && GSGetPresentCapRenderSkip())
+			g_gs_device->AgePoolAfterPresentCapSkip();
+		else
+			g_gs_device->AgePool();
+	}
 
 #ifdef __ANDROID__
 	// Suppress only startup blanks, before the GS has produced any output. Mid-game blank/fade
@@ -865,9 +1159,8 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 		blank_frame,
 		g_gs_device->GetCurrent() != nullptr,
 		g_gs_device->GetRenderAPI() == RenderAPI::Vulkan,
-		m_consecutive_blank_frames);
-	const bool skip_present = (skip_frame || g_gs_device->ShouldSkipPresentingFrame()) ||
-		skip_blank;
+		m_consecutive_blank_frames) && !ImGuiManager::HasPresentableOverlayContent();
+	const bool skip_present = skip_frame || skip_blank || g_gs_device->ShouldSkipPresentingFrame();
 #else
 	const bool skip_present = skip_frame || g_gs_device->ShouldSkipPresentingFrame();
 #endif
@@ -882,9 +1175,6 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 	}
 	else
 	{
-		if (!idle_frame)
-			g_gs_device->AgePool();
-
 		g_perfmon.EndFrame(idle_frame);
 
 		if ((g_perfmon.GetFrame() & 0x1f) == 0)
@@ -898,22 +1188,60 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 		{
 			src_rect = CalculateDrawSrcRect(current, m_real_size);
 			src_uv = GSVector4(src_rect) / GSVector4(current->GetSize()).xyxy();
-			draw_rect = CalculateDrawDstRect(g_gs_device->GetWindowWidth(), g_gs_device->GetWindowHeight(),
+			draw_rect = CalculateDrawDstRect(g_gs_device->GetPresentationWidth(), g_gs_device->GetPresentationHeight(),
 				src_rect, current->GetSize(), s_display_alignment, g_gs_device->UsesLowerLeftOrigin(),
 				GetVideoMode() == GSVideoMode::SDTV_480P);
 			s_last_draw_rect = GSConfig.LocalMultiplayerMode == 0 ? draw_rect :
-				GSVector4(0.0f, 0.0f, static_cast<float>(g_gs_device->GetWindowWidth()),
-					static_cast<float>(g_gs_device->GetWindowHeight()));
+				GSVector4(0.0f, 0.0f, static_cast<float>(g_gs_device->GetPresentationWidth()),
+					static_cast<float>(g_gs_device->GetPresentationHeight()));
 
-			if (GSConfig.CASMode != GSCASMode::Disabled && !IsSGSRPresentActive())
+			if (GSConfig.Upscaler == GSUpscaler::SGSR || GSConfig.Upscaler == GSUpscaler::SGSREdge)
+			{
+				static bool sgsr_log_once = false;
+				if (g_gs_device->Features().sgsr)
+				{
+					const int draw_w = static_cast<int>(std::ceil(draw_rect.z - draw_rect.x));
+					const int draw_h = static_cast<int>(std::ceil(draw_rect.w - draw_rect.y));
+					if (current->GetWidth() < draw_w && current->GetHeight() < draw_h)
+						g_gs_device->SGSRUpscale(current, src_rect, src_uv, draw_rect,
+							GSConfig.Upscaler == GSUpscaler::SGSREdge);
+				}
+				else if (!sgsr_log_once)
+				{
+					Host::AddIconOSDMessage("SGSRUnsupported", ICON_FA_TRIANGLE_EXCLAMATION,
+						TRANSLATE_SV("GS", "SGSR upscaling is not available, your graphics driver does not support the required functionality."),
+						10.0f);
+					sgsr_log_once = true;
+				}
+			}
+
+			else if (GSConfig.Upscaler == GSUpscaler::FSR1)
+			{
+				static bool fsr1_log_once = false;
+				if (g_gs_device->Features().fsr1)
+				{
+					const int draw_w = static_cast<int>(std::ceil(draw_rect.z - draw_rect.x));
+					const int draw_h = static_cast<int>(std::ceil(draw_rect.w - draw_rect.y));
+					if (current->GetWidth() < draw_w && current->GetHeight() < draw_h)
+						g_gs_device->FSR1Upscale(current, src_rect, src_uv, draw_rect);
+				}
+				else if (!fsr1_log_once)
+				{
+					Host::AddIconOSDMessage("FSR1Unsupported", ICON_FA_TRIANGLE_EXCLAMATION,
+						TRANSLATE_SV("GS", "FSR1 upscaling is not available, your graphics driver does not support the required functionality."),
+						10.0f);
+					fsr1_log_once = true;
+				}
+			}
+			else if (GSConfig.Upscaler == GSUpscaler::Off && GSConfig.CASMode != GSCASMode::Disabled && !IsSGSRPresentActive())
 			{
 				static bool cas_log_once = false;
 				if (g_gs_device->Features().cas_sharpening)
 				{
 					// sharpen only if the IR is higher than the display resolution
 					const bool sharpen_only = (GSConfig.CASMode == GSCASMode::SharpenOnly ||
-					                           (current->GetWidth() > g_gs_device->GetWindowWidth() &&
-					                            current->GetHeight() > g_gs_device->GetWindowHeight()));
+					                           (current->GetWidth() > g_gs_device->GetPresentationWidth() &&
+					                            current->GetHeight() > g_gs_device->GetPresentationHeight()));
 					g_gs_device->CAS(current, src_rect, src_uv, draw_rect, sharpen_only);
 				}
 				else if (!cas_log_once)
@@ -935,10 +1263,11 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 
 				const bool use_sgsr = IsSGSRPresentActive();
 				const float present_shader_parameter = use_sgsr ? static_cast<float>(GSConfig.SGSRMode) : shader_time;
-				PresentLocalMultiplayerFrame(current, src_uv, draw_rect,
+				PresentLocalMultiplayerFrame(current,src_rect,src_uv,draw_rect,GetVideoMode()==GSVideoMode::SDTV_480P,
 					use_sgsr ? PresentShader::SGSR : s_tv_shader_indices[GSConfig.TVShader], present_shader_parameter,
 					use_sgsr ? false : (GSConfig.LinearPresent != GSPostBilinearMode::Off));
 				g_gs_device->NotePresentHasNewFrame();
+				NotePresentGeometryForCurrentFrame(src_rect,draw_rect);
 			}
 
 			EndPresentFrame();
@@ -973,9 +1302,9 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 				ReadbackTextureCache();
 
 			freezeData fd = {0, nullptr};
-			Freeze(&fd, true);
+			m_parse_target->Freeze(&fd, true);
 			fd.data = new u8[fd.size];
-			Freeze(&fd, false);
+			m_parse_target->Freeze(&fd, false);
 
 			// keep the screenshot relatively small so we don't bloat the dump
 			static constexpr u32 DUMP_SCREENSHOT_WIDTH = 640;
@@ -1021,8 +1350,8 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 		const bool aspect_correct = (GSConfig.ScreenshotSize != GSScreenshotSize::InternalResolutionUncorrected);
 
 		if (g_gs_device->GetCurrent() && SaveSnapshotToMemory(
-			internal_resolution ? 0 : g_gs_device->GetWindowWidth(),
-			internal_resolution ? 0 : g_gs_device->GetWindowHeight(),
+			internal_resolution ? 0 : g_gs_device->GetPresentationWidth(),
+			internal_resolution ? 0 : g_gs_device->GetPresentationHeight(),
 			aspect_correct, true,
 			&screenshot_width, &screenshot_height, &screenshot_pixels))
 		{
@@ -1206,19 +1535,19 @@ void GSRenderer::PresentCurrentFrame()
 		{
 			const GSVector4i src_rect(CalculateDrawSrcRect(current, m_real_size));
 			const GSVector4 src_uv(GSVector4(src_rect) / GSVector4(current->GetSize()).xyxy());
-			const GSVector4 draw_rect(CalculateDrawDstRect(g_gs_device->GetWindowWidth(), g_gs_device->GetWindowHeight(),
+			const GSVector4 draw_rect(CalculateDrawDstRect(g_gs_device->GetPresentationWidth(), g_gs_device->GetPresentationHeight(),
 				src_rect, current->GetSize(), s_display_alignment, g_gs_device->UsesLowerLeftOrigin(),
 				GetVideoMode() == GSVideoMode::SDTV_480P));
 			s_last_draw_rect = GSConfig.LocalMultiplayerMode == 0 ? draw_rect :
-				GSVector4(0.0f, 0.0f, static_cast<float>(g_gs_device->GetWindowWidth()),
-					static_cast<float>(g_gs_device->GetWindowHeight()));
+				GSVector4(0.0f, 0.0f, static_cast<float>(g_gs_device->GetPresentationWidth()),
+					static_cast<float>(g_gs_device->GetPresentationHeight()));
 
 			const u64 current_time = Common::Timer::GetCurrentValue();
 			const float shader_time = static_cast<float>(Common::Timer::ConvertValueToSeconds(current_time - m_shader_time_start));
 
 			const bool use_sgsr = IsSGSRPresentActive();
 			const float present_shader_parameter = use_sgsr ? static_cast<float>(GSConfig.SGSRMode) : shader_time;
-			PresentLocalMultiplayerFrame(current, src_uv, draw_rect,
+			PresentLocalMultiplayerFrame(current,src_rect,src_uv,draw_rect,GetVideoMode()==GSVideoMode::SDTV_480P,
 				use_sgsr ? PresentShader::SGSR : s_tv_shader_indices[GSConfig.TVShader], present_shader_parameter,
 				use_sgsr ? false : (GSConfig.LinearPresent != GSPostBilinearMode::Off));
 		}
@@ -1488,4 +1817,24 @@ void DumpGSPrivRegs(const GSPrivRegSet& r, const std::string& filename)
 
 	std::fprintf(fp.get(), "EXTWRITE: { EN: %u }\n", r.EXTWRITE.WRITE);
 }
+#endif
+
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+#include "GSPresentationParityTests.inl"
+#endif
+
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+#include "GSMovieCombTests.inl"
+#endif
+
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+#include "GSCommonCompositionTests.inl"
+#endif
+
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+#include "GSFrameGenGeometryTests.inl"
+#endif
+
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+#include "GSPresentationGeometryTests.inl"
 #endif

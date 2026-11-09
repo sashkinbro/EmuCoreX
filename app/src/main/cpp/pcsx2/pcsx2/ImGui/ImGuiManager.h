@@ -3,6 +3,8 @@
 
 #pragma once
 
+#define GS_PRESENTABLE_OVERLAY_SUPPORTED 1
+
 #include "common/Pcsx2Defs.h"
 
 #include <span>
@@ -58,6 +60,9 @@ namespace ImGuiManager
 
 	/// Renders any on-screen display elements.
 	void RenderOSD();
+
+	/// GS-thread query of posted/active messages and fullscreen notifications.
+	bool HasPresentableOverlayContent();
 
 	/// Returns the scale of all on-screen elements.
 	float GetGlobalScale();

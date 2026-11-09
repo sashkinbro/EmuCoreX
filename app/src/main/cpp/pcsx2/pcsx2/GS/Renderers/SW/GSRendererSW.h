@@ -79,9 +79,10 @@ protected:
 
 	bool GetScanlineGlobalData(SharedData* data);
 
-	template <u32 primclass>
-	void RewriteVerticesIfSTOverflow();
-
+	bool IsCoverageAlphaSupported() override;
+	bool BuildsConsolePlane() override;
+	GSVertexKernels::CullGrid EngineCullGrid() const override { return GSVertexKernels::MakeCullGrid(4, 4); }
+	GSHWAutoFlushLevel GetAutoFlushLevel() const override;
 public:
 	GSRendererSW(int threads);
 	~GSRendererSW() override;

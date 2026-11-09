@@ -1,17 +1,19 @@
 // SPDX-FileCopyrightText: 2026 EmuCoreX Team
 // SPDX-License-Identifier: GPL-3.0+
 #include <cmath>
+#include "GSCoherenceTestDevice.h"
 #include "cpuinfo.h"
 #include "common/ScopedGuard.h"
 
 void GSRendererHW::TestDepthFloor(void (*check)(bool, const char*))
 {
     cpuinfo_initialize();
-    check(!g_texture_cache && !g_gs_renderer, "GS depth-floor fixture owns an isolated renderer");
-    if (g_texture_cache || g_gs_renderer) return;
+    check(!g_texture_cache && !g_gs_renderer && !g_gs_device, "GS depth-floor fixture owns an isolated renderer");
+    if (g_texture_cache || g_gs_renderer || g_gs_device) return;
     const auto config = GSConfig;
     GSConfig = Pcsx2Config::GSOptions();
-    const ScopedGuard restore([&]() { GSConfig = config; });
+    g_gs_device=std::make_unique<CoherenceDevice>();
+    const ScopedGuard restore([&]() { g_gs_device.reset(); GSConfig = config; });
     auto renderer = std::make_unique<GSRendererHW>();
     auto& r = *renderer;
     bool identity = true, high = true, low = true, clamp = true;

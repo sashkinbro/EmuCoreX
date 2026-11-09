@@ -32,62 +32,40 @@ GSClut::GSClut(GSLocalMemory* mem)
 			const bool eight_bit = (j & 0x7) == 0x3;
 			const bool four_bit = (j & 0x7) == 0x4;
 
-			switch (i)
-			{
-				case PSMCT32:
-				case PSMCT24: // undocumented (KH?)
-					if (eight_bit)
-						m_wc[0][i][j] = &GSClut::WriteCLUT32_I8_CSM1;
-					else if (four_bit)
-						m_wc[0][i][j] = &GSClut::WriteCLUT32_I4_CSM1;
-					else
-						m_wc[0][i][j] = &GSClut::WriteCLUT_NULL;
-					break;
-				case PSMCT16:
-					if (eight_bit)
-						m_wc[0][i][j] = &GSClut::WriteCLUT16_I8_CSM1;
-					else if (four_bit)
-						m_wc[0][i][j] = &GSClut::WriteCLUT16_I4_CSM1;
-					else
-						m_wc[0][i][j] = &GSClut::WriteCLUT_NULL;
-					break;
-				case PSMCT16S:
-					if (eight_bit)
-						m_wc[0][i][j] = &GSClut::WriteCLUT16S_I8_CSM1;
-					else if (four_bit)
-						m_wc[0][i][j] = &GSClut::WriteCLUT16S_I4_CSM1;
-					else
-						m_wc[0][i][j] = &GSClut::WriteCLUT_NULL;
-					break;
-				default:
-					m_wc[0][i][j] = &GSClut::WriteCLUT_NULL;
-			}
+			// The gs-clut hardware capture (SCPH-30001, 2026-08-11): CPSM decodes
+			// two bits — bit 1 selects the entry width (set means 16-bit) and
+			// bit 3 selects the S block layout. The undocumented values
+			// (0x03/0x08/0x09/0x0B) load accordingly; silicon refuses nothing.
+			// (Measured for CSM1 over bits 0/1/3; bit 2 follows the capture's
+			// two-meaningful-bits rule.)
+			const bool sixteen_bit = (i & 0x2) != 0;
+			const bool s_layout = (i & 0x8) != 0;
 
-			// TODO: test this
-			m_wc[1][i][j] = &GSClut::WriteCLUT_NULL;
+			if (eight_bit)
+				m_wc[0][i][j] = !sixteen_bit ? &GSClut::WriteCLUT32_I8_CSM1 :
+				                s_layout     ? &GSClut::WriteCLUT16S_I8_CSM1 :
+				                               &GSClut::WriteCLUT16_I8_CSM1;
+			else if (four_bit)
+				m_wc[0][i][j] = !sixteen_bit ? &GSClut::WriteCLUT32_I4_CSM1 :
+				                s_layout     ? &GSClut::WriteCLUT16S_I4_CSM1 :
+				                               &GSClut::WriteCLUT16_I4_CSM1;
+			else
+				m_wc[0][i][j] = &GSClut::WriteCLUT_NULL;
+
+			// CSM2 decodes CPSM through the same two bits — the capture
+			// measured the undocumented values loading there as well.
+			if (eight_bit)
+				m_wc[1][i][j] = !sixteen_bit ? &GSClut::WriteCLUT32_CSM2<256> :
+				                s_layout     ? &GSClut::WriteCLUT16S_CSM2<256> :
+				                               &GSClut::WriteCLUT16_CSM2<256>;
+			else if (four_bit)
+				m_wc[1][i][j] = !sixteen_bit ? &GSClut::WriteCLUT32_CSM2<16> :
+				                s_layout     ? &GSClut::WriteCLUT16S_CSM2<16> :
+				                               &GSClut::WriteCLUT16_CSM2<16>;
+			else
+				m_wc[1][i][j] = &GSClut::WriteCLUT_NULL;
 		}
 	}
-
-	m_wc[1][PSMCT32][PSMT8] = &GSClut::WriteCLUT32_CSM2<256>;
-	m_wc[1][PSMCT32][PSMT8H] = &GSClut::WriteCLUT32_CSM2<256>;
-	m_wc[1][PSMCT32][PSMT4] = &GSClut::WriteCLUT32_CSM2<16>;
-	m_wc[1][PSMCT32][PSMT4HL] = &GSClut::WriteCLUT32_CSM2<16>;
-	m_wc[1][PSMCT32][PSMT4HH] = &GSClut::WriteCLUT32_CSM2<16>;
-	m_wc[1][PSMCT24][PSMT8] = &GSClut::WriteCLUT32_CSM2<256>;
-	m_wc[1][PSMCT24][PSMT8H] = &GSClut::WriteCLUT32_CSM2<256>;
-	m_wc[1][PSMCT24][PSMT4] = &GSClut::WriteCLUT32_CSM2<16>;
-	m_wc[1][PSMCT24][PSMT4HL] = &GSClut::WriteCLUT32_CSM2<16>;
-	m_wc[1][PSMCT24][PSMT4HH] = &GSClut::WriteCLUT32_CSM2<16>;
-	m_wc[1][PSMCT16][PSMT8] = &GSClut::WriteCLUT16_CSM2<256>;
-	m_wc[1][PSMCT16][PSMT8H] = &GSClut::WriteCLUT16_CSM2<256>;
-	m_wc[1][PSMCT16][PSMT4] = &GSClut::WriteCLUT16_CSM2<16>;
-	m_wc[1][PSMCT16][PSMT4HL] = &GSClut::WriteCLUT16_CSM2<16>;
-	m_wc[1][PSMCT16][PSMT4HH] = &GSClut::WriteCLUT16_CSM2<16>;
-	m_wc[1][PSMCT16S][PSMT8] = &GSClut::WriteCLUT16S_CSM2<256>;
-	m_wc[1][PSMCT16S][PSMT8H] = &GSClut::WriteCLUT16S_CSM2<256>;
-	m_wc[1][PSMCT16S][PSMT4] = &GSClut::WriteCLUT16S_CSM2<16>;
-	m_wc[1][PSMCT16S][PSMT4HL] = &GSClut::WriteCLUT16S_CSM2<16>;
-	m_wc[1][PSMCT16S][PSMT4HH] = &GSClut::WriteCLUT16S_CSM2<16>;
 }
 
 GSClut::~GSClut()
@@ -121,6 +99,11 @@ u32 GSClut::GetCLUTCPSM()
 	return m_write.TEX0.CPSM;
 }
 
+u32 GSClut::GetCLUTCSM()
+{
+	return m_write.TEX0.CSM;
+}
+
 void GSClut::SetNextCLUTTEX0(u64 TEX0)
 {
 	m_write.next_tex0 = TEX0;
@@ -134,6 +117,7 @@ void GSClut::Reset()
 	m_write.dirty = 1;
 	m_read = {};
 	m_read.dirty = true;
+	m_read_serial++;
 }
 
 bool GSClut::InvalidateRange(u32 start_block, u32 end_block, bool is_draw)
@@ -215,14 +199,24 @@ bool GSClut::WriteTest(const GIFRegTEX0& TEX0, const GIFRegTEXCLUT& TEXCLUT)
 	return m_write.IsDirty(TEX0, TEXCLUT);
 }
 
-void GSClut::Write(const GIFRegTEX0& TEX0, const GIFRegTEXCLUT& TEXCLUT)
+void GSClut::WriteDecision(const GIFRegTEX0& TEX0, const GIFRegTEXCLUT& TEXCLUT)
 {
 	m_write.TEX0 = TEX0;
 	m_write.TEXCLUT = TEXCLUT;
-	m_read.dirty = true;
 	m_write.dirty = 0;
+}
+
+void GSClut::WriteLoad(const GIFRegTEX0& TEX0, const GIFRegTEXCLUT& TEXCLUT)
+{
+	m_read.dirty = true;
 
 	(this->*m_wc[TEX0.CSM][TEX0.CPSM][TEX0.PSM])(TEX0, TEXCLUT);
+}
+
+void GSClut::Write(const GIFRegTEX0& TEX0,const GIFRegTEXCLUT& TEXCLUT)
+{
+	WriteDecision(TEX0,TEXCLUT);
+	WriteLoad(TEX0,TEXCLUT);
 }
 
 void GSClut::WriteCLUT32_I8_CSM1(const GIFRegTEX0& TEX0, const GIFRegTEXCLUT& TEXCLUT)
@@ -261,15 +255,30 @@ void GSClut::WriteCLUT16S_I4_CSM1(const GIFRegTEX0& TEX0, const GIFRegTEXCLUT& T
 template <int n>
 void GSClut::WriteCLUT32_CSM2(const GIFRegTEX0& TEX0, const GIFRegTEXCLUT& TEXCLUT)
 {
+	// The gs-clut2 hardware capture (SCPH-30001, 2026-08-12): with an EIGHT-bit
+	// index this reads 128 source words starting 128 pixels past
+	// (COU*16, COV), and fills all 256 entries from them -- so entry e and
+	// entry e+128 are the same word. The offset is a constant in the
+	// coordinate, measured identical at CBW 1, 2, 4 and 8, and moving CBP off
+	// the page boundary moves the strip with it and leaves the offset alone.
+	//
+	// It belongs to this configuration alone, and the reason is that the
+	// configuration is out of spec: CSM2 admits 16-bit entries only, so a
+	// 32-bit CSM2 palette is something the hardware was never asked to do.
+	// Four-bit indices and 16-bit palettes start exactly at the origin and
+	// never repeat, which the capture measured separately.
+	constexpr bool wide_index = (n == 256);
+	constexpr int origin = wide_index ? 128 : 0;
+
 	GSOffset off = GSOffset::fromKnownPSM(TEX0.CBP, TEXCLUT.CBW, PSMCT32);
-	GSOffset::PAHelper pa = off.paMulti(TEXCLUT.COU << 4, TEXCLUT.COV);
+	GSOffset::PAHelper pa = off.paMulti((TEXCLUT.COU << 4) + origin, TEXCLUT.COV);
 
 	u32* vm = m_mem->vm32();
 	u16* RESTRICT clut = m_clut + ((TEX0.CSA & 15) << 4);
 
 	for (int i = 0; i < n; i++)
 	{
-		u32 c = vm[pa.value(i)];
+		u32 c = vm[pa.value(wide_index ? (i & 127) : i)];
 
 		clut[i] = (u16)(c & 0xffff);
 		clut[i + 256] = (u16)(c >> 16);
@@ -312,53 +321,37 @@ void GSClut::WriteCLUT_NULL(const GIFRegTEX0& TEX0, const GIFRegTEXCLUT& TEXCLUT
 	GL_INS("[WARNING] CLUT write ignored (psm: %d, cpsm: %d)", TEX0.PSM, TEX0.CPSM);
 }
 
-#if 0
-void GSClut::Read(const GIFRegTEX0& TEX0)
+// Whether the GPU palette road reproduces what the expansion in Read32 produces.
+//
+// That road does not read m_clut at all: it rebuilds the palette out of a render target
+// in a shader (ps_convert_clut_4 / _8), and the shader implements the CLUT addressing it
+// was written against -- CSA added to the entry index, and a CSM2 strip that starts at
+// (COU*16, COV). Two console-measured rules the expansion follows do not survive that,
+// and both are the same configuration: an eight-bit index into a 32-bit palette.
+//
+//   * CSA ORs into the group rather than adding to it -- group = (entry >> 4) | CSA.
+//     OR and add agree at CSA 0 and nowhere else that matters; the capture separates
+//     1,504 of 1,536 readings.
+//   * Under CSM2 that configuration reads its 128 source words starting 128 pixels past
+//     (COU*16, COV) and repeats every 128 entries. The shader starts at the origin.
+//
+// The shader could be taught both. It has not been, because neither rule has been shown
+// to matter to a title, and a colour that is wrong only under one renderer with one hack
+// enabled is the expensive kind of wrong to chase later. So refuse the road there and
+// let the texture cache take the expanded palette, which is the answer the software
+// renderer gives -- the two agree by construction rather than by review.
+bool GSClut::GPUPaletteRoadIsExact(u32 PSM, u32 CPSM, u32 CSA, u32 CSM)
 {
-	if(m_read.IsDirty(TEX0))
-	{
-		m_read.TEX0 = TEX0;
-		m_read.dirty = false;
+	const bool wide_index = (PSM != PSMT4 && PSM != PSMT4HL && PSM != PSMT4HH);
+	const bool palette_is_32bit = (CPSM & 0x2) == 0;
 
-		u16* clut = m_clut;
+	if (!wide_index || !palette_is_32bit)
+		return true;
 
-		if(TEX0.CPSM == PSMCT32 || TEX0.CPSM == PSMCT24)
-		{
-			switch(TEX0.PSM)
-			{
-			case PSMT8:
-			case PSMT8H:
-				clut += (TEX0.CSA & 15) << 4;
-				ReadCLUT_T32_I8(clut, m_buff32);
-				break;
-			case PSMT4:
-			case PSMT4HL:
-			case PSMT4HH:
-				clut += (TEX0.CSA & 15) << 4;
-				ReadCLUT_T32_I4(clut, m_buff32, m_buff64);
-				break;
-			}
-		}
-		else if (TEX0.CPSM == PSMCT16 || TEX0.CPSM == PSMCT16S)
-		{
-			switch(TEX0.PSM)
-			{
-			case PSMT8:
-			case PSMT8H:
-				clut += TEX0.CSA << 4;
-				ReadCLUT_T16_I8(clut, m_buff32);
-				break;
-			case PSMT4:
-			case PSMT4HL:
-			case PSMT4HH:
-				clut += TEX0.CSA << 4;
-				ReadCLUT_T16_I4(clut, m_buff32, m_buff64);
-				break;
-			}
-		}
-	}
+	// CSA 0 is the one group where OR and add are the same answer; CSM1 is the one
+	// addressing mode without the shifted origin.
+	return CSA == 0 && CSM == 0;
 }
-#endif
 
 void GSClut::Read32(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA)
 {
@@ -368,10 +361,13 @@ void GSClut::Read32(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA)
 		m_read.TEXA = TEXA;
 		m_read.dirty = false;
 		m_read.adirty = true;
+		m_read_serial++;
 
 		u16* clut = m_clut;
 
-		if (TEX0.CPSM == PSMCT32 || TEX0.CPSM == PSMCT24)
+		// Entry width matches the write side's CPSM decode: bit 1 clear is a
+		// 32-bit palette, set is 16-bit, undocumented values included.
+		if ((TEX0.CPSM & 0x2) == 0)
 		{
 			switch (TEX0.PSM)
 			{
@@ -384,14 +380,17 @@ void GSClut::Read32(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA)
 				case PSMT4HH:
 					clut += (TEX0.CSA & 15) << 4;
 					// TODO: merge these functions
+
+					// This is for a situation with Breath of Fire Dragon Quarter where it reinterprets the buffer under CSM2 after reading as CSM1.
 					if (TEX0.CSM == 1 && m_write.TEX0.CSM == 0)
 						ReadCLUT_T32_I4_Swizzled(clut, m_buff32);
 					else
 						ReadCLUT_T32_I4(clut, m_buff32);
+
 					break;
 			}
 		}
-		else if (TEX0.CPSM == PSMCT16 || TEX0.CPSM == PSMCT16S)
+		else
 		{
 			switch (TEX0.PSM)
 			{
@@ -410,7 +409,8 @@ void GSClut::Read32(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA)
 			}
 		}
 
-		if (GSConfig.UserHacks_GPUTargetCLUTMode != GSGPUTargetCLUTMode::Disabled)
+		if (GSConfig.UserHacks_GPUTargetCLUTMode != GSGPUTargetCLUTMode::Disabled &&
+			GPUPaletteRoadIsExact(TEX0.PSM, TEX0.CPSM, TEX0.CSA, TEX0.CSM))
 		{
 			const bool is_4bit = (TEX0.PSM == PSMT4 || TEX0.PSM == PSMT4HL || TEX0.PSM == PSMT4HH);
 
@@ -439,7 +439,13 @@ void GSClut::Read32(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA)
 			{
 				GSTexture* dst = is_4bit ? m_gpu_clut4 : m_gpu_clut8;
 				const u32 dst_size = is_4bit ? 16 : 256;
-				const u32 dOffset = (TEX0.CSA & ((TEX0.CPSM == PSMCT16 || TEX0.CPSM == PSMCT16S) ? 15u : 31u)) << 4;
+				// Entry width by bit 1 of CPSM, the same decode the expansion above
+				// uses, so the undocumented CPSM values land on the same side here
+				// as they do there. The CSA mask here is the reverse of the CPU
+				// expansion's (five bits for 32-bit palettes, four for 16-bit); that is
+				// upstream's and unmeasured, and after the refusal above it only
+				// matters for CSA above 15, which no capture has exercised.
+				const u32 dOffset = (TEX0.CSA & ((TEX0.CPSM & 0x2) ? 15u : 31u)) << 4;
 
 				if (src != m_current_gpu_clut && (src != m_last_gpu_clut || m_gpu_clut_last_offset != offset))
 					m_gpu_clut_dirty = true;
@@ -575,6 +581,20 @@ __forceinline void GSClut::WriteCLUT_T32_I4_CSM1(const u32* RESTRICT src, u16* R
 	d[0] = v0;
 	d[16] = v1;
 
+#elif defined(ARCH_ARM64)
+
+	// LD2 splits the low and high halves, then UZPs put the pairs in the order the zips below would.
+	const uint16x8x2_t a = vld2q_u16(reinterpret_cast<const u16*>(src));
+	const uint16x8x2_t b = vld2q_u16(reinterpret_cast<const u16*>(src + 8));
+	const uint32x4_t la = vreinterpretq_u32_u16(a.val[0]);
+	const uint32x4_t ha = vreinterpretq_u32_u16(a.val[1]);
+	const uint32x4_t lb = vreinterpretq_u32_u16(b.val[0]);
+	const uint32x4_t hb = vreinterpretq_u32_u16(b.val[1]);
+	vst1q_u32(reinterpret_cast<u32*>(clut), vuzp1q_u32(la, lb));
+	vst1q_u32(reinterpret_cast<u32*>(clut + 8), vuzp2q_u32(la, lb));
+	vst1q_u32(reinterpret_cast<u32*>(clut + 256), vuzp1q_u32(ha, hb));
+	vst1q_u32(reinterpret_cast<u32*>(clut + 264), vuzp2q_u32(ha, hb));
+
 #else
 
 	GSVector4i* s = (GSVector4i*)src;
@@ -632,10 +652,13 @@ __forceinline void GSClut::WriteCLUT_T16_I4_CSM1(const u16* RESTRICT src, u16* R
 	}
 }
 
+// These functions are only used if the CLUT is in 32bit mode and it swaps to CSM2, a very obscure setup used by Breath of Fire Dragon Quarter.
+// This doesn't handle offsetting the CLUT or anything crazy, that would be a lot more work
 void GSClut::ReadCLUT_T32_I4_Swizzled(const u16* RESTRICT clut, u32* RESTRICT dst)
 {
-	const GSVector4i* s = reinterpret_cast<const GSVector4i*>(clut);
-	GSVector4i* d = reinterpret_cast<GSVector4i*>(dst);
+	// Point to the base of the palette block
+	GSVector4i* s = (GSVector4i*)clut;
+	GSVector4i* d = (GSVector4i*)dst;
 
 	GSVector4i v0 = s[0];
 	GSVector4i v1 = s[2];
@@ -652,21 +675,28 @@ void GSClut::ReadCLUT_T32_I4_Swizzled(const u16* RESTRICT clut, u32* RESTRICT ds
 
 void GSClut::ReadCLUT_T32_I8(const u16* RESTRICT clut, u32* RESTRICT dst, int offset)
 {
-	// Okay this deserves a small explanation
-	// T32 I8 can address up to 256 colors however the offset can be "more than zero" when reading
-	// Previously I assumed that it would wrap around the end of the buffer to the beginning
-	// but it turns out this is incorrect, the address doesn't mirror, it clamps to to the last offset,
-	// probably though some sort of addressing mechanism then picks the color from the lower 0xF of the requested CLUT entry.
-	// if we don't do this, the dirt on GTA SA goes transparent and actually cleans the car driving through dirt.
+	// The gs-clut hardware capture (SCPH-30001, 2026-08-11): CSA is ORed into
+	// the CLUT group an entry reads — group = (entry >> 4) | CSA, 1,536/1,536
+	// readings. An OR looks like a clamp from CSA 15 and like an add from
+	// CSA 0, which is why the old add-and-clamp (kept for GTA SA's dirt
+	// overlay) held up on the games that motivated it; it is wrong at every
+	// CSA between.
 	for (int i = 0; i < 256; i += 16)
 	{
-		// Min value + offet or Last CSA * 16 (240)
-		ReadCLUT_T32_I4(&clut[std::min((i + offset), 240)], &dst[i]);
+		ReadCLUT_T32_I4(&clut[i | offset], &dst[i]);
 	}
 }
 
 __forceinline void GSClut::ReadCLUT_T32_I4(const u16* RESTRICT clut, u32* RESTRICT dst)
 {
+#if defined(ARCH_ARM64)
+	// Each entry is its low half from clut[0..15] and its high half from clut[256..271]: two interleaving stores.
+	uint16x8x2_t lo_hi0 = {vld1q_u16(clut), vld1q_u16(clut + 256)};
+	uint16x8x2_t lo_hi1 = {vld1q_u16(clut + 8), vld1q_u16(clut + 264)};
+	vst2q_u16(reinterpret_cast<u16*>(dst), lo_hi0);
+	vst2q_u16(reinterpret_cast<u16*>(dst + 8), lo_hi1);
+	return;
+#endif
 	GSVector4i* s = (GSVector4i*)clut;
 	GSVector4i* d = (GSVector4i*)dst;
 

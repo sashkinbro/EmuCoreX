@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 Texture2D Texture;
@@ -7,6 +7,10 @@ SamplerState Sampler;
 cbuffer cb0
 {
 	float4 ZrH;
+	// xy: the device rows [x, y) of the merge that were not drawn for the field being read, starting
+	// where the circuit's display rect starts; zw are for the comb pass (ps_main5). GSRenderer::Merge offsets a
+	// field's picture down by one native line and the merge target is cleared, so nothing drew them.
+	float4 FieldPad;
 };
 
 struct PS_INPUT
@@ -24,7 +28,14 @@ float4 ps_main0(PS_INPUT input) : SV_Target0
 	const int vpos  = int(input.p.y); // vertical position of destination texture
 
 	if ((vpos & 1) == field)
-		return Texture.SampleLevel(Sampler, input.t, 0);
+	{
+		// Rows [pad.x, pad.y) were never drawn for this field, so read the first row that was
+		// instead of the cleared hole. The band starts where the display rect does. At 1x it is
+		// one row and the field's own lowest row is its next, so nothing moves; at 2x it is two
+		// rows and this is what fills the black device row.
+		const float src_row = (float(vpos) >= FieldPad.x && float(vpos) < FieldPad.y) ? FieldPad.y : float(vpos);
+		return Texture.SampleLevel(Sampler, input.t + float2(0.0f, (src_row - float(vpos)) * ZrH.y), 0);
+	}
 	else
 		discard;
 
@@ -71,7 +82,14 @@ float4 ps_main3(PS_INPUT input) : SV_Target0
 	// if the index of current destination line belongs to the current fiels we update it, otherwise
 	// we leave the old line in the destination buffer
 	if ((vpos & 1) == field)
-		return Texture.SampleLevel(Sampler, input.t, 0);
+	{
+		// Same undrawn band as the weave shader. This pass writes one bank of a target twice the
+		// source's height, so the source row a fragment reads is its row within the bank, and one
+		// source row is 1 / vres of the texture coordinate.
+		const int   srow    = int(input.p.y) - bank * vres;
+		const float src_row = (float(srow) >= FieldPad.x && float(srow) < FieldPad.y) ? FieldPad.y : float(srow);
+		return Texture.SampleLevel(Sampler, input.t + float2(0.0f, (src_row - float(srow)) / float(vres)), 0);
+	}
 	else
 		discard;
 
@@ -175,9 +193,62 @@ float4 ps_main4(PS_INPUT input) : SV_Target0
 			// high motion -> interpolate pixels above and below
 			return (hn + ln) / 2.0f;
 		else
-			// low motion -> weave
-			return cn;
+		{
+			// Check if it's completely static first, we don't need to mess with any of that.
+			if((mh_max != -motion_thr.x) || (ml_max != -motion_thr.x) || (mc_max != -motion_thr.x))
+			{
+				// Check the diff with the above and below lines, if the difference is smaller between the new high and low lines
+				// compared to the new centre line and the high line (with some threshold of about 25 color steps), then reconstruct.
+				float3 mhln = hn.rgb - ln.rgb;
+				float3 mchn = hn.rgb - cn.rgb;
+
+				mhln = max(mhln, -mhln) - motion_thr;
+				mchn = max(mchn, -mchn) - motion_thr;
+
+				float mhln_max = max(max(mhln.x, mhln.y), mhln.z);
+				float mchn_max = max(max(mchn.x, mchn.y), mchn.z);
+
+				// The new centre line is a fair chunk different from those surrounding it, so quite likely incorrect.
+				if (mhln_max < 0.0f && mchn_max >= (mhln_max * 0.90f))
+					return (hn + ln) / 2.0f;
+				else
+					// low motion -> weave
+					return cn;
+			}
+			else
+				// low motion -> weave
+				return cn;
+		}
 	}
 
 	return float4(0.0f, 0.0f, 0.0f, 0.0f);
+}
+
+
+// Comb-adaptive deinterlace, for interlaced video woven into one frame (a movie in frame mode). Works
+// in native lines, FieldPad.z device rows each from device row FieldPad.w. The lines of the field on
+// screen now are kept. A line of the other field is replaced by the mean of its neighbours where it
+// combs: where it stands out the same way from both neighbours (they show the other moment) more than
+// it differs from its own field's lines two away. A still picture stays whole, and so does a thin line
+// that stands out from its own field too.
+float4 ps_main5(PS_INPUT input) : SV_Target0
+{
+	const int   field = int(ZrH.x) & 1;
+	const int   native_line = int(floor((input.p.y - FieldPad.w) / FieldPad.z));
+	const float4 c    = Texture.SampleLevel(Sampler, input.t, 0);
+	if ((native_line & 1) == field)
+		return c;
+
+	const float2 vstep = float2(0.0f, FieldPad.z * ZrH.y); // one native line
+	const float4 a     = Texture.SampleLevel(Sampler, input.t - vstep, 0);
+	const float4 b     = Texture.SampleLevel(Sampler, input.t + vstep, 0);
+	const float3 luma  = float3(0.299f, 0.587f, 0.114f);
+	const float  lc    = dot(c.rgb, luma);
+	const float  la    = dot(a.rgb, luma);
+	const float  lb    = dot(b.rgb, luma);
+	const float  lown  = 0.5f * (dot(Texture.SampleLevel(Sampler, input.t - 2.0f * vstep, 0).rgb, luma) +
+	                             dot(Texture.SampleLevel(Sampler, input.t + 2.0f * vstep, 0).rgb, luma));
+	const float  out_of = ((lc - la) * (lc - lb) > 0.0f) ? min(abs(lc - la), abs(lc - lb)) : 0.0f;
+	const float  comb   = smoothstep(0.02f, 0.06f, out_of - abs(lc - lown));
+	return lerp(c, 0.5f * (a + b), comb);
 }

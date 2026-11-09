@@ -67,6 +67,9 @@ void main()
 	gl_Position.xy = gl_Position.xy * vec2(VertexScale.x, -VertexScale.y) - vec2(VertexOffset.x, -VertexOffset.y);
 	gl_Position.z *= exp2(-32.0f);		// integer->float depth
 	gl_Position.y = -gl_Position.y;
+#if GPU_PROFILE_MALI
+	if (gl_Position.z == gl_Position.w) gl_Position.z *= 0.999999f;
+#endif
 
 	#if VS_TME
 		vec2 uv = a_uv - TextureOffset;
@@ -464,6 +467,9 @@ void main()
 #endif
 
 	gl_Position = vtx.p;
+#if GPU_PROFILE_MALI
+	if (gl_Position.z == gl_Position.w) gl_Position.z *= 0.999999f;
+#endif
 	vsOut.t = vtx.t;
 	vsOut.ti = vtx.ti;
 	vsOut.c = vtx.c;
@@ -547,6 +553,8 @@ void main()
 #define PS_A_MASKED 0
 #define PS_FBA 0
 #define PS_FBMASK 0
+#define PS_QUANTIZE_COLOR 0
+#define PS_SUBSTITUTE_ALPHA 0
 #define PS_LTF 1
 #define PS_TCOFFSETHACK 0
 #define PS_SHUFFLE 0
@@ -584,6 +592,7 @@ void main()
 #define PS_TEX_IS_FB 0
 #define PS_ROV_COLOR 0
 #define PS_ROV_DEPTH 0
+#define PS_STENCIL_COUNTER 0
 #endif
 
 #define SW_BLEND (PS_BLEND_A || PS_BLEND_B || PS_BLEND_D)
@@ -626,12 +635,13 @@ layout(std140, set = 0, binding = 1) uniform cb1
 	mat4 DitherMatrix;
 	float ScaledScaleFactor;
 	float RcpScaleFactor;
-	float _pad0_cb1;
+	float RtScaleFactor;
 	float _pad1_cb1;
 	float LineCovScale;
-	float _pad2_cb1;
-	float _pad3_cb1;
-	float _pad4_cb1;
+	uint SubstituteAlphaKeep;
+	uint SubstituteAlphaValue;
+	uint DitherPhase;
+	vec4 NativeTexelGrid;
 };
 
 layout(location = 0) in VSOutput
@@ -707,7 +717,8 @@ layout(set = 1, binding = 3) uniform texture2D PrimMinTexture;
 #endif
 
 #if ZWRITE && !PS_FEEDBACK_LOOP_IS_NEEDED_DEPTH
-layout(depth_less) out float gl_FragDepth;
+// Float32 Z flooring can exceed the interpolated value; no conservative depth promise.
+out float gl_FragDepth;
 #endif
 
 #if NEEDS_TEX
@@ -1328,7 +1339,11 @@ vec4 sample_color(vec2 st)
 #if PS_AEM_FMT == FMT_32 && PS_PAL_FMT == 0 && PS_RTA_SRC_CORRECTION
 	t.a = t.a * (128.5f / 255.0f);
 #endif
-	return trunc(t * 255.0f + 0.05f);
+    t = trunc(t * 255.0f + 0.05f);
+#if PS_REPLACEMENT_ALPHA_SNAP
+    if(abs(t.a-128.0f)<=8.0f)t.a=128.0f;
+#endif
+    return t;
 }
 
 #endif // NEEDS_TEX
@@ -1421,6 +1436,23 @@ vec4 ps_color()
 	}
 #endif
 
+#if PS_NATIVE_TEXEL_GRID
+	// A sprite that MINIFIES a GS-memory texture under a nearest sampler reads the texel its NATIVE
+	// pixel read, not the one this device pixel's own sample point lands on. The console samples a
+	// sprite once per pixel, so at two source texels per native pixel it never displays the texels
+	// in between, and at 2x those unreachable texels land on every second device column. See
+	// GSNativeTexelGridPolicy.h for the whole rule.
+	//
+	// NativeTexelGrid.xy is the source step per NATIVE pixel in these same coordinates -- zero on
+	// an axis that does not minify, which makes that axis' term vanish -- and .z is the scale. The
+	// convention is the integer pixel index, not the fragment centre: a device pixel samples where
+	// native coordinate pixel/scale samples, and its owner native pixel sampled at the floor of
+	// that. Hence floor the coordinate first, and divide rather than multiply by a reciprocal,
+	// which can land a hair under an integer where the divide is exact.
+	vec2 native_here = floor(gl_FragCoord.xy) / NativeTexelGrid.z;
+	st += NativeTexelGrid.xy * (floor(native_here) - native_here);
+#endif
+
 #if !NEEDS_TEX
 	vec4 T = vec4(0.0f);
 #elif PS_CHANNEL_FETCH == 1
@@ -1465,15 +1497,26 @@ vec4 ps_color()
 	return C;
 }
 
+uvec4 quantize_color(vec4 C)
+{
+	return uvec4(C);
+}
+
 void ps_fbmask(inout vec4 C)
 {
 	#if PS_FBMASK
-		#if PS_COLCLIP_HW == 1
-			vec4 RT = trunc(sample_from_rt() * 65535.0f);
-		#else
-			vec4 RT = trunc(sample_from_rt() * 255.0f + 0.1f);
+		float multi_rgb = PS_COLCLIP_HW != 0 ? 65535.0f : 255.0f;
+		float multi_a = PS_RTA_CORRECTION != 0 ? 128.0f : 255.0f;
+		vec4 RT = sample_from_rt();
+		RT.rgb = trunc(RT.rgb * multi_rgb + 0.1f);
+		RT.a = round(RT.a * multi_a);
+		C = vec4(gpu_bitwise_and(quantize_color(C), ~FbMask) | gpu_bitwise_and(uvec4(RT), FbMask));
+	#elif PS_QUANTIZE_COLOR || PS_SUBSTITUTE_ALPHA
+		uvec4 Cq = quantize_color(C);
+		#if PS_SUBSTITUTE_ALPHA
+			Cq.a = (Cq.a & SubstituteAlphaKeep) | SubstituteAlphaValue;
 		#endif
-		C = vec4(gpu_bitwise_and(uvec4(C), ~FbMask) | gpu_bitwise_and(uvec4(RT), FbMask));
+		C = vec4(Cq);
 	#endif
 }
 
@@ -1485,7 +1528,19 @@ void ps_dither(inout vec3 C, float As)
 		#if PS_DITHER == 2
 			fpos = ivec2(gl_FragCoord.xy);
 		#else
-			fpos = ivec2(gl_FragCoord.xy * RcpScaleFactor);
+			// The dither matrix indexes by NATIVE pixel, so reduce the device pixel to the one
+			// that owns it on both axes -- same fix and same reasoning as the SCANMSK test below:
+			// floor before dividing, because gl_FragCoord is coord + 0.5, and a true divide by S
+			// (the RENDER TARGET's scale: the texture's, in ScaledScaleFactor, is 1 for a texture read
+			// from GS memory) rather than a reciprocal multiply, which can land a hair under an integer
+			// where the divide is exact.
+			// DitherPhase then rotates the matrix under that index. At a fractional S some native
+			// pixels own one more device pixel than their neighbours, so their matrix entry covers
+			// more of the screen than the others; the phase decides which entries those are, and
+			// the CPU picks the quietest. It is zero at every whole S, where no cell is wider.
+			const float dither_scale = RtScaleFactor;
+			fpos = ivec2(floor(gl_FragCoord.xy) / dither_scale)
+			     + ivec2(DitherPhase & 3u, (DitherPhase >> 2) & 3u);
 		#endif
 
 		float value = gpu_matrix_element(DitherMatrix, fpos.y & 3, fpos.x & 3);
@@ -1514,7 +1569,7 @@ void ps_color_clamp_wrap(inout vec3 C)
 {
 	// When dithering the bottom 3 bits become meaningless and cause lines in the picture
 	// so we need to limit the color depth on dithered items
-#if SW_BLEND || (PS_DITHER > 0 && PS_DITHER < 3) || PS_FBMASK
+#if SW_BLEND || (PS_DITHER > 0 && PS_DITHER < 3) || PS_FBMASK || PS_QUANTIZE_COLOR || PS_SUBSTITUTE_ALPHA
 
 #if PS_DST_FMT == FMT_16 && PS_BLEND_MIX == 0 && PS_ROUND_INV
 	C += 7.0f; // Need to round up, not down since the shader will invert
@@ -1785,8 +1840,15 @@ void main()
 #endif
 
 #if PS_SCANMSK & 2
-	// fail depth test on prohibited lines
-	if ((int(gl_FragCoord.y) & 1) == (PS_SCANMSK & 1))
+	// fail depth test on prohibited lines. SCANMSK masks NATIVE scanlines, so reduce the device row
+	// to the line that owns it -- floor(row / S) -- before the parity test. Two traps, both silent:
+	// gl_FragCoord.y is row + 0.5, and at a fractional scale that half puts some rows in the line
+	// above their owner; and a multiply by RcpScaleFactor can land a hair under an integer where
+	// row / S is exactly integral. S is RtScaleFactor, the render target's
+	// scale: ScaledScaleFactor is the texture's, which is 1 for a texture read from GS memory.
+	// (The dither path above uses the same floor-then-divide fix.)
+	const float scanmsk_scale = RtScaleFactor;
+	if ((int(floor(gl_FragCoord.y) / scanmsk_scale) & 1) == (PS_SCANMSK & 1))
 		DISCARD;
 #endif
 #if PS_DATE >= 5
@@ -1951,7 +2013,11 @@ void main()
 
 	// Output color scaling
 	#if !PS_NO_COLOR
-		#if PS_RTA_CORRECTION
+		#if PS_BLEND_FACTOR_IN_ALPHA
+			// No dual-source blend unit here. Nothing is keeping this pass's alpha, so hand the
+			// blend factor to fixed-function SRC_ALPHA through it instead of a second output.
+			o_col0.a = alpha_blend.a;
+		#elif PS_RTA_CORRECTION
 			o_col0.a = C.a / 128.0f;
 		#else
 			o_col0.a = C.a / 255.0f;
@@ -1963,6 +2029,16 @@ void main()
 		#endif
 		#if !PS_NO_COLOR1
 			o_col1 = alpha_blend;
+		#endif
+
+		#if PS_STENCIL_COUNTER && !PS_NO_COLOR1
+			// Alpha stencil counter (GSFastStencilShadow.h): new A = (Ad * Av) >> 7 with a flat Av of
+			// 127 or 130. The blend unit computes Ad * o_col0.a + Ad * o_col1.a (source DST_ALPHA,
+			// destination SRC1_ALPHA). The factors are whole 8-bit values because a fixed-point blend
+			// unit keeps 8 bits: up is Ad * (1 + 3/255), down is Ad * 252/255, and 128 or 129 leave Ad
+			// alone. RGB is kept by its blend factors.
+			o_col0 = vec4(0.0f, 0.0f, 0.0f, (vsIn.c.a > 129.5f) ? (3.0f / 255.0f) : 0.0f);
+			o_col1 = vec4((vsIn.c.a < 127.5f) ? (252.0f / 255.0f) : 1.0f);
 		#endif
 
 		// Alpha test with feedback

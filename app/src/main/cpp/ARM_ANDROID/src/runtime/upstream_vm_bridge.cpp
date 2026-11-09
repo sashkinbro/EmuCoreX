@@ -11,6 +11,7 @@
 #include "pcsx2/ImGui/ImGuiManager.h"
 #include "pcsx2/OpcodeFamilies.h"
 #include "pcsx2/GS/GSUtil.h"
+#include "pcsx2/GS/GS.h"
 #include "pcsx2/GS/GSXXH.h"
 #include "pcsx2/GS/Renderers/Common/GSDevice.h"
 #include "pcsx2/GS/Renderers/Vulkan/GSDeviceVK.h"
@@ -746,6 +747,7 @@ bool RunUpstreamVm(const VmLaunchConfig& config, VmStartupCallback startup_callb
 	}
 #endif
 	QueryAndNotifyAchievementsState();
+	bool cache_flush_requested_for_pause = false;
 	for (;;)
 	{
 		Host::PumpMessagesOnCPUThread();
@@ -755,12 +757,18 @@ bool RunUpstreamVm(const VmLaunchConfig& config, VmStartupCallback startup_callb
 
 		if (state == VMState::Paused)
 		{
+			if (!cache_flush_requested_for_pause)
+			{
+				GSRequestShaderCacheFlush();
+				cache_flush_requested_for_pause = true;
+			}
 			Host::PumpMessagesOnCPUThread();
 			VMManager::IdlePollUpdate();
 			std::this_thread::sleep_for(std::chrono::milliseconds(8));
 			continue;
 		}
 
+		cache_flush_requested_for_pause = false;
 		RecordVmExecutePhaseForCrashDiagnostics("execute");
 		VMManager::Execute();
 		RecordVmExecutePhaseForCrashDiagnostics("execute-returned");

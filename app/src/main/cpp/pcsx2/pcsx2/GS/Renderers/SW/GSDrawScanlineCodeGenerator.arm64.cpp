@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #include "GS/Renderers/SW/GSDrawScanlineCodeGenerator.arm64.h"
+#include "GS/Renderers/SW/GSBlockWalk.h"
+#include "GS/Renderers/SW/GSCoordinateWalk.h"
 #include "GS/Renderers/SW/GSDrawScanline.h"
 #include "GS/Renderers/SW/GSVertexSW.h"
 #include "GS/GSState.h"
@@ -21,298 +23,75 @@ MULTI_ISA_UNSHARED_IMPL;
 
 using namespace oak::util;
 
-static constexpr oak::WReg _steps{0};
-static constexpr oak::WReg _left{1};
-static constexpr oak::WReg _skip{1};
-static constexpr oak::WReg _top{2};
-static constexpr oak::XReg _v{3};
-static constexpr oak::XReg _locals{4};
+static const auto& _steps = W0;
+static const auto& _left = W1;
+static const auto& _skip = W1;
+static const auto& _top = W2;
+static const auto& _v = X3;
+static const auto& _locals = X4;
 
 // X5-X9 used internally
 
-static constexpr oak::XReg _globals{10};
-static constexpr oak::XReg _vm{11};
-static constexpr oak::XReg _vm_high{12};
-static constexpr oak::XReg _global_tex0{13};
-static constexpr oak::XReg _global_clut{14};
+static const auto& _globals = X10;
+static const auto& _vm = X11;
+static const auto& _vm_high = X12;
+static const auto& _global_tex0 = X13;
+static const auto& _global_clut = X14;
 
-static constexpr oak::WReg _wscratch{15};
-static constexpr oak::XReg _xscratch{15};
-static constexpr oak::WReg _wscratch2{16};
-static constexpr oak::XReg _scratchaddr{17};
+static const auto& _wscratch = W15;
+static const auto& _xscratch = X15;
+static const auto& _wscratch2 = W16;
+static const auto& _xscratch2 = X16;
+static const auto& _scratchaddr = X17;
 
-static constexpr oak::XReg _global_dimx{19};
-static constexpr oak::WReg _local_aref{20};
-static constexpr oak::WReg _global_frb{21};
-static constexpr oak::WReg _global_fga{22};
-static constexpr oak::WReg _global_l{23};
-static constexpr oak::WReg _global_k{24};
-static constexpr oak::WReg _global_mxl{25};
+static const auto& _global_dimx = X19;
+static const auto& _local_aref = W20;
+static const auto& _global_frb = W21;
+static const auto& _global_fga = W22;
+// The level-of-detail table's per-draw scalars and base (GSLevelOfDetail.h):
+// 4 + TEX1.L, TEX1.K in sixteenths, and the integer ceiling. X28 is saved by
+// the prologue and otherwise unused.
+static const auto& _global_lodshift = W23;
+static const auto& _global_lodk = W24;
+static const auto& _global_mxl = W25;
+static const auto& _global_lodtab = X28;
 
-static constexpr oak::QReg _vscratch{31};
-static constexpr oak::QReg _vscratch2{30};
-static constexpr oak::QReg _vscratch3{29};
-static constexpr oak::QReg _temp_s{28};
-static constexpr oak::QReg _temp_t{27};
-static constexpr oak::QReg _temp_q{26};
-static constexpr oak::QReg _temp_z0{25};
-static constexpr oak::QReg _temp_z1{24};
-static constexpr oak::QReg _temp_rb{23};
-static constexpr oak::QReg _temp_ga{22};
-static constexpr oak::QReg _temp_zs{21};
-static constexpr oak::QReg _temp_zd{20};
-static constexpr oak::QReg _temp_vf{19};
-static constexpr oak::QReg _d4_z{18};
-static constexpr oak::QReg _d4_stq{17};
-static constexpr oak::QReg _d4_c{16};
-static constexpr oak::QReg _global_tmin{15};
-static constexpr oak::QReg _global_tmax{14};
-static constexpr oak::QReg _global_tmask{13};
-static constexpr oak::QReg _const_movemskw_mask{12};
-static constexpr oak::QReg _const_log2_coef{11};
-static constexpr oak::QReg _temp_f{10};
-static constexpr oak::QReg _d4_f{9};
+// The alternating block step's cursor. Callee-saved on purpose: X5-X9 all
+// carry live values inside the loop body.
+static const auto& _block_ptr = X26;
+static const auto& _block_hop = X27;
 
-static constexpr oak::QReg _test{8};
-static constexpr oak::QReg _fd{2};
+static const auto& _vscratch = Q31;
+static const auto& _vscratch2 = Q30;
+static const auto& _vscratch3 = Q29;
+static const auto& _temp_s = Q28;
+static const auto& _temp_t = Q27;
+static const auto& _temp_q = Q26;
+static const auto& _temp_z0 = Q25;
+static const auto& _temp_z1 = Q24;
+static const auto& _temp_rb = Q23;
+static const auto& _temp_ga = Q22;
+static const auto& _temp_zs = Q21;
+static const auto& _temp_zd = Q20;
+static const auto& _temp_vf = Q19;
+static const auto& _d4_z = Q18;
+static const auto& _d4_stq = Q17;
+static const auto& _d4_c = Q16;
+static const auto& _global_tmin = Q15;
+static const auto& _global_tmax = Q14;
+static const auto& _global_tmask = Q13;
+static const auto& _const_movemskw_mask = Q12;
+static const auto& _temp_f = Q10;
+static const auto& _d4_f = Q9;
+
+static const auto& _test = Q8;
+static const auto& _fd = Q2;
 
 // Yay, you can't offsetof with non-constant array indices in GCC
 #define OFFSETOF(base, field) (reinterpret_cast<uptr>(&reinterpret_cast<base*>(0)->field))
 #define _local(field) OakMemOperand{_locals, static_cast<s64>(OFFSETOF(GSScanlineLocalData, field))}
 #define _global(field) OakMemOperand{_globals, static_cast<s64>(OFFSETOF(GSScanlineGlobalData, field))}
-
-class GSDrawOakEmitter
-{
-public:
-	explicit GSDrawOakEmitter(oak::CodeGenerator& emitter)
-		: m_emit(emitter)
-	{
-	}
-
-	template <typename... Args>
-	void ADD(Args&&... args) { m_emit.ADD(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void ADDV(Args&&... args) { m_emit.ADDV(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void AND(Args&&... args) { m_emit.AND(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void ASR(Args&&... args) { m_emit.ASR(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void B(Args&&... args) { m_emit.B(std::forward<Args>(args)...); }
-	void BIC(oak::VReg_8H rd, int imm, int amount) { m_emit.BIC(rd, imm, oak::LslSymbol::LSL, amount); }
-	template <typename... Args>
-	void BIC(Args&&... args) { m_emit.BIC(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void BR(Args&&... args) { m_emit.BR(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void BRK(Args&&... args) { m_emit.BRK(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void BSL(Args&&... args) { m_emit.BSL(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void CMEQ(Args&&... args) { m_emit.CMEQ(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void CMGT(Args&&... args) { m_emit.CMGT(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void CMN(Args&&... args) { m_emit.CMN(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void CMP(Args&&... args) { m_emit.CMP(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void EOR(Args&&... args) { m_emit.EOR(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void EXT(Args&&... args) { m_emit.EXT(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void FADD(Args&&... args) { m_emit.FADD(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void FCVTL(Args&&... args) { m_emit.FCVTL(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void FCVTL2(Args&&... args) { m_emit.FCVTL2(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void FCVTZS(Args&&... args) { m_emit.FCVTZS(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void FDIV(Args&&... args) { m_emit.FDIV(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void FMAXNM(Args&&... args) { m_emit.FMAXNM(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void FMINNM(Args&&... args) { m_emit.FMINNM(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void FMLA(Args&&... args) { m_emit.FMLA(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void FMOV(Args&&... args) { m_emit.FMOV(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void FMUL(Args&&... args) { m_emit.FMUL(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void FSUB(Args&&... args) { m_emit.FSUB(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void LDP(Args&&... args) { m_emit.LDP(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void LSL(Args&&... args) { m_emit.LSL(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void MUL(Args&&... args) { m_emit.MUL(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void MVN(Args&&... args) { m_emit.MVN(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void NEG(Args&&... args) { m_emit.NEG(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void ORR(Args&&... args) { m_emit.ORR(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void RET(Args&&... args) { m_emit.RET(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void SCVTF(Args&&... args) { m_emit.SCVTF(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void SHL(Args&&... args) { m_emit.SHL(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void SMAX(Args&&... args) { m_emit.SMAX(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void SMIN(Args&&... args) { m_emit.SMIN(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void SQDMULH(Args&&... args) { m_emit.SQDMULH(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void SQXTN(Args&&... args) { m_emit.SQXTN(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void SQXTN2(Args&&... args) { m_emit.SQXTN2(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void SQXTUN(Args&&... args) { m_emit.SQXTUN(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void SQXTUN2(Args&&... args) { m_emit.SQXTUN2(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void SSHL(Args&&... args) { m_emit.SSHL(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void SSHR(Args&&... args) { m_emit.SSHR(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void STP(Args&&... args) { m_emit.STP(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void SUB(Args&&... args) { m_emit.SUB(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void TRN1(Args&&... args) { m_emit.TRN1(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void TRN2(Args&&... args) { m_emit.TRN2(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void TST(Args&&... args) { m_emit.TST(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void UMIN(Args&&... args) { m_emit.UMIN(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void UMINV(Args&&... args) { m_emit.UMINV(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void UQADD(Args&&... args) { m_emit.UQADD(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void USHL(Args&&... args) { m_emit.USHL(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void USHLL(Args&&... args) { m_emit.USHLL(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void USHR(Args&&... args) { m_emit.USHR(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void UZP1(Args&&... args) { m_emit.UZP1(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void ZIP1(Args&&... args) { m_emit.ZIP1(std::forward<Args>(args)...); }
-	template <typename... Args>
-	void ZIP2(Args&&... args) { m_emit.ZIP2(std::forward<Args>(args)...); }
-
-	void l(oak::Label& label) { m_emit.l(label); }
-
-	void DUP(oak::VReg_8H rd, oak::VReg_8H rn, int lane) { m_emit.DUP(rd, oak::QReg(rn.index()).Helem()[lane]); }
-	void DUP(oak::VReg_4S rd, oak::VReg_4S rn, int lane) { m_emit.DUP(rd, oak::QReg(rn.index()).Selem()[lane]); }
-	void DUP(oak::VReg_2D rd, oak::VReg_2D rn, int lane) { m_emit.DUP(rd, oak::QReg(rn.index()).Delem()[lane]); }
-	template <typename... Args>
-	void DUP(Args&&... args) { m_emit.DUP(std::forward<Args>(args)...); }
-
-	void LDR(oak::WReg dst, OakMemOperand mem) { oakLoad32(dst, mem); }
-	void LDR(oak::XReg dst, OakMemOperand mem) { oakLoad64(dst, mem); }
-	void LDR(oak::SReg dst, OakMemOperand mem) { oakLoad32(OAK_WSCRATCH, mem); m_emit.FMOV(dst, OAK_WSCRATCH); }
-	void LDR(oak::DReg dst, OakMemOperand mem) { oakLoad64(OAK_XSCRATCH, mem); m_emit.FMOV(dst, OAK_XSCRATCH); }
-	void LDR(oak::QReg dst, OakMemOperand mem) { oakLoad128(dst, mem); }
-	template <typename... Args>
-	void LDR(Args&&... args) { m_emit.LDR(std::forward<Args>(args)...); }
-
-	void LDRB(oak::WReg dst, OakMemOperand mem)
-	{
-		m_emit.ADD(OAK_XSCRATCH, mem.base, mem.offset);
-		m_emit.LDRB(dst, OAK_XSCRATCH);
-	}
-	template <typename... Args>
-	void LDRB(Args&&... args) { m_emit.LDRB(std::forward<Args>(args)...); }
-
-	void STR(oak::WReg src, OakMemOperand mem) { oakStore32(src, mem); }
-	void STR(oak::XReg src, OakMemOperand mem) { oakStore64(src, mem); }
-	void STR(oak::SReg src, OakMemOperand mem) { m_emit.FMOV(OAK_WSCRATCH, src); oakStore32(OAK_WSCRATCH, mem); }
-	void STR(oak::DReg src, OakMemOperand mem) { m_emit.FMOV(OAK_XSCRATCH, src); oakStore64(OAK_XSCRATCH, mem); }
-	void STR(oak::QReg src, OakMemOperand mem) { oakStore128(src, mem); }
-	void STR(oak::VReg_4S src, OakMemOperand mem) { oakStore128(oak::QReg(src.index()), mem); }
-	template <typename... Args>
-	void STR(Args&&... args) { m_emit.STR(std::forward<Args>(args)...); }
-
-	void STRH(oak::WReg src, OakMemOperand mem) { oakStore16(src, mem); }
-	template <typename... Args>
-	void STRH(Args&&... args) { m_emit.STRH(std::forward<Args>(args)...); }
-
-	void LD1R(oak::VReg_4S dst, OakMemOperand mem) { oakLoad32(OAK_WSCRATCH, mem); m_emit.DUP(dst, OAK_WSCRATCH); }
-	void LD1R(oak::VReg_2D dst, OakMemOperand mem) { oakLoad64(OAK_XSCRATCH, mem); m_emit.DUP(dst, OAK_XSCRATCH); }
-	void LD1R(oak::VReg_8H dst, OakMemOperand mem) { oakLoad16(OAK_WSCRATCH, mem); m_emit.DUP(dst, OAK_WSCRATCH); }
-
-	void LD1(oak::VReg_2D dst, int lane, OakMemOperand mem)
-	{
-		oakLoad64(OAK_XSCRATCH, mem);
-		m_emit.INS(oak::QReg(dst.index()).Delem()[lane], OAK_XSCRATCH);
-	}
-	void LD1(oak::VReg_2D dst, u8 lane, OakMemOperand mem) { LD1(dst, static_cast<int>(lane), mem); }
-	void LD1(oak::VReg_4S dst, int lane, OakMemOperand mem)
-	{
-		oakLoad32(OAK_WSCRATCH, mem);
-		m_emit.INS(oak::QReg(dst.index()).Selem()[lane], OAK_WSCRATCH);
-	}
-	void LD1(oak::VReg_4S dst, u8 lane, OakMemOperand mem) { LD1(dst, static_cast<int>(lane), mem); }
-	template <typename... Args>
-	void LD1(Args&&... args) { m_emit.LD1(std::forward<Args>(args)...); }
-
-	void ST1(oak::VReg_2D src, int lane, OakMemOperand mem)
-	{
-		m_emit.UMOV(OAK_XSCRATCH, oak::QReg(src.index()).Delem()[lane]);
-		oakStore64(OAK_XSCRATCH, mem);
-	}
-	void ST1(oak::VReg_2D src, u8 lane, OakMemOperand mem) { ST1(src, static_cast<int>(lane), mem); }
-	void ST1(oak::VReg_4S src, int lane, OakMemOperand mem)
-	{
-		m_emit.UMOV(OAK_WSCRATCH, oak::QReg(src.index()).Selem()[lane]);
-		oakStore32(OAK_WSCRATCH, mem);
-	}
-	void ST1(oak::VReg_4S src, u8 lane, OakMemOperand mem) { ST1(src, static_cast<int>(lane), mem); }
-
-	void MOVI(oak::VReg_2D rd, u64 imm)
-	{
-		m_emit.MOV(OAK_XSCRATCH, imm);
-		m_emit.DUP(rd, OAK_XSCRATCH);
-	}
-	void MOVI(oak::VReg_2D rd, unsigned long long imm) { MOVI(rd, static_cast<u64>(imm)); }
-	void MOVI(oak::VReg_4S rd, u32 imm)
-	{
-		if (imm <= 0xff)
-		{
-			m_emit.MOVI(rd, imm);
-			return;
-		}
-
-		m_emit.MOV(OAK_WSCRATCH, imm);
-		m_emit.DUP(rd, OAK_WSCRATCH);
-	}
-	void MOVI(oak::VReg_4S rd, int imm) { MOVI(rd, static_cast<u32>(imm)); }
-	template <typename... Args>
-	void MOVI(Args&&... args) { m_emit.MOVI(std::forward<Args>(args)...); }
-
-	void MOV(oak::QReg dst, oak::QReg src) { m_emit.MOV(dst.B16(), src.B16()); }
-	void MOV(oak::WReg dst, oak::VReg_4S src, int lane) { m_emit.UMOV(dst, oak::QReg(src.index()).Selem()[lane]); }
-	void MOV(oak::WReg dst, oak::VReg_4S src, u8 lane) { MOV(dst, src, static_cast<int>(lane)); }
-	template <typename... Args>
-	void MOV(Args&&... args) { m_emit.MOV(std::forward<Args>(args)...); }
-
-	void UMOV(oak::WReg dst, oak::VReg_8H src, int lane) { m_emit.UMOV(dst, oak::QReg(src.index()).Helem()[lane]); }
-	void UMOV(oak::WReg dst, oak::VReg_4S src, int lane) { m_emit.UMOV(dst, oak::QReg(src.index()).Selem()[lane]); }
-	void UMOV(oak::XReg dst, oak::VReg_2D src, int lane) { m_emit.UMOV(dst, oak::QReg(src.index()).Delem()[lane]); }
-	template <typename... Args>
-	void UMOV(Args&&... args) { m_emit.UMOV(std::forward<Args>(args)...); }
-
-private:
-	oak::CodeGenerator& m_emit;
-};
-
+#include "GSOakScanlineEmitter.h"
 static thread_local GSDrawOakEmitter* gsAsm;
 
 GSDrawScanlineCodeGenerator::GSDrawScanlineCodeGenerator(u64 key, void* code, size_t maxsize)
@@ -320,6 +99,7 @@ GSDrawScanlineCodeGenerator::GSDrawScanlineCodeGenerator(u64 key, void* code, si
 	, m_capacity(maxsize)
 	, m_sel(key)
 {
+	m_block_split = GSBlockWalkIsSplit(4);
 }
 
 void GSDrawScanlineCodeGenerator::Generate()
@@ -329,7 +109,6 @@ void GSDrawScanlineCodeGenerator::Generate()
 	GSDrawOakEmitter gs_emitter(emitter);
 	oakAsm = &emitter;
 	gsAsm = &gs_emitter;
-
 	if (m_sel.breakpoint)
 		gsAsm->BRK(1);
 
@@ -340,22 +119,22 @@ void GSDrawScanlineCodeGenerator::Generate()
 												&GSDrawScanline::CDrawScanline)));
 		gsAsm->BR(X15);
 		m_size = static_cast<size_t>(emitter.offset());
-		if (m_size >= m_capacity)
-			pxAssert(false);
+		pxAssert(m_size < m_capacity);
 		gsAsm = nullptr;
 		oakAsm = nullptr;
 		return;
 	}
 
-	gsAsm->SUB(SP, SP, 128);
-	gsAsm->STP(X19, X20, SP, oak::SOffset<10, 3>(0));
-	gsAsm->STP(X21, X22, SP, oak::SOffset<10, 3>(16));
-	gsAsm->STP(X23, X24, SP, oak::SOffset<10, 3>(32));
-	gsAsm->STP(X25, X26, SP, oak::SOffset<10, 3>(48));
-	gsAsm->STP(D8, D9, SP, oak::SOffset<10, 3>(64));
-	gsAsm->STP(D10, D11, SP, oak::SOffset<10, 3>(80));
-	gsAsm->STP(D12, D13, SP, oak::SOffset<10, 3>(96));
-	gsAsm->STP(D14, D15, SP, oak::SOffset<10, 3>(112));
+	gsAsm->SUB(SP, SP, 144);
+	gsAsm->STP(X19, X20, SP, oak::SOffset<10,3>(0));
+	gsAsm->STP(X21, X22, SP, oak::SOffset<10,3>(16));
+	gsAsm->STP(X23, X24, SP, oak::SOffset<10,3>(32));
+	gsAsm->STP(X25, X26, SP, oak::SOffset<10,3>(48));
+	gsAsm->STP(D8, D9, SP, oak::SOffset<10,3>(64));
+	gsAsm->STP(D10, D11, SP, oak::SOffset<10,3>(80));
+	gsAsm->STP(D12, D13, SP, oak::SOffset<10,3>(96));
+	gsAsm->STP(D14, D15, SP, oak::SOffset<10,3>(112));
+	gsAsm->STP(X27, X28, SP, oak::SOffset<10,3>(128));
 
 	gsAsm->LDR(_globals, _local(gd));
 	gsAsm->LDR(_vm, _global(vm));
@@ -405,7 +184,7 @@ void GSDrawScanlineCodeGenerator::Generate()
 	if (!m_sel.edge)
 	{
 		gsAsm->CMP(_steps, 0);
-		gsAsm->B(LE, exit);
+		gsAsm->B(oak::Cond::LE, exit);
 
 		Step();
 
@@ -414,21 +193,21 @@ void GSDrawScanlineCodeGenerator::Generate()
 
 	gsAsm->l(exit);
 
-	gsAsm->LDP(D14, D15, SP, oak::SOffset<10, 3>(112));
-	gsAsm->LDP(D12, D13, SP, oak::SOffset<10, 3>(96));
-	gsAsm->LDP(D10, D11, SP, oak::SOffset<10, 3>(80));
-	gsAsm->LDP(D8, D9, SP, oak::SOffset<10, 3>(64));
-	gsAsm->LDP(X25, X26, SP, oak::SOffset<10, 3>(48));
-	gsAsm->LDP(X23, X24, SP, oak::SOffset<10, 3>(32));
-	gsAsm->LDP(X21, X22, SP, oak::SOffset<10, 3>(16));
-	gsAsm->LDP(X19, X20, SP, oak::SOffset<10, 3>(0));
-	gsAsm->ADD(SP, SP, 128);
+	gsAsm->LDP(X27, X28, SP, oak::SOffset<10,3>(128));
+	gsAsm->LDP(D14, D15, SP, oak::SOffset<10,3>(112));
+	gsAsm->LDP(D12, D13, SP, oak::SOffset<10,3>(96));
+	gsAsm->LDP(D10, D11, SP, oak::SOffset<10,3>(80));
+	gsAsm->LDP(D8, D9, SP, oak::SOffset<10,3>(64));
+	gsAsm->LDP(X25, X26, SP, oak::SOffset<10,3>(48));
+	gsAsm->LDP(X23, X24, SP, oak::SOffset<10,3>(32));
+	gsAsm->LDP(X21, X22, SP, oak::SOffset<10,3>(16));
+	gsAsm->LDP(X19, X20, SP, oak::SOffset<10,3>(0));
+	gsAsm->ADD(SP, SP, 144);
 
 	gsAsm->RET();
 
 	m_size = static_cast<size_t>(emitter.offset());
-	if (m_size >= m_capacity)
-		pxAssert(false);
+	pxAssert(m_size < m_capacity);
 	gsAsm = nullptr;
 	oakAsm = nullptr;
 
@@ -437,6 +216,12 @@ void GSDrawScanlineCodeGenerator::Generate()
 
 void GSDrawScanlineCodeGenerator::Init()
 {
+	// Where this span starts inside its eight-pixel block indexes the colour and
+	// fog lane tables, and on a four-lane host decides which of the two alternating
+	// steps the walk begins on. Read off the true left edge, before vector
+	// alignment rounds it down. See GSColourWalk.h.
+	gsAsm->AND(W9, _left, 7);
+
 	if (!m_sel.notest)
 	{
 		// int skip = left & 3;
@@ -486,10 +271,26 @@ void GSDrawScanlineCodeGenerator::Init()
 	gsAsm->LSL(W8, W6, 1); // *2
 	gsAsm->ADD(X8, _scratchaddr, X8);
 
-	if ((m_sel.prim != GS_SPRITE_CLASS && ((m_sel.fwrite && m_sel.fge) || m_sel.zb)) || (m_sel.fb && (m_sel.edge || m_sel.tfx != TFX_NONE || m_sel.iip)))
-	{
-		// W1 = &m_local.d[skip]
+	// X26 = &m_local.d[left & 7]. The colour and fog inits below read their lane
+	// offsets from there; at the end of Init it moves to &m_local.dw[left & 7][0],
+	// where Step walks the alternating pair. X27 is the signed hop to the other
+	// phase, so stepping is one add and one negate with no alignment assumption.
+	//
+	// The shift is the row stride of both tables, hard-coded. A fifth GSVector4i in
+	// skip or blockstep, or a third phase, would silently index the wrong row.
+	static_assert(sizeof(GSScanlineLocalData::skip) == 128);
+	static_assert(sizeof(GSScanlineLocalData::blockstep) == 64);
+	static_assert(sizeof(GSScanlineLocalData::dw[0]) == 128);
+	static_assert(offsetof(GSScanlineLocalData, d) == 0);
+	gsAsm->ADD(_block_ptr, _locals, X9, oak::AddSubShift::LSL, 7);
 
+	if (m_block_split)
+		gsAsm->MOV(_block_hop, sizeof(GSScanlineLocalData::blockstep));
+
+	// W1 = &m_local.d[skip], for the lanes indexed by the span's position inside
+	// the vector: depth and the texture coordinate. Colour and fog use _block_ptr.
+	if ((m_sel.prim != GS_SPRITE_CLASS && m_sel.zb) || (m_sel.fb && m_sel.tfx != TFX_NONE))
+	{
 		gsAsm->LSL(W1, W1, 3); // *8
 		gsAsm->ADD(X1, X1, _locals);
 		static_assert(offsetof(GSScanlineLocalData, d) == 0);
@@ -503,20 +304,21 @@ void GSDrawScanlineCodeGenerator::Init()
 
 			if (m_sel.fwrite && m_sel.fge)
 			{
-				// f = GSVector4i(v.t).zzzzh().zzzz().add16(m_local.d[skip].f);
-				gsAsm->LDR(_temp_f.toS(), OakMemOperand{_v, static_cast<s64>(offsetof(GSVertexSW, t.w))});
-				gsAsm->LDR(_vscratch, OakMemOperand{X1, static_cast<s64>(offsetof(GSScanlineLocalData::skip, f))});
-				gsAsm->LDR(_d4_f, _local(d4.f));
+				// f = GSVector4i(v.t).zzzzh().zzzz().add16(m_local.d[left & 7].f);
+				gsAsm->LDR(oak::SReg(_temp_f.index()), OakMemOperand{_v, static_cast<s64>(offsetof(GSVertexSW, t.w))});
+				gsAsm->LDR(_vscratch, OakMemOperand{_block_ptr, static_cast<s64>(offsetof(GSScanlineLocalData::skip, f))});
+				if (!m_block_split)
+					gsAsm->LDR(_d4_f, _local(d4.f));
 
-				gsAsm->FCVTZS(_temp_f.toS(), _temp_f.toS());
+				gsAsm->FCVTZS(oak::SReg(_temp_f.index()), oak::SReg(_temp_f.index()));
 				gsAsm->DUP(_temp_f.H8(), _temp_f.H8(), 0);
 				gsAsm->ADD(_temp_f.H8(), _temp_f.H8(), _vscratch.H8());
 			}
 
 			if (m_sel.zb && m_sel.zequal)
 			{
-				gsAsm->LDR(_temp_z0.toD(), OakMemOperand{_v, static_cast<s64>(offsetof(GSVertexSW, p.z))});
-				gsAsm->FCVTZS(_temp_z0.toD(), _temp_z0.toD());
+				gsAsm->LDR(oak::DReg(_temp_z0.index()), OakMemOperand{_v, static_cast<s64>(offsetof(GSVertexSW, p.z))});
+				gsAsm->FCVTZS(oak::DReg(_temp_z0.index()), oak::DReg(_temp_z0.index()));
 				gsAsm->DUP(_temp_z0.S4(), _temp_z0.S4(), 0);
 			}
 			else if (m_sel.zb)
@@ -524,10 +326,10 @@ void GSDrawScanlineCodeGenerator::Init()
 				// z = vp.zzzz() + m_local.d[skip].z;
 				gsAsm->ADD(_scratchaddr, _v, offsetof(GSVertexSW, p.z));
 				gsAsm->LDR(_vscratch, OakMemOperand{X1, static_cast<s64>(offsetof(GSScanlineLocalData::skip, z))});
-				gsAsm->LD1R(_vscratch2.D2(), OakMemOperand{_scratchaddr, 0});
+				gsAsm->LD1R(_vscratch2.D2(), OakMemOperand{_scratchaddr, static_cast<s64>(0)});
 
 				// low
-				gsAsm->FCVTL(_temp_z0.D2(), _vscratch.toD().S2());
+				gsAsm->FCVTL(_temp_z0.D2(), oak::VReg_2S(_vscratch.index()));
 				gsAsm->FADD(_temp_z0.D2(), _temp_z0.D2(), _vscratch2.D2());
 
 				// high
@@ -554,7 +356,7 @@ void GSDrawScanlineCodeGenerator::Init()
 		if (m_sel.edge)
 		{
 			gsAsm->ADD(_scratchaddr, _v, offsetof(GSVertexSW, p.x));
-			gsAsm->LD1R(Q3.H8(), OakMemOperand{_scratchaddr, 0});
+			gsAsm->LD1R(Q3.H8(), OakMemOperand{_scratchaddr, static_cast<s64>(0)});
 		}
 
 		if (m_sel.tfx != TFX_NONE)
@@ -573,9 +375,21 @@ void GSDrawScanlineCodeGenerator::Init()
 		{
 			if (m_sel.fst)
 			{
-				// GSVector4i vti(vt);
+				// GSVector4i vti = GSVector4i(vt.floor()) & GS_UV_GRID_MASK;
+				//
+				// A span that walks the accumulator seeds on its 12.15 grid, floored below
+				// the exact plane (GSCoordinateWalk.h). FCVTMS is the floor; the BIC is the
+				// grid. A triangle's own ST plane keeps the truncating conversion.
 
-				gsAsm->FCVTZS(Q6.S4(), Q4.S4());
+				if (m_sel.uvwalk)
+				{
+					gsAsm->FCVTMS(Q6.S4(), Q4.S4());
+					gsAsm->BIC(Q6.S4(), (1 << GS_UV_GRID_SHIFT) - 1, 0);
+				}
+				else
+				{
+					gsAsm->FCVTZS(Q6.S4(), Q4.S4());
+				}
 
 				// s = vti.xxxx() + m_local.d[skip].s;
 				// t = vti.yyyy(); if (!sprite) t += m_local.d[skip].t;
@@ -595,7 +409,22 @@ void GSDrawScanlineCodeGenerator::Init()
 				{
 					if (m_sel.ltf)
 					{
-						gsAsm->TRN1(_temp_vf.H8(), _temp_t.H8(), _temp_t.H8());
+						// vf = GSTruncateCoordinate(v).xxzzlh().srl16(12);
+						//
+						// The sixteenth index truncates toward zero, so a negative coordinate takes
+						// a sixteenth less one first. A sprite's V never steps, so the weight is
+						// taken once here while the loop re-forms the index from t; both must read
+						// the same sixteenth, so the bias goes to the weight's register and t keeps
+						// the raw coordinate.
+						gsAsm->SSHR(_temp_vf.S4(), _temp_t.S4(), 31);
+						gsAsm->USHR(_temp_vf.S4(), _temp_vf.S4(), 20);
+						gsAsm->ADD(_temp_vf.S4(), _temp_t.S4(), _temp_vf.S4());
+
+						// The weight and the index have to read the same 12.4 field,
+						// and the loop saturates the index it re-forms from t.
+						SaturateCoordinate(_temp_vf, _vscratch);
+
+						gsAsm->TRN1(_temp_vf.H8(), _temp_vf.H8(), _temp_vf.H8());
 						gsAsm->USHR(_temp_vf.H8(), _temp_vf.H8(), 12);
 					}
 				}
@@ -614,9 +443,20 @@ void GSDrawScanlineCodeGenerator::Init()
 				gsAsm->DUP(Q3.S4(), Q4.S4(), 1);
 				gsAsm->DUP(Q4.S4(), Q4.S4(), 2);
 
-				gsAsm->FADD(_temp_s.S4(), Q2.S4(), _temp_s.S4());
-				gsAsm->FADD(_temp_t.S4(), Q3.S4(), _temp_t.S4());
-				gsAsm->FADD(_temp_q.S4(), Q4.S4(), _temp_q.S4());
+				if (m_sel.stqplane)
+				{
+					// Integer accumulators in units of g/2^14 (GSPerspectivePlane.h); the
+					// seed and the lane offsets are integers in the same lanes.
+					gsAsm->ADD(_temp_s.S4(), Q2.S4(), _temp_s.S4());
+					gsAsm->ADD(_temp_t.S4(), Q3.S4(), _temp_t.S4());
+					gsAsm->ADD(_temp_q.S4(), Q4.S4(), _temp_q.S4());
+				}
+				else
+				{
+					gsAsm->FADD(_temp_s.S4(), Q2.S4(), _temp_s.S4());
+					gsAsm->FADD(_temp_t.S4(), Q3.S4(), _temp_t.S4());
+					gsAsm->FADD(_temp_q.S4(), Q4.S4(), _temp_q.S4());
+				}
 			}
 
 			gsAsm->LDR(_d4_stq, _local(d4.stq));
@@ -640,8 +480,8 @@ void GSDrawScanlineCodeGenerator::Init()
 				// GSVector4i vc = GSVector4i(v.c);
 
 				gsAsm->LDR(Q6, OakMemOperand{_v, static_cast<s64>(offsetof(GSVertexSW, c))});
-				gsAsm->LDR(Q1, OakMemOperand{X1, static_cast<s64>(offsetof(GSScanlineLocalData::skip, rb))});
-				gsAsm->LDR(_vscratch, OakMemOperand{X1, static_cast<s64>(offsetof(GSScanlineLocalData::skip, ga))});
+				gsAsm->LDR(Q1, OakMemOperand{_block_ptr, static_cast<s64>(offsetof(GSScanlineLocalData::skip, rb))});
+				gsAsm->LDR(_vscratch, OakMemOperand{_block_ptr, static_cast<s64>(offsetof(GSScanlineLocalData::skip, ga))});
 				gsAsm->FCVTZS(Q6.S4(), Q6.S4());
 
 				// vc = vc.upl16(vc.zwxy());
@@ -658,7 +498,8 @@ void GSDrawScanlineCodeGenerator::Init()
 				gsAsm->ADD(_temp_rb.H8(), _temp_rb.H8(), Q1.H8());
 				gsAsm->ADD(_temp_ga.H8(), _temp_ga.H8(), _vscratch.H8());
 
-				gsAsm->LDR(_d4_c, _local(d4.c));
+				if (!m_block_split)
+					gsAsm->LDR(_d4_c, _local(d4.c));
 			}
 			else
 			{
@@ -684,14 +525,21 @@ void GSDrawScanlineCodeGenerator::Init()
 
 	if (m_sel.mmin && !m_sel.lcm)
 	{
-		gsAsm->LDR(_const_log2_coef, _global(const_log2_coef));
-		gsAsm->LDR(_global_l, _global(l));
-		gsAsm->LDR(_global_k, _global(k));
-		gsAsm->LDR(_global_mxl, _global(mxl));
+		gsAsm->LDR(_global_lodshift, _global(lodshift));
+		gsAsm->LDR(_global_lodk, _global(lodk));
+		gsAsm->LDR(_global_mxl, _global(lodmxl));
+		gsAsm->LDR(_global_lodtab, _global(lodtab));
 	}
 
-	if (m_sel.fpsm == 2 && m_sel.dthe)
+	// Every colour destination is dithered, not just 16-bit ones (see WriteFrame
+	// in GSDrawScanline.cpp). fmt 3 is not a frame-buffer format.
+	if (m_sel.dthe && m_sel.fpsm != 3)
 		gsAsm->LDR(_global_dimx, _global(dimx));
+
+	// Lane-offset loads are done; hand the cursor to Step. dw has the same row
+	// stride as d, so this is one add.
+	if (m_block_split)
+		gsAsm->ADD(_block_ptr, _block_ptr, OFFSETOF(GSScanlineLocalData, dw));
 }
 
 void GSDrawScanlineCodeGenerator::Step()
@@ -706,7 +554,7 @@ void GSDrawScanlineCodeGenerator::Step()
 
 	if (m_sel.prim != GS_SPRITE_CLASS)
 	{
-		// z += m_local.D4.z;
+		// z += m_local.d4.z;
 
 		if (m_sel.zb && !m_sel.zequal)
 		{
@@ -714,11 +562,19 @@ void GSDrawScanlineCodeGenerator::Step()
 			gsAsm->FADD(_temp_z0.D2(), _temp_z0.D2(), _d4_z.D2());
 		}
 
-		// f = f.add16(m_local.D4.f);
+		// f = f.add16(m_local.d4.f);
 
 		if (m_sel.fwrite && m_sel.fge)
 		{
-			gsAsm->ADD(_temp_f.H8(), _temp_f.H8(), _d4_f.H8());
+			if (m_block_split)
+			{
+				gsAsm->LDR(_vscratch, OakMemOperand{_block_ptr, static_cast<s64>(offsetof(GSScanlineLocalData::blockstep, f))});
+				gsAsm->ADD(_temp_f.H8(), _temp_f.H8(), _vscratch.H8());
+			}
+			else
+			{
+				gsAsm->ADD(_temp_f.H8(), _temp_f.H8(), _d4_f.H8());
+			}
 		}
 	}
 
@@ -728,7 +584,7 @@ void GSDrawScanlineCodeGenerator::Step()
 		{
 			if (m_sel.fst)
 			{
-				// GSVector4i stq = m_local.D4.stq;
+				// GSVector4i stq = m_local.d4.stq;
 
 				// s += stq.xxxx();
 				// if (!sprite) t += stq.yyyy();
@@ -744,7 +600,7 @@ void GSDrawScanlineCodeGenerator::Step()
 			}
 			else
 			{
-				// GSVector4 stq = m_local.D4.stq;
+				// GSVector4 stq = m_local.d4.stq;
 
 				// s += stq.xxxx();
 				// t += stq.yyyy();
@@ -754,9 +610,18 @@ void GSDrawScanlineCodeGenerator::Step()
 				gsAsm->DUP(_vscratch2.S4(), _d4_stq.S4(), 1);
 				gsAsm->DUP(Q1.S4(), _d4_stq.S4(), 2);
 
-				gsAsm->FADD(_temp_s.S4(), _temp_s.S4(), _vscratch.S4());
-				gsAsm->FADD(_temp_t.S4(), _temp_t.S4(), _vscratch2.S4());
-				gsAsm->FADD(_temp_q.S4(), _temp_q.S4(), Q1.S4());
+				if (m_sel.stqplane)
+				{
+					gsAsm->ADD(_temp_s.S4(), _temp_s.S4(), _vscratch.S4());
+					gsAsm->ADD(_temp_t.S4(), _temp_t.S4(), _vscratch2.S4());
+					gsAsm->ADD(_temp_q.S4(), _temp_q.S4(), Q1.S4());
+				}
+				else
+				{
+					gsAsm->FADD(_temp_s.S4(), _temp_s.S4(), _vscratch.S4());
+					gsAsm->FADD(_temp_t.S4(), _temp_t.S4(), _vscratch2.S4());
+					gsAsm->FADD(_temp_q.S4(), _temp_q.S4(), Q1.S4());
+				}
 			}
 		}
 
@@ -764,13 +629,21 @@ void GSDrawScanlineCodeGenerator::Step()
 		{
 			if (m_sel.iip)
 			{
-				// GSVector4i c = m_local.D4.c;
+				// GSVector4i c = m_local.d4.c;
 
 				// rb = rb.add16(c.xxxx());
 				// ga = ga.add16(c.yyyy());
 
-				gsAsm->DUP(_vscratch.S4(), _d4_c.S4(), 0);
-				gsAsm->DUP(_vscratch2.S4(), _d4_c.S4(), 1);
+				if (m_block_split)
+				{
+					gsAsm->LDR(_vscratch, OakMemOperand{_block_ptr, static_cast<s64>(offsetof(GSScanlineLocalData::blockstep, rb))});
+					gsAsm->LDR(_vscratch2, OakMemOperand{_block_ptr, static_cast<s64>(offsetof(GSScanlineLocalData::blockstep, ga))});
+				}
+				else
+				{
+					gsAsm->DUP(_vscratch.S4(), _d4_c.S4(), 0);
+					gsAsm->DUP(_vscratch2.S4(), _d4_c.S4(), 1);
+				}
 				gsAsm->MOVI(Q1.H8(), 0);
 
 				gsAsm->ADD(_temp_rb.H8(), _temp_rb.H8(), _vscratch.H8());
@@ -782,6 +655,13 @@ void GSDrawScanlineCodeGenerator::Step()
 				gsAsm->SMAX(_temp_ga.H8(), _temp_ga.H8(), Q1.H8());
 			}
 		}
+	}
+
+	if (m_block_split)
+	{
+		// Hop to the other phase of the pair.
+		gsAsm->ADD(_block_ptr, _block_ptr, _block_hop);
+		gsAsm->NEG(_block_hop, _block_hop);
 	}
 
 	if (!m_sel.notest)
@@ -835,7 +715,7 @@ void GSDrawScanlineCodeGenerator::TestZ(oak::QReg temp1, oak::QReg temp2)
 			gsAsm->MOVI(_vscratch.S4(), 0x80000000);
 			gsAsm->UZP1(Q0.S4(), Q0.S4(), temp1.S4());
 
-			// zs += VectorI::x80000000();
+			// zs += VectorI::X80000000();
 			gsAsm->ADD(Q0.S4(), Q0.S4(), _vscratch.S4());
 			zs = Q0;
 		}
@@ -882,7 +762,7 @@ void GSDrawScanlineCodeGenerator::TestZ(oak::QReg temp1, oak::QReg temp2)
 
 		if (m_sel.zpsm == 0)
 		{
-			// GSVector4i o = GSVector4i::x80000000();
+			// GSVector4i o = GSVector4i::X80000000();
 			gsAsm->MOVI(temp1.S4(), 0x80000000u);
 
 			// GSVector4i zso = zs - o;
@@ -913,6 +793,21 @@ void GSDrawScanlineCodeGenerator::TestZ(oak::QReg temp1, oak::QReg temp2)
 	}
 }
 
+// The formed coordinate saturates into a signed 12.4 field (GSCoordinateWalk.h):
+// take the sixteenth, saturate it to sixteen signed bits, put it back. The bits
+// below the sixteenth go with it; nothing downstream reads them (the texel is
+// bits 16 and up, the weight bits 12 to 15).
+//
+// SQXTN is the saturation; the C++ reference's min/max form computes the same
+// function.
+void GSDrawScanlineCodeGenerator::SaturateCoordinate(oak::QReg c, oak::QReg scratch)
+{
+	gsAsm->SSHR(scratch.S4(), c.S4(), GS_COORD_SIXTEENTH_SHIFT);
+	gsAsm->SQXTN(oak::VReg_4H(scratch.index()), scratch.S4());
+	gsAsm->SXTL(scratch.S4(), oak::VReg_4H(scratch.index()));
+	gsAsm->SHL(c.S4(), scratch.S4(), GS_COORD_SIXTEENTH_SHIFT);
+}
+
 void GSDrawScanlineCodeGenerator::SampleTexture()
 {
 	if (!m_sel.fb || m_sel.tfx == TFX_NONE)
@@ -926,26 +821,131 @@ void GSDrawScanlineCodeGenerator::SampleTexture()
 	oak::QReg ureg = _temp_s;
 	oak::QReg vreg = _temp_t;
 
+	// All-ones in every lane whose pixel takes the linear filter. lod > 0 is
+	// exactly Q < the crossing constant, so the per-pixel MMAG/MMIN choice is one
+	// compare. Cheap enough to emit twice rather than hold a register.
+	const auto emit_ltfx_mask = [this](oak::QReg dst) {
+		oak::QReg q = _temp_q;
+
+		if (m_sel.stqplane)
+		{
+			// Q as a float: the count of g/4 times 2^(E - 16) (GSPerspectivePlane.h).
+			gsAsm->SSHR(_vscratch.S4(), _temp_q.S4(), GS_PLANE_PIXEL_SHIFT);
+			gsAsm->SCVTF(_vscratch.S4(), _vscratch.S4());
+			gsAsm->LDR(_vscratch2, _local(pwalk.qscale));
+			gsAsm->FMUL(_vscratch.S4(), _vscratch.S4(), _vscratch2.S4());
+			q = _vscratch;
+		}
+
+		gsAsm->LDR(dst, _global(ltfx_q));
+		gsAsm->FCMGT(dst.S4(), dst.S4(), q.S4());
+
+		if (m_sel.ltfx_ge)
+			gsAsm->MVN(dst.B16(), dst.B16());
+	};
+
 	if (!m_sel.fst)
 	{
-		gsAsm->FDIV(Q2.S4(), _temp_s.S4(), _temp_q.S4());
-		gsAsm->FDIV(Q3.S4(), _temp_t.S4(), _temp_q.S4());
+		// Multiply by a reciprocal truncated to fourteen mantissa bits, not a divide.
+		// Clearing the low nine bits of the float32 mantissa is that grid; two BICs
+		// rather than a shift pair so the sign survives a negative Q. See
+		// GSDrawScanline.cpp for why the width is fourteen.
+		if (m_sel.stqplane)
+		{
+			// Floor each g/2^14 accumulator to a count of g/4 (the shift) and convert, so S/Q is
+			// a quotient of two counts and the power of two that takes it to 16.16 texels
+			// (2^(16 + TW), 2^(16 + TH)) rides on the product. The reciprocal is taken of the
+			// count because cutting its mantissa commutes with a power-of-two scale.
+			gsAsm->SSHR(Q0.S4(), _temp_q.S4(), GS_PLANE_PIXEL_SHIFT);
+			gsAsm->SCVTF(Q0.S4(), Q0.S4());
+			gsAsm->FMOV(Q1.S4(), oak::FImm8(0x70));
+			gsAsm->FDIV(Q0.S4(), Q1.S4(), Q0.S4());
+			gsAsm->MOVI(Q1.S4(), GS_RECIP_ROUND_UP);
+			gsAsm->ADD(Q0.S4(), Q0.S4(), Q1.S4());
+			gsAsm->BIC(Q0.S4(), 0xff, 0);
+
+			gsAsm->LDR(Q1, _local(pwalk.stscale));
+			gsAsm->SSHR(Q2.S4(), _temp_s.S4(), GS_PLANE_PIXEL_SHIFT);
+			gsAsm->SSHR(Q3.S4(), _temp_t.S4(), GS_PLANE_PIXEL_SHIFT);
+			gsAsm->SCVTF(Q2.S4(), Q2.S4());
+			gsAsm->SCVTF(Q3.S4(), Q3.S4());
+			gsAsm->FMUL(Q2.S4(), Q2.S4(), Q0.S4());
+			gsAsm->FMUL(Q3.S4(), Q3.S4(), Q0.S4());
+			gsAsm->FMUL(Q2.S4(), Q2.S4(), oak::SReg(Q1.index()), 0);
+			gsAsm->FMUL(Q3.S4(), Q3.S4(), oak::SReg(Q1.index()), 1);
+		}
+		else
+		{
+			gsAsm->FMOV(Q0.S4(), oak::FImm8(0x70));
+			gsAsm->FDIV(Q0.S4(), Q0.S4(), _temp_q.S4());
+			gsAsm->MOVI(Q1.S4(), GS_RECIP_ROUND_UP);
+			gsAsm->ADD(Q0.S4(), Q0.S4(), Q1.S4());
+			gsAsm->BIC(Q0.S4(), 0xff, 0);
+
+			gsAsm->FMUL(Q2.S4(), _temp_s.S4(), Q0.S4());
+			gsAsm->FMUL(Q3.S4(), _temp_t.S4(), Q0.S4());
+		}
+
 		ureg = Q2;
 		vreg = Q3;
 
 		gsAsm->FCVTZS(Q2.S4(), Q2.S4());
 		gsAsm->FCVTZS(Q3.S4(), Q3.S4());
-
-		if (m_sel.ltf)
-		{
-			// u -= 0x8000;
-			// v -= 0x8000;
-
-			gsAsm->MOVI(Q1.S4(), 0x8000);
-			gsAsm->SUB(Q2.S4(), Q2.S4(), Q1.S4());
-			gsAsm->SUB(Q3.S4(), Q3.S4(), Q1.S4());
-		}
 	}
+
+	// The coordinate DDA's lag: one 16.16 unit on an axis that walks forward, zero
+	// on one that is still or walks back. See GSDrawScanline.cpp. On the FST side
+	// ureg is the live accumulator, so the biased copy goes to the scratch pair the
+	// packing below consumes anyway.
+	if (m_sel.prim != GS_SPRITE_CLASS)
+	{
+		gsAsm->LDR(Q0, _local(tclag.u));
+		gsAsm->SUB(Q2.S4(), ureg.S4(), Q0.S4());
+		gsAsm->LDR(Q0, _local(tclag.v));
+		gsAsm->SUB(Q3.S4(), vreg.S4(), Q0.S4());
+		ureg = Q2;
+		vreg = Q3;
+	}
+
+	// GSTruncateCoordinate: the sixteenth index truncates toward zero, so a
+	// negative coordinate takes a sixteenth less one before the shifts below floor
+	// it into a texel and a weight. The result goes to the scratch pair, so this
+	// costs no register even where ureg is the live FST accumulator.
+	gsAsm->SSHR(Q0.S4(), ureg.S4(), 31);
+	gsAsm->SSHR(Q1.S4(), vreg.S4(), 31);
+	gsAsm->USHR(Q0.S4(), Q0.S4(), 20);
+	gsAsm->USHR(Q1.S4(), Q1.S4(), 20);
+	gsAsm->ADD(Q2.S4(), ureg.S4(), Q0.S4());
+	gsAsm->ADD(Q3.S4(), vreg.S4(), Q1.S4());
+	ureg = Q2;
+	vreg = Q3;
+
+	if (!m_sel.fst && m_sel.ltf)
+	{
+		// u -= 0x8000;
+		// v -= 0x8000;
+		//
+		// Exactly eight sixteenths, so it moves the texel index and never the
+		// weight. It is our step onto the tap pair, not part of the hardware
+		// coordinate, so it comes after the truncation. It applies only to pixels
+		// that filter linearly; the two filters do not sample the same point.
+		gsAsm->MOVI(Q1.S4(), 0x8000);
+
+		if (m_sel.ltfx)
+		{
+			emit_ltfx_mask(Q0);
+			gsAsm->AND(Q1.B16(), Q1.B16(), Q0.B16());
+		}
+
+		gsAsm->SUB(ureg.S4(), ureg.S4(), Q1.S4());
+		gsAsm->SUB(vreg.S4(), vreg.S4(), Q1.S4());
+	}
+
+	// The 12.4 field, taken after the half-texel step (so the top of the field
+	// reads weight 15, not the 7 that clamping first would give) and before the
+	// tap pair below.
+	SaturateCoordinate(ureg, Q0);
+	SaturateCoordinate(vreg, Q0);
 
 	if (m_sel.ltf)
 	{
@@ -961,18 +961,31 @@ void GSDrawScanlineCodeGenerator::SampleTexture()
 			gsAsm->TRN1(vf.H8(), vreg.H8(), vreg.H8());
 			gsAsm->USHR(vf.H8(), vf.H8(), 12);
 		}
+
+		// A zero weight collapses the four-tap blend onto the nearest tap, so the
+		// nearest side of the crossing needs no separate path.
+		if (m_sel.ltfx)
+		{
+			emit_ltfx_mask(Q0);
+			gsAsm->TRN1(Q1.H8(), Q0.H8(), Q0.H8());
+
+			gsAsm->AND(uf.B16(), uf.B16(), Q1.B16());
+
+			if (m_sel.prim != GS_SPRITE_CLASS)
+				gsAsm->AND(vf.B16(), vf.B16(), Q1.B16());
+		}
 	}
 
 	// GSVector4i uv0 = u.sra32(16).ps32(v.sra32(16));
 
 	gsAsm->SSHR(Q2.S4(), ureg.S4(), 16);
 	gsAsm->SSHR(Q3.S4(), vreg.S4(), 16);
-	gsAsm->SQXTN(Q2.toD().H4(), Q2.S4());
+	gsAsm->SQXTN(oak::VReg_4H(Q2.index()), Q2.S4());
 	gsAsm->SQXTN2(Q2.H8(), Q3.S4());
 
 	if (m_sel.ltf)
 	{
-		// GSVector4i uv1 = uv0.add16(GSVector4i::x0001());
+		// GSVector4i uv1 = uv0.add16(GSVector4i::X0001());
 
 		gsAsm->MOVI(Q1.H8(), 1);
 		gsAsm->ADD(Q3.H8(), Q2.H8(), Q1.H8());
@@ -1030,7 +1043,7 @@ void GSDrawScanlineCodeGenerator::SampleTexture_TexelReadHelper(int mip_offset)
 		// c10 = addr10.gather32_32((const u32/u8*)tex[, clut]);
 		// c11 = addr11.gather32_32((const u32/u8*)tex[, clut]);
 
-		//         D0  D1  d2s0  d3s1 s2 s3
+		//         D0  D1  d2s0  d3s1 S2 S3
 		ReadTexel4(Q5, Q6, Q0, Q2, Q1, Q3, mip_offset);
 
 		// GSVector4i rb00 = c00 & mask;
@@ -1243,8 +1256,38 @@ void GSDrawScanlineCodeGenerator::SampleTextureLOD()
 
 	if (!m_sel.fst)
 	{
-		gsAsm->FDIV(local0.S4(), _temp_s.S4(), _temp_q.S4());
-		gsAsm->FDIV(local1.S4(), _temp_t.S4(), _temp_q.S4());
+		// Truncated reciprocal, as in SampleTexture above.
+		if (m_sel.stqplane)
+		{
+			gsAsm->SSHR(local2.S4(), _temp_q.S4(), GS_PLANE_PIXEL_SHIFT);
+			gsAsm->SCVTF(local2.S4(), local2.S4());
+			gsAsm->FMOV(local1.S4(), oak::FImm8(0x70));
+			gsAsm->FDIV(local2.S4(), local1.S4(), local2.S4());
+			gsAsm->MOVI(local1.S4(), GS_RECIP_ROUND_UP);
+			gsAsm->ADD(local2.S4(), local2.S4(), local1.S4());
+			gsAsm->BIC(local2.S4(), 0xff, 0);
+
+			gsAsm->LDR(Q0, _local(pwalk.stscale));
+			gsAsm->SSHR(local0.S4(), _temp_s.S4(), GS_PLANE_PIXEL_SHIFT);
+			gsAsm->SSHR(local1.S4(), _temp_t.S4(), GS_PLANE_PIXEL_SHIFT);
+			gsAsm->SCVTF(local0.S4(), local0.S4());
+			gsAsm->SCVTF(local1.S4(), local1.S4());
+			gsAsm->FMUL(local0.S4(), local0.S4(), local2.S4());
+			gsAsm->FMUL(local1.S4(), local1.S4(), local2.S4());
+			gsAsm->FMUL(local0.S4(), local0.S4(), oak::SReg(Q0.index()), 0);
+			gsAsm->FMUL(local1.S4(), local1.S4(), oak::SReg(Q0.index()), 1);
+		}
+		else
+		{
+			gsAsm->FMOV(local2.S4(), oak::FImm8(0x70));
+			gsAsm->FDIV(local2.S4(), local2.S4(), _temp_q.S4());
+			gsAsm->MOVI(local0.S4(), GS_RECIP_ROUND_UP);
+			gsAsm->ADD(local2.S4(), local2.S4(), local0.S4());
+			gsAsm->BIC(local2.S4(), 0xff, 0);
+
+			gsAsm->FMUL(local0.S4(), _temp_s.S4(), local2.S4());
+			gsAsm->FMUL(local1.S4(), _temp_t.S4(), local2.S4());
+		}
 
 		gsAsm->FCVTZS(local0.S4(), local0.S4());
 		gsAsm->FCVTZS(local1.S4(), local1.S4());
@@ -1253,76 +1296,78 @@ void GSDrawScanlineCodeGenerator::SampleTextureLOD()
 		uv1 = local1;
 	}
 
-	// TODO: if the fractional part is not needed in round-off mode then there is a faster integer log2 (just take the exp) (but can we round it?)
+	// The coordinate DDA's lag, taken before the level shift divides it away. See
+	// SampleTexture above.
+	if (m_sel.prim != GS_SPRITE_CLASS)
+	{
+		gsAsm->LDR(local2, _local(tclag.u));
+		gsAsm->SUB(local0.S4(), uv0.S4(), local2.S4());
+		gsAsm->LDR(local2, _local(tclag.v));
+		gsAsm->SUB(local1.S4(), uv1.S4(), local2.S4());
+		uv0 = local0;
+		uv1 = local1;
+	}
 
 	if (!m_sel.lcm)
 	{
-		// lod = -log2(Q) * (1 << L) + K
+		// LOD16 = K + (-e) * 2^(4+L) - T[L][idx], in sixteenths of a level.
+		//
+		// The logarithm is a 128-entry table on the top seven fractional bits of Q's
+		// mantissa (GSLevelOfDetail.h), not a polynomial log2.
 
+		// With the plane rule Q is the count of g/4 times 2^(E - 16) (GSPerspectivePlane.h);
+		// local2 held the reciprocal and is spent.
+		oak::QReg qf = _temp_q;
+
+		if (m_sel.stqplane)
+		{
+			gsAsm->SSHR(local2.S4(), _temp_q.S4(), GS_PLANE_PIXEL_SHIFT);
+			gsAsm->SCVTF(local2.S4(), local2.S4());
+			gsAsm->LDR(Q1, _local(pwalk.qscale));
+			gsAsm->FMUL(local2.S4(), local2.S4(), Q1.S4());
+			qf = local2;
+		}
+
+		// -e = 127 - ((q >> 23) & 0xff)
+		gsAsm->USHR(Q0.S4(), qf.S4(), 23);
+		gsAsm->MOVI(Q1.S4(), 0xff);
+		gsAsm->AND(Q0.B16(), Q0.B16(), Q1.B16());
 		gsAsm->MOVI(Q1.S4(), 127);
-		gsAsm->SHL(Q0.S4(), _temp_q.S4(), 1);
-		gsAsm->USHR(Q0.S4(), Q0.S4(), 24);
+		gsAsm->SUB(Q0.S4(), Q1.S4(), Q0.S4());
+
+		// (-e) << (4 + L), then + K
+		gsAsm->DUP(Q1.S4(), _global_lodshift);
+		gsAsm->SSHL(Q0.S4(), Q0.S4(), Q1.S4());
+		gsAsm->DUP(Q1.S4(), _global_lodk);
+		gsAsm->ADD(Q0.S4(), Q0.S4(), Q1.S4());
+
+		// - T[idx], idx = (q >> 16) & 0x7f. One extract-add-load triple per lane,
+		// as in ReadTexelImpl, which is why the table is held as words.
+		gsAsm->USHR(Q4.S4(), qf.S4(), 16);
+		gsAsm->MOVI(Q1.S4(), 0x7f);
+		gsAsm->AND(Q4.B16(), Q4.B16(), Q1.B16());
+
+		for (int i = 0; i < 4; i++)
+		{
+			gsAsm->MOV(_scratchaddr.toW(), Q4.S4(), i);
+			gsAsm->ADD(_scratchaddr, _global_lodtab, _scratchaddr.toW(), oak::AddSubExt::UXTW, 2);
+
+			if (i == 0)
+				gsAsm->LDR(oak::SReg(Q1.index()), OakMemOperand{_scratchaddr, static_cast<s64>(0)});
+			else
+				gsAsm->LD1(Q1.S4(), i, OakMemOperand{_scratchaddr, static_cast<s64>(0)});
+		}
+
 		gsAsm->SUB(Q0.S4(), Q0.S4(), Q1.S4());
-		gsAsm->SCVTF(Q0.S4(), Q0.S4());
 
-		// Q0 = (float)(exp(q) - 127)
-
-		gsAsm->SHL(Q4.S4(), _temp_q.S4(), 9);
-		gsAsm->USHR(Q4.S4(), Q4.S4(), 9);
-
-		gsAsm->DUP(Q1.S4(), _const_log2_coef.S4(), 3);
-		gsAsm->ORR(Q4.B16(), Q4.B16(), Q1.B16()); // m_log2_coef_128b[3]
-
-		// Q4 = mant(q) | 1.0f
-		// Q4 = log2(Q) = ((((c0 * Q4) + c1) * Q4) + c2) * (Q4 - 1.0f) + Q0
-
-#if 0
-		// non-fma
-		gsAsm->DUP(Q1.S4(), _const_log2_coef.S4(), 0);
-		gsAsm->FMUL(Q5.S4(), Q4.S4(), Q1.S4());
-
-		gsAsm->DUP(Q1.S4(), _const_log2_coef.S4(), 1);
-		gsAsm->FADD(Q5.S4(), Q5.S4(), Q1.S4());
-
-		gsAsm->FMUL(Q5.S4(), Q5.S4(), Q4.S4());
-
-		gsAsm->DUP(Q1.S4(), _const_log2_coef.S4(), 3);
-		gsAsm->FSUB(Q4.S4(), Q4.S4(), Q1.S4());
-			
-		gsAsm->DUP(Q1.S4(), _const_log2_coef.S4(), 2);
-		gsAsm->FADD(Q5.S4(), Q5.S4(), Q1.S4());
-
-		gsAsm->FMUL(Q4.S4(), Q4.S4(), Q5.S4());
-		gsAsm->FADD(Q4.S4(), Q4.S4(), Q0.S4());
-
-		gsAsm->DUP(Q0.S4(), _global_l);
-		gsAsm->DUP(Q1.S4(), _global_k);
-
-		gsAsm->FMUL(Q4.S4(), Q4.S4(), Q0.S4());
-		gsAsm->FADD(Q4.S4(), Q4.S4(), Q1.S4());
-#else
-		// fma
-		gsAsm->DUP(Q1.S4(), _const_log2_coef.S4(), 0); // Q1 = c0
-		gsAsm->DUP(local2.S4(), _const_log2_coef.S4(), 1); // local2 = c1
-		gsAsm->FMLA(local2.S4(), Q4.S4(), Q1.S4()); // local2 = c0 * Q4 + c1
-		gsAsm->DUP(Q1.S4(), _const_log2_coef.S4(), 2); // Q1 = c2
-		gsAsm->FMLA(Q1.S4(), local2.S4(), Q4.S4()); // Q1 = ((c0 * Q4 + c1) * Q4) + c2
-		gsAsm->DUP(local2.S4(), _const_log2_coef.S4(), 3); // local2 = c3
-		gsAsm->FSUB(Q4.S4(), Q4.S4(), local2.S4()); // Q4 -= 1.0f
-		gsAsm->FMLA(Q0.S4(), Q4.S4(), Q1.S4()); // Q0 = (Q4 - 1.0f) * (((c0 * Q4 + c1) * Q4) + c2) + Q0
-
-		gsAsm->DUP(Q1.S4(), _global_l); // Q1 = llll
-		gsAsm->DUP(Q4.S4(), _global_k); // Q4 = kkkk
-		gsAsm->FMLA(Q4.S4(), Q0.S4(), Q1.S4()); // Q4 = k + Q0 * l
-#endif
-
-		// Q4 = (-log2(Q) * (1 << L) + K) * 0x10000
-
+		// Sixteenths -> 16.16, then the ceiling. The `+ 0x8000` round-off below is
+		// then (LOD16 + 8) >> 4 with ties up, and the trilinear weight from the top
+		// four fraction bits is LOD16 & 15.
+		gsAsm->SHL(Q4.S4(), Q0.S4(), 12);
 		gsAsm->DUP(Q0.S4(), _global_mxl);
-		gsAsm->MOVI(Q1.S4(), 0);
-		gsAsm->FMINNM(Q4.S4(), Q4.S4(), Q0.S4());
-		gsAsm->FMAXNM(Q4.S4(), Q4.S4(), Q1.S4());
-		gsAsm->FCVTZS(Q4.S4(), Q4.S4());
+		gsAsm->SMIN(Q4.S4(), Q4.S4(), Q0.S4());
+		gsAsm->MOVI(Q0.S4(), 0);
+		gsAsm->SMAX(Q4.S4(), Q4.S4(), Q0.S4());
 
 		if (m_sel.mmin == 1) // round-off mode
 		{
@@ -1356,14 +1401,14 @@ void GSDrawScanlineCodeGenerator::SampleTextureLOD()
 		gsAsm->ZIP2(Q6.H8(), _global_tmin.H8(), Q1.H8()); // minv
 		gsAsm->USHL(Q5.S4(), Q5.S4(), Q0.S4());
 		gsAsm->USHL(Q6.S4(), Q6.S4(), Q0.S4());
-		gsAsm->SQXTUN(Q5.toD().H4(), Q5.S4());
+		gsAsm->SQXTUN(oak::VReg_4H(Q5.index()), Q5.S4());
 		gsAsm->SQXTUN2(Q5.H8(), Q6.S4());
 
 		gsAsm->ZIP1(Q6.H8(), _global_tmax.H8(), Q1.H8()); // maxu
 		gsAsm->ZIP2(Q4.H8(), _global_tmax.H8(), Q1.H8()); // maxu
 		gsAsm->USHL(Q6.S4(), Q6.S4(), Q0.S4());
 		gsAsm->USHL(Q4.S4(), Q4.S4(), Q0.S4());
-		gsAsm->SQXTUN(Q6.toD().H4(), Q6.S4());
+		gsAsm->SQXTUN(oak::VReg_4H(Q6.index()), Q6.S4());
 		gsAsm->SQXTUN2(Q6.H8(), Q4.S4());
 
 		if (m_sel.mmin != 1)
@@ -1377,7 +1422,7 @@ void GSDrawScanlineCodeGenerator::SampleTextureLOD()
 		// lod = K
 
 		gsAsm->ADD(_scratchaddr, _globals, offsetof(GSScanlineGlobalData, lod));
-		gsAsm->LD1R(Q0.S4(), OakMemOperand{_scratchaddr, 0});
+		gsAsm->LD1R(Q0.S4(), OakMemOperand{_scratchaddr, static_cast<s64>(0)});
 		gsAsm->NEG(Q0.S4(), Q0.S4());
 
 		gsAsm->SSHL(local0.S4(), uv0.S4(), Q0.S4());
@@ -1389,15 +1434,32 @@ void GSDrawScanlineCodeGenerator::SampleTextureLOD()
 		gsAsm->LDR(Q6, _local(temp.uv_minmax[1]));
 	}
 
+	// GSTruncateCoordinate, as in SampleTexture above. Into the scratch pair, so
+	// uv0/uv1 keep this level's own coordinate for the level above it.
+	gsAsm->SSHR(Q0.S4(), uv0.S4(), 31);
+	gsAsm->SSHR(Q1.S4(), uv1.S4(), 31);
+	gsAsm->USHR(Q0.S4(), Q0.S4(), 20);
+	gsAsm->USHR(Q1.S4(), Q1.S4(), 20);
+	gsAsm->ADD(Q2.S4(), uv0.S4(), Q0.S4());
+	gsAsm->ADD(Q3.S4(), uv1.S4(), Q1.S4());
+
 	if (m_sel.ltf)
 	{
 		// u -= 0x8000;
 		// v -= 0x8000;
 
 		gsAsm->MOVI(Q4.S4(), 0x8000);
-		gsAsm->SUB(Q2.S4(), uv0.S4(), Q4.S4());
-		gsAsm->SUB(Q3.S4(), uv1.S4(), Q4.S4());
+		gsAsm->SUB(Q2.S4(), Q2.S4(), Q4.S4());
+		gsAsm->SUB(Q3.S4(), Q3.S4(), Q4.S4());
+	}
 
+	// The 12.4 field, as in SampleTexture above, taken at the same point in this
+	// level's copy of the chain.
+	SaturateCoordinate(Q2, Q0);
+	SaturateCoordinate(Q3, Q0);
+
+	if (m_sel.ltf)
+	{
 		// GSVector4i uf = u.xxzzlh().srl16(1);
 
 		gsAsm->TRN1(uf.H8(), Q2.H8(), Q2.H8());
@@ -1411,14 +1473,14 @@ void GSDrawScanlineCodeGenerator::SampleTextureLOD()
 
 	// GSVector4i uv0 = u.sra32(16).ps32(v.sra32(16));
 
-	gsAsm->SSHR(Q2.S4(), m_sel.ltf ? Q2.S4() : uv0.S4(), 16);
-	gsAsm->SSHR(Q3.S4(), m_sel.ltf ? Q3.S4() : uv1.S4(), 16);
-	gsAsm->SQXTN(Q2.toD().H4(), Q2.S4());
+	gsAsm->SSHR(Q2.S4(), Q2.S4(), 16);
+	gsAsm->SSHR(Q3.S4(), Q3.S4(), 16);
+	gsAsm->SQXTN(oak::VReg_4H(Q2.index()), Q2.S4());
 	gsAsm->SQXTN2(Q2.H8(), Q3.S4());
 
 	if (m_sel.ltf)
 	{
-		// GSVector4i uv1 = uv0.add16(GSVector4i::x0001());
+		// GSVector4i uv1 = uv0.add16(GSVector4i::X0001());
 
 		gsAsm->MOVI(Q1.H8(), 1);
 		gsAsm->ADD(Q3.H8(), Q2.H8(), Q1.H8());
@@ -1451,6 +1513,15 @@ void GSDrawScanlineCodeGenerator::SampleTextureLOD()
 		gsAsm->USHR(Q5.H8(), Q5.H8(), 1);
 		gsAsm->USHR(Q6.H8(), Q6.H8(), 1);
 
+		// GSTruncateCoordinate, as above.
+
+		gsAsm->SSHR(Q0.S4(), Q2.S4(), 31);
+		gsAsm->SSHR(Q1.S4(), Q3.S4(), 31);
+		gsAsm->USHR(Q0.S4(), Q0.S4(), 20);
+		gsAsm->USHR(Q1.S4(), Q1.S4(), 20);
+		gsAsm->ADD(Q2.S4(), Q2.S4(), Q0.S4());
+		gsAsm->ADD(Q3.S4(), Q3.S4(), Q1.S4());
+
 		if (m_sel.ltf)
 		{
 			// u -= 0x8000;
@@ -1459,7 +1530,15 @@ void GSDrawScanlineCodeGenerator::SampleTextureLOD()
 			gsAsm->MOVI(Q4.S4(), 0x8000);
 			gsAsm->SUB(Q2.S4(), Q2.S4(), Q4.S4());
 			gsAsm->SUB(Q3.S4(), Q3.S4(), Q4.S4());
+		}
 
+		// The 12.4 field, as in SampleTexture above, taken at the same point in this
+		// level's copy of the chain.
+		SaturateCoordinate(Q2, Q0);
+		SaturateCoordinate(Q3, Q0);
+
+		if (m_sel.ltf)
+		{
 			// GSVector4i uf = u.xxzzlh().srl16(1);
 
 			gsAsm->TRN1(uf.H8(), Q2.H8(), Q2.H8());
@@ -1475,12 +1554,12 @@ void GSDrawScanlineCodeGenerator::SampleTextureLOD()
 
 		gsAsm->SSHR(Q2.S4(), Q2.S4(), 16);
 		gsAsm->SSHR(Q3.S4(), Q3.S4(), 16);
-		gsAsm->SQXTN(Q2.toD().H4(), Q2.S4());
+		gsAsm->SQXTN(oak::VReg_4H(Q2.index()), Q2.S4());
 		gsAsm->SQXTN2(Q2.H8(), Q3.S4());
 
 		if (m_sel.ltf)
 		{
-			// GSVector4i uv1 = uv0.add16(GSVector4i::x0001());
+			// GSVector4i uv1 = uv0.add16(GSVector4i::X0001());
 
 			gsAsm->MOVI(Q1.H8(), 1);
 			gsAsm->ADD(Q3.H8(), Q2.H8(), Q1.H8());
@@ -1504,7 +1583,10 @@ void GSDrawScanlineCodeGenerator::SampleTextureLOD()
 		// Q5: rb
 		// Q6: ga
 
-		gsAsm->USHR(Q0.H8(), local2.H8(), 1);
+		// Four-bit trilinear weight, truncated: (f & 0xf000) >> 1, which is the
+		// >> 1 the lerp wants folded into the quantisation. See GSDrawScanline.cpp.
+		gsAsm->USHR(Q0.H8(), local2.H8(), 12);
+		gsAsm->SHL(Q0.H8(), Q0.H8(), 11);
 
 		lerp16(Q5, local0, Q0, 0);
 		lerp16(Q6, local1, Q0, 0);
@@ -1635,16 +1717,16 @@ void GSDrawScanlineCodeGenerator::AlphaTFX()
 
 			// GSVector4i ga = iip ? gaf : m_local.c.ga;
 
-			// gat = gat.modulate16<1>(ga).clamp8();
-			// modulate16(Q6, Q4, 1);
-			modulate16(Q6, _temp_ga, 1);
+			// gat = gat.modulate16<1>(ga.srl16<7>().sll16<7>()).clamp8();
+			storedVertexColor(_vscratch, _temp_ga);
+			modulate16(Q6, _vscratch, 1);
 			clamp16(Q6, Q3);
 
 			// if (!tcc) gat = gat.mix16(ga.srl16(7));
 
 			if (!m_sel.tcc)
 			{
-				gsAsm->USHR(Q4.H8(), _temp_ga.H8(), 7);
+				walkColorByte(Q4, _temp_ga);
 
 				mix16(Q6, Q4, Q3);
 			}
@@ -1659,7 +1741,7 @@ void GSDrawScanlineCodeGenerator::AlphaTFX()
 			{
 				// GSVector4i ga = iip ? gaf : m_local.c.ga;
 
-				gsAsm->USHR(Q4.H8(), _temp_ga.H8(), 7);
+				walkColorByte(Q4, _temp_ga);
 				mix16(Q6, Q4, Q3);
 			}
 
@@ -1670,7 +1752,7 @@ void GSDrawScanlineCodeGenerator::AlphaTFX()
 			// GSVector4i ga = iip ? gaf : m_local.c.ga;
 
 			// gat = gat.mix16(!tcc ? ga.srl16(7) : gat.addus8(ga.srl16(7)));
-			gsAsm->USHR(Q4.H8(), _temp_ga.H8(), 7);
+			walkColorByte(Q4, _temp_ga);
 
 			if (m_sel.tcc)
 				gsAsm->UQADD(Q4.B16(), Q4.B16(), Q6.B16());
@@ -1686,7 +1768,7 @@ void GSDrawScanlineCodeGenerator::AlphaTFX()
 			if (!m_sel.tcc)
 			{
 				// GSVector4i ga = iip ? gaf : m_local.c.ga;
-				gsAsm->USHR(Q4.H8(), _temp_ga.H8(), 7);
+				walkColorByte(Q4, _temp_ga);
 
 				mix16(Q6, Q4, Q3);
 			}
@@ -1698,7 +1780,7 @@ void GSDrawScanlineCodeGenerator::AlphaTFX()
 			// gat = iip ? ga.srl16(7) : ga;
 
 			if (m_sel.iip)
-				gsAsm->USHR(Q6.H8(), _temp_ga.H8(), 7);
+				walkColorByte(Q6, _temp_ga);
 			else
 				gsAsm->MOV(Q6, _temp_ga);
 
@@ -1839,9 +1921,10 @@ void GSDrawScanlineCodeGenerator::ColorTFX()
 
 			// GSVector4i rb = iip ? rbf : m_local.c.rb;
 
-			// rbt = rbt.modulate16<1>(rb).clamp8();
+			// rbt = rbt.modulate16<1>(rb.srl16<7>().sll16<7>()).clamp8();
 
-			modulate16(Q5, _temp_rb, 1);
+			storedVertexColor(_vscratch, _temp_rb);
+			modulate16(Q5, _vscratch, 1);
 			clamp16(Q5, Q1);
 
 			break;
@@ -1857,10 +1940,15 @@ void GSDrawScanlineCodeGenerator::ColorTFX()
 			// gat = gat.modulate16<1>(ga).add16(af).clamp8().mix16(gat);
 
 			gsAsm->MOV(Q1, Q6);
-			modulate16(Q6, _temp_ga, 1);
+			storedVertexColor(_vscratch, _temp_ga);
+			modulate16(Q6, _vscratch, 1);
 
-			gsAsm->TRN2(Q2.H8(), _temp_ga.H8(), _temp_ga.H8());
-			gsAsm->USHR(Q2.H8(), Q2.H8(), 7);
+			// af is the walked alpha as the stored byte, so a negative the walk carries
+			// must be clamped to zero before the shift (GSWalkColorByte / walkColorByte).
+			// A plain logical shift turns a negative into up to 511, HIGHLIGHT adds it to
+			// the colour, and the clamp below drives every channel to 255.
+			gsAsm->TRN2(_vscratch.H8(), _temp_ga.H8(), _temp_ga.H8());
+			walkColorByte(Q2, _vscratch);
 			gsAsm->ADD(Q6.H8(), Q6.H8(), Q2.H8());
 
 			clamp16(Q6, Q0);
@@ -1871,7 +1959,8 @@ void GSDrawScanlineCodeGenerator::ColorTFX()
 
 			// rbt = rbt.modulate16<1>(rb).add16(af).clamp8();
 
-			modulate16(Q5, _temp_rb, 1);
+			storedVertexColor(_vscratch, _temp_rb);
+			modulate16(Q5, _vscratch, 1);
 			gsAsm->ADD(Q5.H8(), Q5.H8(), Q2.H8());
 
 			clamp16(Q5, Q0);
@@ -1883,7 +1972,7 @@ void GSDrawScanlineCodeGenerator::ColorTFX()
 			// rbt = iip ? rb.srl16(7) : rb;
 
 			if (m_sel.iip)
-				gsAsm->USHR(Q5.H8(), _temp_rb.H8(), 7);
+				walkColorByte(Q5, _temp_rb);
 			else
 				gsAsm->MOV(Q5, _temp_rb);
 
@@ -1898,16 +1987,24 @@ void GSDrawScanlineCodeGenerator::Fog()
 		return;
 	}
 
-	// rb = m_local.gd->frb.lerp16<0>(rb, f);
-	// ga = m_local.gd->fga.lerp16<0>(ga, f).mix16(ga);
+	// rb = m_local.gd->frb.lerp16<0>(rb, floor(f));
+	// ga = m_local.gd->fga.lerp16<0>(ga, floor(f)).mix16(ga);
+	//
+	// The blend takes an integer F; see the C++ twin in GSDrawScanline.cpp for
+	// why lerp16<0> is already the 256 - F floor rule. storedVertexColor is that
+	// truncation plus the pack's saturation: fog rides the colour DDA, so a fog
+	// lane carried below zero saturates to 0 like a colour lane. It goes to a
+	// scratch because _temp_f is the walk's accumulator and Step carries it on
+	// with its fraction intact.
+	storedVertexColor(_vscratch3, _temp_f);
 
 	gsAsm->DUP(_vscratch.S4(), _global_frb);
 	gsAsm->DUP(_vscratch2.S4(), _global_fga);
 	gsAsm->MOV(Q1, Q6);
 
-	lerp16(Q5, _vscratch, _temp_f, 0);
+	lerp16(Q5, _vscratch, _vscratch3, 0);
 
-	lerp16(Q6, _vscratch2, _temp_f, 0);
+	lerp16(Q6, _vscratch2, _vscratch3, 0);
 	mix16(Q6, Q1, Q0);
 }
 
@@ -1920,8 +2017,8 @@ void GSDrawScanlineCodeGenerator::ReadFrame()
 
 	// int fa = fza_base.x + fza_offset->x;
 
-	gsAsm->LDR(W6, OakMemOperand{X7, 0});
-	gsAsm->LDR(_wscratch, OakMemOperand{X8, 0});
+	gsAsm->LDR(W6, OakMemOperand{X7, static_cast<s64>(0)});
+	gsAsm->LDR(_wscratch, OakMemOperand{X8, static_cast<s64>(0)});
 	gsAsm->ADD(W6, W6, _wscratch);
 	gsAsm->AND(W6, W6, HALF_VM_SIZE - 1);
 
@@ -1946,10 +2043,9 @@ void GSDrawScanlineCodeGenerator::TestDestAlpha()
 	{
 		if (m_sel.fpsm == 2)
 		{
-			gsAsm->MOVI(Q0.S4(), 0);
 			gsAsm->SHL(Q1.S4(), _fd.S4(), 16);
 			gsAsm->USHR(Q1.S4(), Q1.S4(), 31);
-			gsAsm->CMEQ(Q1.S4(), Q0.S4(), 0);
+			gsAsm->CMEQ(Q1.S4(), Q1.S4(), 0);
 		}
 		else
 		{
@@ -1999,24 +2095,26 @@ void GSDrawScanlineCodeGenerator::WriteMask()
 	{
 		gsAsm->CMEQ(Q0.S4(), Q1.S4(), Q4.S4());
 		gsAsm->CMEQ(Q1.S4(), Q1.S4(), Q3.S4());
-		gsAsm->SQXTN(Q1.toD().H4(), Q1.S4());
+		gsAsm->SQXTN(oak::VReg_4H(Q1.index()), Q1.S4());
 		gsAsm->SQXTN2(Q1.H8(), Q0.S4());
 	}
 	else if (m_sel.fwrite)
 	{
 		gsAsm->CMEQ(_vscratch.S4(), Q1.S4(), Q3.S4());
-		gsAsm->SQXTN(Q1.toD().H4(), _vscratch.S4());
+		gsAsm->SQXTN(oak::VReg_4H(Q1.index()), _vscratch.S4());
 		gsAsm->SQXTN2(Q1.H8(), _vscratch.S4());
 	}
 	else if (m_sel.zwrite)
 	{
-		gsAsm->CMEQ(Q1.S4(), Q1.S4(), Q4.S4());
-		gsAsm->SQXTN(Q1.toD().H4(), _vscratch.S4());
+		// Both halves narrow from the register the compare wrote. Narrowing from
+		// anything else gives a depth-only draw an arbitrary write mask.
+		gsAsm->CMEQ(_vscratch.S4(), Q1.S4(), Q4.S4());
+		gsAsm->SQXTN(oak::VReg_4H(Q1.index()), _vscratch.S4());
 		gsAsm->SQXTN2(Q1.H8(), _vscratch.S4());
 	}
 
 	gsAsm->AND(Q1.B16(), Q1.B16(), _const_movemskw_mask.B16());
-	gsAsm->ADDV(Q1.toH(), Q1.H8());
+	gsAsm->ADDV(oak::HReg(Q1.index()), Q1.H8());
 	gsAsm->UMOV(W1, Q1.H8(), 0);
 	gsAsm->MVN(W1, W1);
 }
@@ -2297,7 +2395,7 @@ void GSDrawScanlineCodeGenerator::WriteFrame()
 		return;
 	}
 
-	if (m_sel.fpsm == 2 && m_sel.dthe)
+	if (m_sel.dthe && m_sel.fpsm != 3)
 	{
 		gsAsm->AND(W5, _top, 3);
 		gsAsm->LSL(W5, W5, 5);
@@ -2323,7 +2421,7 @@ void GSDrawScanlineCodeGenerator::WriteFrame()
 
 	gsAsm->ZIP2(Q7.H8(), Q5.H8(), Q6.H8());
 	gsAsm->ZIP1(Q5.H8(), Q5.H8(), Q6.H8());
-	gsAsm->SQXTUN(Q5.toD().B8(), Q5.H8());
+	gsAsm->SQXTUN(oak::VReg_8B(Q5.index()), Q5.H8());
 	gsAsm->SQXTUN2(Q5.B16(), Q7.H8());
 
 	if (m_sel.fba && m_sel.fpsm != 1)
@@ -2375,9 +2473,9 @@ void GSDrawScanlineCodeGenerator::ReadPixel(oak::QReg dst, oak::WReg addr)
 {
 	pxAssert(addr.IsW());
 	gsAsm->LSL(_wscratch, addr, 1); // *2
-	gsAsm->LDR(dst.toD(), _vm, _xscratch);
+	gsAsm->LDR(oak::DReg(dst.index()), _vm, _xscratch);
 	gsAsm->ADD(_scratchaddr, _vm_high, _xscratch);
-	gsAsm->LD1(dst.D2(), 1, OakMemOperand{_scratchaddr, 0});
+	gsAsm->LD1(dst.D2(), 1, OakMemOperand{_scratchaddr, static_cast<s64>(0)});
 }
 
 void GSDrawScanlineCodeGenerator::WritePixel(oak::QReg src, oak::WReg addr, oak::WReg mask, bool high, bool fast, int psm, int fz)
@@ -2388,9 +2486,9 @@ void GSDrawScanlineCodeGenerator::WritePixel(oak::QReg src, oak::WReg addr, oak:
 		if (fast)
 		{
 			gsAsm->LSL(_wscratch, addr, 1); // *2
-			gsAsm->STR(src.toD(), _vm, _xscratch);
+			gsAsm->STR(oak::DReg(src.index()), _vm, _xscratch);
 			gsAsm->ADD(_scratchaddr, _vm_high, _xscratch);
-			gsAsm->ST1(src.D2(), 1, OakMemOperand{_scratchaddr, 0});
+			gsAsm->ST1(src.D2(), 1, OakMemOperand{_scratchaddr, static_cast<s64>(0)});
 		}
 		else
 		{
@@ -2411,14 +2509,14 @@ void GSDrawScanlineCodeGenerator::WritePixel(oak::QReg src, oak::WReg addr, oak:
 			gsAsm->LSL(_wscratch, addr, 1); // *2
 
 			gsAsm->TST(mask, high ? 0x0F00 : 0x0F);
-			gsAsm->B(EQ, skip_low);
-			gsAsm->STR(src.toD(), _vm, _xscratch);
+			gsAsm->B(oak::Cond::EQ, skip_low);
+			gsAsm->STR(oak::DReg(src.index()), _vm, _xscratch);
 			gsAsm->l(skip_low);
 
 			gsAsm->TST(mask, high ? 0xF000 : 0xF0);
-			gsAsm->B(EQ, skip_high);
+			gsAsm->B(oak::Cond::EQ, skip_high);
 			gsAsm->ADD(_scratchaddr, _vm_high, _xscratch);
-			gsAsm->ST1(src.D2(), 1, OakMemOperand{_scratchaddr, 0});
+			gsAsm->ST1(src.D2(), 1, OakMemOperand{_scratchaddr, static_cast<s64>(0)});
 			gsAsm->l(skip_high);
 		}
 		else
@@ -2431,22 +2529,22 @@ void GSDrawScanlineCodeGenerator::WritePixel(oak::QReg src, oak::WReg addr, oak:
 			oak::Label skip_0, skip_1, skip_2, skip_3;
 
 			gsAsm->TST(mask, high ? 0x0300 : 0x03);
-			gsAsm->B(EQ, skip_0);
+			gsAsm->B(oak::Cond::EQ, skip_0);
 			WritePixel(src, addr, 0, psm);
 			gsAsm->l(skip_0);
 
 			gsAsm->TST(mask, high ? 0x0c00 : 0x0c);
-			gsAsm->B(EQ, skip_1);
+			gsAsm->B(oak::Cond::EQ, skip_1);
 			WritePixel(src, addr, 1, psm);
 			gsAsm->l(skip_1);
 
 			gsAsm->TST(mask, high ? 0x3000 : 0x30);
-			gsAsm->B(EQ, skip_2);
+			gsAsm->B(oak::Cond::EQ, skip_2);
 			WritePixel(src, addr, 2, psm);
 			gsAsm->l(skip_2);
 
 			gsAsm->TST(mask, high ? 0xc000 : 0xc0);
-			gsAsm->B(EQ, skip_3);
+			gsAsm->B(oak::Cond::EQ, skip_3);
 			WritePixel(src, addr, 3, psm);
 			gsAsm->l(skip_3);
 		}
@@ -2467,12 +2565,12 @@ void GSDrawScanlineCodeGenerator::WritePixel(oak::QReg src, oak::WReg addr, u8 i
 		case 0:
 			if (i == 0)
 			{
-				gsAsm->STR(src.toS(), _scratchaddr, _xscratch);
+				gsAsm->STR(oak::SReg(src.index()), _scratchaddr, _xscratch);
 			}
 			else
 			{
 				gsAsm->ADD(_scratchaddr, _scratchaddr, _xscratch);
-				gsAsm->ST1(src.S4(), i, OakMemOperand{_scratchaddr, 0});
+				gsAsm->ST1(src.S4(), i, OakMemOperand{_scratchaddr, static_cast<s64>(0)});
 			}
 			break;
 		case 1:
@@ -2502,16 +2600,21 @@ void GSDrawScanlineCodeGenerator::ReadTexel1(oak::QReg dst, oak::QReg src, oak::
 void GSDrawScanlineCodeGenerator::ReadTexel4(
 	oak::QReg D0, oak::QReg D1,
 	oak::QReg d2s0, oak::QReg d3s1,
-	oak::QReg s2, oak::QReg s3,
+	oak::QReg S2, oak::QReg S3,
 	int mip_offset)
 {
-	ReadTexelImpl(D0, D1, d2s0, d3s1, s2, s3, 4, mip_offset);
+	ReadTexelImpl(D0, D1, d2s0, d3s1, S2, S3, 4, mip_offset);
 }
 
 void GSDrawScanlineCodeGenerator::ReadTexelImplLoadTexLOD(oak::XReg addr, int lod, int mip_offset)
 {
+	pxAssert(addr.IsX());
 	pxAssert(m_sel.mmin);
-	gsAsm->LDR(addr.toW(), m_sel.lcm ? _global(lod.i.U32[lod]) : _local(temp.lod.i.U32[lod]));
+	// Runtime-indexed U32 lane: hand-compute the offset since `lod` isn't constexpr.
+	const size_t lod_lane = static_cast<size_t>(lod) * sizeof(u32);
+	gsAsm->LDR(addr.toW(), m_sel.lcm
+		? OakMemOperand{_globals, static_cast<s64>(offsetof(GSScanlineGlobalData, lod.i.U32) + lod_lane)}
+		: OakMemOperand{_locals, static_cast<s64>(offsetof(GSScanlineLocalData, temp.lod.i.U32) + lod_lane)});
 	if (mip_offset != 0)
 		gsAsm->ADD(addr.toW(), addr.toW(), mip_offset);
 	gsAsm->LDR(addr.toX(), _global_tex0, addr, oak::IndexExt::LSL, 3);
@@ -2520,14 +2623,14 @@ void GSDrawScanlineCodeGenerator::ReadTexelImplLoadTexLOD(oak::XReg addr, int lo
 void GSDrawScanlineCodeGenerator::ReadTexelImpl(
 	oak::QReg D0, oak::QReg D1,
 	oak::QReg d2s0, oak::QReg d3s1,
-	oak::QReg s2, oak::QReg s3,
+	oak::QReg S2, oak::QReg S3,
 	int pixels, int mip_offset)
 {
 	//mip_offset *= wordsize;
 
 	const bool preserve[] = {false, false, true, true};
 	const oak::QReg dst[] = {D0, D1, d2s0, d3s1};
-	const oak::QReg src[] = {d2s0, d3s1, s2, s3};
+	const oak::QReg src[] = {d2s0, d3s1, S2, S3};
 
 	if (m_sel.mmin && !m_sel.lcm)
 	{
@@ -2565,7 +2668,9 @@ void GSDrawScanlineCodeGenerator::ReadTexelImpl(oak::QReg dst,
 	oak::QReg addr, u8 i, oak::XReg baseRegister, bool preserveDst)
 {
 	// const Address& src = m_sel.tlu ? ptr[W1 + W5 * 4] : ptr[W6 + W5 * 4];
-	pxAssert(baseRegister.index() != _scratchaddr.index());	gsAsm->MOV(_scratchaddr.toW(), addr.S4(), i);
+	pxAssert(baseRegister.index() != _scratchaddr.index());
+	pxAssert(baseRegister.IsX());
+	gsAsm->MOV(_scratchaddr.toW(), addr.S4(), i);
 
 	if (m_sel.tlu)
 	{
@@ -2573,17 +2678,17 @@ void GSDrawScanlineCodeGenerator::ReadTexelImpl(oak::QReg dst,
 
 		gsAsm->ADD(_scratchaddr, _global_clut, _scratchaddr.toW(), oak::AddSubExt::UXTW, 2);
 		if (i == 0 && !preserveDst)
-			gsAsm->LDR(dst.toS(), OakMemOperand{_scratchaddr, 0});
+			gsAsm->LDR(oak::SReg(dst.index()), OakMemOperand{_scratchaddr, static_cast<s64>(0)});
 		else
-			gsAsm->LD1(dst.S4(), i, OakMemOperand{_scratchaddr, 0});
+			gsAsm->LD1(dst.S4(), i, OakMemOperand{_scratchaddr, static_cast<s64>(0)});
 	}
 	else
 	{
 		gsAsm->ADD(_scratchaddr, baseRegister, _scratchaddr.toW(), oak::AddSubExt::UXTW, 2);
 		if (i == 0 && !preserveDst)
-			gsAsm->LDR(dst.toS(), OakMemOperand{_scratchaddr, 0});
+			gsAsm->LDR(oak::SReg(dst.index()), OakMemOperand{_scratchaddr, static_cast<s64>(0)});
 		else
-			gsAsm->LD1(dst.S4(), i, OakMemOperand{_scratchaddr, 0});
+			gsAsm->LD1(dst.S4(), i, OakMemOperand{_scratchaddr, static_cast<s64>(0)});
 	}
 }
 
@@ -2595,15 +2700,42 @@ void GSDrawScanlineCodeGenerator::modulate16(oak::QReg a, oak::QReg f, u8 shift)
 
 void GSDrawScanlineCodeGenerator::modulate16(oak::QReg d, oak::QReg a, oak::QReg f, u8 shift)
 {
-	if (shift)
-	{
-		gsAsm->SHL(d.H8(), a.H8(), shift);
-		gsAsm->SQDMULH(d.H8(), d.H8(), f.H8());
-	}
-	else
-	{
-		gsAsm->SQDMULH(a.H8(), d.H8(), f.H8());
-	}
+	// GSVector4i::modulate16<shift>(f) is `sll16<shift + 1>().mul16hs(f)`: the
+	// shift happens in 16-bit lanes and wraps, then the widening multiply takes
+	// the product's high half.
+	//
+	// SQDMULH after a shift of `shift` agrees on every reachable lane but differs
+	// once a lane reaches 8192 (the reference wraps `a << (shift + 1)`) and it
+	// saturates where the reference does not. Matching the reference keeps X86,
+	// the C++ fallback and this path identical.
+	//
+	// Shifting by shift + 1 puts the 16-bit wrap where the reference has it;
+	// halving afterwards is exact because the shifted value is even, and SQDMULH's
+	// doubling puts it back. Three instructions, no extra register.
+	gsAsm->SHL(d.H8(), a.H8(), shift + 1);
+	gsAsm->SSHR(d.H8(), d.H8(), 1);
+	gsAsm->SQDMULH(d.H8(), d.H8(), f.H8());
+}
+
+// The walk's carried colour as the stored byte. SQSHRUN is a signed shift
+// right by seven then unsigned saturating narrow, so a lane carried below zero
+// saturates to 0 instead of becoming 511; UXTL widens back to sixteen bits.
+// The top saturation changes nothing: 32767 >> 7 is already 255.
+//
+// The walk itself is not clamped; see the C++ twin in GSDrawScanline.cpp.
+void GSDrawScanlineCodeGenerator::walkColorByte(oak::QReg d, oak::QReg c)
+{
+	gsAsm->SQSHRUN(oak::VReg_8B(d.index()), c.H8(), 7);
+	gsAsm->UXTL(d.H8(), oak::VReg_8B(d.index()));
+}
+
+// The stored eight-bit colour, put back on the seven-fraction grid the
+// modulate expects. The texture function multiplies the stored byte, not the
+// wider DDA value; same rule as GSStoredVertexColor in GSDrawScanline.cpp.
+void GSDrawScanlineCodeGenerator::storedVertexColor(oak::QReg d, oak::QReg c)
+{
+	walkColorByte(d, c);
+	gsAsm->SHL(d.H8(), d.H8(), 7);
 }
 
 void GSDrawScanlineCodeGenerator::lerp16(oak::QReg a, oak::QReg b, oak::QReg f, u8 shift)
@@ -2632,16 +2764,16 @@ void GSDrawScanlineCodeGenerator::mix16(oak::QReg a, oak::QReg b, oak::QReg temp
 
 void GSDrawScanlineCodeGenerator::clamp16(oak::QReg a, oak::QReg temp)
 {
-	gsAsm->SQXTUN(a.toD().B8(), a.H8());
-	gsAsm->USHLL(a.H8(), a.toD().B8(), 0);
+	gsAsm->SQXTUN(oak::VReg_8B(a.index()), a.H8());
+	gsAsm->USHLL(a.H8(), oak::VReg_8B(a.index()), 0);
 }
 
 void GSDrawScanlineCodeGenerator::alltrue(oak::QReg test, oak::QReg temp)
 {
-	gsAsm->UMINV(temp.toS(), test.S4());
-	gsAsm->FMOV(_wscratch, temp.toS());
+	gsAsm->UMINV(oak::SReg(temp.index()), test.S4());
+	gsAsm->FMOV(_wscratch, oak::SReg(temp.index()));
 	gsAsm->CMN(_wscratch, 1);
-	gsAsm->B(EQ, m_step_label);
+	gsAsm->B(oak::Cond::EQ, m_step_label);
 }
 
 void GSDrawScanlineCodeGenerator::blend8(oak::QReg a, oak::QReg b, oak::QReg mask, oak::QReg temp)

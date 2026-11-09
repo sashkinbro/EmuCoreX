@@ -100,9 +100,7 @@ void GSDeviceOGL::TestFramebufferFetchPlanProof(void (*check)(bool, const char*)
     glBindVertexArray(vao); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index);
     constexpr u16 indices[] = {0,1,2,3,4,5,6,7,8};
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-    const auto vertexText = target.GenGlslHeader("main", GL_VERTEX_SHADER, "") + std::string(R"(
-void main(){int i=gl_VertexID%3;gl_Position=vec4(i==0?vec2(-1.,-1.):i==1?vec2(3.,-1.):vec2(-1.,3.),0.,1.);}
-)");
+    const auto vertexText = target.GenGlslHeader("main", GL_VERTEX_SHADER, "") +GLFetchOracle::VertexBody(false);
     const GLuint vertex = GLFetchOracle::Compile(GL_VERTEX_SHADER, vertexText);
     const ScopedGuard deleteVertex([&]() { if (vertex) glDeleteShader(vertex); });
     GSTextureOGL rt(GSTexture::RenderTarget, 4, 4, 1, GSTexture::Format::Color);
@@ -129,9 +127,13 @@ void main(){int i=gl_VertexID%3;gl_Position=vec4(i==0?vec2(-1.,-1.):i==1?vec2(3.
     });
     bool pixels = true, commands = true, links = vertex != 0, aliases = true;
     u32 executed = 0;
+    const std::vector<size_t> groups={1,1,1};
+    const std::vector<GSVector4i> boxes(3,GSVector4i(0,0,4,4));
     for (bool enabled : {false, true})
     for (u32 variant = 0; variant < 5; ++variant)
+    for(bool minimal:{false,true})
     {
+        if(minimal&&(!enabled||variant!=1||originalCaps.preferred!=GSFramebufferFetchBackend::EXT))continue;
         const bool withDepth = variant == 1 || variant == 3;
         const bool alias = variant >= 2;
         target.m_fetch_caps = enabled ? originalCaps : GLFramebufferFetchCaps{};
@@ -141,21 +143,24 @@ void main(){int i=gl_VertexID%3;gl_Position=vec4(i==0?vec2(-1.,-1.):i==1?vec2(3.
             selector.color_feedback = selector.depth_feedback = false;
             selector.tfx = 0; // actual TextureSampler declaration, without shader feedback flags
         }
-        const auto plan = target.SelectFetchPlan(selector, true, withDepth);
+        const auto plan = minimal?GLFramebufferFetchPlan{2}:target.SelectFetchPlan(selector, true, withDepth);
         const char* main = variant == 3 ?
             "\nlayout(location=1) out highp float alias_depth;void main(){o_col0=vec4(8./255.,16./255.,32./255.,64./255.);alias_depth=texelFetch(TextureSampler,ivec2(gl_FragCoord.xy),0).r+0.125;}\n" : alias ?
             "\nvoid main(){o_col0=texelFetch(TextureSampler,ivec2(gl_FragCoord.xy),0)+vec4(1./255.,0.,0.,0.);}\n" : withDepth ?
             "\nvoid main(){o_col0=sample_from_rt()+vec4(1./255.,0.,0.,0.);o_col1=sample_from_depth()+0.125;}\n" :
             "\nvoid main(){o_col0=sample_from_rt()+vec4(1./255.,0.,0.,0.);}\n";
-        const GLuint fragment = GLFetchOracle::Compile(GL_FRAGMENT_SHADER,
-            GLFetchOracle::ProbeMain(target.GetPSSource(selector, plan), main));
+        const std::string fsText=minimal?target.GenGlslHeader("main",GL_FRAGMENT_SHADER,"",plan)+
+            "layout(location=0) inout highp vec4 value;layout(location=1) out highp float z;layout(binding=4) uniform highp sampler2D prior;void main(){value+=vec4(1./255.,0.,0.,0.);z=texelFetch(prior,ivec2(gl_FragCoord.xy),0).r+0.125;}":
+            GLFetchOracle::ProbeMain(target.GetPSSource(selector, plan), main);
+        const GLuint fragment = GLFetchOracle::Compile(GL_FRAGMENT_SHADER,fsText);
         const GLuint program = GLFetchOracle::Link(vertex, fragment);
-        links &= program != 0;
+        if(!minimal)links &= program != 0;
         if (fragment) glDeleteShader(fragment);
         if (!program) continue;
         const ScopedGuard deleteProgram([&]() { glDeleteProgram(program); });
         std::array<u8, 64> seed{};
         for (u32 i=0;i<seed.size();i+=4) {seed[i]=8;seed[i+1]=16;seed[i+2]=32;seed[i+3]=64;}
+        glBindFramebuffer(GL_FRAMEBUFFER,0);
         glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, rt.GetID());
         glTexSubImage2D(GL_TEXTURE_2D,0,0,0,4,4,GL_RGBA,GL_UNSIGNED_BYTE,seed.data());
         std::array<float,16> z; z.fill(0.25f);
@@ -174,6 +179,7 @@ void main(){int i=gl_VertexID%3;gl_Position=vec4(i==0?vec2(-1.,-1.):i==1?vec2(3.
         config.ps=selector;config.rt=&rt;config.ds_as_rt=withDepth?&ds:nullptr;
         if(alias)config.tex=withDepth?&ds:&rt; // intentionally no TEX_HAZARD bit
         if(variant==4)config.rt=config.tex=&logicalRT;
+        config.drawlist=&groups;config.drawlist_bbox=&boxes;
         config.nindices=9;config.indices_per_prim=3;config.drawarea=config.samplearea=GSVector4i(0,0,4,4);
         GLFetchPlanOracle::draws=GLFetchPlanOracle::copies=0;
         GSTexture* colorCopy=alias?(withDepth?nullptr:&rtCopy):(plan.Color()==GSFramebufferFetchBackend::None?&rtCopy:nullptr);
@@ -196,20 +202,21 @@ void main(){int i=gl_VertexID%3;gl_Position=vec4(i==0?vec2(-1.,-1.):i==1?vec2(3.
         glReadBuffer(GL_COLOR_ATTACHMENT0);glReadPixels(0,0,4,4,GL_RGBA,GL_UNSIGNED_BYTE,seed.data());
         bool exact=true;
         for(u32 i=0;i<seed.size();i+=4)exact&=seed[i]==(variant==3?8:11)&&seed[i+1]==16&&seed[i+2]==32&&seed[i+3]==64;
+        float firstZ=-1.f;
         if(withDepth)
         {
             std::array<float,64> result{};
             glReadBuffer(GL_COLOR_ATTACHMENT1);glReadPixels(0,0,4,4,GL_RGBA,GL_FLOAT,result.data());
-            for(u32 i=0;i<result.size();i+=4)exact&=result[i]==0.625f;
+            firstZ=result[0];for(u32 i=0;i<result.size();i+=4)exact&=result[i]==0.625f;
         }
         const u32 perPrimitive=static_cast<u32>(colorCopy!=nullptr)+static_cast<u32>(depthCopy!=nullptr);
-        const bool command=GLFetchPlanOracle::draws==(perPrimitive?3u:1u)&&GLFetchPlanOracle::copies==perPrimitive*3;
-        exact&=glGetError()==GL_NO_ERROR;
-        if(alias)aliases&=command&&exact;
-        else{commands&=command;pixels&=exact;}
+        const bool command=GLFetchPlanOracle::draws==((perPrimitive||config.require_full_barrier)?3u:1u)&&GLFetchPlanOracle::copies==perPrimitive*3;
+        const GLenum pixelError=glGetError();exact&=pixelError==GL_NO_ERROR;
+        if(!minimal){if(alias)aliases&=command&&exact;else{commands&=command;pixels&=exact;}}
         if(!command||!exact)std::fprintf(stderr,"GL_FETCH_COPY_DIFF enabled=%u variant=%u plan=%u draws=%u copies=%u expectedCopies=%u command=%u pixels=%u\n",
             enabled,variant,plan.key,GLFetchPlanOracle::draws,GLFetchPlanOracle::copies,perPrimitive*3,command,exact);
-        ++executed;
+        if(!exact)std::fprintf(stderr,"GL_FETCH_COPY_PIXEL rgba=%u/%u/%u/%u z=%g error=%x\n",seed[0],seed[1],seed[2],seed[3],firstZ,pixelError);
+        if(minimal)std::fprintf(stderr,"GL_EXT_MINIMAL_MRT rgba=%u/%u/%u/%u z=%g error=%x\n",seed[0],seed[1],seed[2],seed[3],firstZ,pixelError);else ++executed;
     }
     check(links&&executed==10,"GL actual selected single/MRT and disabled TFX sample programs compile and link");
     check(commands,"GL actual SendHWDraw skips ARM copies and orders sampler fallback copies per primitive");

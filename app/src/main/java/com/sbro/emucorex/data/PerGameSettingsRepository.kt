@@ -862,7 +862,7 @@ private fun sanitizeRendererValue(value: Int): Int {
 }
 
 private fun sanitizeAspectRatioValue(value: Int): Int {
-    return if (value in 0..4) value else 1
+    return com.sbro.emucorex.core.GSAspectRatioSettings.normalize(value)
 }
 
 private fun sanitizeLocalMultiplayerMode(value: Int): Int {

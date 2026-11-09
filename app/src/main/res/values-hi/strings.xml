@@ -1184,7 +1184,7 @@
     <string name="texture_manager_loading">टेक्सचर पैक्स लोड हो रहे हैं…</string>
     <string name="texture_manager_options">रनटाइम विकल्प</string>
     <string name="texture_manager_enable_replacements">रिप्लेसमेंट टेक्सचर लोड करें</string>
-    <string name="texture_manager_enable_replacements_desc">प्रत्येक गेम सीरियल फ़ोल्डर से PNG और DDS / KTX2 फ़ाइलों का उपयोग करें।</string>
+    <string name="texture_manager_enable_replacements_desc">प्रत्येक गेम सीरियल फ़ोल्डर से PNG और DDS / KTX2 / ASTC / KTX फ़ाइलों का उपयोग करें।</string>
     <string name="texture_manager_async_loading">एसिंक लोडिंग</string>
     <string name="texture_manager_async_loading_desc">गेम चलने के दौरान वर्कर थ्रेड पर रिप्लेसमेंट टेक्सचर लोड करें।</string>
     <string name="texture_manager_precache">रिप्लेसमेंट को प्रीकैश करें</string>

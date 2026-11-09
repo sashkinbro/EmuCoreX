@@ -83,6 +83,8 @@ namespace GSCarryingLayoutOracle
     }
 }
 
+#include "jit_oracle_gs_all_scale.inl"
+
 void GSCarryingLayoutTests()
 {
     using namespace GSCarryingLayoutOracle;
@@ -323,4 +325,5 @@ void GSCarryingLayoutTests()
     std::printf("GS_CARRYING_LAYOUT cases=%llu handlers=%llu vertices=%llu kernel=%llu scalarReference=%llu scalarCandidate=%llu\n",
         static_cast<unsigned long long>(cases),static_cast<unsigned long long>(handlers),static_cast<unsigned long long>(vertices),
         static_cast<unsigned long long>(kernel),static_cast<unsigned long long>(referenceDispatch),static_cast<unsigned long long>(candidateDispatch));
+    GSAllScalePackedTests();
 }

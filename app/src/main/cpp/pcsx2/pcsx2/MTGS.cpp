@@ -1032,7 +1032,7 @@ void MTGS::RunOnGSThread(AsyncCallType func)
 void MTGS::GameChanged()
 {
 	pxAssertRel(IsOpen(), "MTGS is running");
-	RunOnGSThread(GSGameChanged);
+	RunOnGSThread([serial = VMManager::GetDiscSerial(), crc = VMManager::GetDiscCRC()]() { GSGameChanged(serial, crc); });
 }
 
 void MTGS::ApplySettings()

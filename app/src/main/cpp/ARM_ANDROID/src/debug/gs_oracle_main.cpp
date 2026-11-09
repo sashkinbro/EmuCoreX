@@ -4,8 +4,9 @@
 #include <dlfcn.h>
 #include <string>
 #include <unistd.h>
+#include "OracleProcessGuard.h"
 
-int main(int argc, char** argv)
+static int RunGSOraclePayload(int argc, char** argv)
 {
     if (argc != 11)
     {
@@ -18,7 +19,6 @@ int main(int argc, char** argv)
     if (library_path.empty() || library_path.front() != '/' || slash == std::string::npos ||
         chdir(library_path.substr(0, slash).c_str()) != 0)
         return 2;
-    alarm(900);
     void* library = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
     if (!library)
     {
@@ -31,7 +31,20 @@ int main(int argc, char** argv)
         std::fprintf(stderr, "GS oracle is unavailable in this build: %s\n", dlerror());
         return 2;
     }
+    const rlimit descriptors{256, 256};
+    if (setrlimit(RLIMIT_NOFILE, &descriptors) != 0)
+    { std::perror("GS oracle descriptor limit"); return 2; }
     const int result = run(argc - 2, argv + 2);
     std::fflush(nullptr);
     _exit(result);
+}
+
+int main(int argc, char** argv)
+{
+    struct Arguments { int argc; char** argv; } arguments{argc, argv};
+    const auto run = +[](void* value) -> int {
+        auto& args = *static_cast<Arguments*>(value);
+        return RunGSOraclePayload(args.argc, args.argv);
+    };
+    return OracleGuard::Run(run, &arguments, {20000, 384 * 1024, 1024, 128, 12}).code;
 }

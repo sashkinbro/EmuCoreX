@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
+#include "GS/GSCacheFile.h"
 #include "GS/Renderers/OpenGL/GLProgram.h"
 
-#include "common/HashCombine.h"
-
-#include <cstdio>
+#include <array>
+#include <memory>
 #include <functional>
 #include <optional>
 #include <string>
@@ -23,79 +23,46 @@ public:
 	~GLShaderCache();
 
 	bool Open();
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+	static void TestGamePackStorage(void(*check)(bool,const char*),const char* directory);
+#endif
+	bool Open(bool is_gles);
+	bool HasProgram(std::string_view vertex_shader, std::string_view fragment_shader) const;
+	void RequestFlush() { m_writer.Flush(false); }
+	/// Writes what changed within the close deadline and drops the packs.
 	void Close();
+
+	/// Opens the program pack of the game the GS runs now (an empty serial: none), reading it whole.
+	void SetGame(const std::string& serial, u32 crc);
 
 	std::optional<GLProgram> GetProgram(const std::string_view vertex_shader, const std::string_view fragment_shader,
 		const PreLinkCallback& callback = {});
 	bool GetProgram(GLProgram* out_program, const std::string_view vertex_shader,
 		const std::string_view fragment_shader, const PreLinkCallback& callback = {});
 
-	/// Returns true if a compiled binary for this program pair exists in the disk cache.
-	bool HasProgram(const std::string_view vertex_shader, const std::string_view fragment_shader) const;
-
 	std::optional<GLProgram> GetComputeProgram(const std::string_view glsl, const PreLinkCallback& callback = {});
 	bool GetComputeProgram(GLProgram* out_program, const std::string_view glsl, const PreLinkCallback& callback = {});
 
 private:
-	struct CacheIndexKey
-	{
-		u64 vertex_source_hash_low;
-		u64 vertex_source_hash_high;
-		u32 vertex_source_length;
-		u64 fragment_source_hash_low;
-		u64 fragment_source_hash_high;
-		u32 fragment_source_length;
+	static constexpr u32 KEY_SIZE = 2 * (sizeof(GSCacheFile::Digest) + sizeof(u32)) + sizeof(u32);
+	using CacheKey = std::array<u8, KEY_SIZE>;
 
-		bool operator==(const CacheIndexKey& key) const;
-		bool operator!=(const CacheIndexKey& key) const;
-	};
+	static CacheKey GetCacheKey(const std::string_view vertex_shader, const std::string_view fragment_shader, bool compute);
 
-	struct CacheIndexEntryHasher
-	{
-		std::size_t operator()(const CacheIndexKey& e) const noexcept
-		{
-			std::size_t h = 0;
-			HashCombine(h, e.vertex_source_hash_low, e.vertex_source_hash_high, e.vertex_source_length,
-				e.fragment_source_hash_low, e.fragment_source_hash_high, e.fragment_source_length);
-			return h;
-		}
-	};
-
-	struct CacheIndexData
-	{
-		u32 file_offset;
-		u32 blob_size;
-		u32 blob_format;
-	};
-
-	using CacheIndex = std::unordered_map<CacheIndexKey, CacheIndexData, CacheIndexEntryHasher>;
-
-	static CacheIndexKey GetCacheKey(const std::string_view vertex_shader, const std::string_view fragment_shader);
-
-	std::string GetIndexFileName() const;
-	std::string GetBlobFileName() const;
-
-	bool CreateNew(const std::string& index_filename, const std::string& blob_filename);
-	bool ReadExisting(const std::string& index_filename, const std::string& blob_filename);
-	bool Recreate();
-
-	bool WriteToBlobFile(const CacheIndexKey& key, const std::vector<u8>& prog_data, u32 prog_format);
+	std::optional<GLProgram> GetCachedProgram(const CacheKey& key);
 
 	std::optional<GLProgram> CompileProgram(const std::string_view vertex_shader,
 		const std::string_view fragment_shader, const PreLinkCallback& callback, bool set_retrievable);
-	std::optional<GLProgram> CompileAndAddProgram(const CacheIndexKey& key, const std::string_view vertex_shader,
-		const std::string_view fragment_shader, const PreLinkCallback& callback);
-
 	std::optional<GLProgram> CompileComputeProgram(
 		const std::string_view glsl, const PreLinkCallback& callback, bool set_retrievable);
-	std::optional<GLProgram> CompileAndAddComputeProgram(
-		const CacheIndexKey& key, const std::string_view glsl, const PreLinkCallback& callback);
+	void AddProgram(const CacheKey& key, GLProgram& prog);
 
-	std::FILE* m_index_file = nullptr;
-	std::FILE* m_blob_file = nullptr;
-
-	CacheIndex m_index;
+	/// Program binaries by source: the device's own programs, and the running game's. GS thread,
+	/// apart from the writer's thread writing them.
+	GSCacheFile::PackWriter m_writer;
+	GSCacheFile::Stamp m_stamp;
+	std::string m_stem;
+	std::shared_ptr<GSCacheFile::Pack> m_device_pack;
+	std::shared_ptr<GSCacheFile::Pack> m_game_pack;
 	bool m_program_binary_supported = false;
-	u32 m_binary_load_failures = 0;
-	u32 m_driver_signature = 0;
 };

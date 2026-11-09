@@ -44,6 +44,7 @@ class alignas(32) GSClut final : public GSAlignedClass<32>
 		bool IsDirty(const GIFRegTEX0& TEX0);
 		bool IsDirty(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA);
 	} m_read = {};
+	u32 m_read_serial = 0; // counts the rewrites of the expanded palette (m_buff32) in Read32
 
 	GSTexture* m_gpu_clut4 = nullptr;
 	GSTexture* m_gpu_clut8 = nullptr;
@@ -98,6 +99,9 @@ private:
 
 public:
 	GSClut(GSLocalMemory* mem);
+
+	/// Changes whenever Read32 rewrites the expanded palette; equal values mean the same contents.
+	u32 GetReadSerial() const { return m_read_serial; }
 	~GSClut();
 
 	__fi GSTexture* GetGPUTexture() const { return m_current_gpu_clut; }
@@ -115,12 +119,23 @@ public:
 	void ClearDrawInvalidity();
 	u32 GetCLUTCBP();
 	u32 GetCLUTCPSM();
+	/// The CSM of the LOAD that filled the CLUT RAM, which is not always the CSM the draw reading
+	/// it names: Read32's four-bit 32-bit path un-swizzles exactly when a CSM1 read follows a CSM0
+	/// load. A consumer keying on the expanded content needs it for that reason alone.
+	u32 GetCLUTCSM();
 	void SetNextCLUTTEX0(u64 CBP);
 	bool CanLoadCLUT(const GIFRegTEX0& TEX0, const bool update_CBP = false);
 	bool WriteTest(const GIFRegTEX0& TEX0, const GIFRegTEXCLUT& TEXCLUT);
+	void WriteDecision(const GIFRegTEX0& TEX0,const GIFRegTEXCLUT& TEXCLUT);
+	void WriteLoad(const GIFRegTEX0& TEX0,const GIFRegTEXCLUT& TEXCLUT);
 	void Write(const GIFRegTEX0& TEX0, const GIFRegTEXCLUT& TEXCLUT);
-	//void Read(const GIFRegTEX0& TEX0);
 	void Read32(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA);
+
+	/// Whether the GPU palette road (UserHacks_GPUTargetCLUTMode) reproduces the CPU
+	/// expansion for this palette configuration; Read32 refuses it when it does not, so
+	/// the hardware and software renderers cannot disagree on colour. Static and pure so
+	/// the pin can drive it without a device -- see GSClut.cpp for what the two rules are.
+	static bool GPUPaletteRoadIsExact(u32 PSM, u32 CPSM, u32 CSA, u32 CSM);
 	void GetAlphaMinMax32(int& amin, int& amax);
 
 	u32 operator[](size_t i) const { return m_buff32[i]; }

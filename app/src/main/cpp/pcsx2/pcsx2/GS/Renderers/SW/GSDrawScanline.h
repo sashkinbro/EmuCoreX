@@ -27,10 +27,13 @@ class GSDrawScanline : public GSVirtualAlignedClass<32>
 
 public:
 	GSDrawScanline();
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+	static void TestWalkers(void(*check)(bool,const char*));
+#endif
 	~GSDrawScanline() override;
 
 	/// Debug override for disabling scanline JIT on a key basis.
-#ifdef EMUCOREX_DISABLE_GS_DIAGNOSTICS
+	#ifdef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 	static constexpr bool ShouldUseCDrawScanline(u64) { return false; }
 #else
 	static bool ShouldUseCDrawScanline(u64 key);
@@ -43,11 +46,21 @@ public:
 	/// Flushes the code cache, forcing everything to be recompiled.
 	void ResetCodeCache();
 
-	/// Populates function pointers. If this returns false, we ran out of code space.
-	bool SetupDraw(GSRasterizerData& data);
+	/// Populates function pointers. If this returns false, we either ran out of code space, or
+	/// allow_compile was false and something still needed generating.
+	bool SetupDraw(GSRasterizerData& data, bool allow_compile = true);
 
 	/// Draw pre-calculations, computed per-thread.
 	static void BeginDraw(const GSRasterizerData& data, GSScanlineLocalData& local);
+
+	/// Builds the scanline's colour and fog tables from local.cwalk (GSColourWalk.h) for the row `y` whose span
+	/// starts at pixel `left`. Neither SetupPrim builds them, so the rasterizer calls this before each row. Only the
+	/// entry the span reads is built (see the definition).
+	static void SetupColourWalkTables(GSScanlineLocalData& local, int y, int left);
+
+	/// Builds every entry of the tables last built, for a reader that does not go through SetupColourWalkTables
+	/// (the AA1 edge pass reads the tables its primitive's last row left).
+	static void CompleteColourWalkTables(GSScanlineLocalData& local);
 
 	/// Not currently jitted.
 	static void DrawRect(const GSVector4i& r, const GSVertexSW& v, GSScanlineLocalData& local);
@@ -55,12 +68,15 @@ public:
 	void UpdateDrawStats(u64 frame, u64 ticks, int actual, int total, int prims);
 	void PrintStats();
 
+	/// The C++ rasteriser, used when there is no code memory to compile into.
+	/// Public so it can be run beside the generated code to compare the two.
+	static void CSetupPrim(const GSVertexSW* vertex, const u16* index, const GSVertexSW& dscan, GSScanlineLocalData& local);
+	static void CDrawScanline(int pixels, int left, int top, const GSVertexSW& scan, GSScanlineLocalData& local);
+
 private:
 	GSCodeGeneratorFunctionMap<GSSetupPrimCodeGenerator, u64, SetupPrimPtr> m_sp_map;
 	GSCodeGeneratorFunctionMap<GSDrawScanlineCodeGenerator, u64, DrawScanlinePtr> m_ds_map;
 
-	static void CSetupPrim(const GSVertexSW* vertex, const u16* index, const GSVertexSW& dscan, GSScanlineLocalData& local);
-	static void CDrawScanline(int pixels, int left, int top, const GSVertexSW& scan, GSScanlineLocalData& local);
 	static void CDrawEdge(int pixels, int left, int top, const GSVertexSW& scan, GSScanlineLocalData& local);
 	__ri static void CDrawScanline(int pixels, int left, int top, const GSVertexSW& scan, GSScanlineLocalData& local, GSScanlineSelector sel);
 };

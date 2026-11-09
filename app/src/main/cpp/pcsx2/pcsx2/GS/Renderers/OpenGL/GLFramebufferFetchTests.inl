@@ -13,15 +13,26 @@ extern "C" void EmuCoreXOracleFeedbackBlendStages(void (*check)(bool,const char*
 namespace GLFetchOracle
 {
     static PFNGLGETSTRINGPROC realGetString = nullptr;
+    static PFNGLGETBOOLEANVPROC realGetBooleanv = nullptr;
     static const char* vendor = nullptr;
     static const char* renderer = nullptr;
+    static const char* version = nullptr;
     static GLContext* activeContext = nullptr;
 
     const GLubyte* GLAPIENTRY GetString(GLenum name)
     {
         if (vendor && name == GL_VENDOR) return reinterpret_cast<const GLubyte*>(vendor);
         if (renderer && name == GL_RENDERER) return reinterpret_cast<const GLubyte*>(renderer);
+        if (version && name == GL_VERSION) return reinterpret_cast<const GLubyte*>(version);
         return realGetString(name);
+    }
+
+    void GLAPIENTRY GetBooleanv(GLenum name,GLboolean* value)
+    {
+        // Synthetic ARM availability is CPU control-flow evidence. Its
+        // extension enum must never be queried on a physical non-ARM driver.
+        if(vendor&&name==GL_FRAGMENT_SHADER_FRAMEBUFFER_FETCH_MRT_ARM){*value=GL_FALSE;return;}
+        realGetBooleanv(name,value);
     }
 
     GLuint Compile(GLenum type, const std::string& source)
@@ -57,6 +68,25 @@ namespace GLFetchOracle
         return 0;
     }
 
+    struct IndexedCall {GLenum mode=0,type=0;GLuint first=0,last=0;GLsizei count=0;const void* indices=nullptr;GLint base=0;bool ranged=false;};
+    inline IndexedCall indexedCall;
+    void GLAPIENTRY DrawRange(GLenum mode,GLuint first,GLuint last,GLsizei count,GLenum type,const void* indices,GLint base)
+    {indexedCall={mode,type,first,last,count,indices,base,true};}
+    void GLAPIENTRY DrawPlain(GLenum mode,GLsizei count,GLenum type,const void* indices,GLint base)
+    {indexedCall={mode,type,0,0,count,indices,base,false};}
+
+    // Canonical TFX interface; even a renamed production main can keep its
+    // inputs active during driver linkage. Match interpolation explicitly.
+    std::string VertexBody(bool iip)
+    {
+        return std::string("out SHADER{vec4 t_float;vec4 t_int;") +
+            (iip ? "vec4 c;" : "flat vec4 c;") + R"(
+float inv_cov;flat uint interior;} VSout;
+void main(){int i=gl_VertexID%3;vec2 p=i==0?vec2(-1.,-1.):i==1?vec2(3.,-1.):vec2(-1.,3.);
+gl_Position=vec4(p,0.,1.);VSout.t_float=vec4(0.);VSout.t_int=vec4(0.);VSout.c=vec4(1.);VSout.inv_cov=0.;VSout.interior=1u;}
+)";
+    }
+
     // Retain the production declarations, directives and sample helpers; only
     // replace main to isolate their contract from unrelated TFX arithmetic.
     std::string ProbeMain(std::string source, const char* main)
@@ -89,13 +119,16 @@ void GSDeviceOGL::TestFramebufferFetch(void (*check)(bool, const char*))
     if (!context->IsGLES() || !context->IsCurrent()) return;
     activeContext = context.get();
     realGetString = glad_glGetString;
+    realGetBooleanv = glad_glGetBooleanv;
+    glad_glGetBooleanv = GetBooleanv;
     const bool physicalARM = GLAD_GL_ARM_shader_framebuffer_fetch;
     const bool physicalEXT = GLAD_GL_EXT_shader_framebuffer_fetch;
     const auto savedConfig = GSConfig;
     const auto savedResources = EmuFolders::Resources;
     const ScopedGuard restore([&]() {
-        vendor = renderer = nullptr;
+        vendor = renderer = version = nullptr;
         glad_glGetString = realGetString;
+        glad_glGetBooleanv = realGetBooleanv;
         // CheckFeatures installs compatibility entry points. Reload actual
         // functions/caps before dropping this context, never retain fake caps.
         gladLoadGLES2(+[](const char* name) {
@@ -113,6 +146,30 @@ void GSDeviceOGL::TestFramebufferFetch(void (*check)(bool, const char*))
     check(source && !source->empty(), "GL fetch reads canonical production TFX fragment source");
     if (!source || source->empty()) return;
     device.m_shader_tfx_fs = *source;
+
+    // Capture production submission arguments without forwarding fake indices.
+    // Omitting range hints, changing byte offsets/base vertex, or dropping the
+    // no-range/empty-vertex fallback breaks these independently derived literals.
+    {
+        const auto range=glad_glDrawRangeElementsBaseVertex;const auto plain=glad_glDrawElementsBaseVertex;
+        const ScopedGuard restoreDraws([&](){glad_glDrawRangeElementsBaseVertex=range;glad_glDrawElementsBaseVertex=plain;});
+        glad_glDrawRangeElementsBaseVertex=DrawRange;glad_glDrawElementsBaseVertex=DrawPlain;
+        device.m_draw_topology=GL_TRIANGLES;device.m_vertex.start=11;device.m_vertex.count=7;
+        device.m_index.start=13;device.m_index.count=9;
+        device.DrawIndexedPrimitive();
+        check(indexedCall.ranged&&indexedCall.first==0&&indexedCall.last==6&&indexedCall.count==9&&
+            indexedCall.indices==reinterpret_cast<void*>(26)&&indexedCall.base==11&&indexedCall.type==GL_UNSIGNED_SHORT,
+            "GL full indexed production draw forwards uploaded range byte offset and base vertex");
+        device.DrawIndexedPrimitive(3,6);
+        check(indexedCall.ranged&&indexedCall.last==6&&indexedCall.count==6&&indexedCall.indices==reinterpret_cast<void*>(32)&&indexedCall.base==11,
+            "GL partial indexed production draw retains full vertex range and relative index offset");
+        device.m_vertex.count=0;device.DrawIndexedPrimitive(3,6);
+        check(!indexedCall.ranged&&indexedCall.count==6&&indexedCall.indices==reinterpret_cast<void*>(32)&&indexedCall.base==11,
+            "GL zero vertex range preserves unranged fallback without unsigned underflow");
+        glad_glDrawRangeElementsBaseVertex=nullptr;device.m_vertex.count=7;device.DrawIndexedPrimitive();
+        check(!indexedCall.ranged&&indexedCall.count==9&&indexedCall.indices==reinterpret_cast<void*>(26),
+            "GL missing ranged entry preserves actual unranged submission");
+    }
 
     bool featureAgreement = true, directives = true, ordering = true, veto = true;
     u32 structuralCases = 0;
@@ -159,17 +216,21 @@ void GSDeviceOGL::TestFramebufferFetch(void (*check)(bool, const char*))
 
     // Physical driver only from here: no synthetic extension is compiled or
     // submitted, and unsupported MRT/float configurations are not GPU-run.
-    vendor = renderer = nullptr;
+    vendor = renderer = version = nullptr;
     glad_glGetString = realGetString;
+    glad_glGetBooleanv = realGetBooleanv;
     GLAD_GL_ARM_shader_framebuffer_fetch = physicalARM;
     GLAD_GL_EXT_shader_framebuffer_fetch = physicalEXT;
     GSConfig = savedConfig;
     GSConfig.DisableFramebufferFetch = false;
     device.m_features = {};
     if (!device.CheckFeatures()) { check(false, "GL fetch physical feature initialization"); return; }
-    const std::string vertexSource = device.GenGlslHeader("main", GL_VERTEX_SHADER, "") + R"(
-void main(){int i=gl_VertexID%3;vec2 p=i==0?vec2(-1.,-1.):i==1?vec2(3.,-1.):vec2(-1.,3.);gl_Position=vec4(p,0.,1.);}
-)";
+    std::fprintf(stderr,"GL_FETCH_RAW_DRIVER vendor=%s renderer=%s version=%s\n",glGetString(GL_VENDOR),glGetString(GL_RENDERER),glGetString(GL_VERSION));
+    #include "GLParityTests.inl"
+    if(device.m_fetch_caps.adreno&&device.m_features.framebuffer_fetch&&GSConfig.DepthFeedbackMode==GSDepthFeedbackMode::Auto)
+        check(device.m_features.depth_feedback==DepthFeedbackSupport::Depth,
+            "GL Adreno Auto uses direct depth attachment instead of incompatible depth-as-colour output");
+    const std::string vertexSource = device.GenGlslHeader("main", GL_VERTEX_SHADER, "") + VertexBody(true);
     GLuint vertex = Compile(GL_VERTEX_SHADER, vertexSource);
     const ScopedGuard deleteVertex([&]() { if (vertex) glDeleteShader(vertex); });
     bool links = vertex != 0;
@@ -193,6 +254,26 @@ void main(){int i=gl_VertexID%3;vec2 p=i==0?vec2(-1.,-1.):i==1?vec2(3.,-1.):vec2
         if (fragment) glDeleteShader(fragment);
         if (variant == 0) colorProgram = program;
         else if (program) glDeleteProgram(program);
+    }
+    // Isolate the reported location-1 failure from fetch and actual dual-source
+    // output use. The only diagnostic mutation is the extension directive.
+    PSSelector mrt{};mrt.tfx=4;mrt.iip=true;mrt.no_color1=true;mrt.depth_feedback=true;
+    device.m_features.depth_feedback=DepthFeedbackSupport::DepthAsRT;
+    for (bool blendExtension : {true,false})
+    for (bool fetchEnabled : {false,true})
+    {
+        const auto plan=fetchEnabled?device.SelectFetchPlan(mrt,true,true):GLFramebufferFetchPlan{};
+        std::string text=ProbeMain(device.GetPSSource(mrt,plan),
+            "\nvoid main(){o_col0=vec4(0.25);o_col1=sample_from_depth();}\n");
+        if(!blendExtension)
+        {
+            const std::string directive="#extension GL_EXT_blend_func_extended : require\n";
+            const auto at=text.find(directive);if(at!=std::string::npos)text.erase(at,directive.size());
+        }
+        const GLuint fs=Compile(GL_FRAGMENT_SHADER,text);const GLuint linked=Link(vertex,fs);
+        std::printf("GL_MRT_EXTENSION_CONTROL blend=%u fetch=%u plan=%u linked=%u\n",
+            blendExtension,fetchEnabled,plan.key,linked!=0);
+        if(fs)glDeleteShader(fs);if(linked)glDeleteProgram(linked);
     }
     check(links, "GL actual TFX colour no-colour DepthAsRT direct-depth and dual-source variants compile and link");
     bool endpointCompiled=true;
@@ -238,12 +319,21 @@ void main(){int i=gl_VertexID%3;vec2 p=i==0?vec2(-1.,-1.):i==1?vec2(3.,-1.):vec2
     glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_SCISSOR_TEST); glDisable(GL_DITHER);
     glBindVertexArray(vao);
     glUseProgram(colorProgram);
-    glDrawArrays(GL_TRIANGLES, 0, 9); // three overlapping primitives, one real driver draw
+    if(device.m_features.framebuffer_fetch_orders_overlap)
+        glDrawArrays(GL_TRIANGLES,0,9);
+    else
+        for(GLint primitive=0;primitive<3;primitive++)glDrawArrays(GL_TRIANGLES,primitive*3,3);
+    // Conservative EXT follows the selected production ordering policy; only
+    // ordered ARM is entitled to overlap three primitives in one submission.
     glReadPixels(0, 0, 4, 4, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
     bool exact = physicalARM || physicalEXT;
     for (u32 i = 0; i < pixels.size(); i += 4)
         exact &= pixels[i] == 11 && pixels[i + 1] == 16 && pixels[i + 2] == 32 && pixels[i + 3] == 64;
-    check(exact && glGetError() == GL_NO_ERROR, "GL actual TFX sample helper reads the prior tile pixel for overlapping UNORM primitives");
+    const GLenum overlapError=glGetError();
+    if(!exact||overlapError)std::fprintf(stderr,"GL_FETCH_OVERLAP rgba=%u/%u/%u/%u ordered=%u error=%x\n",
+        pixels[0],pixels[1],pixels[2],pixels[3],device.m_features.framebuffer_fetch_orders_overlap,overlapError);
+    check(exact && overlapError == GL_NO_ERROR, "GL actual TFX sample helper reads prior UNORM pixels under selected overlap ordering");
+    #include "GLLegacyDepthTests.inl"
     device.TestFramebufferFetchPlanProof(check);
     device.TestFramebufferFetchPixelProof(check);
     device.TestFramebufferFetchPlannerProof(check);

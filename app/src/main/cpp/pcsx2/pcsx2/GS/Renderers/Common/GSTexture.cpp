@@ -388,3 +388,47 @@ bool GSDownloadTexture::ReadTexels(const GSVector4i& rc, void* out_ptr, u32 out_
 	StringUtil::StrideMemCpy(out_ptr, out_stride, m_map_pointer + copy_offset, m_current_pitch, copy_size, copy_rows);
 	return true;
 }
+
+GSTexture::BlockInfo GSTexture::GetBlockInfo(Format format)
+{
+	switch (format)
+	{
+		default:
+			pxFailRel("Invalid texture format");
+			[[fallthrough]];
+		case Format::Invalid:      return {1, 1, 1};   // Invalid
+		case Format::Color:        return {1, 1, 4};   // Color/RGBA8
+		case Format::ColorHQ:      return {1, 1, 4};   // ColorHQ/RGB10A2
+		case Format::ColorHDR:     return {1, 1, 8};   // ColorHDR/RGBA16F
+		case Format::ColorClip:    return {1, 1, 8};   // ColorClip/RGBA16
+		case Format::DepthStencil: return {1, 1, 4};   // DepthStencil
+		case Format::DepthColor:   return {1, 1, 4};   // DepthColor/R32
+		case Format::UNorm8:       return {1, 1, 1};   // UNorm8/R8
+		case Format::UInt16:       return {1, 1, 2};   // UInt16/R16UI
+		case Format::UInt32:       return {1, 1, 4};   // UInt32/R32UI
+		case Format::PrimID:       return {1, 1, 4};   // PrimID/R32
+		case Format::BC1:          return {4, 4, 8};   // BC1 - 16 pixels in 64 bits
+		case Format::BC2:          return {4, 4, 16};  // BC2 - 16 pixels in 128 bits
+		case Format::BC3:          return {4, 4, 16};  // BC3 - 16 pixels in 128 bits
+		case Format::BC7:          return {4, 4, 16};  // BC7 - 16 pixels in 128 bits
+		case Format::ASTC4x4:      return {4, 4, 16};
+		case Format::ASTC5x4:      return {5, 4, 16};
+		case Format::ASTC5x5:      return {5, 5, 16};
+		case Format::ASTC6x5:      return {6, 5, 16};
+		case Format::ASTC6x6:      return {6, 6, 16};
+		case Format::ASTC8x5:      return {8, 5, 16};
+		case Format::ASTC8x6:      return {8, 6, 16};
+		case Format::ASTC8x8:      return {8, 8, 16};
+		case Format::ASTC10x5:     return {10, 5, 16};
+		case Format::ASTC10x6:     return {10, 6, 16};
+		case Format::ASTC10x8:     return {10, 8, 16};
+		case Format::ASTC10x10:    return {10, 10, 16};
+		case Format::ASTC12x10:    return {12, 10, 16};
+		case Format::ASTC12x12:    return {12, 12, 16};
+	}
+}
+
+bool GSTexture::IsASTCFormat(Format format)
+{
+	return format >= Format::ASTC4x4 && format <= Format::ASTC12x12;
+}

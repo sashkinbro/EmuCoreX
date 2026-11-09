@@ -113,6 +113,9 @@ public:
 class GSDeviceOGL final : public GSDevice
 {
 public:
+    void SetGameIdentity(const std::string& serial,u32 crc) override;
+    void PrepareShaderCacheClear() override;
+    void RequestShaderCacheFlush() override;
 	using VSSelector = GSHWDrawConfig::VSSelector;
 	using PSSelector = GSHWDrawConfig::PSSelector;
 	using PSSamplerSelector = GSHWDrawConfig::SamplerSelector;
@@ -167,13 +170,14 @@ private:
 
 	struct
 	{
+		bool rewrite_boolean_negation : 1; ///< Qualcomm proprietary GL compiler negated-boolean workaround
 		bool buggy_pbo              : 1; ///< Avoid PBOs and just use glTextureSubImage2D with immediate data
 		bool broken_blend_coherency : 1; ///< Issue on Nvidia GPUs where some blend modes don't seem to be properly coherent, see comment in RenderHW
 	} m_bugs;
 
 	bool m_disable_download_pbo = false;
 	GLFramebufferFetchCaps m_fetch_caps;
-	GLFramebufferFetchPlan SelectFetchPlan(const PSSelector& ps, bool color0_unorm, bool mrt) const;
+	GLFramebufferFetchPlan SelectFetchPlan(const PSSelector& ps, bool color0_unorm, bool mrt, bool color0_rgba8 = true) const;
 	bool SupportsFetchPlan(GLFramebufferFetchPlan fetch) const;
 
 	GLuint m_fbo = 0; // frame buffer container
@@ -323,6 +327,7 @@ private:
 	void KickPipelineStatisticsQuery();
 
 	void DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, GSVector4* dRect, const GSRegPMODE& PMODE, const GSRegEXTBUF& EXTBUF, u32 c, const Filter filter) override;
+	void DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, GSVector4* dRect, const MergeTopBand* top_band, const GSRegPMODE& PMODE, const GSRegEXTBUF& EXTBUF, u32 c, const Filter filter) override;
 	void DoInterlace(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, ShaderInterlace shader, Filter filter, const InterlaceConstantBuffer& cb) override;
 
 	bool CompileFXAAProgram();
@@ -493,7 +498,7 @@ public:
 	std::string GetShaderSource(const std::string_view entry, GLenum type, const std::string_view glsl_h_code,
 		const std::string_view macro_sel = std::string_view());
 	std::string GenGlslHeader(const std::string_view entry, GLenum type, const std::string_view macro);
-	std::string GenGlslHeader(const std::string_view entry, GLenum type, const std::string_view macro, GLFramebufferFetchPlan fetch);
+	std::string GenGlslHeader(const std::string_view entry, GLenum type, const std::string_view macro, GLFramebufferFetchPlan fetch, bool dual_source = false);
 	std::string GetVSSource(VSSelector sel);
 	std::string GetPSSource(const PSSelector& sel);
 	std::string GetPSSource(const PSSelector& sel, GLFramebufferFetchPlan fetch);

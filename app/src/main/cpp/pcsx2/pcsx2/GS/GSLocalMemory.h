@@ -11,6 +11,7 @@
 #include "common/Assertions.h"
 
 #include <array>
+#include <atomic>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -109,6 +110,7 @@ public:
 	u32 bp()  const { return m_bp; }
 	u32 bw()  const { return m_bwPg << (m_pageShiftX - 6); }
 	u32 psm() const { return m_psm; }
+	int pageRowWidth() const { return m_bwPg << m_pageShiftX; }
 	int blockShiftX() const { return m_blockShiftX; }
 	int blockShiftY() const { return m_blockShiftY; }
 
@@ -438,6 +440,8 @@ public:
 	typedef void (*readTexture)(GSLocalMemory& mem, const GSOffset& off, const GSVector4i& r, u8* dst, int dstpitch, const GIFRegTEXA& TEXA);
 	typedef void (*readTextureBlock)(const GSLocalMemory& mem, u32 bp, u8* dst, int dstpitch, const GIFRegTEXA& TEXA);
 
+	typedef bool (*writeBlocksOfPixel)(GSLocalMemory& mem, u8* src, u32 pitch, const GSOffset& off, const GSVector4i& r, u32 write_mask);
+
 	enum PSM_FMT
 	{
 		PSM_FMT_32,
@@ -467,12 +471,16 @@ public:
 
 	static psm_t m_psm[64];
 	static readImage m_readImageX;
+	static writeBlocksOfPixel m_writeBlocksOfPixel32;
+	static writeBlocksOfPixel m_writeBlocksOfPixel16;
 
 	static constexpr int m_vmsize = 1024 * 1024 * 4;
 
 	u8* m_vm8;
 
 	GSClut m_clut;
+	u64 m_write_seq = 1;
+	u64 m_page_stamp[GS_MAX_PAGES] = {};
 
 public:
 	static constexpr GSSwizzleInfo swizzle32   {swizzleTables32,  0x00};
@@ -485,6 +493,48 @@ public:
 	static constexpr GSSwizzleInfo swizzle4    {swizzleTables4,   0x00};
 
 protected:
+	// Dirty bitmap: one bit per 256-byte block, set by the same marks as the stamps. See HashDirty().
+	static constexpr u32 DIRTY_WORDS = GS_MAX_BLOCKS / 64;
+	u64 m_hash_dirty[DIRTY_WORDS];
+	u64 m_mark_all_events = 0;
+	u32 m_id;
+	static inline std::atomic<u64> s_total_mark_all_events{0};
+
+	__forceinline static bool DirtyBit(const u64* bitmap, u32 block)
+	{
+		block %= GS_MAX_BLOCKS;
+		return (bitmap[block >> 6] >> (block & 63)) & 1;
+	}
+
+	__forceinline static bool TestAndClearDirtyBit(u64* bitmap, u32 block)
+	{
+		block %= GS_MAX_BLOCKS;
+		const u64 bit = u64(1) << (block & 63);
+		const u64 word = bitmap[block >> 6];
+		// Most bits a consumer asks about are clear, so the store is only paid when there is a bit to clear.
+		if (!(word & bit))
+			return false;
+		bitmap[block >> 6] = word & ~bit;
+		return true;
+	}
+
+	__forceinline void SetBlockMarks(u32 block)
+	{
+		m_hash_dirty[block >> 6] |= u64(1) << (block & 63);
+	}
+
+	__forceinline void SetPageBlockMarks(u32 page)
+	{
+		static_assert(GS_BLOCKS_PER_PAGE == 32, "a page is half a word of the dirty bitmap");
+		m_hash_dirty[(page % GS_MAX_PAGES) >> 1] |= u64(0xFFFFFFFFu) << ((page & 1) * 32);
+	}
+
+	__forceinline bool PageBlocksAllMarked(u32 page) const
+	{
+		const u64 bits = u64(0xFFFFFFFFu) << ((page & 1) * 32);
+		return (m_hash_dirty[(page % GS_MAX_PAGES) >> 1] & bits) == bits;
+	}
+
 	__forceinline static u32 Expand24To32(u32 c, const GIFRegTEXA& TEXA)
 	{
 		return (((!TEXA.AEM | (c & 0xffffff)) ? TEXA.TA0 : 0) << 24) | (c & 0xffffff);
@@ -515,6 +565,66 @@ public:
 	__forceinline u8* vm8() const { return m_vm8; }
 	__forceinline u16* vm16() const { return reinterpret_cast<u16*>(m_vm8); }
 	__forceinline u32* vm32() const { return reinterpret_cast<u32*>(m_vm8); }
+
+	// Write stamps. Every store into local memory marks the pages it stores to. A mark is one step of a sequence
+	// and each page keeps the step of the last mark that covered it, so a reader that notes WriteSeq() before it
+	// reads local memory knows its result still holds while no page it read has a stamp past the note (the
+	// texture hash memo does this).
+	//
+	// Marks are unconditional, whether or not the store changed a byte, and may cover more than was written: an
+	// extra mark costs a recomputation, a missing one a stale result. Stores through a raw pointer (the CPU
+	// fallbacks in the hardware renderer, the software rasterizer) mark at their call site.
+	//
+	// Not atomic: stores and readers run on the thread that executes draws (the GS thread, or the back thread
+	// when the split is on, with the other thread drained at the seams).
+
+	/// Whether a rectangle has a page set that a mark of it names. An empty or inverted rectangle, or one that
+	/// reaches x or y 2048, has none: writers disagree on how such a rectangle wraps (Move wraps x at 2048 and
+	/// nothing else does), so no page set describes all of them.
+	static bool HasPageSet(const GSVector4i& r)
+	{
+		return r.left >= 0 && r.top >= 0 && r.right > r.left && r.bottom > r.top && r.right <= 2048 && r.bottom <= 2048;
+	}
+
+	/// Mark the pages that the rectangle `r` of the surface `off` covers, or every page if it has no page set.
+	void MarkPagesWritten(const GSOffset& off, const GSVector4i& r);
+	/// Mark `count` consecutive pages from `first_page`, wrapping at the end of local memory.
+	void MarkPageRangeWritten(u32 first_page, u32 count);
+	void MarkAllPagesWritten();
+
+	/// The step of the latest mark. Starts at 1 over stamps of 0.
+	__forceinline u64 WriteSeq() const { return m_write_seq; }
+	/// The step that last wrote `page` (0 if none has).
+	__forceinline u64 PageStamp(u32 page) const { return m_page_stamp[page]; }
+
+	// Dirty bitmap. Every mark above also sets a bit for each 256-byte block it covers (all 32 blocks of each
+	// page for a page range, every block for a mark of everything). It belongs to the texture cache's per-block
+	// hash cache: a block whose bit is set has no valid cached hash, and the cache clears the bit when it hashes
+	// the block. Nothing else clears it.
+	//
+	// It starts all set (the constructor's memset is not a mark). A hash cache that outlives the memory it
+	// described compares Id() with the id it last synced against and marks everything dirty (MarkAllHashDirty)
+	// on a mismatch.
+	//
+	// A block is marked when any byte of a rectangle's pixels may live in it, so a mark that rewrites the same
+	// bytes is an extra rehash, never a missed one. Not atomic, like the stamps.
+
+	/// Unique among every GSLocalMemory the process has made, and never reused.
+	__forceinline u32 Id() const { return m_id; }
+
+	/// Whether `block` (a block number, wrapped the way GSOffset wraps it) is marked since its bit was last cleared.
+	__forceinline bool HashDirty(u32 block) const { return DirtyBit(m_hash_dirty, block); }
+	/// Returns whether the bit was set, and clears it.
+	__forceinline bool TestAndClearHashDirty(u32 block) { return TestAndClearDirtyBit(m_hash_dirty, block); }
+	void MarkAllHashDirty();
+
+	/// Marks of everything so far: a rectangle with no page set (MarkPagesWritten), a page range of every page,
+	/// and MarkAllPagesWritten itself. Each one sets every block's bits and costs its consumers a full pass
+	/// (a rehash of every window, a restage of every window). A title that does it every frame is slow, not
+	/// wrong, so gsrunner reports the count per frame.
+	__forceinline u64 MarkAllEvents() const { return m_mark_all_events; }
+	/// The same over every memory in the process.
+	static u64 TotalMarkAllEvents() { return s_total_mark_all_events.load(std::memory_order_relaxed); }
 
 	GSOffset GetOffset(u32 bp, u32 bw, u32 psm) const
 	{
@@ -973,12 +1083,25 @@ public:
 
 	void WritePixel32(u8* RESTRICT src, u32 pitch, const GSOffset& off, const GSVector4i& r)
 	{
+		if (m_writeBlocksOfPixel32(*this, src, pitch, off, r, 0xffffffffu))
+		{
+			MarkPagesWritten(off, r);
+			return;
+		}
 		off.loopPixels(r, vm32(), (u32*)src, pitch, [&](u32* dst, u32* src) { *dst = *src; });
+		MarkPagesWritten(off, r);
 	}
 
 	void WritePixel32(u8* RESTRICT src, u32 pitch, const GSOffset& off, const GSVector4i& r, u32 write_mask)
 	{
+		// The masks block writes can handle: 32-bit with alpha, or 24-bit.
+		if ((write_mask == 0xffffffffu || write_mask == 0x00ffffffu) && m_writeBlocksOfPixel32(*this, src, pitch, off, r, write_mask))
+		{
+			MarkPagesWritten(off, r);
+			return;
+		}
 		off.loopPixels(r, vm32(), (u32*)src, pitch, [&](u32* dst, u32* src) { *dst = (*dst & ~write_mask) | (*src & write_mask); });
+		MarkPagesWritten(off, r);
 	}
 
 	void WritePixel24(u8* RESTRICT src, u32 pitch, const GSOffset& off, const GSVector4i& r)
@@ -988,11 +1111,18 @@ public:
 		{
 			*dst = (*dst & 0xff000000) | (*src & 0x00ffffff);
 		});
+		MarkPagesWritten(off, r);
 	}
 
 	void WritePixel16(u8* RESTRICT src, u32 pitch, const GSOffset& off, const GSVector4i& r)
 	{
+		if (m_writeBlocksOfPixel16(*this, src, pitch, off, r, 0xffffu))
+		{
+			MarkPagesWritten(off, r);
+			return;
+		}
 		off.loopPixels(r, vm16(), (u16*)src, pitch, [&](u16* dst, u16* src) { *dst = *src; });
+		MarkPagesWritten(off, r);
 	}
 
 	void WriteFrame16(u8* RESTRICT src, u32 pitch, const GSOffset& off, const GSVector4i& r)
@@ -1005,6 +1135,7 @@ public:
 
 			*dst = (u16)((ga >> 16) | (rb >> 9) | (ga >> 6) | (rb >> 3));
 		});
+		MarkPagesWritten(off, r);
 	}
 
 	__forceinline u32 ReadTexel32(u32 addr, const GIFRegTEXA& TEXA) const
@@ -1116,6 +1247,8 @@ public:
 	{
 		m_readImageX(*this, tx, ty, dst, len, BITBLTBUF, TRXPOS, TRXREG);
 	}
+
+	void Move(const GIFRegBITBLTBUF& BITBLTBUF, const GIFRegTRXPOS& TRXPOS, const GIFRegTRXREG& TRXREG);
 
 	void ReadTexture(const GSOffset& off, const GSVector4i& r, u8* dst, int dstpitch, const GIFRegTEXA& TEXA);
 

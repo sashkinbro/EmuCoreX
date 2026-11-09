@@ -1184,7 +1184,7 @@
     <string name="texture_manager_loading">텍스처 팩 로드 중…</string>
     <string name="texture_manager_options">런타임 옵션</string>
     <string name="texture_manager_enable_replacements">교체 텍스처 로드</string>
-    <string name="texture_manager_enable_replacements_desc">각 게임 시리얼 폴더에서 PNG 및 DDS / KTX2 파일을 사용합니다.</string>
+    <string name="texture_manager_enable_replacements_desc">각 게임 시리얼 폴더에서 PNG 및 DDS / KTX2 / ASTC / KTX 파일을 사용합니다.</string>
     <string name="texture_manager_async_loading">비동기 로딩</string>
     <string name="texture_manager_async_loading_desc">게임이 실행되는 동안 작업자 스레드에서 교체 텍스처를 로드합니다.</string>
     <string name="texture_manager_precache">교체 사전 캐시</string>

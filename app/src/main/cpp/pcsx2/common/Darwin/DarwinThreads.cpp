@@ -277,3 +277,23 @@ void Threading::SetNameOfCurrentThread(const char* name)
 {
 	pthread_setname_np(name);
 }
+
+bool Threading::KernelSemaphore::TimedWait(u32 microseconds)
+{
+	mach_timespec_t time;
+	time.tv_sec = microseconds / 1000000;
+	time.tv_nsec = (microseconds % 1000000) * 1000;
+	kern_return_t res = semaphore_timedwait(m_sema, time);
+	// An interrupted wait reads as a timeout; callers re-check their condition.
+	if (res == KERN_OPERATION_TIMED_OUT || res == KERN_ABORTED)
+		return false;
+	MACH_CHECK(res);
+	return true;
+}
+
+bool Threading::ThreadHandle::SetNicePriority(int nice) const
+{
+	// Darwin uses Mach thread policies; nice values on pthreads are advisory
+	// and not reliably honored. No-op for now.
+	return false;
+}

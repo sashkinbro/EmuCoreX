@@ -913,7 +913,7 @@
     <string name="texture_manager_loading">Načítání balíčků textur…</string>
     <string name="texture_manager_options">Možnosti za běhu (Runtime)</string>
     <string name="texture_manager_enable_replacements">Načíst náhradní textury</string>
-    <string name="texture_manager_enable_replacements_desc">Použít soubory PNG a DDS / KTX2 ze složky každého sériového čísla hry.</string>
+    <string name="texture_manager_enable_replacements_desc">Použít soubory PNG a DDS / KTX2 / ASTC / KTX ze složky každého sériového čísla hry.</string>
     <string name="texture_manager_async_loading">Asynchronní načítání</string>
     <string name="texture_manager_async_loading_desc">Načítat náhradní textury v pracovním vlákně (worker thread) během běhu hry.</string>
     <string name="texture_manager_precache">Ukládat náhrady do mezipaměti (Precache)</string>

@@ -187,8 +187,8 @@ bool ImGuiManager::Initialize()
 	g.ConfigNavWindowingKeyPrev = ImGuiKey_None;
 	g.ConfigNavWindowingWithGamepad = false;
 
-	s_window_width = static_cast<float>(g_gs_device->GetWindowWidth());
-	s_window_height = static_cast<float>(g_gs_device->GetWindowHeight());
+	s_window_width = static_cast<float>(g_gs_device->GetPresentationWidth());
+	s_window_height = static_cast<float>(g_gs_device->GetPresentationHeight());
 	io.DisplayFramebufferScale = ImVec2(1, 1); // We already scale things ourselves, this would double-apply scaling
 	io.DisplaySize = ImVec2(s_window_width, s_window_height);
 
@@ -273,8 +273,8 @@ float ImGuiManager::GetWindowHeight()
 
 void ImGuiManager::WindowResized()
 {
-	const u32 new_width = g_gs_device ? g_gs_device->GetWindowWidth() : 0;
-	const u32 new_height = g_gs_device ? g_gs_device->GetWindowHeight() : 0;
+	const u32 new_width = g_gs_device ? g_gs_device->GetPresentationWidth() : 0;
+	const u32 new_height = g_gs_device ? g_gs_device->GetPresentationHeight() : 0;
 
 	s_window_width = static_cast<float>(new_width);
 	s_window_height = static_cast<float>(new_height);
@@ -1109,6 +1109,18 @@ void ImGuiManager::RenderOSD()
 	DrawSoftwareCursors();
 }
 
+bool ImGuiManager::HasPresentableOverlayContent()
+{
+	{
+		std::unique_lock<std::mutex> lock(s_osd_messages_lock);
+		if (!s_osd_posted_messages.empty())
+			return true;
+	}
+	if (!s_osd_active_messages.empty())
+		return true;
+	return FullscreenUI::HasActiveWindow() || ImGuiFullscreen::HasActiveNotifications();
+}
+
 float ImGuiManager::GetGlobalScale()
 {
 	return s_global_scale;
@@ -1531,3 +1543,7 @@ std::string ImGuiManager::StripIconCharacters(std::string_view str)
 
 	return result;
 }
+
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+#include "GSOverlayContentTests.inl"
+#endif

@@ -5,6 +5,7 @@
 #include "Common.h"
 #include "Config.h"
 #include "Memory.h"
+#include "GameDatabase.h"
 #include "GS/GS.h"
 #include "GS/GSLzma.h"
 #include "GS/GSDump.h"
@@ -23,7 +24,9 @@
 #include <array>
 #include <charconv>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -336,7 +339,7 @@ struct Replay
 
     void Drain()
     {
-        g_gs_renderer->Flush(GSState::VSYNC);
+        GSFlushPendingDraws();
         // SWExtraThreads=0 selects GSSingleRasterizer: Flush completes SW work inline.
         g_gs_device->FlushDeferredDraws();
         if (g_gs_device->GetRenderAPI() == RenderAPI::Vulkan)
@@ -387,7 +390,7 @@ struct Replay
             }
             Send(Scene(i, seed));
             s_corpus = nullptr;
-            g_gs_renderer->Flush(GSState::VSYNC);
+            GSFlushPendingDraws();
             if (profile) RecordProfile(i, name, start);
             if (capture)
             {
@@ -450,6 +453,14 @@ struct Replay
                     if (capture)
                     {
                         GSTexture* texture = g_gs_device->GetCurrent();
+                        // A dump can begin at the VSync which precedes its
+                        // first completed draw. No host output exists yet.
+                        if (!texture && checkpoints.empty())
+                        {
+                            ++frames;
+                            frame_start = std::chrono::steady_clock::now();
+                            break;
+                        }
                         Require(texture != nullptr, "Dump frame has no output texture");
                         const u32 width = texture->GetWidth(), height = texture->GetHeight();
                         Require(width && height && static_cast<u64>(width)*height <= 16777216, "Invalid output texture dimensions");
@@ -549,15 +560,67 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunGSOracle(int ar
         config.ManualUserHacks = true;
         config.HWDownloadMode = GSHardwareDownloadMode::Enabled;
         config.HWDownloadModeUserOverride = true;
+        if (const char* value = std::getenv("EMUCOREX_GS_ORACLE_SCALE"))
+        {
+            char* end = nullptr;
+            const float scale = std::strtof(value, &end);
+            Require(end != value && *end == '\0' && std::isfinite(scale) && scale >= 0.25f && scale <= 8.0f,
+                "Invalid GS oracle scale");
+            config.UpscaleMultiplier = scale;
+        }
+        const auto integer_option = [](const char* name, long fallback, long maximum) {
+            const char* value = std::getenv(name);
+            if (!value) return fallback;
+            char* end = nullptr;
+            const long parsed = std::strtol(value, &end, 10);
+            Require(end != value && *end == '\0' && parsed >= 0 && parsed <= maximum,
+                "Invalid GS oracle option");
+            return parsed;
+        };
+        config.AccurateBlendingUnit = static_cast<AccBlendLevel>(integer_option(
+            "EMUCOREX_GS_ORACLE_BLEND", static_cast<long>(config.AccurateBlendingUnit), 5));
+        config.HWDownloadMode = static_cast<GSHardwareDownloadMode>(integer_option(
+            "EMUCOREX_GS_ORACLE_HW_DOWNLOAD", static_cast<long>(config.HWDownloadMode), 5));
         config.InterlaceMode = GSInterlaceMode::Automatic;
         config.LinearPresent = GSPostBilinearMode::Off;
         config.TextureFiltering = BiFiltering::PS2;
         config.SWExtraThreads = 0;
         config.SkipDuplicateFrames = false;
+        config.PrecompilePipelines = false;
+        config.DisableAsyncTFXCompile = true;
         config.FXAA = false; config.ShadeBoost = false;
         config.CASMode = GSCASMode::Disabled; config.SGSRMode = GSSGSRMode::Disabled;
         config.LoadTextureReplacements = false;
         config.OsdMessagesPos = OsdOverlayPos::None; config.OsdPerformancePos = OsdOverlayPos::None;
+        // Opt-in game-dump reproduction must include its hardware fixes. Keep
+        // synthetic corpus defaults unchanged and record the effective inputs.
+        const char* use_gamedb = std::getenv("EMUCOREX_GS_ORACLE_GAMEDB");
+        if (dump && use_gamedb && std::strcmp(use_gamedb, "1") == 0)
+        {
+            const auto* entry = GameDatabase::findGame(dump->GetSerial());
+            Require(entry != nullptr, "Dump serial has no GameDB entry");
+            config.ManualUserHacks = false;
+            entry->applyGSHardwareFixes(config);
+            config.ManualUserHacks = true;
+            std::ofstream effective(output + "/game-settings.txt");
+            effective << "serial=" << dump->GetSerial() << '\n'
+                << "textureInsideRT=" << static_cast<u32>(config.UserHacks_TextureInsideRt) << '\n'
+                << "halfPixelOffset=" << static_cast<u32>(config.UserHacks_HalfPixelOffset) << '\n'
+                << "autoFlush=" << static_cast<u32>(config.UserHacks_AutoFlush) << '\n'
+                << "blending=" << static_cast<u32>(config.AccurateBlendingUnit) << '\n'
+                << "upscale=" << config.UpscaleMultiplier << '\n'
+                << "hwDownload=" << static_cast<u32>(config.HWDownloadMode) << '\n';
+            Require(effective.good(), "Cannot record effective game fixes");
+        }
+        if (const char* draw_frame = std::getenv("EMUCOREX_GS_ORACLE_DRAW_FRAME"))
+        {
+            config.DumpGSData = true;
+            config.SaveRT = config.SaveTexture = config.SaveInfo = config.SaveHWConfig = true;
+            config.SaveFrameStart = Number(draw_frame, 0, 100);
+            config.SaveFrameCount = 1;
+            config.HWDumpDirectory = output + "/draws";
+            std::filesystem::create_directories(config.HWDumpDirectory);
+        }
         Require(GSopen(config, config.Renderer, reinterpret_cast<u8*>(&regs), GSVSyncMode::Disabled, false), "GSopen failed");
         opened = true;
         {
@@ -577,6 +640,10 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunGSOracle(int ar
             else replay.Synthetic();
             replay.Drain();
             Require(replay.frames > 0, "No frames executed");
+            if (dump && replay.capture)
+                Require(std::any_of(replay.checkpoints.begin(), replay.checkpoints.end(),
+                    [](const Checkpoint& p) { return p.name == "display" && p.kind == "rgba"; }),
+                    "Dump produced no display output");
         };
         std::vector<double> samples;
         if (replay.capture || replay.profile) run();
@@ -609,9 +676,10 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunGSOracle(int ar
             manifest << fmt::format("{:.9f}", samples[i]);
         }
         manifest << "],\"profiles\":[";
-        constexpr std::array<const char*, GSPerfMon::CounterLast> counter_names{"primitives", "draws", "draw_calls", "readbacks",
+        constexpr const char* counter_names[]{"primitives", "draws", "draw_calls", "readbacks",
             "swizzle_bytes", "unswizzle_bytes", "copies_or_fillrate", "uploads_or_syncpoints", "barriers", "render_passes",
-            "rov_copies", "rov_draw_calls", "rov_barriers"};
+            "rov_copies", "rov_draw_calls", "rov_barriers", "sw_palette_block_copies"};
+        static_assert(std::size(counter_names) == GSPerfMon::CounterLast);
         for (size_t i = 0; i < replay.profiles.size(); ++i)
         {
             if (i) manifest << ',';

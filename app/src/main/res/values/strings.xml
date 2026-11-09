@@ -670,6 +670,9 @@
     <string name="settings_aspect_ratio_43">4:3</string>
     <string name="settings_aspect_ratio_169">16:9</string>
     <string name="settings_aspect_ratio_107">10:7</string>
+    <string name="settings_aspect_ratio_219">21:9</string>
+    <string name="settings_aspect_ratio_209">20:9</string>
+    <string name="settings_aspect_ratio_1959">19.5:9</string>
     <string name="settings_paths">Files</string>
     <string name="settings_bios_path">BIOS File</string>
     <string name="settings_bios_path_desc">Select the PS2 BIOS image file needed to start games.</string>
@@ -960,7 +963,7 @@
     <string name="texture_manager_loading">Loading texture packs…</string>
     <string name="texture_manager_options">Runtime Options</string>
     <string name="texture_manager_enable_replacements">Load replacement textures</string>
-    <string name="texture_manager_enable_replacements_desc">Use PNG and DDS / KTX2 files from each game serial folder.</string>
+    <string name="texture_manager_enable_replacements_desc">Use PNG and DDS / KTX2 / ASTC / KTX files from each game serial folder.</string>
     <string name="texture_manager_async_loading">Async loading</string>
     <string name="texture_manager_async_loading_desc">Load replacement textures on a worker thread while the game runs.</string>
     <string name="texture_manager_precache">Precache replacements</string>
@@ -3088,4 +3091,9 @@
     <string name="onboarding_account_community">Track play time, enter the leaderboard, add friends and unlock achievements.</string>
     <string name="onboarding_account_privacy">Cloud profiles store settings only. Games, BIOS, saves and memory cards stay on this device; each device uses a random ID you can show or hide.</string>
     <string name="onboarding_account_note">Signing in is optional — open the Profile tab whenever you want.</string>
+    <string name="texture_manager_upscale">Texture enhancement</string>
+    <string name="texture_manager_upscale_desc">Enhance game textures in the background. Uses more CPU and memory; texture packs take priority.</string>
+    <string name="texture_manager_upscale_off">Off</string>
+    <string name="texture_manager_upscale_2x">RAISR 2×</string>
+    <string name="texture_manager_upscale_4x">RAISR 4×</string>
 </resources>

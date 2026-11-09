@@ -390,7 +390,7 @@ class AppPreferences(private val context: Context) {
             "enableInstantVu1", "enableMtvu", "enableIopThread", "enableVUAot", "enableThreadPinning", "enableFastCdvd",
             "hwDownloadMode", "frameSkip", "skipDuplicateFrames", "lowLatencyMode", "textureFiltering",
             "trilinearFiltering", "blendingAccuracy", "texturePreloading",
-            "textureReplacementsEnabled", "textureReplacementsAsync", "textureReplacementsPrecache",
+            "textureReplacementsEnabled", "textureReplacementsAsync", "textureReplacementsPrecache", "textureUpscaleMode",
             "textureDumpingEnabled", "enableFxaa", "sgsrMode", "casMode", "casSharpness",
             "tvShader", "enableWidescreenPatches", "enableNoInterlacingPatches",
             "deinterlaceMode", "dithering", "antiBlur", "anisotropicFiltering",
@@ -770,6 +770,7 @@ class AppPreferences(private val context: Context) {
         private val BLENDING_ACCURACY = intPreferencesKey("blending_accuracy")
         private val BLENDING_ACCURACY_USER_OVERRIDE = booleanPreferencesKey("blending_accuracy_user_override")
         private val TEXTURE_PRELOADING = intPreferencesKey("texture_preloading")
+        private val TEXTURE_UPSCALE_MODE = intPreferencesKey("texture_upscale_mode")
         private val TEXTURE_REPLACEMENTS_ENABLED = booleanPreferencesKey("texture_replacements_enabled")
         private val TEXTURE_REPLACEMENTS_ASYNC = booleanPreferencesKey("texture_replacements_async")
         private val TEXTURE_REPLACEMENTS_PRECACHE = booleanPreferencesKey("texture_replacements_precache")
@@ -2348,10 +2349,7 @@ class AppPreferences(private val context: Context) {
     }
 
     private fun normalizeAspectRatioPreference(value: Int?): Int {
-        return when (value) {
-            0, 1, 2, 3, 4 -> value
-            else -> 1
-        }
+        return com.sbro.emucorex.core.GSAspectRatioSettings.normalize(value)
     }
 
     val padVibration: Flow<Boolean> = context.dataStore.data.map { prefs ->
@@ -3410,6 +3408,14 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setTexturePreloading(value: Int) {
         context.dataStore.edit { it[TEXTURE_PRELOADING] = GsHackDefaults.coerceTexturePreloading(value) }
+    }
+
+    val textureUpscaleMode: Flow<Int> = context.dataStore.data.map { prefs ->
+        GsHackDefaults.coerceTextureUpscaleMode(prefs[TEXTURE_UPSCALE_MODE] ?: GsHackDefaults.TEXTURE_UPSCALE_DEFAULT)
+    }
+
+    suspend fun setTextureUpscaleMode(value: Int) {
+        context.dataStore.edit { it[TEXTURE_UPSCALE_MODE] = GsHackDefaults.coerceTextureUpscaleMode(value) }
     }
 
     val textureReplacementsEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
@@ -4860,6 +4866,7 @@ class AppPreferences(private val context: Context) {
             put("texturePreloading", GsHackDefaults.coerceTexturePreloading(
                 prefs[TEXTURE_PRELOADING] ?: GsHackDefaults.TEXTURE_PRELOADING_DEFAULT
             ))
+            put("textureUpscaleMode", GsHackDefaults.coerceTextureUpscaleMode(prefs[TEXTURE_UPSCALE_MODE] ?: GsHackDefaults.TEXTURE_UPSCALE_DEFAULT))
             put("textureReplacementsEnabled", prefs[TEXTURE_REPLACEMENTS_ENABLED] ?: false)
             put("textureReplacementsAsync", prefs[TEXTURE_REPLACEMENTS_ASYNC] ?: true)
             put("textureReplacementsPrecache", prefs[TEXTURE_REPLACEMENTS_PRECACHE] ?: false)
@@ -5384,6 +5391,7 @@ class AppPreferences(private val context: Context) {
             prefs[TEXTURE_PRELOADING] = GsHackDefaults.coerceTexturePreloading(
                 json.optInt("texturePreloading", GsHackDefaults.TEXTURE_PRELOADING_DEFAULT)
             )
+            prefs[TEXTURE_UPSCALE_MODE] = GsHackDefaults.coerceTextureUpscaleMode(json.optInt("textureUpscaleMode", GsHackDefaults.TEXTURE_UPSCALE_DEFAULT))
             prefs[TEXTURE_REPLACEMENTS_ENABLED] = json.optBoolean("textureReplacementsEnabled", false)
             prefs[TEXTURE_REPLACEMENTS_ASYNC] = json.optBoolean("textureReplacementsAsync", true)
             prefs[TEXTURE_REPLACEMENTS_PRECACHE] = json.optBoolean("textureReplacementsPrecache", false)

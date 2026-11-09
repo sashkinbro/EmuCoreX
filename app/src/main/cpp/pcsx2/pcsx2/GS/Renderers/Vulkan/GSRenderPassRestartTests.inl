@@ -5,6 +5,8 @@
 #include "GSDriverSafetyTests.inl"
 #include "GSStreamRingAllocationTests.inl"
 #include "GSBlendCarryPixelTests.inl"
+#include "VKAlphaBitPixelTests.inl"
+#include "VKStencilCounterPixelTests.inl"
 void GSDeviceVK::TestRenderPassRestarts(void (*check)(bool, const char*))
 {
     check(m_tfx_preparation_device && !m_allocator, "GS restart fixture starts on an isolated preparation device");
@@ -66,7 +68,7 @@ void GSDeviceVK::TestRenderPassRestarts(void (*check)(bool, const char*))
     };
     const bool initialized = CreateAllocator() && CreateCommandBuffers() &&
         m_texture_stream_buffer.Create(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 1024 * 1024, "restart-texture") &&
-        m_index_stream_buffer.Create(VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 4096, "restart-index") && CreateNullTexture();
+        m_index_stream_buffer.Create(VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 16384, "restart-index") && CreateNullTexture();
     check(initialized, "GS restart fixture creates real upload, index and null-texture resources");
     if (!initialized) return;
     m_index_buffer = m_index_stream_buffer.GetBuffer();
@@ -306,4 +308,5 @@ void main(){color=texelFetch(source,ivec2(0),0)*params.factor;})");
     TestRoadModelParity(check);
     TestDepthSamplingPolicy(check);
     TestBlendCarryPixels(check);
+    TestAlphaBitPixels(check);
 }

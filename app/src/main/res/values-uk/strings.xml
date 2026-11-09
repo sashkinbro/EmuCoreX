@@ -1215,7 +1215,7 @@
     <string name="texture_manager_loading">Завантаження пакетів текстур…</string>
     <string name="texture_manager_options">Параметри виконання</string>
     <string name="texture_manager_enable_replacements">Завантажувати текстури для заміни</string>
-    <string name="texture_manager_enable_replacements_desc">Використовувати файли PNG та DDS / KTX2 з папки з серійним номером кожної гри.</string>
+    <string name="texture_manager_enable_replacements_desc">Використовувати файли PNG та DDS / KTX2 / ASTC / KTX з папки з серійним номером кожної гри.</string>
     <string name="texture_manager_async_loading">Асинхронне завантаження</string>
     <string name="texture_manager_async_loading_desc">Завантажувати текстури для заміни в робочому потоці під час гри.</string>
     <string name="texture_manager_precache">Передкешування замін</string>
@@ -3075,4 +3075,9 @@
     <string name="onboarding_account_community">Відстежуйте час гри, потрапляйте до таблиці лідерів, додавайте друзів і відкривайте досягнення.</string>
     <string name="onboarding_account_privacy">Хмарні профілі зберігають лише налаштування. Ігри, BIOS, збереження й карти пам’яті залишаються на цьому пристрої; кожен пристрій має випадковий ID, який можна показувати або ховати.</string>
     <string name="onboarding_account_note">Вхід необов’язковий — відкрийте вкладку «Профіль», коли захочете.</string>
+    <string name="texture_manager_upscale">Покращення текстур</string>
+    <string name="texture_manager_upscale_desc">Покращувати ігрові текстури у фоні. Потребує більше ресурсів процесора та пам’яті; пакети текстур мають пріоритет.</string>
+    <string name="texture_manager_upscale_off">Вимкнено</string>
+    <string name="texture_manager_upscale_2x">RAISR 2×</string>
+    <string name="texture_manager_upscale_4x">RAISR 4×</string>
 </resources>

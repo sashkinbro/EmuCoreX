@@ -14,7 +14,7 @@ class VKSwapChain;
 ///
 /// The upstream consumer app captures the screen with MediaProjection and composites over the
 /// target process, because Android 12+ forbids injecting code into a non-debuggable app. That
-/// constraint is not ours: EMUCOREX owns its swapchain, so we hand the library our own images
+/// constraint is not ours: ARMSX2 owns its swapchain, so we hand the library our own images
 /// through its AHardwareBuffer entry points. No screen capture, no overlay, no accessibility
 /// service, and the interpolated frames never leave our process.
 ///
@@ -33,7 +33,7 @@ namespace GSLsfg
 		Available = 0,   ///< usable right now
 		NotCompiledIn,   ///< play flavour, or the library was not fetched
 		NotVulkan,       ///< the OpenGL backend has no AHardwareBuffer path
-		GpuUnsupported,  ///< needs Adreno 7xx or newer
+		GpuUnsupported,  ///< needs Adreno 7xx or newer, or a 6xx on Turnip
 		NoDll,           ///< the user has not supplied Lossless.dll
 		DllUnreadable,   ///< supplied, but not a PE we can read shaders out of
 		InitFailed,      ///< the library refused to initialise on this device
@@ -46,6 +46,9 @@ namespace GSLsfg
 	/// True only when GetUnavailableReason() == Available.
 	bool IsAvailable();
 
+	/// True only for a renderer whose resolved Vulkan/Adreno capability was reported.
+	bool HasSupportedRenderer();
+
 	/// One-line explanation of the current reason, for the log and the settings row.
 	const char* GetUnavailableReasonString();
 
@@ -57,6 +60,11 @@ namespace GSLsfg
 	/// "LSFG: unavailable" / "failed" / "no shaders" / "starting" / "LSFG: 118.80".
 	std::string GetStatusText();
 
+	/// Frame generation is switched on and not working: unavailable, failed, no shaders, or no
+	/// display image to spare. The overlay shows its line for this even when the rest of the
+	/// overlay is off.
+	bool StatusIsProblem();
+
 	/// Frames reaching the DISPLAY per second — real plus generated — over the last one-second
 	/// window. Deliberately not the emulator's FPS, which frame generation does not change: what
 	/// changes is how many frames get presented, and that is only visible if something counts it.
@@ -65,20 +73,25 @@ namespace GSLsfg
 
 	/// Record what the renderer that just came up can do. Called once from GSDeviceVK::Create so
 	/// the frontend can answer "is this supported" without a device, and so the verdict survives
-	/// into the settings screen after the game stops. `adreno_generation` is 7 for Adreno 7xx, 8
+	/// into the settings screen after the game stops. `adreno_generation` is 6 for an Adreno 6xx on
+	/// Turnip, 7 for Adreno 7xx, 8
 	/// for 8xx, 0 when the GPU is not an Adreno or was not recognised.
 	void NoteRendererCapability(bool is_vulkan, u32 adreno_generation);
 
-	/// Actual Android display rate, independent from the app's requested Surface frame rate.
 	void SetHostRefreshRate(float refresh_rate);
 
 	/// Absolute path to the user-supplied Lossless.dll, or empty when unset. The frontend copies
 	/// the SAF pick into app storage first — the PE is read with ordinary file IO, so a
 	/// content:// URI will not do.
-	void SetDllPath(const std::string& path);
-	const std::string& GetDllPath();
+	void SetDllPath(std::string path);
+	std::string GetDllPath();
 
-	/// Cheap structural check that a file is a PE EMUCOREX could read shaders out of, so the UI can
+	/// Drop the cached structural verdict so the next GetUnavailableReason() re-reads the file.
+	/// The importer rewrites the same path on every import, so a path change cannot be the
+	/// trigger; the present path must not pay for a re-read it never needs.
+	void InvalidateDllVerdict();
+
+	/// Cheap structural check that a file is a PE ARMSX2 could read shaders out of, so the UI can
 	/// reject a wrong pick at import time instead of failing later inside a frame. Does not
 	/// validate that it IS Lossless Scaling — only that it is a readable PE image.
 	bool LooksLikeLosslessDll(const std::string& path);
@@ -118,4 +131,23 @@ namespace GSLsfg
 	/// or consumed and the caller must fall through to its ordinary present path.
 	bool PresentWithGeneration(VkQueue present_queue, VKSwapChain* swap_chain, VkSemaphore render_finished,
 		bool frame_has_new_content);
+
+	/// The game's own frame, before it was scaled to the screen, and how the present drew it.
+	struct GameFrame
+	{
+		VkImage image = VK_NULL_HANDLE; ///< in TRANSFER_SRC_OPTIMAL (the caller transitions it)
+		s32 src[4] = {};                ///< the visible area in it: left, top, right, bottom
+		float draw[4] = {};             ///< where the present drew it, in swap chain pixels
+		bool linear = false;            ///< the present's filter: bilinear, else nearest
+	};
+
+	/// Frame generation on the game's own image rather than the finished screen: copies [frame]
+	/// into frame generation's input, shrunk to fit the screen but never grown, and
+	/// PresentWithGeneration then puts each generated frame on screen with the same scaled blit
+	/// the real frame got. Record into [cmd], the frame's own command buffer: read from frame
+	/// generation's later submission, the copy would not be ordered against the GS drawing into the
+	/// texture again next frame. Pass null [frame] when the present is more than that one blit;
+	/// PresentWithGeneration then works on the finished screen.
+	/// Call AFTER Initialize/Shutdown for the frame, which may replace the image it copies into.
+	void CaptureGameFrame(VkCommandBuffer cmd, const GameFrame* frame);
 } // namespace GSLsfg

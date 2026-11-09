@@ -6,6 +6,8 @@
 #include "GS/Renderers/Common/GSRenderer.h"
 #include "GS/Renderers/Common/GSFastList.h"
 #include "GS/Renderers/Common/GSDirtyRect.h"
+#include "GS/Renderers/HW/GSAlphaKnownBits.h"
+#include "GSTargetRebase.h"
 
 #include <unordered_set>
 #include <utility>
@@ -109,7 +111,7 @@ public:
 
 		HashCacheKey();
 
-		static HashCacheKey Create(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA, const u32* clut, const GSVector2i* lod, SourceRegion region);
+		static HashCacheKey Create(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA, const u32* clut, const GSVector2i* lod, SourceRegion region, bool raw_blocks = false);
 
 		HashCacheKey WithRemovedCLUTHash() const;
 		void RemoveCLUTHash();
@@ -133,25 +135,105 @@ public:
 		std::pair<u8, u8> alpha_minmax;
 		bool valid_alpha_minmax;
 		bool is_replacement;
+        bool generated = false;
+        // Entry-owned original texels, materialized lazily for swatch draws.
+        GSTexture* native = nullptr;
 	};
 
 	using HashCacheMap = std::unordered_map<HashCacheKey, HashCacheEntry, HashCacheKeyHash>;
+
+	/// What HashCacheKey::Create did with the memo of texture hashes of this cache.
+	struct HashMemoStats
+	{
+		u64 lookups = 0; ///< Texture hashes asked for of a texture large enough to be memoised.
+		u64 hits = 0; ///< Answered by the memo, without reading local memory.
+		u64 stale = 0; ///< Had a memo entry whose pages were written since.
+	};
+
+	/// What verify mode found. Totals over every cache of the process.
+	struct HashMemoVerifyReport
+	{
+		u64 hits = 0; ///< Memo hits whose hash was computed afresh and compared.
+		u64 mismatches = 0; ///< Of those, how many differed.
+		u64 sweeps = 0; ///< Frame boundaries at which the pages of local memory were hashed.
+		u64 missed_writers = 0; ///< Pages whose bytes changed between two sweeps with no mark in between.
+	};
+
+	/// A 64-bit hash for each 256-byte block of local memory, kept valid by the hash-dirty bitmap of
+	/// GSLocalMemory (see HashCacheKey::Create). Defined in the .cpp.
+	struct BlockHashCache;
+
+	/// What the block hash cache did, over every cache of the process.
+	struct BlockHashStats
+	{
+		u64 levels = 0; ///< Texture levels keyed through the cache.
+		u64 blocks = 0; ///< Blocks of those levels.
+		u64 rehashed = 0; ///< Of those, how many had to be hashed (their hash-dirty bit was set), or were masked H-format blocks.
+	};
+
+	/// What -verify-block-hash found. Totals over every cache of the process.
+	struct BlockHashVerifyReport
+	{
+		u64 levels = 0; ///< Levels whose cached block hashes were each compared with a fresh hash.
+		u64 blocks = 0; ///< Blocks compared.
+		u64 stale_blocks = 0; ///< Of those, how many cached hashes differed: a store into local memory that was not marked.
+		u64 lookups = 0; ///< Keys whose cached form was compared with the form without the cache.
+		u64 extra_misses = 0; ///< Lookups where two windows had one key without the cache and two with it: a hit lost.
+		u64 false_hits = 0; ///< Lookups where two windows had one key with the cache and two without it: a wrong texture.
+	};
 
 	class Surface : public GSAlignedClass<32>
 	{
 	protected:
 		Surface();
 		~Surface();
+
 		bool OverlapsHelper(u32 start_block0, u32 end_block0, u32 bp, u32 bw, u32 psm, const GSVector4i& rect) const;
+
+		/// Set by Target's constructor: a target's block range is kept in the texture cache's target page index,
+		/// so every change of its base block or end block goes through RangeChanged().
+		bool m_is_target = false;
+
+	private:
+		u32 m_end_block = MAX_BP; // Hint of the surface area.
+
+		/// Tells the target page index that a target's base block or end block may have changed.
+		void RangeChanged();
 
 	public:
 		GSTexture* m_texture = nullptr;
+		/// Read freely. Write the base block only through SetTEX0() or SetTBP0(), which keep the target page index
+		/// right; the other fields do not move the block range.
 		GIFRegTEX0 m_TEX0 = {};
 		GIFRegTEXA m_TEXA = {};
 		GSVector2i m_unscaled_size = {};
 		float m_scale = 0.0f;
 		int m_age = 0;
-		u32 m_end_block = MAX_BP; // Hint of the surface area.
+
+		/// The end block: a hint of the surface area.
+		u32 EndBlock() const { return m_end_block; }
+		void SetEndBlock(u32 end_block)
+		{
+			if (m_end_block == end_block)
+				return;
+			m_end_block = end_block;
+			RangeChanged();
+		}
+		void SetTBP0(u32 tbp)
+		{
+			if (m_TEX0.TBP0 == tbp)
+				return;
+			m_TEX0.TBP0 = tbp;
+			RangeChanged();
+		}
+		void SetTEX0(const GIFRegTEX0& TEX0)
+		{
+			const bool moved = m_TEX0.TBP0 != TEX0.TBP0;
+			m_TEX0 = TEX0;
+			if (moved)
+				RangeChanged();
+		}
+
 		bool m_32_bits_fmt = false; // Allow to detect the casting of 32 bits as 16 bits texture
 		bool m_was_dst_matched = false;
 		bool m_shared_texture = false;
@@ -170,8 +252,8 @@ public:
 		/// Can be used for overlap tests.
 		u32 UnwrappedEndBlock() const { return (m_end_block + (Wraps() ? GS_MAX_BLOCKS : 0)); }
 
-		bool Inside(u32 bp, u32 bw, u32 psm, const GSVector4i& rect);
-		bool Overlaps(u32 bp, u32 bw, u32 psm, const GSVector4i& rect);
+		bool Inside(u32 bp, u32 bw, u32 psm, const GSVector4i& rect) const;
+		bool Overlaps(u32 bp, u32 bw, u32 psm, const GSVector4i& rect) const;
 	};
 
 	struct PaletteKey
@@ -237,6 +319,8 @@ public:
 		int m_alpha_max = 0;
 		int m_alpha_min = 0;
 		bool m_alpha_range = false;
+		GSAlphaKnownBits::Known m_alpha_known;
+		bool m_alpha_known_via_union = false;
 
 		// Valid alpha means "we have rendered to the alpha channel of this target".
 		// A false value means that the alpha in local memory is still valid/up-to-date.
@@ -250,7 +334,9 @@ public:
 		bool m_is_frame = false;
 		bool m_used = false;
 		float OffsetHack_modxy = 0.0f;
-		GSDirtyRectList m_dirty;
+		GSTargetDirty m_dirty;
+		u16 m_index_lo = 0, m_index_hi = 0;
+		bool m_indexed = false;
 		// Dirty-list revision and the revision last checked for union coverage.
 		u32 m_dirty_revision = 0;
 		u32 m_dirty_cover_checked = 0;
@@ -279,6 +365,8 @@ public:
 		void ResizeValidity(const GSVector4i& rect);
 		void UpdateValidity(const GSVector4i& rect, bool can_resize = true);
 		bool OverlapsValid(u32 bp, u32 bw, u32 psm, const GSVector4i& rect) const;
+
+		void AssertAlphaKnownAgreesWithRange(const char* site) const;
 
 		void ScaleRTAlpha();
 		void UnscaleRTAlpha();
@@ -374,12 +462,16 @@ public:
 	class PaletteMap
 	{
 	private:
-		static const u16 MAX_SIZE = 65535; // Max size of each map.
+		static const u16 MAX_SIZE = 4096; // Max size of each map.
 
 		// Array of 2 maps, the first for 64B palettes and the second for 1024B palettes.
 		// Each map stores the key PaletteKey (clut copy, pal value) pointing to the relevant shared pointer to Palette object.
 		// There is one PaletteKey per Palette, and the hashing and comparison of PaletteKey is done with custom operators PaletteKeyHash and PaletteKeyEqual.
 		std::array<std::unordered_map<PaletteKey, std::shared_ptr<Palette>, PaletteKeyHash, PaletteKeyEqual>, 2> m_maps;
+
+		std::shared_ptr<Palette> m_memo;
+		u32 m_memo_serial = 0;
+		u16 m_memo_pal = 0;
 
 	public:
 		PaletteMap();
@@ -453,6 +545,23 @@ public:
 	};
 
 protected:
+	/// The blocks of local memory one write touched: one bit per block, by block address, in pages of 32. A
+	/// block the write covers in all its pixels is in `full`; one it covers in part is in `part`. `pages` lists
+	/// the pages with a bit, so the set is emptied page by page.
+	struct WrittenBlocks
+	{
+		std::array<u32, GS_MAX_PAGES> full{};
+		std::array<u32, GS_MAX_PAGES> part{};
+		std::vector<u16> pages;
+	};
+	WrittenBlocks m_written;
+
+	/// Finds the blocks the write of `rect` in `off` touches.
+	void BuildWrittenBlocks(const GSOffset& off, const GSVector4i& rect);
+	/// Marks dirty, in the channels of `rgba`, the blocks of `t` inside `region` (target coordinates) whose
+	/// memory the last BuildWrittenBlocks found. Returns whether any bit was new.
+	bool MarkWrittenBlocks(Target* t, const GSVector4i& region, RGBAMask rgba);
+
 	PaletteMap m_palette_map;
 	SourceMap m_src;
 	u64 m_source_memory_usage = 0;
@@ -460,9 +569,47 @@ protected:
 	u64 m_hash_cache_memory_usage = 0;
 	u64 m_hash_cache_replacement_memory_usage = 0;
 
+	/// The last hash of each texture and the write sequence of local memory it was taken at, so that
+	/// HashCacheKey::Create can reuse it while no page the texture reads has been written since. Direct
+	/// mapped in a fixed array, so a lookup is a few compares and no allocation. Lives and dies with the
+	/// cache, as the local memory whose write sequence it stores does with the renderer.
+	static constexpr u32 HASH_MEMO_ENTRIES = 32;
+	static constexpr u32 HASH_MEMO_MAX_LEVELS = 8; // the base level and the six mipmaps below it
+	/// Smallest base level that is memoised, in blocks of 256 bytes: 128 KiB of local memory read per hash.
+	static constexpr int HASH_MEMO_MIN_BLOCKS = 512;
+	struct HashMemoEntry
+	{
+		u64 seq; ///< GSLocalMemory::WriteSeq() before the hash was computed.
+		HashType hash;
+		u64 texa; ///< The TEXA bits the hash reads.
+		u64 region; ///< SourceRegion::bits of the base level.
+		u64 tex0[HASH_MEMO_MAX_LEVELS]; ///< Per level, the TEX0 bits the hash reads.
+		u32 levels; ///< Number of levels hashed. 0 in an empty entry.
+		bool raw_blocks; ///< The hash was allowed to read raw blocks (HashCacheKey::Create), which is a different hash.
+		bool block_hash_cache; ///< The raw levels were keyed through the block hash cache, which is another hash again.
+	};
+	struct HashMemo
+	{
+		HashMemoEntry entries[HASH_MEMO_ENTRIES] = {};
+		HashMemoStats stats;
+		u32 mem_id = 0;
+	};
+	HashMemo m_hash_memo;
+
+	static inline bool s_hash_memo_verify = false;
+	struct HashMemoSweep;
+	std::unique_ptr<HashMemoSweep> m_hash_memo_sweep;
+
+	/// The block hash cache of this texture cache, made at the first lookup that needs it.
+	std::unique_ptr<BlockHashCache> m_block_hash_cache;
+	BlockHashCache& SyncBlockHashCache(GSLocalMemory& mem);
+	static inline bool s_block_hash_cache_enabled = true;
+	static inline bool s_block_hash_verify = false;
+
 	FastList<Target*> m_dst[2];
 	FastList<TargetHeightElem> m_target_heights;
 	u64 m_target_memory_usage = 0;
+	bool m_no_display_hit_since_purge = false;
 
 	int m_expected_src_bp = -1;
 	int m_remembered_src_bp = -1;
@@ -489,11 +636,15 @@ protected:
 		u32 write_mask = 0;
 		u64 queued_frame = 0;
 		u64 captured_generation = 0;
+		bool cpu_convert_rgb5a1 = false;
 	};
 
 	static constexpr size_t MAX_PENDING_DOWNLOADS = 16;
+	static constexpr u64 VISIBILITY_QUERY_LATENCY_FRAMES = 3;
+	static constexpr u64 MAX_PENDING_DOWNLOAD_FRAMES = 4;
 	std::deque<PendingDownload> m_pending_downloads;
 	std::vector<std::unique_ptr<GSDownloadTexture>> m_async_download_texture_pool;
+	std::vector<u16> m_readback_pack_fallback;
 
 	// Immutable decoded patterns are independent of GS VRAM and survive GSReset.
 	// The renderer purge hook releases them before replacing the GS device.
@@ -506,6 +657,9 @@ protected:
 	GSTexture* GetClearPatternTexture(bool depth, u32 raw_clear);
 	bool TryReuseClearPatternTarget(Target* t, GIFRegTEX0 tex0, const GSVector2i& size, float scale, u32 raw_clear);
 
+
+	void CommitTargetRebase(Target* target, GSTexture* texture, const GSTargetRebase::Plan& plan);
+	bool TryRebaseTargetForOverwrite(Target* target, const GIFRegTEX0& incoming, const GSVector4i& draw_rect, const Source* source, const Target* depth, u32 width_page_offset, bool is_shuffle);
 
 	Source* CreateSource(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA, const GIFRegCLAMP& CLAMP, Target* t, int x_offset, int y_offset, const GSVector2i* lod, const GSVector4i* src_range, GSTexture* gpu_clut, SourceRegion region, bool force_temporary = false);
 	bool HasExpectedStripedMove(u32 sbp, u32 dbp) const;
@@ -578,6 +732,71 @@ public:
 	__fi u64 GetSourceMemoryUsage() const { return m_source_memory_usage; }
 	__fi u64 GetTargetMemoryUsage() const { return m_target_memory_usage; }
 
+	__fi const HashMemoStats& GetHashMemoStats() const { return m_hash_memo.stats; }
+
+	/// Verify mode for the hash memo and the write stamps (pcsx2-gsrunner -verify-hash-memo), off by default.
+	/// While it is on, every memo hit also hashes the texture afresh and compares, and VerifyWriteStamps()
+	/// finds stores into local memory that nothing marked. Neither changes what the renderer does.
+	static void SetHashMemoVerify(bool enable);
+	static bool IsHashMemoVerify() { return s_hash_memo_verify; }
+	static HashMemoVerifyReport GetHashMemoVerifyReport();
+	/// Hashes every page of `mem` and reports each page whose bytes changed since the previous call while
+	/// its stamp did not, which is a store that was not marked. Call at a frame boundary, on the thread that
+	/// writes `mem`, with no writer in flight.
+	void VerifyWriteStamps(const GSLocalMemory& mem);
+
+	/// The per-block hash cache. A paletted window keyed from the bytes of its blocks (see
+	/// HashCacheKey::Create) is keyed from a hash of each block's hash. A block is rehashed only when its
+	/// hash-dirty bit in GSLocalMemory is set, so a window looked up last frame costs only the blocks
+	/// written since. This relies on every writer of local memory setting those marks, on every backend.
+	///
+	/// On by default. Off (gsrunner -block-hash-cache off), a window is keyed by one hash of its raw blocks
+	/// with no cache. The two keys differ but group windows identically, so the setting changes no pixel
+	/// and no hit.
+	static void SetBlockHashCacheEnabled(bool enable) { s_block_hash_cache_enabled = enable; }
+	static bool IsBlockHashCacheEnabled() { return s_block_hash_cache_enabled; }
+
+	/// Verify mode for the block hash cache (pcsx2-gsrunner -verify-block-hash), off by default. While on,
+	/// every block of a level keyed through the cache is also hashed afresh and compared with the cached
+	/// hash, and the key is also made without the cache; the two forms must agree on which windows are
+	/// one. The memo of texture hashes is not consulted, so every lookup is checked. Neither changes what
+	/// the renderer does.
+	static void SetBlockHashVerify(bool enable);
+	static bool IsBlockHashVerify() { return s_block_hash_verify; }
+	static BlockHashVerifyReport GetBlockHashVerifyReport();
+	static BlockHashStats GetBlockHashStats();
+
+	/// How much AgeHashCache keeps. Entries unused for 30 frames go regardless; past these limits the oldest
+	/// unreferenced entries go first. An entry's memory is its texture's, a replacement or an upscale counted
+	/// the same as a texture of the guest's own texels.
+	struct HashCacheLimits
+	{
+		/// Entries are never dropped for memory while there are no more than this many.
+		u32 floor_entries = 800;
+		/// The most entries kept, whatever they hold. 0 = no limit.
+		u32 max_entries = 1600;
+		/// The most bytes of textures kept above `floor_entries` entries. 0 = no limit.
+		u64 max_bytes = 128ull << 20;
+	};
+	static void SetHashCacheLimits(const HashCacheLimits& limits);
+	static HashCacheLimits GetHashCacheLimits();
+
+	/// The most the hash cache has held at the end of a frame (just before AgeHashCache drops anything), over
+	/// every cache of the process, and the same moment's total of the memory the renderer accounts for.
+	struct HashCacheStats
+	{
+		u64 peak_entries = 0;
+		u64 peak_bytes = 0; ///< The textures of the entries: GetTotalHashCacheMemoryUsage().
+		u64 peak_total_bytes = 0; ///< Targets, sources, hash cache and the device's texture pool.
+		u64 frames = 0; ///< Frames sampled.
+		u64 sum_bytes = 0; ///< Sum of the per-frame bytes, for the mean.
+	};
+	static HashCacheStats GetHashCacheStats();
+
+	/// The block hash of `block` of `mem`: of its 256 bytes, hashed now if its hash-dirty bit is set. The cache
+	/// is bound to the memory by GSLocalMemory::Id(); a different memory than the last one invalidates it.
+	u64 BlockHash(GSLocalMemory& mem, u32 block);
+
 	void Read(Target* t, const GSVector4i& r, bool force_synchronous = false);
 	void Read(Source* t, const GSVector4i& r);
 	void ProcessPendingDownloads();
@@ -585,6 +804,7 @@ public:
 	void RemoveAll(bool sources, bool targets, bool hash_cache);
 	void ReleaseClearPatterns();
 	void ReadbackAll();
+	void NoteColdStart() { m_no_display_hit_since_purge = true; }
 	static void AddDirtyRectTarget(Target* target, GSVector4i rect, u32 psm, u32 bw, RGBAMask rgba, bool req_linear = false);
 	void ResizeTarget(Target* t, GSVector4i rect, u32 tbp, u32 psm, u32 tbw);
 	static bool FullRectDirty(Target* target, u32 rgba_mask);
@@ -592,6 +812,18 @@ public:
 	static bool DirtyRectsCover(const GSDirtyRectList& list, u32 psm, u32 bw, u32 rgba_mask,
 		const GSVector4i& area, GSVector2i* hole = nullptr);
 	static bool FullRectDirtyByUnion(Target* target);
+	static bool MarkTargetDirty(Target* target, const GSVector4i& rect, u32 psm, u32 bw, RGBAMask rgba, bool req_linear = false);
+	static void NoteDirtyAdded(Target* target);
+	static bool DirtCoversTarget(Target* target);
+	/// The target page index: for each page of unwrapped block space (0 to 2 * GS_MAX_PAGES), how many targets'
+	/// block ranges ([TBP0, UnwrappedEndBlock()]) touch it. Every target is in it from its constructor to its
+	/// destructor, whether or not it is in a target list, so it can only over-state which targets a write may
+	/// reach; Surface's setters keep each target's entry at its current range.
+	static void ReindexTarget(Target* t);
+	static void UnindexTarget(Target* t);
+	/// Whether some target's block range may meet blocks [bp, end_bp] (end_bp unwrapped). False means no
+	/// target in either list is in reach of the write, so InvalidateVideoMem's target half has nothing to do.
+	static bool TargetsMayReach(u32 bp, u32 end_bp);
 	bool CanTranslate(u32 bp, u32 bw, u32 spsm, GSVector4i r, u32 dbp, u32 dpsm, u32 dbw);
 	GSVector4i TranslateAlignedRectByPage(u32 tbp, u32 tebp, u32 tbw, u32 tpsm, GSVector4i t_r, u32 sbp, u32 spsm, u32 sbw, GSVector4i src_r, bool is_invalidation = false);
 	GSVector4i TranslateAlignedRectByPage(Target* t, u32 sbp, u32 spsm, u32 sbw, GSVector4i src_r, bool is_invalidation = false);
@@ -677,7 +909,8 @@ public:
 	void InvalidateTemporaryZ();
 
 	/// Injects a texture into the hash cache, by using GSTexture::Swap(), transitively applying to all sources. Ownership of tex is transferred.
-	void InjectHashCacheTexture(const HashCacheKey& key, GSTexture* tex, const std::pair<u8, u8>& alpha_minmax);
+	void InjectHashCacheTexture(const HashCacheKey& key, GSTexture* tex, const std::pair<u8, u8>& alpha_minmax, bool generated = false);
+    GSTexture* GetNativeTexture(const Source* source);
 };
 
 extern std::unique_ptr<GSTextureCache> g_texture_cache;

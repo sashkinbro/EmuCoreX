@@ -5311,6 +5311,9 @@ private fun EmulationSidebarMenu(
                                 LiveSelectionOption(2, "4:3"),
                                 LiveSelectionOption(3, "16:9"),
                                 LiveSelectionOption(4, stringResource(R.string.settings_aspect_ratio_107)),
+                                LiveSelectionOption(5, stringResource(R.string.settings_aspect_ratio_219)),
+                                LiveSelectionOption(6, stringResource(R.string.settings_aspect_ratio_209)),
+                                LiveSelectionOption(7, stringResource(R.string.settings_aspect_ratio_1959)),
                                 LiveSelectionOption(
                                     value = 0,
                                     icon = Icons.Rounded.Fullscreen,

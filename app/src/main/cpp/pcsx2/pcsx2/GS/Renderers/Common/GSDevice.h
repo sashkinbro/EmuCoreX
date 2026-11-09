@@ -3,6 +3,9 @@
 
 #pragma once
 
+#define GS_PRESENT_GEOMETRY_PARITY 1
+#include "GS/Renderers/Common/GSInterlaceModePolicy.h"
+
 #include "common/HashCombine.h"
 #include "common/WindowInfo.h"
 #include "GS/GS.h"
@@ -108,6 +111,7 @@ enum class ShaderInterlace
 	BLEND = 2,
 	MAD_BUFFER = 3,
 	MAD_RECONSTRUCT = 4,
+	COMB = 5,
 	Count
 };
 
@@ -636,9 +640,10 @@ static_assert(sizeof(MergeConstantBuffer) == 32, "MergeConstantBuffer is correct
 
 struct alignas(16) InterlaceConstantBuffer
 {
-	GSVector4 ZrH; // data passed to the shader
+	GSVector4 ZrH; // (bank, inverse height, height, sensitivity)
+	GSVector4 FieldPad; // (first undrawn row, first drawn row, native line rows, native line origin)
 };
-static_assert(sizeof(InterlaceConstantBuffer) == 16, "InterlaceConstantBuffer is correct size");
+static_assert(sizeof(InterlaceConstantBuffer) == 32, "InterlaceConstantBuffer is correct size");
 
 enum HWBlendFlags
 {
@@ -834,6 +839,12 @@ struct alignas(16) GSHWDrawConfig
 				PS_ROV_DEPTH rov_depth : 2;
 				u32 sprite_edge_clamp : 1;
 				u32 af_in_src1 : 1; // Fixed blend factor carried through the second output.
+				u32 native_texel_grid : 1;
+				u32 quantize_color : 1;
+				u32 substitute_alpha : 1;
+				u32 stencil_counter : 1;
+                u32 replacement_alpha_snap : 1;
+				u32 blend_factor_in_alpha : 1;
 			};
 
 			struct
@@ -894,7 +905,7 @@ struct alignas(16) GSHWDrawConfig
 			tex_is_fb = 0;
 
 			// no point having fbmask, since we're not writing. DATE has to stay.
-			fbmask = 0;
+			fbmask = quantize_color = substitute_alpha = 0;
 
 			// disable both outputs.
 			no_color = no_color1 = 1;
@@ -1007,7 +1018,8 @@ struct alignas(16) GSHWDrawConfig
 				u8 date : 1;
 				u8 date_one : 1;
 
-				u8 _free : 3;
+				u8 alpha_bit_stencil : 2;
+				u8 _free : 1;
 			};
 			u8 key;
 		};
@@ -1031,7 +1043,8 @@ struct alignas(16) GSHWDrawConfig
 				u8 wb : 1;
 				u8 wa : 1;
 
-				u8 _free : 4;
+				u8 logic_op : 2;
+				u8 _free : 2;
 			};
 			struct
 			{
@@ -1142,9 +1155,10 @@ struct alignas(16) GSHWDrawConfig
 
 		GSVector4 ScaleFactor;
 		float LineCovScale;
-		float _pad0;
-		float _pad1;
-		float _pad2;
+		u32 SubstituteAlphaKeep;
+		u32 SubstituteAlphaValue;
+		u32 DitherPhase;
+		GSVector4 NativeTexelGrid;
 
 		__fi PSConstantBuffer()
 		{
@@ -1223,6 +1237,7 @@ struct alignas(16) GSHWDrawConfig
 		FEEDBACK,
 		SIMPLE_FB_ONLY,
 		SIMPLE_RGB_ONLY,
+		SPLIT_RGB_ONLY,
 		PASS_THEN_FAIL,
 		NEVER,
 		ABORT_DRAW
@@ -1232,6 +1247,7 @@ struct alignas(16) GSHWDrawConfig
 	{
 		return method == AlphaTestMode::SIMPLE_FB_ONLY ||
 		       method == AlphaTestMode::SIMPLE_RGB_ONLY ||
+		       method == AlphaTestMode::SPLIT_RGB_ONLY ||
 		       method == AlphaTestMode::PASS_THEN_FAIL ||
 		       method == AlphaTestMode::NEVER;
 	}
@@ -1264,6 +1280,15 @@ struct alignas(16) GSHWDrawConfig
 	u32 nverts;           ///< Number of vertices
 	u32 nindices;         ///< Number of indices
 	u32 indices_per_prim; ///< Number of indices that make up one primitive
+	struct StencilCounter
+	{
+		bool enable;
+		u8 step[3];
+		u32 minus_start;
+	} stencil_counter;
+	float colclip_native_scale;
+	u32 logic_op_split = 0;
+	u8 date_copy = 0;
 	const std::vector<size_t>* drawlist;          ///< For reducing barriers on sprites
 	const std::vector<GSVector4i>* drawlist_bbox; ///< For RT copy when barriers not available.
 	GSVector4i scissor; ///< Scissor rect
@@ -1319,6 +1344,27 @@ struct alignas(16) GSHWDrawConfig
 		u8 no_color1 : 1;
 		u8 blend_hw : 3; // HWBlendType
 		u8 dither : 2;
+		/// The second pass runs the first pass's shader with its software-blend bits (blend_a, blend_b,
+		/// blend_d, blend_mix) cleared. blend_hw types 1-3 are only a pure function of the colour and
+		/// alpha when those are clear: with them set the shader takes its software-blend branch, where
+		/// the same codes mean something else.
+		u8 clear_sw_blend : 1;
+
+		/// Turns the first pass's pixel shader selector into the second pass's. Every backend that runs
+		/// the second pass takes the selector from here, so they cannot differ on what it changes.
+		void ApplyTo(PSSelector& ps) const
+		{
+			ps.no_color1 = no_color1;
+			ps.blend_hw = blend_hw;
+			ps.dither = dither;
+			if (clear_sw_blend)
+			{
+				ps.blend_a = 0;
+				ps.blend_b = 0;
+				ps.blend_d = 0;
+				ps.blend_mix = 0;
+			}
+		}
 	};
 	static_assert(sizeof(BlendMultiPass) == 8, "blend multi pass is 8 bytes");
 
@@ -1437,6 +1483,8 @@ public:
 	// clang-format off
 	struct FeatureSupport
 	{
+		bool broken_mad_deinterlace : 1; ///< Driver returns stale FastMAD history banks.
+		bool no_ps2_z_quantization : 1; ///< Upstream Mali/Apple policy; skips fixed Z floor, not generally pixel-equivalent.
 		bool broken_blend_constant : 1; ///< Fixed blend constants need the source1 route.
 		bool broken_point_sampler : 1; ///< Issue with AMD cards, see tfx shader for details
 		bool sprite_edge_clamp    : 1; ///< Shader can clamp snapped sprites to their last native sample.
@@ -1457,10 +1505,17 @@ public:
 		bool declared_feedback_loop_orders_overlap : 1; ///< Declared loop orders overlapping primitives.
 		GSFeedbackCarry feedback_carry = GSFeedbackCarry::None;
 		bool framebuffer_fetch    : 1; ///< Can sample from the framebuffer without texture barriers.
+		bool native_counter_draws : 1;
+		bool fast_stencil_shadow : 1;
+		bool stencil_counter : 1; ///< Exact colour-wrap count using a sampled stencil aspect.
+		bool alpha_bit_logic_op : 1;
+		bool ordered_read_costs_per_draw : 1;
 		bool cheap_rt_feedback_read : 1; ///< Backend has evidence voluntary RT feedback reads avoid a costly pass/copy.
 		bool texture_feedback_requires_copy : 1; ///< Framebuffer fetch cannot make ordinary sampler reads of attached textures safe (Haunting Ground-only workaround).
 		bool stencil_buffer       : 1; ///< Supports stencil buffer, and can use for DATE.
 		bool cas_sharpening       : 1; ///< Supports sufficient functionality for contrast adaptive sharpening.
+		bool fsr1 : 1;
+		bool sgsr : 1;
 		bool test_and_sample_depth: 1; ///< Supports concurrently binding the depth-stencil buffer for sampling and depth testing.
 		bool aa1                 : 1; ///< Supports AA1 (anti-aliasing for lines/triangles).
 		bool rov                 : 1; ///< Supports rasterizer ordered views for both depth and color.
@@ -1484,6 +1539,13 @@ public:
 		GSTexture* src;
 		Filter filter;
 		GSHWDrawConfig::ColorMaskSelector wmask; // 0xf for all channels by default
+	};
+
+	struct MergeTopBand
+	{
+		GSVector4 src;
+		GSVector4 dst;
+		bool enabled = false;
 	};
 
 	struct TextureRecycleDeleter
@@ -1524,6 +1586,7 @@ protected:
 	} m_index = {};
 
 	u32 m_frame = 0; // for ageing the pool
+	u32 m_frames_since_pool_cleanup = 0;
 
 private:
 	std::array<FastList<GSTexture*>, 2> m_pool; // [texture, target]
@@ -1532,13 +1595,16 @@ private:
 	static const std::array<HWBlend, 3*3*3*3> m_blendMap;
 
 protected:
-	static constexpr int NUM_INTERLACE_SHADERS = 5;
+	static constexpr int NUM_INTERLACE_SHADERS = 6;
 	static constexpr float MAD_SENSITIVITY = 0.08f;
 	static constexpr u32 MAX_POOLED_TARGETS = 300;
 	static constexpr u32 MAX_TARGET_AGE = 20;
 	static constexpr u32 MAX_POOLED_TEXTURES = 300;
 	static constexpr u32 MAX_TEXTURE_AGE = 10;
 	static constexpr u32 NUM_CAS_CONSTANTS = 12; // 8 plus src offset x/y, 16 byte alignment
+	static constexpr u32 NUM_FSR1_CONSTANTS=20;
+	static constexpr u32 NUM_SGSR_CONSTANTS=11;
+	static constexpr u32 NUM_SGSR_PIPELINES=2;
 	static constexpr u32 EXPAND_BUFFER_SIZE = sizeof(u16) * 16383 * 6;
 
 	WindowInfo m_window_info;
@@ -1547,6 +1613,14 @@ protected:
 	// True only when the current presentation contains a freshly-rendered game
 	// frame. LSFG uses this to avoid inventing motion for pause-menu redraws.
 	bool m_present_has_new_frame = false;
+	struct PresentGeometry
+	{
+		GSVector4i src_rect = GSVector4i::zero(); ///< the game's visible area in GetCurrent(), texture pixels
+		GSVector4 draw_rect = GSVector4::zero();  ///< where it lands in the presentation, pixels
+		bool linear = false;                      ///< bilinear, else nearest
+		bool plain = false;                       ///< the present is nothing but that scaled blit
+	};
+	PresentGeometry m_present_geometry;
 	u64 m_last_frame_displayed_time = 0;
 
 	GSTexture* m_merge = nullptr;
@@ -1556,6 +1630,9 @@ protected:
 	GSTexture* m_target_tmp = nullptr;
 	GSTexture* m_current = nullptr;
 	GSTexture* m_cas = nullptr;
+	GSTexture* m_fsr1_easu=nullptr;
+	GSTexture* m_fsr1_output=nullptr;
+	GSTexture* m_sgsr_output=nullptr;
 	GSTexture* m_colclip_rt = nullptr; ///< Temp hw colclip texture
 	GSTexture* m_ds_as_rt = nullptr; ///< Depth as color
 
@@ -1574,6 +1651,8 @@ protected:
 	u32 GetPoolMaxAge(bool texture) const;
 
 	virtual void DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, GSVector4* dRect, const GSRegPMODE& PMODE, const GSRegEXTBUF& EXTBUF, u32 c, const Filter filter) = 0;
+	virtual void DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, GSVector4* dRect, const MergeTopBand* top_band, const GSRegPMODE& PMODE, const GSRegEXTBUF& EXTBUF, u32 c, const Filter filter)
+	{ DoMerge(sTex, sRect, dTex, dRect, PMODE, EXTBUF, c, filter); }
 	virtual void DoInterlace(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, ShaderInterlace shader, Filter filter, const InterlaceConstantBuffer& cb) = 0;
 	virtual void DoFXAA(GSTexture* sTex, GSTexture* dTex) = 0;
 	virtual void DoShadeBoost(GSTexture* sTex, GSTexture* dTex, const float params[4]) = 0;
@@ -1584,6 +1663,22 @@ protected:
 
 	/// Resolves CAS shader includes for the specified source.
 	static bool GetCASShaderSource(std::string* source);
+	/// Resolves FSR1 shader includes for the specified source, and prepends the #version line
+	/// plus the FSR_PASS_EASU gate. The pass cannot be a specialization constant: it decides
+	/// which function bodies ffx_fsr1.h emits at all, which is a preprocessor-time question.
+	static bool GetFSR1ShaderSource(std::string* source, bool easu_pass);
+
+	/// FSR1 pass 1 (EASU): edge-adaptive spatial upsample from sTex to dTex's size.
+	/// FSR1 pass 2 (RCAS): robust contrast-adaptive sharpen, same size in and out.
+	/// Both no-op in the base class so only the backends that gate Features().fsr1 on need them.
+	virtual bool DoFSR1EASU(GSTexture* sTex, GSTexture* dTex, const std::array<u32, NUM_FSR1_CONSTANTS>& constants) { return false; }
+	virtual bool DoFSR1RCAS(GSTexture* sTex, GSTexture* dTex, const std::array<u32, NUM_FSR1_CONSTANTS>& constants) { return false; }
+
+	/// SGSR: edge-directed spatial upsample from sTex to dTex's size, in a single dispatch.
+	/// No-op in the base class, like the FSR1 pair above.
+	virtual bool DoSGSR(GSTexture* sTex, GSTexture* dTex, const std::array<u32, NUM_SGSR_CONSTANTS>& constants,
+		bool edge_direction) { return false; }
+
 
 	/// Applies CAS and writes to the destination texture, which should be a shader writeable texture.
 	virtual bool DoCAS(GSTexture* sTex, GSTexture* dTex, bool sharpen_only, const std::array<u32, NUM_CAS_CONSTANTS>& constants) = 0;
@@ -1663,6 +1758,11 @@ public:
 	__fi const WindowInfo& GetWindowInfo() const { return m_window_info; }
 	__fi s32 GetWindowWidth() const { return static_cast<s32>(m_window_info.surface_width); }
 	__fi s32 GetWindowHeight() const { return static_cast<s32>(m_window_info.surface_height); }
+	GSVector2i GetPresentationSize() const;
+	__fi s32 GetPresentationWidth() const { return GetPresentationSize().x; }
+	__fi s32 GetPresentationHeight() const { return GetPresentationSize().y; }
+	virtual DisplayRotation GetSurfacePreRotation() const { return DisplayRotation::Rot0; }
+	DisplayRotation GetPresentRotation() const;
 	__fi GSVector2i GetWindowSize() const { return GSVector2i(static_cast<s32>(m_window_info.surface_width), static_cast<s32>(m_window_info.surface_height)); }
 	__fi float GetWindowScale() const { return m_window_info.surface_scale; }
 	__fi GSVSyncMode GetVSyncMode() const { return m_vsync_mode; }
@@ -1713,6 +1813,7 @@ public:
 	bool DeferredDrawsWouldObserve(const GSTexture* tex) const;
 
 	void NotePresentHasNewFrame() { m_present_has_new_frame = true; }
+	void NotePresentGeometry(const GSVector4i& src,const GSVector4& dst,bool linear,bool plain){m_present_geometry={src,dst,linear,plain};}
 
 	/// Presents the frame to the display.
 	virtual void EndPresent() = 0;
@@ -1833,10 +1934,15 @@ public:
 	void RenderHW(GSHWDrawConfig& config);
 
 	virtual void ClearSamplerCache() = 0;
+	virtual void SetGameIdentity(const std::string& serial, u32 crc) {}
+	virtual void PrepareShaderCacheClear() {}
+	virtual void RequestShaderCacheFlush() {}
 
 	void ClearCurrent();
 	void Merge(GSTexture* sTex[3], GSVector4* sRect, GSVector4* dRect, const GSVector2i& fs, const GSRegPMODE& PMODE, const GSRegEXTBUF& EXTBUF, u32 c);
+	void Merge(GSTexture* sTex[3], GSVector4* sRect, GSVector4* dRect, const MergeTopBand* top_band, const GSVector2i& fs, const GSRegPMODE& PMODE, const GSRegEXTBUF& EXTBUF, u32 c);
 	void Interlace(const GSVector2i& ds, int field, int mode, float yoffset);
+	void Interlace(const GSVector2i& ds, int field, int mode, float yoffset, const GSFieldPadRows& top_pad, float line_rows = 1.0f, float line_origin = 0.0f);
 	void FXAA();
 	void ShadeBoost();
 	/// Runs the configured RetroArch (.slangp) shader chain over m_current, after
@@ -1851,10 +1957,13 @@ public:
 	void Resize(int width, int height);
 
 	void CAS(GSTexture*& tex, GSVector4i& src_rect, GSVector4& src_uv, const GSVector4& draw_rect, bool sharpen_only);
+	void FSR1Upscale(GSTexture*& tex,GSVector4i& src_rect,GSVector4& src_uv,const GSVector4& draw_rect);
+	void SGSRUpscale(GSTexture*& tex,GSVector4i& src_rect,GSVector4& src_uv,const GSVector4& draw_rect,bool edge_direction);
 
 	bool ResizeRenderTarget(GSTexture** t, int w, int h, bool preserve_contents, bool recycle);
 
 	void AgePool();
+	void AgePoolAfterPresentCapSkip();
 	void PurgePool();
 
 	__fi static constexpr bool IsDualSourceBlendFactor(u8 factor)

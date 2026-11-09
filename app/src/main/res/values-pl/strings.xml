@@ -911,7 +911,7 @@
     <string name="texture_manager_loading">Wczytywanie paczek tekstur…</string>
     <string name="texture_manager_options">Opcje środowiska uruchomieniowego</string>
     <string name="texture_manager_enable_replacements">Wczytuj tekstury zastępcze</string>
-    <string name="texture_manager_enable_replacements_desc">Używaj plików PNG i DDS / KTX2 z folderu numeru seryjnego danej gry.</string>
+    <string name="texture_manager_enable_replacements_desc">Używaj plików PNG i DDS / KTX2 / ASTC / KTX z folderu numeru seryjnego danej gry.</string>
     <string name="texture_manager_async_loading">Wczytywanie asynchroniczne</string>
     <string name="texture_manager_async_loading_desc">Wczytuj tekstury zastępcze w wątku roboczym w tle, podczas gdy gra jest włączona.</string>
     <string name="texture_manager_precache">Buforuj tekstury (Precache)</string>

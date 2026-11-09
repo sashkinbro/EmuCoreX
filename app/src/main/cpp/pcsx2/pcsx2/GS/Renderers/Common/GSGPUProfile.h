@@ -8,9 +8,9 @@
 #include <string_view>
 
 // The renderer has two mobile GPU paths:
-//  - Mobile: Mali, Immortalis and PowerVR. They are treated identically. There are no model
-//    tables and no per-driver-version rules; every part resolves to one conservative,
-//    tile-friendly path.
+//  - Mobile: Mali, Immortalis and PowerVR. They are treated identically. Every part resolves to the same
+//    conservative, tile-friendly runtime identity. Separate raw model/driver correctness
+//    facts in GSVulkanDevicePolicy do not introduce additional public runtime profiles.
 //  - Adreno: a separate identity only because a few optional features explicitly require
 //    Adreno hardware (frame generation, custom Vulkan drivers). Rendering uses the same
 //    unified mobile path.

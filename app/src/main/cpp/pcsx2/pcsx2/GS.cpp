@@ -367,6 +367,15 @@ static std::atomic<u64> s_max_present_interval{0};
 // the GS thread in GSRenderer::VSync. Unlimited (frame-limit-off steady state)
 // deliberately does NOT set this — there the present cap is still wanted.
 static std::atomic<bool> s_present_cap_suspended{false};
+static std::atomic<bool> s_present_cap_render_skip{false};
+void GSSetPresentCapRenderSkip(bool enabled)
+{
+	s_present_cap_render_skip.store(enabled, std::memory_order_relaxed);
+}
+bool GSGetPresentCapRenderSkip()
+{
+	return s_present_cap_render_skip.load(std::memory_order_relaxed);
+}
 void GSSetMaxPresentFps(u32 fps, u64 present_interval)
 {
 	s_max_present_fps.store(fps, std::memory_order_relaxed);
@@ -388,4 +397,3 @@ bool GSGetPresentCapSuspended()
 {
 	return s_present_cap_suspended.load(std::memory_order_relaxed);
 }
-

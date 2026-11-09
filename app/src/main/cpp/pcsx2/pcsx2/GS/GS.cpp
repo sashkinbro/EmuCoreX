@@ -1,3 +1,5 @@
+#include "GS/Renderers/Common/GSBackThreadPolicy.h"
+#include <atomic>
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
@@ -6,6 +8,7 @@
 #include "ImGui/FullscreenUI.h"
 #include "ImGui/ImGuiManager.h"
 #include "GS/GS.h"
+#include "GS/GSCacheFile.h"
 #include "GS/GSCapture.h"
 #include "GS/GSExtra.h"
 #include "GS/GSGL.h"
@@ -347,12 +350,56 @@ static void ApplyAndroidGameDBOverrides()
 }
 #endif
 
+static GSBackThreadDecision GSDecideBackThreadFor(const Pcsx2Config::GSOptions& config, GSRendererType renderer)
+{
+	GSBackThreadInputs in;
+	in.requested = config.BackThread;
+	in.hardware_renderer = (renderer != GSRendererType::SW && renderer != GSRendererType::Null);
+	in.vulkan = g_gs_device && g_gs_device->GetRenderAPI() == RenderAPI::Vulkan;
+	in.download_mode = config.HWDownloadMode;
+	return GSDecideBackThread(in);
+}
+
+static void GSResolveBackThreadMode(Pcsx2Config::GSOptions& config, GSRendererType renderer)
+{
+	const GSBackThreadDecision decision = GSDecideBackThreadFor(config, renderer);
+	config.BackThreadResolved = decision.on;
+
+	// Scripts grep the log for the "GS: back thread" wording.
+	if (decision.on != config.BackThread)
+		Console.Warning("GS: back thread off, not pipelined (%s).", GSBackThreadReasonText(decision.reason));
+	else
+		Console.WriteLn("GS: back thread %s (%s).", decision.on ? "pipelined" : "off", GSBackThreadReasonText(decision.reason));
+}
+
+// GV7-1d-ii: the front parser object of the two-object split (GSState.h).
+// Non-null only when GS multi-threading engaged; all GIF-parse entry
+// points below route to it, while draw/present/TC stay on g_gs_renderer.
+std::unique_ptr<GSFrontState> g_gs_front;
+
+// The object GIF data, parse-side resets, readbacks, and savestates route to.
+static __fi GSState* GSParseTarget()
+{
+	return g_gs_front ? static_cast<GSState*>(g_gs_front.get()) : static_cast<GSState*>(g_gs_renderer.get());
+}
+
+void GSFlushPendingDraws()
+{
+	if(g_gs_renderer){GSParseTarget()->Flush(GSState::VSYNC);g_gs_renderer->DrainBackQueue();}
+}
+
+void GSDrainBackQueue()
+{
+	if (g_gs_renderer) g_gs_renderer->DrainBackQueue();
+}
+
 static bool OpenGSRenderer(GSRendererType renderer, u8* basemem)
 {
 	// Must be done first, initialization routines in GSState use GSIsHardwareRenderer().
 	GSCurrentRenderer = renderer;
 
 	GSVertexSW::InitStatic();
+	GSResolveBackThreadMode(GSConfig,renderer);
 
 	if (renderer == GSRendererType::Null)
 	{
@@ -372,6 +419,12 @@ static bool OpenGSRenderer(GSRendererType renderer, u8* basemem)
 	g_gs_renderer->SetRegsMem(basemem);
 	g_gs_renderer->ResetPCRTC();
 	g_gs_renderer->UpdateRenderFixes();
+	g_gs_device->SetGameIdentity(GSIsHardwareRenderer() ? VMManager::GetDiscSerial() : std::string(), VMManager::GetDiscCRC());
+	if(GSConfig.BackThreadResolved && g_gs_renderer->IsBackThreadRunning())
+	{
+		g_gs_front=std::make_unique<GSFrontState>(g_gs_renderer.get());
+		g_gs_front->SetRegsMem(basemem);g_gs_front->ResetPCRTC();
+	}
 	g_perfmon.Reset();
 	g_perfmon.SetCounterTrackingEnabled(ShouldTrackGSPerfMonCounters());
 	return true;
@@ -379,6 +432,8 @@ static bool OpenGSRenderer(GSRendererType renderer, u8* basemem)
 
 static void CloseGSRenderer()
 {
+	g_gs_front.reset();
+	if(g_gs_renderer)g_gs_renderer->StopBackThread();
 	GSTextureReplacements::Shutdown();
 
 	if (g_gs_renderer)
@@ -391,11 +446,13 @@ static void CloseGSRenderer()
 bool GSreopen(bool recreate_device, bool recreate_renderer, GSRendererType new_renderer,
 	std::optional<const Pcsx2Config::GSOptions*> old_config)
 {
+	GSDrainBackQueue();
 	// Reopen correctness matters for rendering too: stale GS state after a backend/config flip can masquerade
 	// as a renderer bug, especially with cached HW targets and feedback-dependent effects.
 	Console.WriteLn("Reopening GS with %s device", recreate_device ? "new" : "existing");
 
-	g_gs_renderer->Flush(GSState::GSFlushReason::GSREOPEN);
+	GSParseTarget()->Flush(GSState::GSFlushReason::GSREOPEN);
+	GSDrainBackQueue();
 
 	if (recreate_device && !recreate_renderer)
 	{
@@ -408,6 +465,7 @@ bool GSreopen(bool recreate_device, bool recreate_renderer, GSRendererType new_r
 	{
 		// The freeze blob contains GS local memory, not live GPU render targets. Always download dirty
 		// targets before destroying the renderer so an API switch cannot restore stale/missing textures.
+		g_gs_renderer->DrainBackQueue();
 		g_gs_renderer->ReadbackTextureCache();
 	}
 
@@ -427,7 +485,7 @@ bool GSreopen(bool recreate_device, bool recreate_renderer, GSRendererType new_r
 	std::unique_ptr<u8[]> fd_data;
 	if (recreate_renderer)
 	{
-		if (g_gs_renderer->Freeze(&fd, true) != 0)
+		if (GSParseTarget()->Freeze(&fd, true) != 0)
 		{
 			Console.Error("(GSreopen) Failed to get GS freeze size");
 			return false;
@@ -435,7 +493,7 @@ bool GSreopen(bool recreate_device, bool recreate_renderer, GSRendererType new_r
 
 		fd_data = std::make_unique<u8[]>(fd.size);
 		fd.data = fd_data.get();
-		if (g_gs_renderer->Freeze(&fd, false) != 0)
+		if (GSParseTarget()->Freeze(&fd, false) != 0)
 		{
 			Console.Error("(GSreopen) Failed to freeze GS");
 			return false;
@@ -485,12 +543,15 @@ bool GSreopen(bool recreate_device, bool recreate_renderer, GSRendererType new_r
 			return false;
 		}
 
-		if (g_gs_renderer->Defrost(&fd) != 0)
+		if (GSParseTarget()->Defrost(&fd) != 0)
 		{
 			Console.Error("(GSreopen) Failed to defrost");
 			return false;
 		}
 	}
+
+	if (recreate_device && !recreate_renderer)
+		g_gs_device->SetGameIdentity(GSIsHardwareRenderer() ? VMManager::GetDiscSerial() : std::string(), VMManager::GetDiscCRC());
 
 	if (!capture_filename.empty())
 		g_gs_renderer->BeginCapture(std::move(capture_filename), capture_size);
@@ -545,6 +606,7 @@ void GSclose()
 
 void GSreset(bool hardware_reset)
 {
+	if(g_gs_front){g_gs_front->Reset(hardware_reset);GSDrainBackQueue();}
 	g_gs_renderer->Reset(hardware_reset);
 
 	// Restart video capture if it's been started.
@@ -561,72 +623,76 @@ void GSreset(bool hardware_reset)
 
 void GSgifSoftReset(u32 mask)
 {
-	g_gs_renderer->SoftReset(mask);
+	GSParseTarget()->SoftReset(mask);
 }
 
 void GSwriteCSR(u32 csr)
 {
-	g_gs_renderer->WriteCSR(csr);
+	GSParseTarget()->WriteCSR(csr);
 }
 
 void GSInitAndReadFIFO(u8* mem, u32 size)
 {
 	GL_PERF("Init and read FIFO %u qwc", size);
-	g_gs_renderer->InitReadFIFO(mem, size);
-	g_gs_renderer->ReadFIFO(mem, size);
+	GSParseTarget()->InitReadFIFO(mem, size);
+	GSParseTarget()->ReadFIFO(mem, size);
 }
 
 void GSReadLocalMemoryUnsync(u8* mem, u32 qwc, u64 BITBLITBUF, u64 TRXPOS, u64 TRXREG)
 {
-	g_gs_renderer->ReadLocalMemoryUnsync(mem, qwc, GIFRegBITBLTBUF{BITBLITBUF}, GIFRegTRXPOS{TRXPOS}, GIFRegTRXREG{TRXREG});
+	GSParseTarget()->ReadLocalMemoryUnsync(mem, qwc, GIFRegBITBLTBUF{BITBLITBUF}, GIFRegTRXPOS{TRXPOS}, GIFRegTRXREG{TRXREG});
 }
 
 void GSgifTransfer(const u8* mem, u32 size)
 {
-	g_gs_renderer->Transfer<3>(mem, size);
+	GSParseTarget()->Transfer<3>(mem, size);
 }
 
 void GSgifTransfer1(u8* mem, u32 addr)
 {
-	g_gs_renderer->Transfer<0>(const_cast<u8*>(mem) + addr, (0x4000 - addr) / 16);
+	GSParseTarget()->Transfer<0>(const_cast<u8*>(mem) + addr, (0x4000 - addr) / 16);
 }
 
 void GSgifTransfer2(u8* mem, u32 size)
 {
-	g_gs_renderer->Transfer<1>(const_cast<u8*>(mem), size);
+	GSParseTarget()->Transfer<1>(const_cast<u8*>(mem), size);
 }
 
 void GSgifTransfer3(u8* mem, u32 size)
 {
-	g_gs_renderer->Transfer<2>(const_cast<u8*>(mem), size);
+	GSParseTarget()->Transfer<2>(const_cast<u8*>(mem), size);
 }
 
 void GSvsync(u32 field, bool registers_written)
 {
 	// Update this here because we need to check if the pending draw affects the current frame, so our regs need to be updated.
-	g_gs_renderer->PCRTCDisplays.SetVideoMode(g_gs_renderer->GetVideoMode());
-	g_gs_renderer->PCRTCDisplays.EnableDisplays(g_gs_renderer->m_regs->PMODE, g_gs_renderer->m_regs->SMODE2, g_gs_renderer->isReallyInterlaced());
-	g_gs_renderer->PCRTCDisplays.SetRects(0, g_gs_renderer->m_regs->DISP[0].DISPLAY, g_gs_renderer->m_regs->DISP[0].DISPFB);
-	g_gs_renderer->PCRTCDisplays.SetRects(1, g_gs_renderer->m_regs->DISP[1].DISPLAY, g_gs_renderer->m_regs->DISP[1].DISPFB);
-	g_gs_renderer->PCRTCDisplays.CheckSameSource();
-	g_gs_renderer->PCRTCDisplays.CalculateDisplayOffset(g_gs_renderer->m_scanmask_used);
-	g_gs_renderer->PCRTCDisplays.CalculateFramebufferOffset(g_gs_renderer->m_scanmask_used, g_gs_renderer->m_regs->DISP[0].DISPFB, g_gs_renderer->m_regs->DISP[1].DISPFB);
+	GSParseTarget()->PCRTCDisplays.SetVideoMode(GSParseTarget()->GetVideoMode());
+	GSParseTarget()->PCRTCDisplays.EnableDisplays(g_gs_renderer->m_regs->PMODE, g_gs_renderer->m_regs->SMODE2, g_gs_renderer->isReallyInterlaced());
+	GSParseTarget()->PCRTCDisplays.SetRects(0, g_gs_renderer->m_regs->DISP[0].DISPLAY, g_gs_renderer->m_regs->DISP[0].DISPFB);
+	GSParseTarget()->PCRTCDisplays.SetRects(1, g_gs_renderer->m_regs->DISP[1].DISPLAY, g_gs_renderer->m_regs->DISP[1].DISPFB);
+	GSParseTarget()->PCRTCDisplays.CheckSameSource();
+	GSParseTarget()->PCRTCDisplays.CalculateDisplayOffset(GSParseTarget()->m_scanmask_used);
+	GSParseTarget()->PCRTCDisplays.CalculateFramebufferOffset(GSParseTarget()->m_scanmask_used, g_gs_renderer->m_regs->DISP[0].DISPFB, g_gs_renderer->m_regs->DISP[1].DISPFB);
 
 	// Do not move the flush into the VSync() method. It's here because EE transfers
 	// get cleared in HW VSync, and may be needed for a buffered draw (FFX FMVs).
-	g_gs_renderer->Flush(GSState::VSYNC);
+	GSParseTarget()->SubmitPcrtcSync();
+	GSParseTarget()->Flush(GSState::VSYNC);
+	GSDrainBackQueue();
 	g_gs_renderer->VSync(field, registers_written, g_gs_renderer->IsIdleFrame());
+	if(g_gs_front)g_gs_front->MirrorPostVsyncState();
 }
 
 int GSfreeze(FreezeAction mode, freezeData* data)
 {
+	GSDrainBackQueue();
 	if (mode == FreezeAction::Save)
 	{
-		return g_gs_renderer->Freeze(data, false);
+		return GSParseTarget()->Freeze(data, false);
 	}
 	else if (mode == FreezeAction::Size)
 	{
-		return g_gs_renderer->Freeze(data, true);
+		return GSParseTarget()->Freeze(data, true);
 	}
 	else // if (mode == FreezeAction::Load)
 	{
@@ -640,12 +706,13 @@ int GSfreeze(FreezeAction mode, freezeData* data)
 		if (GSCapture::IsCapturing())
 			GSCapture::Flush();
 
-		return g_gs_renderer->Defrost(data);
+		return GSParseTarget()->Defrost(data);
 	}
 }
 
 void GSQueueSnapshot(const std::string& path, u32 gsdump_frames)
 {
+	GSDrainBackQueue();
 	if (g_gs_renderer)
 		g_gs_renderer->QueueSnapshot(path, gsdump_frames);
 }
@@ -653,6 +720,7 @@ void GSQueueSnapshot(const std::string& path, u32 gsdump_frames)
 #ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 void GSStopGSDump()
 {
+	GSDrainBackQueue();
 	if (g_gs_renderer)
 		g_gs_renderer->StopGSDump();
 }
@@ -661,6 +729,7 @@ void GSStopGSDump()
 
 bool GSBeginCapture(std::string filename)
 {
+	GSDrainBackQueue();
 	if (g_gs_renderer)
 		return g_gs_renderer->BeginCapture(std::move(filename));
 	else
@@ -669,12 +738,14 @@ bool GSBeginCapture(std::string filename)
 
 void GSEndCapture()
 {
+	GSDrainBackQueue();
 	if (g_gs_renderer)
 		g_gs_renderer->EndCapture();
 }
 
 void GSPresentCurrentFrame()
 {
+	GSDrainBackQueue();
 	g_gs_renderer->PresentCurrentFrame();
 }
 
@@ -691,6 +762,13 @@ void GSThrottlePresentation()
 
 void GSGameChanged()
 {
+	GSGameChanged(VMManager::GetDiscSerial(), VMManager::GetDiscCRC());
+}
+
+void GSGameChanged(const std::string& serial, u32 crc)
+{
+	GSDrainBackQueue();
+	if (g_gs_device) g_gs_device->SetGameIdentity(GSIsHardwareRenderer() ? serial : std::string(), crc);
 	if (GSIsHardwareRenderer())
 	{
 		GSHwHack::ResetState();
@@ -709,6 +787,7 @@ bool GSHasDisplayWindow()
 
 void GSResizeDisplayWindow(u32 width, u32 height, float scale)
 {
+	GSDrainBackQueue();
 	g_gs_device->ResizeWindow(width, height, scale);
 #ifndef __ANDROID__
 	ImGuiManager::WindowResized();
@@ -717,6 +796,7 @@ void GSResizeDisplayWindow(u32 width, u32 height, float scale)
 
 void GSUpdateDisplayWindow()
 {
+	GSDrainBackQueue();
 	if (!g_gs_device->UpdateWindow())
 	{
 		Host::ReportErrorAsync("Error", TRANSLATE_SV("GS", "Failed to change window after update. The log may contain more information."));
@@ -730,6 +810,7 @@ void GSUpdateDisplayWindow()
 
 void GSSetVSyncMode(GSVSyncMode mode, bool allow_present_throttle)
 {
+	GSDrainBackQueue();
 	static constexpr std::array<const char*, static_cast<size_t>(GSVSyncMode::Count)> modes = {{
 		"Disabled",
 		"FIFO",
@@ -973,13 +1054,16 @@ void GSgetTitleStats(std::string& info)
 
 void GSUpdateConfig(const Pcsx2Config::GSOptions& new_config)
 {
+	GSDrainBackQueue();
 	// Finish the buffered primitive with the settings it was created under. Otherwise a live
 	// accuracy/backend change can submit old vertices through the new blend/feedback policy.
 	if (g_gs_renderer)
-		g_gs_renderer->Flush(GSState::GSFlushReason::GSREOPEN);
+		GSParseTarget()->Flush(GSState::GSFlushReason::GSREOPEN);
+	GSDrainBackQueue();
 
 	Pcsx2Config::GSOptions old_config(std::move(GSConfig));
 	GSConfig = new_config;
+	GSConfig.BackThreadResolved=old_config.BackThreadResolved;
 #ifdef __ANDROID__
 	ApplyAndroidGameDBOverrides();
 #endif
@@ -1000,7 +1084,7 @@ void GSUpdateConfig(const Pcsx2Config::GSOptions& new_config)
 #endif
 
 	// Options which need a full teardown/recreate.
-	if (!GSConfig.RestartOptionsAreEqual(old_config))
+	if (!GSConfig.RestartOptionsAreEqual(old_config) || GSDecideBackThreadFor(GSConfig,GSCurrentRenderer).on!=GSConfig.BackThreadResolved)
 	{
 		if (!GSreopen(true, true, GSConfig.Renderer, &old_config))
 			pxFailRel("Failed to do full GS reopen");
@@ -1032,6 +1116,7 @@ void GSUpdateConfig(const Pcsx2Config::GSOptions& new_config)
 
 	// renderer-specific options (e.g. auto flush, TC offset)
 	g_gs_renderer->UpdateSettings(old_config);
+		if(g_gs_front)g_gs_front->UpdateSettings(old_config);
 
 	// Reload texture cache when filtering, blending, or TC options change. These
 	// settings can change how cached sources/targets are sampled or resolved.
@@ -1080,7 +1165,8 @@ void GSUpdateConfig(const Pcsx2Config::GSOptions& new_config)
 	// clear the hash texture cache since we might have replacements now
 	// also clear it when dumping changes, since we want to dump everything being used
 	if (GSConfig.LoadTextureReplacements != old_config.LoadTextureReplacements ||
-		GSConfig.DumpReplaceableTextures != old_config.DumpReplaceableTextures)
+		GSConfig.DumpReplaceableTextures != old_config.DumpReplaceableTextures ||
+        GSConfig.TextureUpscale != old_config.TextureUpscale)
 	{
 		g_gs_renderer->PurgeTextureCache(true, false, true);
 	}
@@ -1130,6 +1216,7 @@ void GSSetSoftwareRendering(bool software_renderer, GSInterlaceMode new_interlac
 bool GSSaveSnapshotToMemory(u32 window_width, u32 window_height, bool apply_aspect, bool crop_borders,
 	u32* width, u32* height, std::vector<u32>* pixels)
 {
+	GSDrainBackQueue();
 	if (!g_gs_renderer)
 		return false;
 
@@ -1139,69 +1226,60 @@ bool GSSaveSnapshotToMemory(u32 window_width, u32 window_height, bool apply_aspe
 
 #ifdef _WIN32
 
-static HANDLE s_fh = NULL;
-
 void* GSAllocateWrappedMemory(size_t size, size_t repeat)
 {
-	pxAssertRel(!s_fh, "Has no file mapping");
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    if (size == 0 || repeat == 0 || size > static_cast<size_t>(-1) / repeat ||
+        size % si.dwAllocationGranularity != 0)
+        return nullptr;
 
-	s_fh = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, size, nullptr);
-	if (s_fh == NULL)
-	{
-		Console.Error("Failed to create file mapping of size %zu. WIN API ERROR:%u", size, GetLastError());
-		return nullptr;
-	}
+    // The section handle is allocation-local; mapped views retain its lifetime.
+    const HANDLE fh = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE,
+        static_cast<DWORD>(static_cast<u64>(size) >> 32), static_cast<DWORD>(size), nullptr);
+    if (!fh)
+        return nullptr;
 
-	// Reserve the whole area with repeats.
-	u8* base = static_cast<u8*>(VirtualAlloc2(
-		GetCurrentProcess(), nullptr, repeat * size,
-		MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS,
-		nullptr, 0));
-	if (base)
-	{
-		bool okay = true;
-		for (size_t i = 0; i < repeat; i++)
-		{
-			// Everything except the last needs the placeholders split to map over them. Then map the same file over the region.
-			u8* addr = base + i * size;
-			if ((i != (repeat - 1) && !VirtualFreeEx(GetCurrentProcess(), addr, size, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER)) ||
-				!MapViewOfFile3(s_fh, GetCurrentProcess(), addr, 0, size, MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, nullptr, 0))
-			{
-				Console.Error("Failed to map repeat %zu of size %zu.", i, size);
-				okay = false;
+    u8* const base = static_cast<u8*>(VirtualAlloc2(GetCurrentProcess(), nullptr, repeat * size,
+        MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS, nullptr, 0));
+    if (!base)
+    {
+        CloseHandle(fh);
+        return nullptr;
+    }
 
-				for (size_t j = 0; j < i; j++)
-					UnmapViewOfFile2(GetCurrentProcess(), addr, MEM_PRESERVE_PLACEHOLDER);
-			}
-		}
+    for (size_t i = 0; i < repeat; i++)
+    {
+        u8* const addr = base + i * size;
+        const bool needs_split = i + 1 < repeat;
+        const bool split = needs_split && VirtualFreeEx(GetCurrentProcess(), addr, size,
+            MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER);
+        if ((needs_split && !split) || !MapViewOfFile3(fh, GetCurrentProcess(), addr, 0, size,
+                MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, nullptr, 0))
+        {
+            // Release each completed view directly. The unmapped tail is one placeholder,
+            // or two if this iteration split successfully before MapViewOfFile3 failed.
+            for (size_t j = 0; j < i; j++)
+                UnmapViewOfFile2(GetCurrentProcess(), base + j * size, 0);
+            VirtualFreeEx(GetCurrentProcess(), addr, 0, MEM_RELEASE);
+            if (split)
+                VirtualFreeEx(GetCurrentProcess(), addr + size, 0, MEM_RELEASE);
+            CloseHandle(fh);
+            return nullptr;
+        }
+    }
 
-		if (okay)
-		{
-			DbgCon.WriteLn("fifo_alloc(): Mapped %zu repeats of %zu bytes at %p.", repeat, size, base);
-			return base;
-		}
-
-		VirtualFreeEx(GetCurrentProcess(), base, 0, MEM_RELEASE);
-	}
-
-	Console.Error("Failed to reserve VA space of size %zu. WIN API ERROR:%u", size, GetLastError());
-	CloseHandle(s_fh);
-	s_fh = NULL;
-	return nullptr;
+    CloseHandle(fh);
+    return base;
 }
 
 void GSFreeWrappedMemory(void* ptr, size_t size, size_t repeat)
 {
-	pxAssertRel(s_fh, "Has a file mapping");
-
-	for (size_t i = 0; i < repeat; i++)
-	{
-		u8* addr = (u8*)ptr + i * size;
-		UnmapViewOfFile2(GetCurrentProcess(), addr, MEM_PRESERVE_PLACEHOLDER);
-	}
-
-	VirtualFreeEx(GetCurrentProcess(), ptr, 0, MEM_RELEASE);
-	s_fh = NULL;
+    if (!ptr)
+        return;
+    // Flag zero releases each mapped view's VA range without leaving placeholders.
+    for (size_t i = 0; i < repeat; i++)
+        UnmapViewOfFile2(GetCurrentProcess(), static_cast<u8*>(ptr) + i * size, 0);
 }
 
 #else
@@ -1214,60 +1292,60 @@ void GSFreeWrappedMemory(void* ptr, size_t size, size_t repeat)
 #include <android/sharedmem.h>
 #endif
 
-static int s_shm_fd = -1;
-
 void* GSAllocateWrappedMemory(size_t size, size_t repeat)
 {
-	pxAssert(s_shm_fd == -1);
+    const long page_size = sysconf(_SC_PAGESIZE);
+    if (page_size <= 0 || size == 0 || repeat == 0 ||
+        size > static_cast<size_t>(-1) / repeat || size % static_cast<size_t>(page_size) != 0)
+        return nullptr;
 
-	const char* file_name = "/GS.mem";
+    const char* file_name = "/GS.mem";
 #ifndef __ANDROID__
-	s_shm_fd = shm_open(file_name, O_RDWR | O_CREAT | O_EXCL, 0600);
-	if (s_shm_fd != -1)
-	{
-		shm_unlink(file_name); // file is deleted but descriptor is still open
-	}
-	else
-	{
-		fprintf(stderr, "Failed to open %s due to %s\n", file_name, strerror(errno));
-		return nullptr;
-	}
-
-	if (ftruncate(s_shm_fd, repeat * size) < 0)
-		fprintf(stderr, "Failed to reserve memory due to %s\n", strerror(errno));
+    const int fd = shm_open(file_name, O_RDWR | O_CREAT | O_EXCL, 0600);
+    if (fd < 0)
+        return nullptr;
+    shm_unlink(file_name);
+    if (ftruncate(fd, repeat * size) < 0)
+    {
+        close(fd);
+        return nullptr;
+    }
 #else
-	s_shm_fd = ASharedMemory_create(file_name, repeat * size);
-	if (s_shm_fd < 0)
-	{
-		fprintf(stderr, "Failed to open shared memory\n");
-		return nullptr;
-	}
+    const int fd = ASharedMemory_create(file_name, repeat * size);
+    if (fd < 0)
+        return nullptr;
 #endif
 
-	void* fifo = mmap(nullptr, size * repeat, PROT_READ | PROT_WRITE, MAP_SHARED, s_shm_fd, 0);
+    void* const fifo = mmap(nullptr, size * repeat, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (fifo == MAP_FAILED)
+    {
+        close(fd);
+        return nullptr;
+    }
 
-	for (size_t i = 1; i < repeat; i++)
-	{
-		void* base = (u8*)fifo + size * i;
-		u8* next = (u8*)mmap(base, size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, s_shm_fd, 0);
-		if (next != base)
-			fprintf(stderr, "Fail to mmap contiguous segment\n");
-	}
+    for (size_t i = 1; i < repeat; i++)
+    {
+        void* const base = static_cast<u8*>(fifo) + size * i;
+        void* const next = mmap(base, size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
+        if (next != base)
+        {
+            if (next != MAP_FAILED)
+                munmap(next, size);
+            munmap(fifo, size * repeat);
+            close(fd);
+            return nullptr;
+        }
+    }
 
-	return fifo;
+    // Each mapped allocation owns its views; closing this descriptor cannot affect another.
+    close(fd);
+    return fifo;
 }
 
 void GSFreeWrappedMemory(void* ptr, size_t size, size_t repeat)
 {
-	pxAssert(s_shm_fd >= 0);
-
-	if (s_shm_fd < 0)
-		return;
-
-	munmap(ptr, size * repeat);
-
-	close(s_shm_fd);
-	s_shm_fd = -1;
+    if (ptr)
+        munmap(ptr, size * repeat);
 }
 
 #endif
@@ -1637,3 +1715,27 @@ BEGIN_HOTKEY_LIST(g_gs_hotkeys){"Screenshot", TRANSLATE_NOOP("Hotkeys", "Graphic
 			}
 		}},
 	END_HOTKEY_LIST()
+
+void GSRequestShaderCacheFlush()
+{
+    if (MTGS::IsOpen()) MTGS::RunOnGSThread([](){ GSDrainBackQueue(); if(g_gs_device) g_gs_device->RequestShaderCacheFlush(); });
+}
+u32 GSClearShaderCacheOnGSThread()
+{
+    GSDrainBackQueue();
+    if(g_gs_device) g_gs_device->PrepareShaderCacheClear();
+    return GSCacheFile::DeleteAll(EmuFolders::Cache);
+}
+void GSClearShaderCache(std::function<void(u32)> done)
+{
+    auto work=[done=std::move(done)](){const u32 removed=GSClearShaderCacheOnGSThread();if(done)done(removed);};
+    if(MTGS::IsOpen()) MTGS::RunOnGSThread(std::move(work));else work();
+}
+
+static std::atomic<u32> s_video_decode_count{0};
+void GSNoteVideoDecode() { s_video_decode_count.fetch_add(1,std::memory_order_relaxed); }
+u32 GSGetVideoDecodeCount() { return s_video_decode_count.load(std::memory_order_relaxed); }
+
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+#include "GSWrappedMemoryTests.inl"
+#endif

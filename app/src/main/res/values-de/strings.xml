@@ -1186,7 +1186,7 @@
     <string name="texture_manager_loading">Lade Texturpakete…</string>
     <string name="texture_manager_options">Laufzeitoptionen</string>
     <string name="texture_manager_enable_replacements">Ersatztexturen laden</string>
-    <string name="texture_manager_enable_replacements_desc">Verwende PNG- und DDS / KTX2-Dateien aus jedem Spiel-Seriennummernordner.</string>
+    <string name="texture_manager_enable_replacements_desc">Verwende PNG- und DDS / KTX2 / ASTC / KTX-Dateien aus jedem Spiel-Seriennummernordner.</string>
     <string name="texture_manager_async_loading">Asynchrones Laden</string>
     <string name="texture_manager_async_loading_desc">Lade Ersatztexturen über einen Worker-Thread, während das Spiel läuft.</string>
     <string name="texture_manager_precache">Ersatztexturen vorladen (Precache)</string>

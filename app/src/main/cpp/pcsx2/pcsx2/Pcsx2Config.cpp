@@ -653,6 +653,10 @@ const char* Pcsx2Config::GSOptions::AspectRatioNames[(size_t)AspectRatioType::Ma
 	"4:3",
 	"16:9",
 	"10:7",
+	"21:9",
+	"20:9",
+	"19.5:9",
+	"Custom",
 	nullptr};
 
 const char* Pcsx2Config::GSOptions::FMVAspectRatioSwitchNames[(size_t)FMVAspectRatioSwitchType::MaxCount + 1] = {
@@ -661,7 +665,13 @@ const char* Pcsx2Config::GSOptions::FMVAspectRatioSwitchNames[(size_t)FMVAspectR
 	"4:3",
 	"16:9",
 	"10:7",
+	"21:9",
+	"20:9",
+	"19.5:9",
+	"Custom",
 	nullptr};
+
+const char* Pcsx2Config::GSOptions::DisplayRotationNames[(size_t)DisplayRotation::MaxCount + 1] = {"0", "90", "180", "270", nullptr};
 
 const char* Pcsx2Config::GSOptions::BlendingLevelNames[] = {
 	"Minimum",
@@ -724,6 +734,8 @@ Pcsx2Config::GSOptions::GSOptions()
 
 	PCRTCAntiBlur = true;
 	DisableInterlaceOffset = false;
+	MovieCombDeinterlace = false;
+	TrimUpscaledEdges = true;
 	PCRTCOffsets = false;
 	PCRTCOverscan = false;
 	IntegerScaling = false;
@@ -731,6 +743,8 @@ Pcsx2Config::GSOptions::GSOptions()
 	UseDebugDevice = false;
 	UseBlitSwapChain = false;
 	DisableShaderCache = false;
+	PrecompilePipelines = true;
+	UserHacks_NativeCounterDraws = false;
 	DisableAsyncTFXCompile = false;
 	DisableFramebufferFetch = false;
 	DisableVertexShaderExpand = false;
@@ -826,6 +840,16 @@ bool Pcsx2Config::GSOptions::OptionsAreEqual(const GSOptions& right) const
 		OpEqu(InterlaceMode) &&
 		OpEqu(LinearPresent) &&
 
+		OpEqu(Rotation) &&
+		OpEqu(DisableSwapChainPreRotation) &&
+		OpEqu(CustomAspectRatio) &&
+		OpEqu(PortraitRenderTopAlign) &&
+		OpEqu(PortraitRenderTopInset) &&
+		OpEqu(LandscapeRenderTopAlign) &&
+		OpEqu(SideBySideVR) &&
+		OpEqu(SideBySideVRSize) &&
+		OpEqu(SideBySideVRDistance) &&
+		OpEqu(SideBySideVRHeight) &&
 		OpEqu(StretchY) &&
 		OpEqu(Crop[0]) &&
 		OpEqu(Crop[1]) &&
@@ -850,12 +874,14 @@ bool Pcsx2Config::GSOptions::OptionsAreEqual(const GSOptions& right) const
 		OpEqu(BlendingAccuracyUserOverride) &&
 		OpEqu(TextureFiltering) &&
 		OpEqu(TexturePreloading) &&
+        OpEqu(TextureUpscale) &&
 		OpEqu(GSDumpCompression) &&
 		OpEqu(HWDownloadMode) &&
 		OpEqu(CASMode) &&
-		OpEqu(SGSRMode) &&
+		OpEqu(SGSRMode) && OpEqu(Upscaler) && OpEqu(FSR_Sharpness) && OpEqu(SGSR_Sharpness) &&
 		OpEqu(Dithering) &&
 		OpEqu(MaxAnisotropy) &&
+		OpEqu(BackThread) &&
 		OpEqu(SWExtraThreads) &&
 		OpEqu(SWExtraThreadsHeight) &&
 		OpEqu(TriFilter) &&
@@ -906,7 +932,7 @@ bool Pcsx2Config::GSOptions::OptionsAreEqual(const GSOptions& right) const
 		OpEqu(LsfgEnabled) &&
 		OpEqu(LsfgMultiplier) &&
 		OpEqu(LsfgDllPath) &&
-		OpEqu(LsfgPerformance) &&
+		OpEqu(LsfgPerformance) && OpEqu(LsfgFp16) &&
 		OpEqu(LsfgFlowScale) &&
 		OpEqu(LsfgTargetRate) &&
 
@@ -934,11 +960,11 @@ bool Pcsx2Config::GSOptions::operator!=(const GSOptions& right) const
 
 bool Pcsx2Config::GSOptions::RestartOptionsAreEqual(const GSOptions& right) const
 {
-	return OpEqu(Renderer) &&
+	return OpEqu(BackThread) && OpEqu(LsfgFp16) && OpEqu(Renderer) &&
 		   OpEqu(Adapter) &&
 		   OpEqu(UseDebugDevice) &&
-		   OpEqu(UseBlitSwapChain) &&
-		   OpEqu(DisableShaderCache) &&
+		   OpEqu(UseBlitSwapChain) && OpEqu(DisableSwapChainPreRotation) &&
+		   OpEqu(DisableShaderCache) && OpEqu(PrecompilePipelines) &&
 		   OpEqu(DisableAsyncTFXCompile) &&
 		   OpEqu(DisableFramebufferFetch) &&
 		   OpEqu(DisableVertexShaderExpand) &&
@@ -951,6 +977,7 @@ bool Pcsx2Config::GSOptions::RestartOptionsAreEqual(const GSOptions& right) cons
 void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 {
 	SettingsWrapSection("EmuCore/GS");
+	BackThread=wrap.EntryBitfield(CURRENT_SETTINGS_SECTION,"GSBackThreadMode",BackThread?1:0,BackThread?1:0)!=0;
 
 #ifdef PCSX2_DEVBUILD
 	SettingsWrapBitBool(SynchronousMTGS);
@@ -972,6 +999,17 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapEntry(ScreenshotQuality);
 	SettingsWrapBitBoolEx(OrganizeSnapshotsByGame, "OrganizeScreenshotsByGame");
 	SettingsWrapBitBoolEx(OrganizeVideoCaptureByGame, "OrganizeVideoCaptureByGame");
+	SettingsWrapEnumEx(Rotation, "DisplayRotation", DisplayRotationNames);
+	SettingsWrapEntry(DisableSwapChainPreRotation);
+	SettingsWrapEntry(CustomAspectRatio);
+	SettingsWrapEntry(PortraitRenderTopAlign);
+	SettingsWrapEntry(PortraitRenderTopInset);
+	SettingsWrapEntry(LandscapeRenderTopAlign);
+	SettingsWrapEntry(SideBySideVR);
+	SettingsWrapEntry(SideBySideVRSize);
+	SettingsWrapEntry(SideBySideVRDistance);
+	SettingsWrapEntry(SideBySideVRHeight);
+	PortraitRenderTopInset = std::max(PortraitRenderTopInset, 0);
 	SettingsWrapEntry(StretchY);
 	SettingsWrapEntryEx(Crop[0], "CropLeft");
 	SettingsWrapEntryEx(Crop[1], "CropTop");
@@ -983,6 +1021,8 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	// using these variables, we need to use the old names. Maybe post 2.0 we can change this.
 	SettingsWrapBitBoolEx(PCRTCAntiBlur, "pcrtc_antiblur");
 	SettingsWrapBitBoolEx(DisableInterlaceOffset, "disable_interlace_offset");
+	SettingsWrapBitBoolEx(MovieCombDeinterlace, "movie_comb_deinterlace");
+	SettingsWrapBitBool(TrimUpscaledEdges);
 	SettingsWrapBitBoolEx(PCRTCOffsets, "pcrtc_offsets");
 	SettingsWrapBitBoolEx(PCRTCOverscan, "pcrtc_overscan");
 	SettingsWrapBitBool(IntegerScaling);
@@ -993,6 +1033,7 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 #endif
 	SettingsWrapBitBool(UseBlitSwapChain);
 	SettingsWrapBitBool(DisableShaderCache);
+	SettingsWrapBitBool(PrecompilePipelines);
 	SettingsWrapBitBool(DisableAsyncTFXCompile);
 	SettingsWrapBitBool(DisableFramebufferFetch);
 	SettingsWrapBitBool(DisableVertexShaderExpand);
@@ -1045,6 +1086,8 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapIntEnumEx(UserHacks_Limit24BitDepth, "UserHacks_Limit24BitDepth");
 	SettingsWrapBitBoolEx(UserHacks_EstimateTextureRegion, "UserHacks_EstimateTextureRegion");
 	SettingsWrapBitBoolEx(UserHacks_DrawBuffering, "UserHacks_DrawBuffering");
+	SettingsWrapBitBoolEx(UserHacks_RewriteLargeSTCoords, "UserHacks_RewriteLargeST");
+	SettingsWrapBitBool(UserHacks_NativeCounterDraws);
 	SettingsWrapBitBoolEx(FXAA, "fxaa");
 	SettingsWrapBitBool(ShadeBoost);
 #ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
@@ -1098,10 +1141,20 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapIntEnumEx(AccurateBlendingUnit, "accurate_blending_unit");
 	SettingsWrapIntEnumEx(TextureFiltering, "filter");
 	SettingsWrapIntEnumEx(TexturePreloading, "texture_preloading");
+    {
+        int texture_upscale=static_cast<int>(TextureUpscale);
+        SettingsWrapEntryEx(texture_upscale,"TextureUpscale");
+        if(texture_upscale<static_cast<int>(GSTextureUpscaleMode::Off) ||
+            texture_upscale>static_cast<int>(GSTextureUpscaleMode::Raisr4x))texture_upscale=0;
+        TextureUpscale=static_cast<GSTextureUpscaleMode>(texture_upscale);
+    }
 	SettingsWrapIntEnumEx(GSDumpCompression, "GSDumpCompression");
 	SettingsWrapIntEnumEx(HWDownloadMode, "HWDownloadMode");
 	SettingsWrapIntEnumEx(CASMode, "CASMode");
 	SettingsWrapIntEnumEx(SGSRMode, "SGSRMode");
+	SettingsWrapIntEnumEx(Upscaler,"Upscaler");
+	SettingsWrapBitfieldEx(FSR_Sharpness,"FSRSharpness");
+	SettingsWrapBitfieldEx(SGSR_Sharpness,"SGSRSharpness");
 	SettingsWrapBitfieldEx(CAS_Sharpness, "CASSharpness");
 	SettingsWrapBitfieldEx(Dithering, "dithering_ps2");
 	SettingsWrapBitfieldEx(MaxAnisotropy, "MaxAnisotropy");
@@ -1147,6 +1200,7 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapBitfieldEx(LsfgMultiplier, "LsfgMultiplier");
 	SettingsWrapEntryEx(LsfgDllPath, "LsfgDllPath");
 	SettingsWrapEntryEx(LsfgPerformance, "LsfgPerformance");
+	SettingsWrapEntryEx(LsfgFp16,"LsfgFp16");
 	SettingsWrapBitfieldEx(LsfgFlowScale, "LsfgFlowScale");
 	SettingsWrapBitfieldEx(LsfgTargetRate, "LsfgTargetRate");
 
@@ -1202,6 +1256,8 @@ void Pcsx2Config::GSOptions::MaskUserHacks()
 	UserHacks_Limit24BitDepth = GSLimit24BitDepth::Disabled;
 	UserHacks_EstimateTextureRegion = false;
 	UserHacks_DrawBuffering = false;
+	UserHacks_RewriteLargeSTCoords = false;
+	UserHacks_NativeCounterDraws = false;
 	UserHacks_TCOffsetX = 0;
 	UserHacks_TCOffsetY = 0;
 	UserHacks_CPUSpriteRenderBW = 0;
@@ -1228,6 +1284,7 @@ void Pcsx2Config::GSOptions::MaskUpscalingHacks()
 	UserHacks_NativeScaling = GSNativeScaling::Off;
 	UserHacks_TCOffsetX = 0;
 	UserHacks_TCOffsetY = 0;
+	UserHacks_NativeCounterDraws = false;
 }
 
 bool Pcsx2Config::GSOptions::UseHardwareRenderer() const

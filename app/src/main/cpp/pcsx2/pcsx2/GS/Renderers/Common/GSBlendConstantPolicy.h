@@ -117,8 +117,8 @@ namespace GSBlendConstantPolicy
             .dual_source_blend = features.dual_source_blend,
             .blend_c = static_cast<u8>(config.ps.blend_c),
             .pabe = static_cast<bool>(config.ps.pabe),
-            // This core has no alpha-output substitution selector/consumer.
-            .blend_factor_in_alpha = false,
+            // An alpha-output factor already owns the substitution channel.
+            .blend_factor_in_alpha = config.ps.blend_factor_in_alpha != 0,
             .multi_pass_reads_second_output = config.blend_multi_pass.enable &&
                 ReadsSecondOutput(config.blend_multi_pass.blend)};
         if (!CanRouteFixedFactorToSecondOutput(config.blend, inputs))

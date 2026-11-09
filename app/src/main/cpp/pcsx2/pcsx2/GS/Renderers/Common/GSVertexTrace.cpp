@@ -108,6 +108,7 @@ void GSVertexTrace::Update(const void* vertex, const u16* index, int v_count, in
 
 		m_filter.mmag = TEX1.IsMagLinear();
 		m_filter.mmin = TEX1.IsMinLinear();
+		m_filter.xover = 0;
 
 		if (TEX1.MXL == 0) // MXL == 0 => MMIN ignored, tested it on ps2
 		{
@@ -147,8 +148,12 @@ void GSVertexTrace::Update(const void* vertex, const u16* index, int v_count, in
 			else
 			{
 				m_filter.linear = m_filter.mmag | m_filter.mmin;
+				m_filter.xover = (m_filter.mmag != m_filter.mmin);
 			}
 		}
+
+		if (GSConfig.TextureFiltering != BiFiltering::PS2)
+			m_filter.xover = 0;
 
 		switch (GSConfig.TextureFiltering)
 		{
@@ -219,3 +224,7 @@ void GSVertexTrace::CorrectDepthTrace(const void* vertex, int count)
 		m_eq.z = 0;
 	}
 }
+
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+#include "GSSWFilterTraceTests.inl"
+#endif

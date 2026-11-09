@@ -19,6 +19,7 @@ object GsHackDefaults {
     const val BLENDING_ACCURACY_DEFAULT = 1
     const val BLENDING_ACCURACY_MINIMUM = 0
     const val BLENDING_ACCURACY_MAXIMUM = 5
+    const val TEXTURE_UPSCALE_DEFAULT = 0
     const val TEXTURE_PRELOADING_DEFAULT = 2
     const val TEXTURE_PRELOADING_MIN = 0
     const val TEXTURE_PRELOADING_MAX = 2
@@ -58,6 +59,8 @@ object GsHackDefaults {
     fun coerceBlendingAccuracy(value: Int): Int {
         return value.coerceIn(BLENDING_ACCURACY_MINIMUM, BLENDING_ACCURACY_MAXIMUM)
     }
+
+    fun coerceTextureUpscaleMode(value: Int): Int = value.takeIf { it in 0..2 } ?: TEXTURE_UPSCALE_DEFAULT
 
     fun coerceTexturePreloading(value: Int): Int {
         return value.coerceIn(TEXTURE_PRELOADING_MIN, TEXTURE_PRELOADING_MAX)

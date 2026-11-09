@@ -1184,7 +1184,7 @@
     <string name="texture_manager_loading">Doku paketleri yükleniyor…</string>
     <string name="texture_manager_options">Çalışma Zamanı Seçenekleri</string>
     <string name="texture_manager_enable_replacements">Değiştirme dokularını yükle</string>
-    <string name="texture_manager_enable_replacements_desc">Her oyun seri klasöründeki PNG ve DDS / KTX2 dosyalarını kullanın.</string>
+    <string name="texture_manager_enable_replacements_desc">Her oyun seri klasöründeki PNG ve DDS / KTX2 / ASTC / KTX dosyalarını kullanın.</string>
     <string name="texture_manager_async_loading">Eşzamansız yükleme</string>
     <string name="texture_manager_async_loading_desc">Oyun çalışırken değiştirme dokularını bir çalışan iş parçacığına yükleyin.</string>
     <string name="texture_manager_precache">Değiştirmeleri önbelleğe al</string>

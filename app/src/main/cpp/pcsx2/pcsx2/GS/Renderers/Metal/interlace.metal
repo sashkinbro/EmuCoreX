@@ -15,11 +15,48 @@ fragment float4 ps_interlace0(ConvertShaderData data [[stage_in]], ConvertPSRes 
 	const int vpos  = int(data.p.y);      // vertical position of destination texture
 
 	if ((vpos & 1) == field)
-		return res.sample_level(data.t, 0);
+	{
+		// Rows [pad.x, pad.y) were never drawn for this field, so read the first row that was
+		// instead of the cleared hole. The band starts where the display rect does. At 1x it is
+		// one row and the field's own lowest row is its next, so nothing moves; at 2x it is two
+		// rows and this is what fills the black device row.
+		const float src_row = (float(vpos) >= uniform.field_pad.x && float(vpos) < uniform.field_pad.y) ? uniform.field_pad.y : float(vpos);
+		return res.sample_level(data.t + float2(0.0f, (src_row - float(vpos)) * uniform.ZrH.y), 0);
+	}
 	else
 		discard_fragment();
 
 	return float4(0.0f, 0.0f, 0.0f, 0.0f);
+}
+
+
+// Comb-adaptive deinterlace, for interlaced video woven into one frame (a movie in frame mode). Works
+// in native lines, field_pad.z device rows each from device row field_pad.w. The lines of the field on
+// screen now are kept. A line of the other field is replaced by the mean of its neighbours where it
+// combs: where it stands out the same way from both neighbours (they show the other moment) more than
+// it differs from its own field's lines two away. A still picture stays whole, and so does a thin line
+// that stands out from its own field too.
+fragment float4 ps_interlace5(ConvertShaderData data [[stage_in]], ConvertPSRes res,
+	constant GSMTLInterlacePSUniform& uniform [[buffer(GSMTLBufferIndexUniforms)]])
+{
+	const int    field = int(uniform.ZrH.x) & 1;
+	const int    native_line = int(floor((data.p.y - uniform.field_pad.w) / uniform.field_pad.z));
+	const float4 c     = res.sample_level(data.t, 0);
+	if ((native_line & 1) == field)
+		return c;
+
+	const float2 vstep = float2(0.0f, uniform.field_pad.z * uniform.ZrH.y); // one native line
+	const float4 a     = res.sample_level(data.t - vstep, 0);
+	const float4 b     = res.sample_level(data.t + vstep, 0);
+	const float3 luma  = float3(0.299f, 0.587f, 0.114f);
+	const float  lc    = dot(c.rgb, luma);
+	const float  la    = dot(a.rgb, luma);
+	const float  lb    = dot(b.rgb, luma);
+	const float  lown  = 0.5f * (dot(res.sample_level(data.t - 2.0f * vstep, 0).rgb, luma) +
+	                             dot(res.sample_level(data.t + 2.0f * vstep, 0).rgb, luma));
+	const float  out_of = ((lc - la) * (lc - lb) > 0.0f) ? min(abs(lc - la), abs(lc - lb)) : 0.0f;
+	const float  comb   = smoothstep(0.02f, 0.06f, out_of - abs(lc - lown));
+	return mix(c, 0.5f * (a + b), comb);
 }
 
 
@@ -63,7 +100,14 @@ fragment float4 ps_interlace3(ConvertShaderData data [[stage_in]], ConvertPSRes 
 	// if the index of current destination line belongs to the current fiels we update it, otherwise
 	// we leave the old line in the destination buffer
 	if ((vpos & 1) == field)
-		return res.sample_level(data.t, 0);
+	{
+		// Same undrawn band as the weave shader. This pass writes one bank of a target twice the
+		// source's height, so the source row a fragment reads is its row within the bank, and one
+		// source row is 1 / vres of the texture coordinate.
+		const int   srow    = int(data.p.y) - bank * vres;
+		const float src_row = (float(srow) >= uniform.field_pad.x && float(srow) < uniform.field_pad.y) ? uniform.field_pad.y : float(srow);
+		return res.sample_level(data.t + float2(0.0f, (src_row - float(srow)) / float(vres)), 0);
+	}
 	else
 		discard_fragment();
 

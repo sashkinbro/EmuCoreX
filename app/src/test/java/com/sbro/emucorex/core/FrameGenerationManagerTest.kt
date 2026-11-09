@@ -89,6 +89,8 @@ class FrameGenerationManagerTest {
     fun `frame generation requires Adreno 7xx or newer`() {
         assertFalse(FrameGenerationManager.supportsAdrenoFamily(null))
         assertFalse(FrameGenerationManager.supportsAdrenoFamily(AdrenoFamily.A6XX))
+        assertTrue(FrameGenerationManager.supportsAdrenoFamily(AdrenoFamily.A6XX, resolvedRendererSupported = true))
+        assertFalse(FrameGenerationManager.supportsAdrenoFamily(null, resolvedRendererSupported = true))
         assertTrue(FrameGenerationManager.supportsAdrenoFamily(AdrenoFamily.A7XX))
         assertTrue(FrameGenerationManager.supportsAdrenoFamily(AdrenoFamily.A8XX))
     }

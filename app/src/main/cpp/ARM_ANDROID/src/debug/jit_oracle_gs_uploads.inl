@@ -1,6 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0+
 // Include beside the existing GS oracle includes; route gs-uploads here.
 extern "C" void EmuCoreXOracleTestTargetScratchUpload(void (*check)(bool, const char*));
+extern "C" void EmuCoreXOracleTestTargetCoherence(void (*check)(bool, const char*));
+extern "C" void EmuCoreXOracleChannelShuffleGeometry(void (*check)(bool, const char*));
+extern "C" void EmuCoreXOracleTestChannelShuffleHazards(void (*check)(bool, const char*));
+extern "C" void EmuCoreXOracleGamePackStorage(void (*check)(bool, const char*), const char* directory);
+extern "C" void EmuCoreXOracleGLGamePackStorage(void (*check)(bool, const char*), const char* directory);
+extern "C" void EmuCoreXOracleMovieComb(void (*check)(bool, const char*));
+extern "C" void EmuCoreXOracleSWTextureReuse(void (*check)(bool, const char*));
+extern "C" void EmuCoreXOracleSWFixedLOD(void (*check)(bool, const char*));
+extern "C" void EmuCoreXOracleSWDepthWalk(void (*check)(bool, const char*));
+extern "C" void EmuCoreXOracleSWWalkers(void (*check)(bool, const char*));
+extern "C" void EmuCoreXOracleSWWalkerExtended(void (*check)(bool, const char*));
+extern "C" void EmuCoreXOracleSWFilterTrace(void (*check)(bool, const char*));
+extern "C" void EmuCoreXOracleSWPalettedBlockRead(void (*check)(bool, const char*));
 void GSUploadTests()
 {
     cpuinfo_initialize();

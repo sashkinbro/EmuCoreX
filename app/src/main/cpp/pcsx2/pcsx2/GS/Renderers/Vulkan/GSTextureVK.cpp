@@ -199,6 +199,22 @@ std::unique_ptr<GSTextureVK> GSTextureVK::Adopt(
 		new GSTextureVK(usage, format, width, height, levels, image, VK_NULL_HANDLE, view, vk_format));
 }
 
+VkImageView GSTextureVK::GetStencilView()
+{
+	if (m_stencil_view != VK_NULL_HANDLE || m_vk_format != VK_FORMAT_D32_SFLOAT_S8_UINT)
+		return m_stencil_view;
+
+	const VkImageViewCreateInfo vci = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, nullptr, 0, m_image,
+		VK_IMAGE_VIEW_TYPE_2D, m_vk_format, s_identity_swizzle, {VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1}};
+	const VkResult res = vkCreateImageView(GSDeviceVK::GetInstance()->GetDevice(), &vci, nullptr, &m_stencil_view);
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vkCreateImageView (stencil) failed: ");
+		m_stencil_view = VK_NULL_HANDLE;
+	}
+	return m_stencil_view;
+}
+
 void GSTextureVK::Destroy(bool defer)
 {
 	if (g_gs_device)
@@ -242,6 +258,16 @@ void GSTextureVK::Destroy(bool defer)
 		}
 		m_framebuffers.clear();
 	}
+
+	if (m_stencil_view != VK_NULL_HANDLE)
+	{
+		if (defer)
+			GSDeviceVK::GetInstance()->DeferImageViewDestruction(m_stencil_view);
+		else
+			vkDestroyImageView(GSDeviceVK::GetInstance()->GetDevice(), m_stencil_view, nullptr);
+		m_stencil_view = VK_NULL_HANDLE;
+	}
+
 
 	if (m_view != VK_NULL_HANDLE)
 	{
@@ -896,6 +922,13 @@ GSDownloadTextureVK::~GSDownloadTextureVK()
 	dev->DeferBufferDestruction(m_buffer, m_allocation);
 }
 
+VkMemoryPropertyFlags GSDownloadTextureVK::GetReadbackMemoryPreference(const GSDeviceVK& device)
+{
+    // Exact upstream r44p1 exception; Map still invalidates after fence retirement.
+    return device.PreferCoherentReadbackMemory() ?
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT : VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+}
+
 std::unique_ptr<GSDownloadTextureVK> GSDownloadTextureVK::Create(u32 width, u32 height, GSTexture::Format format)
 {
 	const u32 buffer_size =
@@ -907,14 +940,7 @@ std::unique_ptr<GSDownloadTextureVK> GSDownloadTextureVK::Create(u32 width, u32 
 	VmaAllocationCreateInfo aci = {};
 	aci.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
 	aci.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-	// Mobile drivers are more reliable with coherent readback memory. Keep this a preference,
-	// not a required heap restriction: the allocator can still pick normal mapped memory when
-	// a device exposes no suitable coherent type.
-#if defined(__ANDROID__)
-	aci.preferredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-#else
-	aci.preferredFlags = VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
-#endif
+	aci.preferredFlags = GetReadbackMemoryPreference(*GSDeviceVK::GetInstance());
 
 	VmaAllocationInfo ai = {};
 	VmaAllocation allocation;

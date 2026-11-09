@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #ifdef VERTEX_SHADER
@@ -24,6 +24,10 @@ layout(location = 0) out vec4 o_col0;
 layout(push_constant) uniform cb0
 {
 	vec4 ZrH;
+	// xy: the device rows [x, y) of the merge that were not drawn for the field being read, starting
+	// where the circuit's display rect starts; zw are for the comb pass (ps_main5). GSRenderer::Merge offsets a
+	// field's picture down by one native line and the merge target is cleared, so nothing drew them.
+	vec4 FieldPad;
 };
 
 layout(set = 0, binding = 0) uniform sampler2D samp0;
@@ -38,7 +42,14 @@ void ps_main0()
 	const int vpos  = int(gl_FragCoord.y); // vertical position of destination texture
 
 	if ((vpos & 1) == field)
-		o_col0 = textureLod(samp0, v_tex, 0);
+	{
+		// Rows [pad.x, pad.y) were never drawn for this field, so read the first row that was
+		// instead of the cleared hole. The band starts where the display rect does. At 1x it is
+		// one row and the field's own lowest row is its next, so nothing moves; at 2x it is two
+		// rows and this is what fills the black device row.
+		const float src_row = (float(vpos) >= FieldPad.x && float(vpos) < FieldPad.y) ? FieldPad.y : float(vpos);
+		o_col0 = textureLod(samp0, v_tex + vec2(0.0f, (src_row - float(vpos)) * ZrH.y), 0);
+	}
 	else
 		discard;
 }
@@ -89,7 +100,14 @@ void ps_main3()
 	// if the index of current destination line belongs to the current fiels we update it, otherwise
 	// we leave the old line in the destination buffer
 	if ((vpos & 1) == field)
-		o_col0 = textureLod(samp0, v_tex, 0);
+	{
+		// Same undrawn band as the weave shader. This pass writes one bank of a target twice the
+		// source's height, so the source row a fragment reads is its row within the bank, and one
+		// source row is 1 / vres of the texture coordinate.
+		const int   srow    = int(gl_FragCoord.y) - bank * vres;
+		const float src_row = (float(srow) >= FieldPad.x && float(srow) < FieldPad.y) ? FieldPad.y : float(srow);
+		o_col0 = textureLod(samp0, v_tex + vec2(0.0f, (src_row - float(srow)) / float(vres)), 0);
+	}
 	else
 		discard;
 }
@@ -194,9 +212,67 @@ void ps_main4()
 			// high motion -> interpolate pixels above and below
 			o_col0 = (hn + ln) / 2.0f;
 		else
-			// low motion -> weave
-			o_col0 = cn;
+		{
+			// Check if it's completely static first, we don't need to mess with any of that.
+			if((mh_max != -motion_thr.x) || (ml_max != -motion_thr.x) || (mc_max != -motion_thr.x))
+			{
+				// Check the diff with the above and below lines, if the difference is smaller between the new high and low lines
+				// compared to the new centre line and the high line (with some threshold of about 25 color steps), then reconstruct.
+				vec3 mhln = hn.rgb - ln.rgb;
+				vec3 mchn = hn.rgb - cn.rgb;
+
+				mhln = max(mhln, -mhln) - motion_thr;
+				mchn = max(mchn, -mchn) - motion_thr;
+
+				float mhln_max = max(max(mhln.x, mhln.y), mhln.z);
+				float mchn_max = max(max(mchn.x, mchn.y), mchn.z);
+
+				// The new centre line is a fair chunk different from those surrounding it, so quite likely incorrect.
+				if (mhln_max < 0.0f && mchn_max >= (mhln_max * 0.90f))
+					o_col0 = (hn + ln) / 2.0f;
+				else
+					// low motion -> weave
+					o_col0 = cn;
+			}
+			else
+				// low motion -> weave
+				o_col0 = cn;
+		}
 	}
+}
+#endif
+
+
+// Comb-adaptive deinterlace, for interlaced video woven into one frame (a movie in frame mode). Works
+// in native lines, FieldPad.z device rows each from device row FieldPad.w. The lines of the field on
+// screen now are kept. A line of the other field is replaced by the mean of its neighbours where it
+// combs: where it stands out the same way from both neighbours (they show the other moment) more than
+// it differs from its own field's lines two away. A still picture stays whole, and so does a thin line
+// that stands out from its own field too.
+#ifdef ps_main5
+void ps_main5()
+{
+	const int   field = int(ZrH.x) & 1;
+	const int   native_line = int(floor((gl_FragCoord.y - FieldPad.w) / FieldPad.z));
+	const vec4  c     = textureLod(samp0, v_tex, 0);
+	if ((native_line & 1) == field)
+	{
+		o_col0 = c;
+		return;
+	}
+
+	const vec2  step = vec2(0.0f, FieldPad.z * ZrH.y); // one native line
+	const vec4  a    = textureLod(samp0, v_tex - step, 0);
+	const vec4  b    = textureLod(samp0, v_tex + step, 0);
+	const vec3  luma = vec3(0.299f, 0.587f, 0.114f);
+	const float lc   = dot(c.rgb, luma);
+	const float la   = dot(a.rgb, luma);
+	const float lb   = dot(b.rgb, luma);
+	const float lown = 0.5f * (dot(textureLod(samp0, v_tex - 2.0f * step, 0).rgb, luma) +
+	                           dot(textureLod(samp0, v_tex + 2.0f * step, 0).rgb, luma));
+	const float out_of = ((lc - la) * (lc - lb) > 0.0f) ? min(abs(lc - la), abs(lc - lb)) : 0.0f;
+	const float comb   = smoothstep(0.02f, 0.06f, out_of - abs(lc - lown));
+	o_col0 = mix(c, 0.5f * (a + b), comb);
 }
 #endif
 

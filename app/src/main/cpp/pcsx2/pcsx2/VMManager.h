@@ -15,6 +15,10 @@
 #include "Config.h"
 
 enum class CDVD_SourceType : uint8_t;
+namespace Threading
+{
+	class ThreadHandle;
+}
 
 enum class VMState
 {
@@ -335,6 +339,7 @@ namespace VMManager
 
 		/// Returns a list of processors in the system, suitable for pinning for the software renderer.
 		const std::vector<u32>& GetSoftwareRendererProcessorList();
+		u64 RegisterGSBackThread(const Threading::ThreadHandle* handle);
 
 		const std::string& GetELFOverride();
 		VMState GetStateForEventTest();

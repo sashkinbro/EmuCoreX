@@ -40,13 +40,7 @@ object EmulatorBridge {
     // the PS2 logo. Keep it held through the boot sequence, matching the real-console action.
     private const val AUTO_PROGRESSIVE_SCAN_HOLD_MS = 30_000L
 
-    private val aspectRatioSettingValues = mapOf(
-        0 to "Stretch",
-        1 to "Auto 4:3/3:2",
-        2 to "4:3",
-        3 to "16:9",
-        4 to "10:7"
-    )
+    private val aspectRatioSettingValues = GSAspectRatioSettings.settingValues
 
     private val serialDispatcher = Dispatchers.IO.limitedParallelism(1)
     private val serialScope = CoroutineScope(SupervisorJob() + serialDispatcher)
@@ -106,7 +100,7 @@ object EmulatorBridge {
     private fun frameSkipOp(value: Int) = RuntimeOp("frame_skip", listOf(value.coerceIn(0, 4).toString()))
 
     private fun normalizeAspectRatio(type: Int): Int {
-        return if (type in aspectRatioSettingValues.keys) type else 1
+        return GSAspectRatioSettings.normalize(type)
     }
 
     private fun aspectOp(type: Int) = RuntimeOp(
@@ -585,6 +579,7 @@ object EmulatorBridge {
         val effectiveEnableCheats = enableCheats && !achievementsHardcore
         val effectiveFrameLimitEnabled = frameLimitEnabled || achievementsHardcore
         val padVibrationEnabled = prefs.padVibration.first()
+        val textureUpscaleMode = prefs.textureUpscaleMode.first()
         val textureReplacementsEnabled = prefs.textureReplacementsEnabled.first()
         val textureReplacementsAsync = prefs.textureReplacementsAsync.first()
         val textureReplacementsPrecache = prefs.textureReplacementsPrecache.first()
@@ -741,6 +736,7 @@ object EmulatorBridge {
                 add(settingOp("EmuCore/GS", "texture_preloading", "int", texturePreloading.toString()))
                 add(settingOp("EmuCore/GS", "ShaderChainEnabled", "bool", (shaderChainEnabled && shaderChainPreset.isNotBlank()).toString()))
                 add(settingOp("EmuCore/GS", "ShaderChainPreset", "string", shaderChainPreset.trim()))
+                add(settingOp("EmuCore/GS", "TextureUpscale", "int", textureUpscaleMode.toString()))
                 add(settingOp("EmuCore/GS", "LoadTextureReplacements", "bool", textureReplacementsEnabled.toString()))
                 add(settingOp("EmuCore/GS", "LoadTextureReplacementsAsync", "bool", textureReplacementsAsync.toString()))
                 add(settingOp("EmuCore/GS", "PrecacheTextureReplacements", "bool", textureReplacementsPrecache.toString()))

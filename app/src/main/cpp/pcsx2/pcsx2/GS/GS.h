@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
+#define GS_MOVIE_COMB_SUPPORTED 1
+void GSNoteVideoDecode();
+unsigned int GSGetVideoDecodeCount();
+#include <functional>
 
 #include "common/WindowInfo.h"
 #include "SaveState.h"
@@ -62,6 +66,8 @@ bool GSreopen(bool recreate_device, bool recreate_renderer, GSRendererType new_r
 	std::optional<const Pcsx2Config::GSOptions*> old_config);
 void GSreset(bool hardware_reset);
 void GSclose();
+void GSDrainBackQueue();
+void GSFlushPendingDraws();
 void GSgifSoftReset(u32 mask);
 void GSwriteCSR(u32 csr);
 void GSInitAndReadFIFO(u8* mem, u32 size);
@@ -81,6 +87,10 @@ void GSEndCapture();
 void GSPresentCurrentFrame();
 void GSThrottlePresentation();
 void GSGameChanged();
+void GSGameChanged(const std::string& serial, u32 crc);
+void GSRequestShaderCacheFlush();
+u32 GSClearShaderCacheOnGSThread();
+void GSClearShaderCache(std::function<void(u32)> done);
 void GSSetDisplayAlignment(GSDisplayAlignment alignment);
 bool GSHasDisplayWindow();
 void GSResizeDisplayWindow(u32 width, u32 height, float scale);

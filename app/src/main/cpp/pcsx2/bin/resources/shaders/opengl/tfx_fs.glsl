@@ -98,13 +98,14 @@ layout(std140, binding = 0) uniform cb21
 
 	float ScaledScaleFactor;
 	float RcpScaleFactor;
-	float _pad0_cb1;
+	float RtScaleFactor;
 	float _pad1_cb1;
 
 	float LineCovScale;
-	float _pad2_cb1;
-	float _pad3_cb1;
-	float _pad4_cb1;
+	uint SubstituteAlphaKeep;
+	uint SubstituteAlphaValue;
+	uint DitherPhase;
+	vec4 NativeTexelGrid;
 };
 
 in SHADER
@@ -530,7 +531,11 @@ mat4 sample_4p(uvec4 u)
 
 uint fetch_raw_depth()
 {
+	#if HAS_CLIP_CONTROL
 	float multiplier = exp2(32.0f);
+#else
+	float multiplier = exp2(24.0f);
+#endif
 
 #if PS_TEX_IS_FB == 1
 	return uint(sample_from_rt().r * multiplier);
@@ -636,13 +641,21 @@ vec4 sample_depth(vec2 st)
 #elif PS_DEPTH_FMT == 1
 	// Based on ps_convert_depth32_rgba8 of convert
 	// Convert a GL_FLOAT32 depth texture into a RGBA color texture
+	#if HAS_CLIP_CONTROL
 	uint d = uint(fetch_c(uv).r * exp2(32.0f));
+#else
+	uint d = uint(fetch_c(uv).r * exp2(24.0f));
+#endif
 	t = vec4(uvec4((d & 0xFFu), ((d >> 8) & 0xFFu), ((d >> 16) & 0xFFu), (d >> 24)));
 
 #elif PS_DEPTH_FMT == 2
 	// Based on ps_convert_depth16_rgb5a1 of convert
 	// Convert a GL_FLOAT32 (only 16 lsb) depth into a RGB5A1 color texture
+	#if HAS_CLIP_CONTROL
 	uint d = uint(fetch_c(uv).r * exp2(32.0f));
+#else
+	uint d = uint(fetch_c(uv).r * exp2(24.0f));
+#endif
 	t = vec4(uvec4((d & 0x1Fu), ((d >> 5) & 0x1Fu), ((d >> 10) & 0x1Fu), (d >> 15) & 0x01u)) * vec4(8.0f, 8.0f, 8.0f, 128.0f);
 
 #elif PS_DEPTH_FMT == 3
@@ -809,7 +822,11 @@ vec4 sample_color(vec2 st)
 	// The 0.05f helps to fix the overbloom of sotc
 	// I think the issue is related to the rounding of texture coodinate. The linear (from fixed unit)
 	// interpolation could be slightly below the correct one.
-	return trunc(t * 255.0f + 0.05f);
+    t = trunc(t * 255.0f + 0.05f);
+#if PS_REPLACEMENT_ALPHA_SNAP
+    if(abs(t.a-128.0f)<=8.0f)t.a=128.0f;
+#endif
+    return t;
 }
 
 #endif // NEEDS_TEX
@@ -891,6 +908,23 @@ vec4 ps_color()
 	vec2 st_int = PSin.t_int.zw;
 #endif
 
+#if PS_NATIVE_TEXEL_GRID
+	// A sprite that MINIFIES a GS-memory texture under a nearest sampler reads the texel its NATIVE
+	// pixel read, not the one this device pixel's own sample point lands on. The console samples a
+	// sprite once per pixel, so at two source texels per native pixel it never displays the texels
+	// in between, and at 2x those unreachable texels land on every second device column. See
+	// GSNativeTexelGridPolicy.h for the whole rule.
+	//
+	// NativeTexelGrid.xy is the source step per NATIVE pixel in these same coordinates -- zero on
+	// an axis that does not minify, which makes that axis' term vanish -- and .z is the scale. The
+	// convention is the integer pixel index, not the fragment centre: a device pixel samples where
+	// native coordinate pixel/scale samples, and its owner native pixel sampled at the floor of
+	// that. Hence floor the coordinate first, and divide rather than multiply by a reciprocal,
+	// which can land a hair under an integer where the divide is exact.
+	vec2 native_here = floor(gl_FragCoord.xy) / NativeTexelGrid.z;
+	st += NativeTexelGrid.xy * (floor(native_here) - native_here);
+#endif
+
 #if !NEEDS_TEX
 	vec4 T = vec4(0.0);
 #elif PS_CHANNEL_FETCH == 1
@@ -936,16 +970,27 @@ vec4 ps_color()
 	return C;
 }
 
+uvec4 quantize_color(vec4 C)
+{
+	return uvec4(C);
+}
+
 void ps_fbmask(inout vec4 C)
 {
 	// FIXME do I need special case for 16 bits
 #if PS_FBMASK
-	#if PS_COLCLIP_HW == 1
-		vec4 RT = trunc(sample_from_rt() * 65535.0f);
-	#else
-		vec4 RT = trunc(sample_from_rt() * 255.0f + 0.1f);
+	float multi_rgb = PS_COLCLIP_HW != 0 ? 65535.0f : 255.0f;
+	float multi_a = PS_RTA_CORRECTION != 0 ? 128.0f : 255.0f;
+	vec4 RT = sample_from_rt();
+	RT.rgb = trunc(RT.rgb * multi_rgb + 0.1f);
+	RT.a = round(RT.a * multi_a);
+	C = vec4(gpu_bitwise_and(quantize_color(C), gpu_bitwise_not(FbMask)) | gpu_bitwise_and(uvec4(RT), FbMask));
+#elif PS_QUANTIZE_COLOR || PS_SUBSTITUTE_ALPHA
+	uvec4 Cq = quantize_color(C);
+	#if PS_SUBSTITUTE_ALPHA
+		Cq.a = (Cq.a & SubstituteAlphaKeep) | SubstituteAlphaValue;
 	#endif
-	C = vec4(gpu_bitwise_and(uvec4(C), gpu_bitwise_not(FbMask)) | gpu_bitwise_and(uvec4(RT), FbMask));
+	C = vec4(Cq);
 #endif
 }
 
@@ -955,7 +1000,19 @@ void ps_dither(inout vec3 C, float As)
 	#if PS_DITHER == 2
 		ivec2 fpos = ivec2(gl_FragCoord.xy);
 	#else
-		ivec2 fpos = ivec2(gl_FragCoord.xy * RcpScaleFactor);
+		// The dither matrix indexes by NATIVE pixel, so reduce the device pixel to the one
+		// that owns it on both axes -- same fix and same reasoning as the SCANMSK test below:
+		// floor before dividing, because gl_FragCoord is coord + 0.5, and a true divide by S
+		// (the RENDER TARGET's scale: the texture's, in ScaledScaleFactor, is 1 for a texture read
+		// from GS memory) rather than a reciprocal multiply, which can land a hair under an integer
+		// where the divide is exact.
+		// DitherPhase then rotates the matrix under that index. At a fractional S some native
+		// pixels own one more device pixel than their neighbours, so their matrix entry covers
+		// more of the screen than the others; the phase decides which entries those are, and
+		// the CPU picks the quietest. It is zero at every whole S, where no cell is wider.
+		float dither_scale = RtScaleFactor;
+		ivec2 fpos = ivec2(floor(gl_FragCoord.xy) / dither_scale)
+		           + ivec2(DitherPhase & 3u, (DitherPhase >> 2) & 3u);
 	#endif
 		float value = DitherMatrix[fpos.y&3][fpos.x&3];
 
@@ -983,7 +1040,7 @@ void ps_color_clamp_wrap(inout vec3 C)
 {
 	// When dithering the bottom 3 bits become meaningless and cause lines in the picture
 	// so we need to limit the color depth on dithered items
-#if SW_BLEND || (PS_DITHER > 0 && PS_DITHER < 3) || PS_FBMASK
+#if SW_BLEND || (PS_DITHER > 0 && PS_DITHER < 3) || PS_FBMASK || PS_QUANTIZE_COLOR || PS_SUBSTITUTE_ALPHA
 
 #if PS_DST_FMT == FMT_16 && PS_BLEND_MIX == 0 && PS_ROUND_INV
 	C += 7.0f; // Need to round up, not down since the shader will invert
@@ -1207,7 +1264,7 @@ void ps_main()
 	float input_z = gl_FragCoord.z;
 
 	// Must floor before depth testing.
-#if PS_ZFLOOR
+#if PS_ZFLOOR && HAS_CLIP_CONTROL
 	input_z = floor(input_z * exp2(32.0f)) * exp2(-32.0f);
 #endif
 
@@ -1220,8 +1277,15 @@ void ps_main()
 #endif
 
 #if PS_SCANMSK & 2
-	// fail depth test on prohibited lines
-	if ((int(gl_FragCoord.y) & 1) == (PS_SCANMSK & 1))
+	// fail depth test on prohibited lines. SCANMSK masks NATIVE scanlines, so reduce the device row
+	// to the line that owns it -- floor(row / S) -- before the parity test. Two traps, both silent:
+	// gl_FragCoord.y is row + 0.5, and at a fractional scale that half puts some rows in the line
+	// above their owner; and a multiply by RcpScaleFactor can land a hair under an integer where
+	// row / S is exactly integral. S is RtScaleFactor, the render target's
+	// scale: ScaledScaleFactor is the texture's, which is 1 for a texture read from GS memory.
+	// (The dither path above uses the same floor-then-divide fix.)
+	float scanmsk_scale = RtScaleFactor;
+	if ((int(floor(gl_FragCoord.y) / scanmsk_scale) & 1) == (PS_SCANMSK & 1))
 		discard;
 #endif
 
@@ -1385,7 +1449,11 @@ void ps_main()
 #endif
 
 #if !PS_NO_COLOR
-	#if PS_RTA_CORRECTION
+	#if PS_BLEND_FACTOR_IN_ALPHA
+		// No dual-source blend unit here. Nothing is keeping this pass's alpha, so hand the
+		// blend factor to fixed-function SRC_ALPHA through it instead of a second output.
+		C.a = alpha_blend.a;
+	#elif PS_RTA_CORRECTION
 		C.a = C.a / 128.0f;
 	#else
 		C.a = C.a / 255.0f;

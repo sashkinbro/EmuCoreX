@@ -14,6 +14,8 @@
 #include <unistd.h>
 #if defined(__linux__)
 #include <sys/prctl.h>
+#include <sys/resource.h>
+#include <cerrno>
 #include <sys/types.h>
 #include <sched.h>
 
@@ -344,5 +346,21 @@ void Threading::SetNameOfCurrentThread(const char* name)
 	prctl(PR_SET_NAME, name, 0, 0, 0);
 #elif defined(__unix__)
 	pthread_set_name_np(pthread_self(), name);
+#endif
+}
+
+bool Threading::ThreadHandle::SetNicePriority(int nice) const
+{
+#if defined(__linux__)
+	if (m_native_id == 0)
+		return false;
+	// PRIO_PROCESS + a tid sets the nice value of that specific thread on Linux.
+	// Silently tolerate EPERM — the process rlimit may forbid going negative.
+	errno = 0;
+	if (setpriority(PRIO_PROCESS, static_cast<id_t>(m_native_id), nice) == 0)
+		return true;
+	return errno == 0;
+#else
+	return false;
 #endif
 }

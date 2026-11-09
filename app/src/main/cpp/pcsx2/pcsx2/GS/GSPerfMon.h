@@ -26,6 +26,7 @@ public:
 		TextureCopiesROV, // Overlaps with regular texture copies.
 		DrawCallsROV, // Overlaps with regular draw calls.
 		BarriersROV, // Overlaps with regular barriers.
+		SwPaletteBlockCopies, // CPU sprite copy draws, kept last to preserve existing IDs.
 		CounterLast,
 
 		// Reused counters for HW.

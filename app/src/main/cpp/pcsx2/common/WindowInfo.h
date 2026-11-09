@@ -43,6 +43,9 @@ struct WindowInfo
 	/// Refresh rate of the surface, if available.
 	float surface_refresh_rate = 0.0f;
 
+	/// Surface rotation hint in Vulkan quarter turns; zero when unknown. Android uses currentTransform.
+	u8 surface_rotation = 0;
+
 	/// Returns the host's refresh rate for the given window, if available.
 	static std::optional<float> QueryRefreshRateForWindow(const WindowInfo& wi);
 };

@@ -194,6 +194,7 @@ class FrameGenerationManager(context: Context) {
             }
             val digest = sha256(temporary)
             check(temporary.renameTo(dllFile) || temporary.copyTo(dllFile, overwrite = true).let { temporary.delete(); true })
+            NativeApp.invalidateLosslessDll()
             prefs.edit()
                 .putString(KEY_DLL_PATH, dllFile.absolutePath)
                 .putString(KEY_DLL_SHA256, digest)
@@ -296,11 +297,18 @@ class FrameGenerationManager(context: Context) {
         internal fun normalizeFlowScale(value: Int): Int =
             ((value.coerceIn(25, 100) + 12) / 25) * 25
 
-        fun supportsCurrentHardware(): Boolean =
-            supportsAdrenoFamily(GpuDriverRecommendations.currentDeviceProfile()?.family)
+        fun supportsCurrentHardware(): Boolean {
+            val family = GpuDriverRecommendations.currentDeviceProfile()?.family
+            // 6xx needs the resolved Vulkan device to confirm Turnip. A package
+            // name or selected driver path does not establish which driver loaded.
+            val resolvedRendererSupported = family == AdrenoFamily.A6XX &&
+                runCatching { NativeApp.supportsFrameGenerationRenderer() }.getOrDefault(false)
+            return supportsAdrenoFamily(family, resolvedRendererSupported)
+        }
 
-        internal fun supportsAdrenoFamily(family: AdrenoFamily?): Boolean =
-            family == AdrenoFamily.A7XX || family == AdrenoFamily.A8XX
+        internal fun supportsAdrenoFamily(family: AdrenoFamily?, resolvedRendererSupported: Boolean = false): Boolean =
+            family == AdrenoFamily.A7XX || family == AdrenoFamily.A8XX ||
+                (family == AdrenoFamily.A6XX && resolvedRendererSupported)
 
         internal fun hasPeSignature(file: File): Boolean = runCatching {
             if (file.length() < 0x40L) return@runCatching false

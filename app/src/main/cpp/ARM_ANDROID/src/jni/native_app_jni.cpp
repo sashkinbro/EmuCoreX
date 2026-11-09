@@ -750,14 +750,8 @@ extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_resetKey
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_resetPadState(JNIEnv*, jclass, jint pad_index) { AndroidRuntime::Instance().ResetPadState(pad_index); }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setAspectRatio(JNIEnv*, jclass, jint type)
 {
-	const char* value = "Auto 4:3/3:2";
-	switch (type)
-	{
-		case 2: value = "4:3"; break;
-		case 3: value = "16:9"; break;
-		case 4: value = "10:7"; break;
-		default: break;
-	}
+	const int normalized=(type>=0&&type<static_cast<int>(AspectRatioType::MaxCount))?type:1;
+	const char* value=Pcsx2Config::GSOptions::AspectRatioNames[normalized];
 	AndroidRuntime::Instance().SetSetting("EmuCore/GS", "AspectRatio", "string", value);
 }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_renderUpscalemultiplier(JNIEnv*, jclass, jfloat value) { AndroidRuntime::Instance().SetSetting("EmuCore/GS", "upscale_multiplier", "float", std::to_string(value)); }
@@ -1190,3 +1184,7 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunTFXPreparationS
 	return failures ? 1 : 0;
 }
 #endif
+
+extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_invalidateLosslessDll(JNIEnv*,jclass){GSLsfg::InvalidateDllVerdict();}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_supportsFrameGenerationRenderer(JNIEnv*,jclass){return GSLsfg::HasSupportedRenderer()?JNI_TRUE:JNI_FALSE;}

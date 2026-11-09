@@ -381,6 +381,64 @@ bool VKSwapChain::SelectPresentMode(VkSurfaceKHR surface, GSVSyncMode* vsync_mod
 	return true;
 }
 
+static DisplayRotation RotationFromSurfaceTransform(VkSurfaceTransformFlagBitsKHR transform)
+{
+	// VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR: the content is rotated 90 degrees clockwise, the
+	// same sense as DisplayRotation::Rot90. Mirrored transforms are not pre-rotated.
+	switch (transform)
+	{
+		case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:
+			return DisplayRotation::Rot90;
+		case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR:
+			return DisplayRotation::Rot180;
+		case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR:
+			return DisplayRotation::Rot270;
+		default:
+			return DisplayRotation::Rot0;
+	}
+}
+
+static VkSurfaceTransformFlagBitsKHR SurfaceTransformFromRotation(DisplayRotation rotation)
+{
+	switch (rotation)
+	{
+		case DisplayRotation::Rot90:
+			return VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR;
+		case DisplayRotation::Rot180:
+			return VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR;
+		case DisplayRotation::Rot270:
+			return VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR;
+		default:
+			return VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+	}
+}
+
+static DisplayRotation WantedSurfaceRotation(const VkSurfaceCapabilitiesKHR& caps, const WindowInfo& wi)
+{
+	if (GSConfig.DisableSwapChainPreRotation)
+		return DisplayRotation::Rot0;
+
+	if (caps.supportedTransforms & caps.currentTransform)
+	{
+		const DisplayRotation reported = RotationFromSurfaceTransform(caps.currentTransform);
+		if (reported != DisplayRotation::Rot0)
+			return reported;
+	}
+
+	const DisplayRotation hinted = static_cast<DisplayRotation>(wi.surface_rotation % 4u);
+	return (caps.supportedTransforms & SurfaceTransformFromRotation(hinted)) ? hinted : DisplayRotation::Rot0;
+}
+
+static bool RotationSwapsAxes(DisplayRotation rotation)
+{
+	return (rotation == DisplayRotation::Rot90 || rotation == DisplayRotation::Rot270);
+}
+
+static u32 ConstrainPowerVRSwapchainWidth(u32 vendor,u32 version,u32 minimum,u32 width)
+{
+    return vendor==0x1010&&version<0x00582558u&&(width&~31u)>=minimum ? (width&~31u) : width;
+}
+
 bool VKSwapChain::CreateSwapChain()
 {
 	// Select swap chain format
@@ -433,10 +491,45 @@ bool VKSwapChain::CreateSwapChain()
 	size.height =
 		std::clamp(size.height, surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.height);
 
-	// Prefer identity transform if possible
+	// Pre-rotation. `size` is in the window's orientation (Android reports currentExtent already
+	// rotated to it). When the surface reports a rotation, create the images in the panel's own
+	// orientation with that rotation as preTransform, and rotate the final present into them, so
+	// the presentation engine shows them as they are. Left to the compositor, the rotation costs a
+	// pass per frame: on Android the display hardware cannot rotate a linear buffer on many panels,
+	// and SurfaceFlinger then draws the game layer on the GPU.
+	m_surface_rotation = WantedSurfaceRotation(surface_capabilities, m_window_info);
+	m_pre_rotation = DisplayRotation::Rot0;
 	VkSurfaceTransformFlagBitsKHR transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-	if (!(surface_capabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR))
+	VkExtent2D image_size = size;
+	if (m_surface_rotation != DisplayRotation::Rot0)
+	{
+		const VkExtent2D rotated = RotationSwapsAxes(m_surface_rotation) ? VkExtent2D{size.height, size.width} : size;
+		if (rotated.width >= surface_capabilities.minImageExtent.width &&
+			rotated.width <= surface_capabilities.maxImageExtent.width &&
+			rotated.height >= surface_capabilities.minImageExtent.height &&
+			rotated.height <= surface_capabilities.maxImageExtent.height)
+		{
+			m_pre_rotation = m_surface_rotation;
+			transform = SurfaceTransformFromRotation(m_pre_rotation);
+			image_size = rotated;
+		}
+		else
+		{
+			Console.Warning("Vulkan: Surface asks for a rotation, but a %ux%u swap chain is outside %ux%u..%ux%u; "
+							"leaving the rotation to the presentation engine.",
+				rotated.width, rotated.height, surface_capabilities.minImageExtent.width,
+				surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.width,
+				surface_capabilities.maxImageExtent.height);
+		}
+	}
+	if (m_pre_rotation == DisplayRotation::Rot0 &&
+		!(surface_capabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR))
+	{
 		transform = surface_capabilities.currentTransform;
+	}
+
+	image_size.width=ConstrainPowerVRSwapchainWidth(GSDeviceVK::GetInstance()->GetDeviceProperties().vendorID,
+		GSDeviceVK::GetInstance()->GetDeviceProperties().driverVersion,surface_capabilities.minImageExtent.width,image_size.width);
 
 	VkCompositeAlphaFlagBitsKHR alpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	if (!(surface_capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR))
@@ -478,7 +571,7 @@ bool VKSwapChain::CreateSwapChain()
 	// Now we can actually create the swap chain
 	VkSwapchainCreateInfoKHR swap_chain_info = {VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, 
 		use_present_modes ? &modes_info : nullptr, 0, m_surface,
-		image_count, surface_format->format, surface_format->colorSpace, size, 1u, image_usage,
+		image_count, surface_format->format, surface_format->colorSpace, image_size, 1u, image_usage,
 		VK_SHARING_MODE_EXCLUSIVE, 0, nullptr, transform, alpha, m_present_mode, VK_TRUE, old_swap_chain};
 	std::array<uint32_t, 2> indices = {{
 		GSDeviceVK::GetInstance()->GetGraphicsQueueFamilyIndex(),
@@ -576,7 +669,7 @@ bool VKSwapChain::CreateSwapChain()
 	{
 		std::unique_ptr<GSTextureVK> texture =
 			GSTextureVK::Adopt(images[i], GSTexture::RenderTarget, GSTexture::Format::Color,
-				m_window_info.surface_width, m_window_info.surface_height, 1, surface_format->format);
+				std::max(1u,image_size.width),std::max(1u,image_size.height),1,surface_format->format);
 		if (!texture)
 			return false;
 
@@ -609,6 +702,20 @@ bool VKSwapChain::CreateSwapChain()
 	}
 
 	return true;
+}
+
+bool VKSwapChain::HasSurfaceRotationChanged() const
+{
+	VkSurfaceCapabilitiesKHR caps;
+	if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(GSDeviceVK::GetInstance()->GetPhysicalDevice(), m_surface, &caps) !=
+		VK_SUCCESS)
+	{
+		return false;
+	}
+
+	// Compared with what the surface asked for at creation, not with m_pre_rotation: a rotation
+	// that could not be applied would otherwise read as changed on every frame.
+	return (WantedSurfaceRotation(caps, m_window_info) != m_surface_rotation);
 }
 
 void VKSwapChain::DestroySwapChainImages()
@@ -821,3 +928,7 @@ void VKSwapChain::DestroySurface()
 	DestroyVulkanSurface(GSDeviceVK::GetInstance()->GetVulkanInstance(), &m_window_info, m_surface);
 	m_surface = VK_NULL_HANDLE;
 }
+
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+#include "GSVKSurfaceRotationTests.inl"
+#endif

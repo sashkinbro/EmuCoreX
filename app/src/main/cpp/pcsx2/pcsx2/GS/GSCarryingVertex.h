@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 #pragma once
 #include "GS/GSRegs.h"
+#include "GS/GSVertexKick.h"
 #include "GS/GSStripKickKernel.h"
 
 // The five scalar-equivalent packed layouts. The two inherited contiguous
@@ -11,6 +12,19 @@
 namespace GSCarryingVertex
 {
     enum class Layout : u32 { NopTriple, STQPair, UVPair, RGBAPair, UVTriple };
+    constexpr GSVertexKernels::PackedLayout KernelLayout(Layout l)
+    {
+        using K=GSVertexKernels::PackedLayout;
+        switch(l)
+        {
+            case Layout::NopTriple:return K::NopTripleXYZF2;
+            case Layout::STQPair:return K::PairSTQXYZ2;
+            case Layout::UVPair:return K::PairUVXYZ2;
+            case Layout::RGBAPair:return K::PairRGBAQXYZ2;
+            case Layout::UVTriple:return K::UvTripleXYZF2;
+        }
+        return K::NopTripleXYZF2;
+    }
     constexpr bool HasUV(Layout l) { return l == Layout::UVPair || l == Layout::UVTriple; }
     constexpr bool HasRGBA(Layout l) { return l == Layout::NopTriple || l == Layout::UVTriple; }
     constexpr bool XYZF(Layout l) { return l == Layout::NopTriple || l == Layout::UVTriple; }

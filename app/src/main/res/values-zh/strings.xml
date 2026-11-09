@@ -1186,7 +1186,7 @@
     <string name="texture_manager_loading">正在加载纹理包…</string>
     <string name="texture_manager_options">运行选项</string>
     <string name="texture_manager_enable_replacements">加载替换纹理</string>
-    <string name="texture_manager_enable_replacements_desc">使用每个游戏序列号文件夹中的 PNG 和 DDS / KTX2 文件。</string>
+    <string name="texture_manager_enable_replacements_desc">使用每个游戏序列号文件夹中的 PNG 和 DDS / KTX2 / ASTC / KTX 文件。</string>
     <string name="texture_manager_async_loading">异步加载</string>
     <string name="texture_manager_async_loading_desc">在游戏运行时，在工作线程上加载替换纹理。</string>
     <string name="texture_manager_precache">预缓存替换文件</string>

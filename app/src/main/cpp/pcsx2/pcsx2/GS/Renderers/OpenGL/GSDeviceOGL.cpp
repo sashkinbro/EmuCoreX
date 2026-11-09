@@ -60,7 +60,7 @@ static constexpr bool ShouldUseOGLInsideTargetFallbackOnGLES(bool is_gles,
 	return is_gles && !features.texture_barrier && (current_mode == GSTextureInRtMode::Disabled);
 }
 
-static constexpr GSDevice::DepthFeedbackSupport GetOGLDepthFeedbackSupport(GSDepthFeedbackMode mode)
+static constexpr GSDevice::DepthFeedbackSupport GetOGLDepthFeedbackSupport(GSDepthFeedbackMode mode, bool adreno_fetch)
 {
 	switch (mode)
 	{
@@ -69,11 +69,34 @@ static constexpr GSDevice::DepthFeedbackSupport GetOGLDepthFeedbackSupport(GSDep
 		case GSDepthFeedbackMode::Depth:
 			return GSDevice::DepthFeedbackSupport::Depth; // native barrier, coherent fetch, or explicit copy
 		case GSDepthFeedbackMode::Auto:
-			return GSDevice::DepthFeedbackSupport::DepthAsRT;
+			return adreno_fetch ? GSDevice::DepthFeedbackSupport::Depth : GSDevice::DepthFeedbackSupport::DepthAsRT;
 		case GSDepthFeedbackMode::None:
 		default:
 			return GSDevice::DepthFeedbackSupport::None;
 	}
+}
+
+// Match the upstream Qualcomm proprietary GL compiler rule from raw driver
+// identity. ANGLE and Mesa drivers do not inherit their host GPU's compiler bugs.
+static bool IsQualcommProprietaryGLDriver(const char* vendor, const char* renderer, const char* version)
+{
+	std::string hints = std::string(vendor) + " " + renderer + " " + version;
+	std::transform(hints.begin(), hints.end(), hints.begin(), [](unsigned char c) {
+		return (c >= 'A' && c <= 'Z') ? static_cast<char>(c + ('a' - 'A')) : static_cast<char>(c);
+	});
+	if (hints.find("turnip") != std::string::npos || hints.find("freedreno") != std::string::npos ||
+		hints.find("angle") != std::string::npos)
+		return false;
+	return GpuProfileDetector::Detect(vendor, renderer) == RuntimeGpuProfile::Adreno;
+}
+
+// Device pixel controls on this exact native driver reproduce stale EXT MRT
+// colour and zero RGBA16 fetches, including standalone highp shaders. Keep
+// other models/builds on their existing path until separately measured.
+static bool RequiresSingleRGBA8EXTFetch(const char* vendor, const char* renderer, const char* version)
+{
+	return std::string_view(vendor) == "Qualcomm" && std::string_view(renderer) == "Adreno (TM) 840" &&
+		std::string_view(version).starts_with("OpenGL ES 3.2 V@0842.52 ");
 }
 
 static constexpr bool ShouldBindOGLColorFeedbackTexture(const GSDevice::FeatureSupport& features,
@@ -767,6 +790,7 @@ bool GSDeviceOGL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 				return false;
 			m_interlace.ps[i].SetFormattedName("Merge pipe %zu", i);
 			m_interlace.ps[i].RegisterUniform("ZrH");
+			m_interlace.ps[i].RegisterUniform("FieldPad");
 		}
 	}
 
@@ -964,6 +988,7 @@ bool GSDeviceOGL::CheckFeatures()
 	const char* vendor_str = vendor ? vendor : "";
 	const char* renderer_str = renderer ? renderer : "";
 	const char* version_str = version ? version : "";
+	m_bugs.rewrite_boolean_negation = IsQualcommProprietaryGLDriver(vendor_str, renderer_str, version_str);
 	if (std::strstr(vendor_str, "Advanced Micro Devices") || std::strstr(vendor_str, "ATI Technologies Inc.") ||
 		std::strstr(vendor_str, "ATI"))
 	{
@@ -1058,7 +1083,14 @@ bool GSDeviceOGL::CheckFeatures()
 	// with an unresolvable immediate caller (Vitals: DoStretchRect -> Unknown on budget
 	// devices), so fall back to the plain equivalents, which are identical for index 0.
 	if (!glColorMaski)
-		glColorMaski = ReplaceGL::ColorMaski;
+	{
+		if (GLAD_GL_OES_draw_buffers_indexed && glColorMaskiOES)
+			glColorMaski = glColorMaskiOES;
+		else if (GLAD_GL_EXT_draw_buffers_indexed && glColorMaskiEXT)
+			glColorMaski = glColorMaskiEXT;
+		else
+			glColorMaski = ReplaceGL::ColorMaski;
+	}
 	if (!glEnablei)
 		glEnablei = ReplaceGL::Enablei;
 	if (!glDisablei)
@@ -1112,7 +1144,8 @@ bool GSDeviceOGL::CheckFeatures()
 	if (has_arm_framebuffer_fetch)
 		glGetBooleanv(GL_FRAGMENT_SHADER_FRAMEBUFFER_FETCH_MRT_ARM, &arm_mrt);
 	m_fetch_caps = {fetch.backend, has_ext_framebuffer_fetch,
-		GLAD_GL_ARM_shader_framebuffer_fetch_depth_stencil != 0, arm_mrt != GL_FALSE, gpu_profile_adreno};
+		GLAD_GL_ARM_shader_framebuffer_fetch_depth_stencil != 0, arm_mrt != GL_FALSE, gpu_profile_adreno,
+		m_is_gles && RequiresSingleRGBA8EXTFetch(vendor_str, renderer_str, version_str)};
 
 	m_features.provoking_vertex_last = true;
 	m_features.astc_textures = GLAD_GL_KHR_texture_compression_astc_ldr || GLAD_GL_ES_VERSION_3_2;
@@ -1182,8 +1215,8 @@ bool GSDeviceOGL::CheckFeatures()
 
 	m_features.test_and_sample_depth = m_features.texture_barrier;
 	// Depth-as-RT feedback works from a copied R32 target, so it doesn't need texture barriers.
-	// Direct depth feedback still requires texture barriers.
-	m_features.depth_feedback = GetOGLDepthFeedbackSupport(GSConfig.DepthFeedbackMode);
+	// Direct depth uses native barriers, coherent ARM depth fetch, or explicit per-primitive copies.
+	m_features.depth_feedback = GetOGLDepthFeedbackSupport(GSConfig.DepthFeedbackMode, gpu_profile_adreno && m_features.framebuffer_fetch);
 
 	GLint max_vertex_ssbos = 0;
 	// GLES 3.2 has SSBOs and base-vertex draws in core, without desktop ARB flags. (AI-assisted)
@@ -1234,6 +1267,15 @@ bool GSDeviceOGL::CheckFeatures()
 	if (!GLAD_GL_ARB_conservative_depth)
 	{
 		Console.Warning("GLAD_GL_ARB_conservative_depth is not supported. This will reduce performance.");
+	}
+
+	// Pass the uploaded vertex range to avoid per-offset index scans and caches.
+	if (!glDrawRangeElementsBaseVertex)
+	{
+		if (GLAD_GL_OES_draw_elements_base_vertex && glDrawRangeElementsBaseVertexOES)
+			glDrawRangeElementsBaseVertex = glDrawRangeElementsBaseVertexOES;
+		else if (GLAD_GL_EXT_draw_elements_base_vertex && glDrawRangeElementsBaseVertexEXT)
+			glDrawRangeElementsBaseVertex = glDrawRangeElementsBaseVertexEXT;
 	}
 
 	if (m_is_gles)
@@ -1661,10 +1703,19 @@ void GSDeviceOGL::DrawPrimitive()
 	glDrawArrays(m_draw_topology, m_vertex.start, m_vertex.count);
 }
 
+// Indices are relative to base_vertex and lie in the uploaded vertex span.
+static void DrawElementsInRange(GLenum mode, u32 vertex_count, GLsizei count, const void* indices, GLint base_vertex)
+{
+	if (glDrawRangeElementsBaseVertex && vertex_count > 0)
+		glDrawRangeElementsBaseVertex(mode, 0, vertex_count - 1, count, GL_UNSIGNED_SHORT, indices, base_vertex);
+	else
+		glDrawElementsBaseVertex(mode, count, GL_UNSIGNED_SHORT, indices, base_vertex);
+}
+
 void GSDeviceOGL::DrawIndexedPrimitive()
 {
 	g_perfmon.Put(GSPerfMon::DrawCalls, 1);
-	glDrawElementsBaseVertex(m_draw_topology, static_cast<u32>(m_index.count), GL_UNSIGNED_SHORT,
+	DrawElementsInRange(m_draw_topology, m_vertex.count, static_cast<u32>(m_index.count),
 		reinterpret_cast<void*>(static_cast<u32>(m_index.start) * sizeof(u16)), static_cast<GLint>(m_vertex.start));
 }
 
@@ -1673,7 +1724,7 @@ void GSDeviceOGL::DrawIndexedPrimitive(int offset, int count)
 	//ASSERT(offset + count <= (int)m_index.count);
 
 	g_perfmon.Put(GSPerfMon::DrawCalls, 1);
-	glDrawElementsBaseVertex(m_draw_topology, count, GL_UNSIGNED_SHORT,
+	DrawElementsInRange(m_draw_topology, m_vertex.count, count,
 		reinterpret_cast<void*>((static_cast<u32>(m_index.start) + static_cast<u32>(offset)) * sizeof(u16)),
 		static_cast<GLint>(m_vertex.start));
 }
@@ -1899,7 +1950,7 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type
 }
 
 std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type,
-	const std::string_view macro, GLFramebufferFetchPlan fetch)
+	const std::string_view macro, GLFramebufferFetchPlan fetch, bool dual_source)
 {
 	std::string header;
 
@@ -1912,9 +1963,9 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type
 		else
 			header = "#version 300 es\n";
 
-		if (GLAD_GL_EXT_blend_func_extended)
+		if (dual_source && GLAD_GL_EXT_blend_func_extended)
 			header += "#extension GL_EXT_blend_func_extended : require\n";
-		if (GLAD_GL_ARB_blend_func_extended)
+		if (dual_source && GLAD_GL_ARB_blend_func_extended)
 			header += "#extension GL_ARB_blend_func_extended : require\n";
 		if (fetch.Color() == GSFramebufferFetchBackend::ARM)
 			header += "#extension GL_ARM_shader_framebuffer_fetch : require\n";
@@ -1971,6 +2022,21 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type
 			header += "#extension GL_ARB_shader_draw_parameters : require\n";
 	}
 
+	// Extension directives must precede every real GLSL declaration.
+	std::string conservative_depth;
+	if (GLAD_GL_VERSION_4_2 || GLAD_GL_ARB_conservative_depth || GLAD_GL_AMD_conservative_depth)
+	{
+		if (!GLAD_GL_VERSION_4_2 && GLAD_GL_ARB_conservative_depth)
+			conservative_depth = "#extension GL_ARB_conservative_depth : enable\n";
+		else if (!GLAD_GL_VERSION_4_2 && GLAD_GL_AMD_conservative_depth)
+			conservative_depth = "#extension GL_AMD_conservative_depth : enable\n";
+		header += "#define PS_HAS_CONSERVATIVE_DEPTH 1\n";
+	}
+	else
+		header += "#define PS_HAS_CONSERVATIVE_DEPTH 0\n";
+	if (!conservative_depth.empty())
+		header.insert(header.find('\n') + 1, conservative_depth);
+
 	if (fetch.Color() != GSFramebufferFetchBackend::None)
 		header += "#define HAS_FRAMEBUFFER_FETCH 1\n";
 	else
@@ -1987,8 +2053,16 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type
 	const bool mobile_shader_defines = HasMobileGPUProfile();
 	header += fmt::format("#define DRIVER_SCALARIZE_VECTOR_BITWISE_AND {}\n", mobile_shader_defines ? 1 : 0);
 	header += fmt::format("#define DRIVER_STORE_BITWISE_NEGATION_IN_TEMPORARY {}\n", mobile_shader_defines ? 1 : 0);
+	header += fmt::format("#define DRIVER_REWRITE_BOOLEAN_NEGATION {}\n", m_bugs.rewrite_boolean_negation ? 1 : 0);
 	header += R"(
-#define gpu_boolean_not(value) (!(value))
+bool gpu_boolean_not(bool value)
+{
+#if DRIVER_REWRITE_BOOLEAN_NEGATION
+	return value == false;
+#else
+	return !value;
+#endif
+}
 
 #if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
 uvec2 gpu_bitwise_and(uvec2 a, uvec2 b)
@@ -2025,15 +2099,6 @@ uvec4 gpu_bitwise_not(uvec4 value)
 #endif
 )";
 
-	if (GLAD_GL_ARB_conservative_depth)
-	{
-		header += "#extension GL_ARB_conservative_depth : enable\n";
-		header += "#define PS_HAS_CONSERVATIVE_DEPTH 1\n";
-	}
-	else
-	{
-		header += "#define PS_HAS_CONSERVATIVE_DEPTH 0\n";
-	}
 
 	if (m_has_clip_control)
 		header += "#define HAS_CLIP_CONTROL 1\n";
@@ -2110,10 +2175,10 @@ std::string GSDeviceOGL::GetPSSource(const PSSelector& sel)
 		m_features.depth_feedback == DepthFeedbackSupport::DepthAsRT && sel.IsFeedbackLoopDepth()));
 }
 
-GLFramebufferFetchPlan GSDeviceOGL::SelectFetchPlan(const PSSelector& ps, bool color0_unorm, bool mrt) const
+GLFramebufferFetchPlan GSDeviceOGL::SelectFetchPlan(const PSSelector& ps, bool color0_unorm, bool mrt, bool color0_rgba8) const
 {
 	return DecideGLFramebufferFetchPlan(m_fetch_caps, ps.IsFeedbackLoopRT(), ps.IsFeedbackLoopDepth(),
-		m_features.depth_feedback == DepthFeedbackSupport::DepthAsRT, color0_unorm, mrt);
+		m_features.depth_feedback == DepthFeedbackSupport::DepthAsRT, color0_unorm, mrt, color0_rgba8);
 }
 
 bool GSDeviceOGL::SupportsFetchPlan(GLFramebufferFetchPlan fetch) const
@@ -2177,9 +2242,13 @@ std::string GSDeviceOGL::GetPSSource(const PSSelector& sel, GLFramebufferFetchPl
 		+ fmt::format("#define PS_READ16_SRC {}\n", sel.real16src)
 		+ fmt::format("#define PS_WRITE_RG {}\n", sel.write_rg)
 		+ fmt::format("#define PS_FBMASK {}\n", sel.fbmask)
+		+ fmt::format("#define PS_QUANTIZE_COLOR {}\n", sel.quantize_color)
+		+ fmt::format("#define PS_SUBSTITUTE_ALPHA {}\n", sel.substitute_alpha)
+		+ fmt::format("#define PS_BLEND_FACTOR_IN_ALPHA {}\n", sel.blend_factor_in_alpha)
 		+ fmt::format("#define PS_COLCLIP_HW {}\n", sel.colclip_hw)
 		+ fmt::format("#define PS_RTA_CORRECTION {}\n", sel.rta_correction)
 		+ fmt::format("#define PS_RTA_SRC_CORRECTION {}\n", sel.rta_source_correction)
+		+ fmt::format("#define PS_REPLACEMENT_ALPHA_SNAP {}\n", sel.replacement_alpha_snap)
 		+ fmt::format("#define PS_DITHER {}\n", sel.dither)
 		+ fmt::format("#define PS_DITHER_ADJUST {}\n", sel.dither_adjust)
 		+ fmt::format("#define PS_ZCLAMP {}\n", sel.zclamp)
@@ -2196,11 +2265,12 @@ std::string GSDeviceOGL::GetPSSource(const PSSelector& sel, GLFramebufferFetchPl
 		+ fmt::format("#define PS_COLOR_FEEDBACK {}\n", sel.color_feedback)
 		+ fmt::format("#define PS_DEPTH_FEEDBACK {}\n", sel.depth_feedback)
 		+ fmt::format("#define PS_AA1 {}\n", static_cast<u32>(sel.aa1))
+		+ fmt::format("#define PS_NATIVE_TEXEL_GRID {}\n", sel.native_texel_grid)
 		+ fmt::format("#define PS_ABE {}\n", sel.abe)
 		+ fmt::format("#define PS_ANISOTROPIC_FILTERING {}\n", sel.sw_aniso)
 	;
 
-	std::string src = GenGlslHeader("ps_main", GL_FRAGMENT_SHADER, macro, fetch);
+	std::string src = GenGlslHeader("ps_main", GL_FRAGMENT_SHADER, macro, fetch, !sel.no_color1);
 	src += m_shader_tfx_fs;
 	return src;
 }
@@ -2615,6 +2685,11 @@ void GSDeviceOGL::DoMultiStretchRects(const MultiStretchRect* rects, u32 num_rec
 
 void GSDeviceOGL::DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, GSVector4* dRect, const GSRegPMODE& PMODE, const GSRegEXTBUF& EXTBUF, u32 c, const Filter filter)
 {
+	DoMerge(sTex, sRect, dTex, dRect, nullptr, PMODE, EXTBUF, c, filter);
+}
+
+void GSDeviceOGL::DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, GSVector4* dRect, const MergeTopBand* top_band, const GSRegPMODE& PMODE, const GSRegEXTBUF& EXTBUF, u32 c, const Filter filter)
+{
 	GL_PUSH("DoMerge");
 
 	const GSVector4 full_r(0.0f, 0.0f, 1.0f, 1.0f);
@@ -2633,6 +2708,8 @@ void GSDeviceOGL::DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex,
 		// 2nd output is enabled and selected. Copy it to destination so we can blend it with 1st output
 		// Note: value outside of dRect must contains the background color (c)
 		StretchRect(sTex[1], sRect[1], dTex, PMODE.SLBG ? dRect[2] : dRect[1], ShaderConvert::COPY, filter);
+		if (top_band && top_band[1].enabled)
+			StretchRect(sTex[1], top_band[1].src, dTex, top_band[1].dst, ShaderConvert::COPY, filter);
 	}
 
 	// Upload constant to select YUV algo
@@ -2663,11 +2740,15 @@ void GSDeviceOGL::DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex,
 			m_merge_obj.ps[1].Bind();
 			m_merge_obj.ps[1].Uniform4fv(0, GSVector4::unorm8(c).v);
 			DoStretchRect(sTex[0], sRect[0], dTex, dRect[0], m_merge_obj.ps[1], true, OMColorMaskSelector(), filter);
+			if (top_band && top_band[0].enabled)
+				DoStretchRect(sTex[0], top_band[0].src, dTex, top_band[0].dst, m_merge_obj.ps[1], true, OMColorMaskSelector(), filter);
 		}
 		else
 		{
 			// Blend with 2 * input alpha
 			DoStretchRect(sTex[0], sRect[0], dTex, dRect[0], m_merge_obj.ps[0], true, OMColorMaskSelector(), filter);
+			if (top_band && top_band[0].enabled)
+				DoStretchRect(sTex[0], top_band[0].src, dTex, top_band[0].dst, m_merge_obj.ps[0], true, OMColorMaskSelector(), filter);
 		}
 	}
 
@@ -2681,6 +2762,7 @@ void GSDeviceOGL::DoInterlace(GSTexture* sTex, const GSVector4& sRect, GSTexture
 
 	m_interlace.ps[static_cast<int>(shader)].Bind();
 	m_interlace.ps[static_cast<int>(shader)].Uniform4fv(0, cb.ZrH.F32);
+	m_interlace.ps[static_cast<int>(shader)].Uniform4fv(1, cb.FieldPad.F32);
 
 	DoStretchRect(sTex, sRect, dTex, dRect, m_interlace.ps[static_cast<int>(shader)], filter);
 }
@@ -3345,7 +3427,7 @@ void GSDeviceOGL::RenderImGui()
 
 			if (glDrawElementsBaseVertex)
 			{
-				glDrawElementsBaseVertex(GL_TRIANGLES, (GLsizei)pcmd->ElemCount, GL_UNSIGNED_SHORT,
+				DrawElementsInRange(GL_TRIANGLES, static_cast<u32>(cmd_list->VtxBuffer.Size) - pcmd->VtxOffset, (GLsizei)pcmd->ElemCount,
 					(void*)(intptr_t)((pcmd->IdxOffset + m_index.start) * sizeof(ImDrawIdx)), pcmd->VtxOffset + vertex_start);
 			}
 			else
@@ -3942,8 +4024,9 @@ void GSDeviceOGL::DoRenderHW(GSHWDrawConfig& config)
 	const bool fetch_unorm = fetch_target && OGLStorageSupportsARMColorFetch(
 		static_cast<const GSTextureOGL*>(fetch_target)->GetGLFormat());
 	const bool fetch_mrt = fetch_target && config.ds_as_rt;
-	const auto primary_fetch = SelectFetchPlan(config.ps, fetch_unorm, fetch_mrt);
-	const auto alpha_fetch = SelectFetchPlan(config.alpha_second_pass.ps, fetch_unorm, fetch_mrt);
+	const bool fetch_rgba8 = fetch_target && static_cast<const GSTextureOGL*>(fetch_target)->GetGLFormat() == GL_RGBA8;
+	const auto primary_fetch = SelectFetchPlan(config.ps, fetch_unorm, fetch_mrt, fetch_rgba8);
+	const auto alpha_fetch = SelectFetchPlan(config.alpha_second_pass.ps, fetch_unorm, fetch_mrt, fetch_rgba8);
 	const bool copy_color = !m_features.texture_barrier &&
 		((config.ps.IsFeedbackLoopRT() && primary_fetch.Color() == GSFramebufferFetchBackend::None) ||
 		 (config.alpha_second_pass.enable && config.alpha_second_pass.ps.IsFeedbackLoopRT() &&
@@ -4015,7 +4098,7 @@ void GSDeviceOGL::DoRenderHW(GSHWDrawConfig& config)
 
 		psel.ps.date = 3;
 		config.alpha_second_pass.ps.date = 3;
-		psel.fetch = SelectFetchPlan(psel.ps, fetch_unorm, fetch_mrt);
+		psel.fetch = SelectFetchPlan(psel.ps, fetch_unorm, fetch_mrt, fetch_rgba8);
 		SetupPipeline(psel);
 		PSSetShaderResource(TEXTURE_PRIMID, primid_texture);
 	}
@@ -4147,10 +4230,8 @@ void GSDeviceOGL::DoRenderHW(GSHWDrawConfig& config)
 		{
 			OMSetBlendState();
 		}
-		psel.ps.no_color1 = config.blend_multi_pass.no_color1;
-		psel.ps.blend_hw = config.blend_multi_pass.blend_hw;
-		psel.ps.dither = config.blend_multi_pass.dither;
-		psel.fetch = SelectFetchPlan(psel.ps, fetch_unorm, fetch_mrt);
+		config.blend_multi_pass.ApplyTo(psel.ps);
+		psel.fetch = SelectFetchPlan(psel.ps, fetch_unorm, fetch_mrt, fetch_rgba8);
 		SetupPipeline(psel);
 		SendHWDraw(config, draw_rt_clone, draw_rt, draw_ds_clone, depth_copy_source,
 			config.require_one_barrier, config.require_full_barrier, psel.ps, psel.fetch);
@@ -4167,7 +4248,7 @@ void GSDeviceOGL::DoRenderHW(GSHWDrawConfig& config)
 		}
 
 		psel.ps = config.alpha_second_pass.ps;
-		psel.fetch = SelectFetchPlan(psel.ps, fetch_unorm, fetch_mrt);
+		psel.fetch = SelectFetchPlan(psel.ps, fetch_unorm, fetch_mrt, fetch_rgba8);
 		SetupPipeline(psel);
 		OMSetColorMaskState(config.alpha_second_pass.colormask);
 		if (config.blend.IsEffective(config.alpha_second_pass.colormask))
@@ -4504,3 +4585,7 @@ void GSDeviceOGL::InsertDebugMessage(DebugMessageCategory category, const char* 
 #include "GLFramebufferFetchPixelTests.inl"
 #include "GLFramebufferFetchPlannerTests.inl"
 #endif
+
+void GSDeviceOGL::SetGameIdentity(const std::string& serial,u32 crc) { m_shader_cache.SetGame(serial,crc); }
+void GSDeviceOGL::PrepareShaderCacheClear() { /* DeleteAll empties registered live packs in place. */ }
+void GSDeviceOGL::RequestShaderCacheFlush() { m_shader_cache.RequestFlush(); }

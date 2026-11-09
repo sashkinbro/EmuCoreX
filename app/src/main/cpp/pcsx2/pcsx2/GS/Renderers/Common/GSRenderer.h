@@ -3,17 +3,33 @@
 
 #pragma once
 
+#define GS_FRAMEGEN_GEOMETRY_PUBLISH_SUPPORTED 1
+
+#define GS_PRESENT_CAP_MERGE_MODES 1
+
 #include "GS/GSState.h"
+#include "GS/Renderers/Common/GSFieldShiftDetector.h"
 #include <memory>
 #include <string>
 
+MULTI_ISA_DEF(class GSSwPrimRenderFunctions;)
+
 class GSRenderer : public GSState
 {
+	MULTI_ISA_FRIEND(GSSwPrimRenderFunctions)
 private:
+	enum class MergeMode { Full, SkipFinalComposition, InterlaceHistoryOnly };
+	template<MergeMode mode> bool Merge(int field);
 	bool Merge(int field);
+	static void NotePresentGeometryForCurrentFrame(const GSVector4i& src_rect,const GSVector4& draw_rect);
+	MergeMode SelectMergeModeForVSync(bool cap_created_skip);
 	bool BeginPresentFrame(bool frame_skip);
 	void EndPresentFrame();
 
+	GSFieldShiftDetector m_field_shift;
+	static constexpr int VIDEO_MERGES = 30;
+	u32 m_video_decode_count = 0;
+	int m_video_merges_left = 0;
 	u64 m_shader_time_start = 0;
 
 	std::string m_snapshot;
@@ -45,6 +61,13 @@ protected:
 
 public:
 	GSRenderer();
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+	static void TestPresentationParity(void (*check)(bool, const char*));
+	static void TestFrameGenGeometry(void(*check)(bool,const char*));
+	static void TestPresentationGeometry(void(*check)(bool,const char*));
+	static void TestCommonComposition(void(*check)(bool,const char*));
+	static void TestMovieComb(void(*check)(bool,const char*));
+#endif
 	virtual ~GSRenderer();
 
 	virtual void Reset(bool hardware_reset) override;

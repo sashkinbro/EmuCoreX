@@ -19,9 +19,7 @@ void GSDeviceOGL::TestFramebufferFetchPixelProof(void (*check)(bool, const char*
     glBindVertexArray(vao);glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,index);
     constexpr u16 ids[]={0,1,2,3,4,5,6,7,8};glBufferData(GL_ELEMENT_ARRAY_BUFFER,sizeof(ids),ids,GL_STATIC_DRAW);
     target.m_index.start=target.m_vertex.start=0;target.m_index.count=9;target.m_draw_topology=GL_TRIANGLES;
-    const GLuint vertex=GLFetchOracle::Compile(GL_VERTEX_SHADER,target.GenGlslHeader("main",GL_VERTEX_SHADER,"")+std::string(R"(
-void main(){int i=gl_VertexID%3;gl_Position=vec4(i==0?vec2(-1.,-1.):i==1?vec2(3.,-1.):vec2(-1.,3.),0.,1.);}
-)"));
+    const GLuint vertex=GLFetchOracle::Compile(GL_VERTEX_SHADER,target.GenGlslHeader("main",GL_VERTEX_SHADER,"")+GLFetchOracle::VertexBody(false));
     const ScopedGuard freeVertex([&](){if(vertex)glDeleteShader(vertex);});
     const auto program=[&](const PSSelector& ps,GLFramebufferFetchPlan plan,const char* main){
         const GLuint fragment=GLFetchOracle::Compile(GL_FRAGMENT_SHADER,GLFetchOracle::ProbeMain(target.GetPSSource(ps,plan),main));
@@ -96,6 +94,7 @@ void main(){int i=gl_VertexID%3;gl_Position=vec4(i==0?vec2(-1.,-1.):i==1?vec2(3.
         if(p)
         {
             std::array<u8,64> seed{};for(u32 i=0;i<seed.size();i+=4){seed[i]=8;seed[i+1]=16;seed[i+2]=32;seed[i+3]=64;}
+            glBindFramebuffer(GL_FRAMEBUFFER,0);
             glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,rt.GetID());
             glTexSubImage2D(GL_TEXTURE_2D,0,0,0,4,4,GL_RGBA,GL_UNSIGNED_BYTE,seed.data());
             std::array<float,16> z;z.fill(0.25f);glBindTexture(GL_TEXTURE_2D,depthRT.GetID());
@@ -112,11 +111,50 @@ void main(){int i=gl_VertexID%3;gl_Position=vec4(i==0?vec2(-1.,-1.):i==1?vec2(3.
             for(u32 i=0;i<seed.size();i+=4)exact&=seed[i]==11&&seed[i+1]==16&&seed[i+2]==32&&seed[i+3]==64;
             std::array<float,64> image{};glReadBuffer(GL_COLOR_ATTACHMENT1);glReadPixels(0,0,4,4,GL_RGBA,GL_FLOAT,image.data());
             for(u32 i=0;i<image.size();i+=4)exact&=image[i]==0.625f;
+            const GLenum mrtError=glGetError();
+            if(!exact||mrtError)std::fprintf(stderr,"GL_FETCH_MRT_PIXEL plan=%u rgba=%u/%u/%u/%u z=%g error=%x\n",plan.key,seed[0],seed[1],seed[2],seed[3],image[0],mrtError);
+            exact&=mrtError==GL_NO_ERROR;
             const u32 copies=static_cast<u32>(copyRT)+static_cast<u32>(copyZ);
             exact&=GLFetchPlanOracle::copies==copies*3&&GLFetchPlanOracle::draws==(copies?3u:1u)&&glGetError()==GL_NO_ERROR;
         }
         check(exact,"GL MRT capability false executes real safe copy fallback with identical colour and depth pixels");
         config.ds_as_rt=nullptr;
+    }
+
+    // Standalone physical format control: no TFX declarations or original main.
+    // GPU clear and sampler-copy controls isolate precision from source policy.
+    for(bool wide:{false,true})
+    {
+        if(wide&&!target.m_features.rgba16_unorm)continue;
+        GLuint image=0,source=0;glGenTextures(1,&image);glGenTextures(1,&source);
+        const ScopedGuard freeImages([&](){glDeleteTextures(1,&image);glDeleteTextures(1,&source);});
+        const float scale=wide?65535.f:255.f;const float seed=wide?1.f/65535.f:8.f/255.f;
+        std::array<float,64> values{};for(size_t i=0;i<values.size();i+=4){values[i]=seed;values[i+3]=1.f;}
+        // Allocate UNORM textures via the exact physical format used by ColorClip.
+        for(GLuint tex:{image,source}){glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,tex);
+            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+            if(wide){std::array<u16,64> v{};for(size_t i=0;i<v.size();i+=4){v[i]=1;v[i+3]=65535;}
+                glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA16,4,4,0,GL_RGBA,GL_UNSIGNED_SHORT,v.data());}
+            else{std::array<u8,64> v{};for(size_t i=0;i<v.size();i+=4){v[i]=8;v[i+3]=255;}
+                glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,4,4,0,GL_RGBA,GL_UNSIGNED_BYTE,v.data());}}
+        for(bool fetch:{false,true})
+        {
+            if(fetch&&caps.preferred!=GSFramebufferFetchBackend::EXT)continue;
+            attach(image,0);const float clear[]={seed,0.f,0.f,1.f};glClearBufferfv(GL_COLOR,0,clear);
+            glActiveTexture(GL_TEXTURE2);glBindTexture(GL_TEXTURE_2D,source);
+            const GLFramebufferFetchPlan plan=fetch?GLFramebufferFetchPlan{2}:GLFramebufferFetchPlan{};
+            const std::string body=fetch?"layout(location=0) inout highp vec4 value;":
+                "layout(location=0) out highp vec4 value;layout(binding=2) uniform highp sampler2D prior;";
+            const std::string expression=fetch?"value.r":"texelFetch(prior,ivec2(gl_FragCoord.xy),0).r";
+            const std::string sourceText=target.GenGlslHeader("main",GL_FRAGMENT_SHADER,"",plan)+body+
+                "void main(){uint v=uint(round("+expression+"*"+std::to_string(scale)+"));value=vec4(float(v&255u)/255.,float(v>>8)/255.,0.,1.);}";
+            const GLuint fs=GLFetchOracle::Compile(GL_FRAGMENT_SHADER,sourceText);const GLuint p=GLFetchOracle::Link(vertex,fs);if(fs)glDeleteShader(fs);
+            if(!p){check(false,"GL standalone physical UNORM fetch precision probe links");continue;}
+            const ScopedGuard freeProgram([&](){glDeleteProgram(p);});glUseProgram(p);glDrawElementsBaseVertex(GL_TRIANGLES,3,GL_UNSIGNED_SHORT,nullptr,0);
+            std::array<u8,64> result{};glReadPixels(0,0,4,4,GL_RGBA,GL_UNSIGNED_BYTE,result.data());
+            std::fprintf(stderr,"GL_EXT_FORMAT_CONTROL wide=%u fetch=%u rgba=%u/%u/%u/%u expectedR=%u error=%x\n",
+                wide,fetch,result[0],result[1],result[2],result[3],wide?1:8,glGetError());
+        }
     }
 
     bool normalized=true;u32 normalizedCases=0,fp32Cases=0;
@@ -139,7 +177,7 @@ void main(){int i=gl_VertexID%3;gl_Position=vec4(i==0?vec2(-1.,-1.):i==1?vec2(3.
         for(bool enabled:{false,true})
         {
             target.m_fetch_caps=enabled?caps:GLFramebufferFetchCaps{};
-            const auto plan=target.SelectFetchPlan(color,OGLStorageSupportsARMColorFetch(clip.GetGLFormat()),false);
+            const auto plan=target.SelectFetchPlan(color,OGLStorageSupportsARMColorFetch(clip.GetGLFormat()),false,clip.GetGLFormat()==GL_RGBA8);
             normalized&=unorm||caps.preferred!=GSFramebufferFetchBackend::ARM||plan.Color()==GSFramebufferFetchBackend::None;
             const GLuint p=program(color,plan,"\nvoid main(){uint v=uint(round(sample_from_rt().r*65535.));o_col0=vec4(float(v&255u)/255.,float(v>>8)/255.,0.,1.);}\n");
             if(!p){normalized=false;continue;}const ScopedGuard deleteProgram([&](){glDeleteProgram(p);});
@@ -149,16 +187,24 @@ void main(){int i=gl_VertexID%3;gl_Position=vec4(i==0?vec2(-1.,-1.):i==1?vec2(3.
             {
                 std::array<u16,64> seed{};for(u32 i=0;i<seed.size();i+=4){seed[i]=value;seed[i+3]=0xffff;}
                 std::array<float,64> floatSeed{};for(u32 i=0;i<floatSeed.size();i+=4){floatSeed[i]=static_cast<float>(value)/65535.f;floatSeed[i+3]=1.f;}
+                glBindFramebuffer(GL_FRAMEBUFFER,0);
                 glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,clip.GetID());
                 glTexSubImage2D(GL_TEXTURE_2D,0,0,0,4,4,GL_RGBA,unorm?GL_UNSIGNED_SHORT:GL_FLOAT,
                     unorm?static_cast<const void*>(seed.data()):static_cast<const void*>(floatSeed.data()));
+                attach(clip.GetID(),0);glUseProgram(p);
+                if(enabled&&value==1)
+                {
+                    std::array<u16,64> control{};glReadPixels(0,0,4,4,GL_RGBA,GL_UNSIGNED_SHORT,control.data());
+                    std::fprintf(stderr,"GL_COLORCLIP_SEED16 value=%u raw=%u/%u/%u/%u error=%x\n",value,control[0],control[1],control[2],control[3],glGetError());
+                }
                 GLState::tex_unit[2]=0;GLFetchPlanOracle::draws=GLFetchPlanOracle::copies=0;
                 const bool copy=plan.Color()==GSFramebufferFetchBackend::None;
                 target.SendHWDraw(config,copy?&clipCopy:nullptr,&clip,nullptr,nullptr,false,false,color,plan);
                 if(unorm)
                 {
                     std::array<u8,64> image{};glReadPixels(0,0,4,4,GL_RGBA,GL_UNSIGNED_BYTE,image.data());
-                    for(u32 i=0;i<image.size();i+=4)normalized&=image[i]==(value&255)&&image[i+1]==(value>>8)&&image[i+2]==0&&image[i+3]==255;
+                    bool pixel=true;for(u32 i=0;i<image.size();i+=4)pixel&=image[i]==(value&255)&&image[i+1]==(value>>8)&&image[i+2]==0&&image[i+3]==255;
+                    normalized&=pixel;if(!pixel)std::fprintf(stderr,"GL_COLORCLIP_PIXEL enabled=%u plan=%u value=%u rgba=%u/%u/%u/%u expected=%u/%u/0/255\n",enabled,plan.key,value,image[0],image[1],image[2],image[3],value&255,value>>8);
                     ++normalizedCases;
                 }
                 else
@@ -259,7 +305,7 @@ void main(){int i=gl_VertexID%3;gl_Position=vec4(i==0?vec2(-1.,-1.):i==1?vec2(3.
         check(transfers&&transferCases==6,"GL actual FP32 ColorClip client/PBO/map uploads and CPU/PBO downloads preserve odd rows rectangles and canaries");
     }
 
-    target.m_fetch_caps=caps;const auto hdrPlan=target.SelectFetchPlan(color,false,false);
+    target.m_fetch_caps=caps;const auto hdrPlan=target.SelectFetchPlan(color,false,false,false);
     bool hdr=caps.preferred!=GSFramebufferFetchBackend::ARM||hdrPlan.Color()==GSFramebufferFetchBackend::None;
     GLuint floats[2]{};glGenTextures(2,floats);
     const ScopedGuard deleteFloats([&](){glDeleteTextures(2,floats);});
@@ -318,5 +364,6 @@ void main(){int i=gl_VertexID%3;gl_Position=vec4(i==0?vec2(-1.,-1.):i==1?vec2(3.
         alpha&=glGetError()==GL_NO_ERROR;++alphaCases;
     }
     check(alpha&&alphaCases==2,"GL second alpha pass uses its own selected source key and prior pass pixels under fetch and copy");
+#include "GLExactAlphaTests.inl"
     std::printf("GL_FETCH_PRECISION directCases=%u norm16Cases=%u fp32Cases=%u alphaCases=%u\n",directCases,normalizedCases,fp32Cases,alphaCases);
 }

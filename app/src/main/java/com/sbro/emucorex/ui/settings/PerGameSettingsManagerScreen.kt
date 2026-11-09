@@ -1039,6 +1039,9 @@ private fun GameSettingsTabContent(
                             2 to stringResource(R.string.settings_aspect_ratio_43),
                             3 to stringResource(R.string.settings_aspect_ratio_169),
                             4 to stringResource(R.string.settings_aspect_ratio_107),
+                            5 to stringResource(R.string.settings_aspect_ratio_219),
+                            6 to stringResource(R.string.settings_aspect_ratio_209),
+                            7 to stringResource(R.string.settings_aspect_ratio_1959),
                             0 to stringResource(R.string.emulation_aspect_stretch)
                         ),
                         selectedValue = draft.aspectRatio,
@@ -2280,6 +2283,9 @@ private fun GameSettingsEditorDialog(
                                     2 to stringResource(R.string.settings_aspect_ratio_43),
                                     3 to stringResource(R.string.settings_aspect_ratio_169),
                                     4 to stringResource(R.string.settings_aspect_ratio_107),
+                                    5 to stringResource(R.string.settings_aspect_ratio_219),
+                                    6 to stringResource(R.string.settings_aspect_ratio_209),
+                                    7 to stringResource(R.string.settings_aspect_ratio_1959),
                                     0 to stringResource(R.string.emulation_aspect_stretch)
                                 ),
                                 selectedValue = draft.aspectRatio,

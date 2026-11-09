@@ -2,9 +2,13 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "GS/Renderers/SW/GSDrawScanline.h"
+#include "GS/Renderers/SW/GSLevelOfDetail.h"
 #include "GS/Renderers/SW/GSTextureCacheSW.h"
 #include "GS/Renderers/SW/GSScanlineEnvironment.h"
+#include "GS/Renderers/SW/GSBlockWalk.h"
+#include "GS/Renderers/SW/GSCoordinateWalk.h"
 #include "GS/Renderers/SW/GSRasterizer.h"
+#include "Memory.h"
 
 #include "common/Console.h"
 
@@ -15,7 +19,8 @@
 
 #if MULTI_ISA_COMPILE_ONCE
 // Lack of a better home
-constexpr GSScanlineConstantData g_const;
+constexpr GSScanlineConstantData256B g_const_256b;
+constexpr GSScanlineConstantData128B g_const_128b;
 #endif
 
 MULTI_ISA_UNSHARED_IMPL;
@@ -29,13 +34,17 @@ GSDrawScanline::GSDrawScanline()
 	: m_sp_map("GSSetupPrim")
 	, m_ds_map("GSDrawScanline")
 {
-	GSCodeReserve::ResetMemory();
+	if (SysMemory::HasCodeMemory())
+		GSCodeReserve::ResetMemory();
 }
 
 GSDrawScanline::~GSDrawScanline()
 {
-	if (const size_t used = GSCodeReserve::GetMemoryUsed(); used > 0)
-		DevCon.WriteLn("SW JIT generated %zu bytes of code", used);
+	if (SysMemory::HasCodeMemory())
+	{
+		if (const size_t used = GSCodeReserve::GetMemoryUsed(); used > 0)
+			DevCon.WriteLn("SW JIT generated %zu bytes of code", used);
+	}
 }
 
 #ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
@@ -96,6 +105,7 @@ bool GSDrawScanline::ShouldUseCDrawScanline(u64 key)
 
 	return idx->second;
 }
+
 #endif
 
 void GSDrawScanline::BeginDraw(const GSRasterizerData& data, GSScanlineLocalData& local)
@@ -116,18 +126,29 @@ void GSDrawScanline::BeginDraw(const GSRasterizerData& data, GSScanlineLocalData
 
 void GSDrawScanline::ResetCodeCache()
 {
+	if (!SysMemory::HasCodeMemory())
+		return;
+
 	Console.Warning("GS Software JIT cache overflow, resetting.");
 	m_sp_map.Clear();
 	m_ds_map.Clear();
 	GSCodeReserve::ResetMemory();
 }
 
-bool GSDrawScanline::SetupDraw(GSRasterizerData& data)
+bool GSDrawScanline::SetupDraw(GSRasterizerData& data, bool allow_compile)
 {
 	const GSScanlineGlobalData& global = data.global;
 
+	if (!SysMemory::HasCodeMemory())
+	{
+		data.setup_prim = &GSDrawScanline::CSetupPrim;
+		data.draw_scanline = &GSDrawScanline::CDrawScanline;
+		data.draw_edge = global.sel.aa1 ? &GSDrawScanline::CDrawEdge : nullptr;
+		return true;
+	}
+
 #ifdef ENABLE_JIT_RASTERIZER
-	data.draw_scanline = m_ds_map[global.sel];
+	data.draw_scanline = m_ds_map.Lookup(global.sel, allow_compile);
 	if (!data.draw_scanline) [[unlikely]]
 		return false;
 
@@ -139,7 +160,7 @@ bool GSDrawScanline::SetupDraw(GSRasterizerData& data)
 		sel.zwrite = 0;
 		sel.edge = 1;
 
-		data.draw_edge = m_ds_map[sel];
+		data.draw_edge = m_ds_map.Lookup(sel, allow_compile);
 		if (!data.draw_edge) [[unlikely]]
 			return false;
 	}
@@ -158,6 +179,8 @@ bool GSDrawScanline::SetupDraw(GSRasterizerData& data)
 	sel.tfx = global.sel.tfx;
 	sel.tcc = global.sel.tcc;
 	sel.fst = global.sel.fst;
+	sel.uvwalk = global.sel.uvwalk;
+	sel.stqplane = global.sel.stqplane;
 	sel.fge = global.sel.fge;
 	sel.prim = global.sel.prim;
 	sel.fb = global.sel.fb;
@@ -166,7 +189,7 @@ bool GSDrawScanline::SetupDraw(GSRasterizerData& data)
 	sel.zequal = global.sel.zequal;
 	sel.notest = global.sel.notest;
 
-	return (data.setup_prim = m_sp_map[sel]) != nullptr;
+	return (data.setup_prim = m_sp_map.Lookup(sel, allow_compile)) != nullptr;
 #else
 	data.setup_prim = &GSDrawScanline::CSetupPrim;
 	data.draw_scanline = &GSDrawScanline::CDrawScanline;
@@ -195,6 +218,356 @@ typedef GSVector4  VectorF;
 #define LOCAL_STEP local.d4
 #endif
 
+// The GS forms the sixteenth-of-a-texel index (texel plus filter weight) by
+// truncating the coordinate toward zero. An arithmetic shift floors instead,
+// which is one sixteenth lower on a negative coordinate. Both the texel (bits 16
+// and up) and the weight (bits 12 to 15) read bit 12 and up, so adding a
+// sixteenth less one to a negative coordinate turns the later floor into a
+// truncation and changes nothing else.
+//
+// Order: the DDA lag is applied before this, since the lag is part of the GS's
+// coordinate. The linear filter's half-texel bias comes after, since it is our
+// sampler's step onto the tap pair and not part of the coordinate. Only U with a
+// negative sign was verified on hardware; V shares this expression.
+static __forceinline VectorI GSTruncateCoordinate(const VectorI& c)
+{
+	return c + c.sra32<31>().srl32<20>();
+}
+
+// The formed coordinate lives in a signed 12.4 field and saturates into it: at
+// or above 2,047.9375 texels samples texel 2,047, at or below -2,048 samples
+// -2,048. See GSCoordinateWalk.h. Bits below the sixteenth are dropped, which
+// nothing downstream reads. The ARM64 generator emits the same shape (one Sqxtn).
+//
+// Applied after the truncation and after the linear half-texel step (the
+// saturated value is the field's top, not half a texel below it), and before the
+// tap pair and wrap addressing.
+static __forceinline VectorI GSSaturateCoordinate(const VectorI& c)
+{
+	return c.sra32<GS_COORD_SIXTEENTH_SHIFT>()
+	    .max_i32(VectorI(GS_COORD_SIXTEENTH_MIN))
+	    .min_i32(VectorI(GS_COORD_SIXTEENTH_MAX))
+	    .sll32<GS_COORD_SIXTEENTH_SHIFT>();
+}
+
+// The GS does not divide the texture coordinate by Q. It multiplies by a
+// reciprocal on a coarse grid, so a perspective coordinate is not the true
+// quotient. An exact divide differs from the console.
+//
+// ARM64 (GSPerspectivePlane.h has the measurement): fifteen bits below the leading
+// bit, rounded as floor(x + 0.7), which is what the console's reciprocal is when S,
+// T and Q are the plane rule's. The rounding constant is fitted, not derived.
+//
+// Elsewhere: clearing the low nine of float32's 23 mantissa bits keeps fourteen and
+// rounds toward zero. Fourteen is the narrowest width consistent with the console;
+// thirteen drops some coordinates a sixteenth low. That is the x86 generators'
+// reciprocal and this must match them.
+__forceinline static VectorF GSPerspectiveRecip(const VectorF& q)
+{
+#ifdef ARCH_ARM64
+	return VectorF::cast((VectorI::cast(VectorF(1.0f) / q) + VectorI(static_cast<s32>(GS_RECIP_ROUND_UP)))
+	                     & VectorI(~((1 << GS_RECIP_GRID_SHIFT) - 1)));
+#else
+	return VectorF::cast(VectorI::cast(VectorF(1.0f) / q) & VectorI(0xfffffe00));
+#endif
+}
+
+/// The walk's carried colour, as the byte the GS stores.
+///
+/// The lane is signed 16-bit 8.7 fixed point. The walk may carry a negative
+/// value (clamping the carried value does not match the GS), but a negative must
+/// not reach the store: a plain logical shift turns -1 into 511, which saturates
+/// to white. max-with-zero only differs from a plain shift on negatives, and the
+/// top needs no clamp because 32767 >> 7 is 255.
+__forceinline static VectorI GSWalkColorByte(const VectorI& c)
+{
+	return c.max_i16(VectorI::zero()).srl16<7>();
+}
+
+// The texture function multiplies the eight-bit colour the GS stores, not the
+// 8.7 value the interpolator carries; the full value is off by up to one unit on
+// a gouraud gradient. Drop the fraction for the multiply only (the walk keeps
+// it), and put the byte back on the 7-bit grid so modulate16<1> lines up.
+__forceinline static VectorI GSStoredVertexColor(const VectorI& c)
+{
+	return GSWalkColorByte(c).sll16<7>();
+}
+
+static void BuildColourWalkEntries(GSScanlineLocalData& local, u32 entries);
+
+void GSDrawScanline::SetupColourWalkTables(GSScanlineLocalData& local, int y, int left)
+{
+	// Builds the colour and fog tables from the primitive's walk (GSColourWalk.h).
+	// From a base that is a multiple of eight, lane i sits
+	// off[i] = i*gc + dw*floor((i - phase) / W), and eight pixels advance by 8g.
+	// A span seeded at `left` starts s = left & 7 lanes in, so entry s holds
+	// off[(s & ~(vlen-1)) + l] - off[s] in lane l:
+	//
+	//     off[i] - off[s] = gc*(i - s) + dw*(floor((i - phase)/W) - floor((s - phase)/W))
+	//
+	// W is a power of two, so the floor division is a shift. At W = 4 the table
+	// repeats with period four, so eight entries serve both block widths.
+	//
+	// Packing: r/b interleaved as the two halves of each 32-bit lane, g/a
+	// likewise, fog replicated. Lanes are masked to 0..65535 first, so the
+	// unsigned pack is the identity and a negative offset survives; a signed
+	// pack would corrupt values from 32768 up.
+	const GSColourWalk& w = local.cwalk;
+
+	if (!w.live)
+	{
+		// Lines, points, sprites and the AA1 edge pass have no walk and a zero
+		// dscan. Write the zeros once; they stay until a walk replaces them.
+		if (w.tables.state == GSColourWalkTablesZero)
+			return;
+
+		local.cwalk.tables.state = GSColourWalkTablesZero;
+
+		for (int s = 0; s < 8; s++)
+		{
+			local.d[s].rb = VectorI::zero();
+			local.d[s].ga = VectorI::zero();
+			local.d[s].f = VectorI::zero();
+		}
+
+#if _M_SSE >= 0x501
+		local.d8.c.rb = 0;
+		local.d8.c.ga = 0;
+		local.d8.p.f = 0;
+#else
+		local.d4.c = GSVector4i::zero();
+		local.d4.f = GSVector4i::zero();
+
+		for (int s = 0; s < 8; s++)
+		{
+			for (int ph = 0; ph < 2; ph++)
+			{
+				local.dw[s][ph].rb = GSVector4i::zero();
+				local.dw[s][ph].ga = GSVector4i::zero();
+				local.dw[s][ph].f = GSVector4i::zero();
+			}
+		}
+#endif
+
+		return;
+	}
+
+	// Built per row, not per primitive. The walk is one floor at every pixel:
+	// gc and gyc are multiples of eight units, P = P_int + p on the 1/8 grid, and
+	// dw*j = D_int + h with h zero or a half, so
+	//
+	//     V(x) = [whole terms] + floor(p + h(x))
+	//
+	// A seed floored once at the span's first pixel would carry floor(p + h(left))
+	// everywhere, which is wrong when dw is not whole (four-wide blocks). So the
+	// jumps below are floored with the row's fraction p included, and p depends
+	// on the row pair.
+	const int yf = w.top_anchor ? (y & ~1) : (y | 1);
+	const GSVector4 rowc = w.c.pa + GSColourWalkTruncUnit(w.c.gy * GSVector4(static_cast<float>(yf) - w.yr));
+	const GSVector4 rowf = w.f.pa + GSColourWalkTruncUnit(w.f.gy * GSVector4(static_cast<float>(yf) - w.yr));
+	const GSVector4 cfrac = rowc - rowc.floor();
+	const GSVector4 ffrac = rowf - rowf.floor();
+
+	// The row reaches the tables only through these two fractions, so the entries
+	// already built for them are reused when they repeat. SetupPrim clears the
+	// state, so the tables cannot be from another primitive.
+	//
+	// A span reads one entry: s = left & 7 (and, for the stepped tables, the pair
+	// of the vector s starts in). Only that one is built; the rest are built when a
+	// row starting there asks for them, or by CompleteColourWalkTables.
+	const u32 want = 1u << (left & 7);
+	if (w.tables.state == GSColourWalkTablesBuilt
+		&& (w.tables.cfrac == cfrac).alltrue()
+		&& (w.tables.ffrac == ffrac).alltrue())
+	{
+		if (w.tables.entries & want)
+			return;
+	}
+	else
+	{
+		local.cwalk.tables.cfrac = cfrac;
+		local.cwalk.tables.ffrac = ffrac;
+		local.cwalk.tables.state = GSColourWalkTablesBuilt;
+		local.cwalk.tables.entries = 0;
+	}
+
+	BuildColourWalkEntries(local, want);
+}
+
+void GSDrawScanline::CompleteColourWalkTables(GSScanlineLocalData& local)
+{
+	const u32 entries = local.cwalk.tables.entries;
+	if (local.cwalk.tables.state == GSColourWalkTablesBuilt && entries != 0xff)
+		BuildColourWalkEntries(local, 0xff & ~entries);
+}
+
+// Builds the entries s (bit s of `entries`) of the tables for the fractions
+// local.cwalk.tables records, and the per-vector steps the first time any entry
+// is built for them.
+static void BuildColourWalkEntries(GSScanlineLocalData& local, u32 entries)
+{
+	constexpr int vlen = sizeof(VectorF) / sizeof(float);
+	constexpr VectorI mask16 = VectorI::cxpr(0xFFFF);
+
+	const GSColourWalk& w = local.cwalk;
+	const GSVector4 cfrac = w.tables.cfrac;
+	const GSVector4 ffrac = w.tables.ffrac;
+	const u32 built = w.tables.entries;
+	local.cwalk.tables.entries = built | entries;
+
+	const VectorF gcv(w.c.gc);
+	const VectorF dwv(w.c.dw);
+	const VectorF pfv(cfrac);
+
+	const VectorF gcr = gcv.xxxx(), gcg = gcv.yyyy(), gcb = gcv.zzzz(), gca = gcv.wwww();
+	const VectorF dwr = dwv.xxxx(), dwg = dwv.yyyy(), dwb = dwv.zzzz(), dwa = dwv.wwww();
+	const VectorF pfr = pfv.xxxx(), pfg = pfv.yyyy(), pfb = pfv.zzzz(), pfa = pfv.wwww();
+	const VectorF fgc(VectorF(w.f.gc).xxxx());
+	const VectorF fdw(VectorF(w.f.dw).xxxx());
+	const VectorF fpf(VectorF(ffrac).xxxx());
+
+	alignas(32) float kbuf[8];
+	alignas(32) float hibuf[8];
+	alignas(32) float lobuf[8];
+
+	// Signed whole blocks from the anchor's grid origin to pixel p. Must match the
+	// row seed's jump term so both anchor the truncation on the same parity. The
+	// shift floors negative numerators (pixels behind the origin).
+	const auto blk = [&w](const GSColourWalkGradient& a, int p) {
+		return w.d * ((w.d * (p - w.S)) >> a.wshift);
+	};
+
+	// One channel's entry: the ramp plus the jump at the far end minus the jump at
+	// the near end. The jumps are floored separately, then subtracted: at W = 4 dw
+	// is half a unit and the differences of floor(dw*b) alternate floor/ceil as
+	// the value does. Flooring the difference would lose half a unit per block.
+	// Use floor, not truncation: block indices go negative behind the origin, and
+	// truncation would gain a unit crossing zero.
+	const auto entry = [](const VectorF& gc, const VectorF& dw, const VectorF& kv,
+						   const VectorF& hi, const VectorF& lo, const VectorF& pf) {
+		return VectorI(gc * kv) + (VectorI((dw * hi + pf).floor()) - VectorI((dw * lo + pf).floor()));
+	};
+
+	// Colour and fog may walk different block widths, so each uses its own.
+	const auto blocks = [&](const GSColourWalkGradient& a, int base, int s, int lanes) {
+		const float sblk = static_cast<float>(blk(a, s));
+		for (int l = 0; l < lanes; l++)
+		{
+			hibuf[l] = static_cast<float>(blk(a, base + l));
+			lobuf[l] = sblk;
+		}
+	};
+	const auto steps = [&](const GSColourWalkGradient& a, int base) {
+		for (int l = 0; l < 4; l++)
+		{
+			hibuf[l] = static_cast<float>(blk(a, base + 4 + l));
+			lobuf[l] = static_cast<float>(blk(a, base + l));
+		}
+	};
+	const auto pack = [&mask16](const VectorI& x, const VectorI& y) {
+		return (x & mask16).pu32().upl16((y & mask16).pu32());
+	};
+
+	// Lane-init tables: lane l of entry s is the offset from the span's first
+	// pixel to lane l of the vector s starts in.
+	for (int s = 0; s < 8; s++)
+	{
+		if (!(entries & (1u << s)))
+			continue;
+
+		const int base = s & ~(vlen - 1);
+
+		for (int l = 0; l < vlen; l++)
+			kbuf[l] = static_cast<float>(base + l - s);
+
+		const VectorF kv = VectorF::template load<true>(kbuf);
+
+		blocks(w.c, base, s, vlen);
+		const VectorF hi = VectorF::template load<true>(hibuf);
+		const VectorF lo = VectorF::template load<true>(lobuf);
+
+		local.d[s].rb = pack(entry(gcr, dwr, kv, hi, lo, pfr), entry(gcb, dwb, kv, hi, lo, pfb));
+		local.d[s].ga = pack(entry(gcg, dwg, kv, hi, lo, pfg), entry(gca, dwa, kv, hi, lo, pfa));
+
+		blocks(w.f, base, s, vlen);
+		const VectorF fhi = VectorF::template load<true>(hibuf);
+		const VectorF flo = VectorF::template load<true>(lobuf);
+
+		local.d[s].f = entry(fgc, fdw, kv, fhi, flo, fpf).xxzzlh();
+	}
+
+#if _M_SSE >= 0x501
+	// One vector is eight pixels, so the per-vector step is 8g, a whole number of units.
+	if (built == 0)
+	{
+		GSVector4i::storel(&local.d8.c, (GSVector4i(w.c.g8) & GSVector4i::cxpr(0xFFFF)).xzyw().pu32());
+		local.d8.p.f = GSVector4i(w.f.g8).extract32<3>();
+	}
+#else
+	// 4g, for the x86 SSE4 generator, which steps one vector without a block.
+	// ARM64 and the C++ path use the alternating pair below.
+	if (built == 0)
+	{
+		local.d4.c = (GSVector4i(w.c.g * GSVector4::cxpr(4.0f)) & GSVector4i::cxpr(0xFFFF)).xzyw().pu32();
+		local.d4.f = GSVector4i(w.f.g * GSVector4::cxpr(4.0f)).zzzzh().wwww();
+	}
+
+	// The per-vector step pair: the first is off[base+4+l] - off[base+l], the
+	// second is the rest of 8g. It depends on the starting vector, not on s < 4:
+	// at W = 4 blocks align to the phase, not the vector. The partner is derived
+	// in whole units so the pair sums to 8g exactly.
+	const GSVector4i g8c = GSVector4i(w.c.g8);
+	const GSVector4i g8f = GSVector4i(w.f.g8).xxxx();
+
+	// The ramp term of a step is gc times the vector length, constant across the table.
+	for (int l = 0; l < vlen; l++)
+		kbuf[l] = static_cast<float>(vlen);
+
+	const GSVector4 kv = GSVector4::load<true>(kbuf);
+
+	// The step depends only on `base`, so all entries of a vector share one pair,
+	// built with the first of them.
+	for (int base = 0; base < 8; base += vlen)
+	{
+		const u32 group = ((1u << vlen) - 1) << base;
+		if (!(entries & group) || (built & group))
+			continue;
+
+		steps(w.c, base);
+		const GSVector4 hi = GSVector4::load<true>(hibuf);
+		const GSVector4 lo = GSVector4::load<true>(lobuf);
+
+		const GSVector4i sr = entry(gcr, dwr, kv, hi, lo, pfr);
+		const GSVector4i sg = entry(gcg, dwg, kv, hi, lo, pfg);
+		const GSVector4i sb = entry(gcb, dwb, kv, hi, lo, pfb);
+		const GSVector4i sa = entry(gca, dwa, kv, hi, lo, pfa);
+
+		steps(w.f, base);
+		const GSVector4 fhi = GSVector4::load<true>(hibuf);
+		const GSVector4 flo = GSVector4::load<true>(lobuf);
+
+		const GSVector4i sf = entry(fgc, fdw, kv, fhi, flo, fpf);
+
+		const GSVector4i rb0 = pack(sr, sb);
+		const GSVector4i ga0 = pack(sg, sa);
+		const GSVector4i f0 = sf.xxzzlh();
+		const GSVector4i rb1 = pack(g8c.xxxx() - sr, g8c.zzzz() - sb);
+		const GSVector4i ga1 = pack(g8c.yyyy() - sg, g8c.wwww() - sa);
+		const GSVector4i f1 = (g8f - sf).xxzzlh();
+
+		for (int s = base; s < base + vlen; s++)
+		{
+			local.dw[s][0].rb = rb0;
+			local.dw[s][0].ga = ga0;
+			local.dw[s][0].f = f0;
+			local.dw[s][1].rb = rb1;
+			local.dw[s][1].ga = ga1;
+			local.dw[s][1].f = f1;
+		}
+	}
+#endif
+}
+
 void GSDrawScanline::CSetupPrim(const GSVertexSW* vertex, const u16* index, const GSVertexSW& dscan, GSScanlineLocalData& local)
 {
 	const GSScanlineGlobalData& global = GlobalFromLocal(local);
@@ -207,50 +580,38 @@ void GSDrawScanline::CSetupPrim(const GSVertexSW* vertex, const u16* index, cons
 
 	constexpr int vlen = sizeof(VectorF) / sizeof(float);
 
+	// Colour and fog tables are built by SetupColourWalkTables, which the
+	// rasterizer calls after this. This sets up depth, the texture coordinate and
+	// the flat-colour constants.
 #if _M_SSE >= 0x501
-	const GSVector8* shift = (GSVector8*)g_const.m_shift_256b;
-	const GSVector4 step_shift = GSVector4::broadcast32(&shift[0]);
+	auto load_shift = [](int i) { return GSVector8::load<false>(&g_const_256b.m_shift[8 - i]); };
+	// One vector is one block here, so the coordinate step equals the block step.
+	const GSVector4 coord_step_shift = GSVector4::broadcast32(&g_const_256b.m_shift[0]);
 #else
-	const GSVector4* shift = (GSVector4*)g_const.m_shift_128b;
-	const GSVector4 step_shift = shift[0];
+	static const GSVector4* shift = reinterpret_cast<const GSVector4*>(g_const_128b.m_shift);
+	auto load_shift = [](int i) { return shift[1 + i]; };
+	// The texture coordinate steps one vector, not one block (GSBlockWalk.h).
+	// The block step would sample the texture twice as fast as the draw walks.
+	const GSVector4 coord_step_shift = shift[0];
 #endif
-
-	GSVector4 tstep = dscan.t * step_shift;
 
 	if (has_z || has_f)
 	{
 		if (sel.prim != GS_SPRITE_CLASS)
 		{
-			if (has_f)
-			{
-#if _M_SSE >= 0x501
-				local.d8.p.f = GSVector4i(tstep).extract32<3>();
-
-				GSVector8 df = GSVector8::broadcast32(&dscan.t.w);
-#else
-				GSVector4 df = dscan.t.wwww();
-
-				local.d4.f = GSVector4i(tstep).zzzzh().wwww();
-#endif
-
-				for (int i = 0; i < vlen; i++)
-				{
-					local.d[i].f = VectorI(df * shift[1 + i]).xxzzlh();
-				}
-			}
-
 			if (has_z && !sel.zequal)
 			{
-				const GSVector4 dz = GSVector4::broadcast64(&dscan.p.z);
 				const VectorF dzf(static_cast<float>(dscan.p.F64[1]));
 #if _M_SSE >= 0x501
-				GSVector4::storel(&local.d8.p.z, dz.mul64(GSVector4::f32to64(shift)));
+				double dz = dscan.p.F64[1] * g_const_256b.m_shift[0];
+				memcpy(&local.d8.p.z, &dz, sizeof(dz));
 #else
+				const GSVector4 dz = GSVector4::broadcast64(&dscan.p.z);
 				local.d4.z = dz.mul64(GSVector4::f32to64(shift));
 #endif
 				for (int i = 0; i < vlen; i++)
 				{
-					local.d[i].z = dzf * shift[i + 1];
+					local.d[i].z = dzf * load_shift(i);
 				}
 			}
 		}
@@ -274,47 +635,145 @@ void GSDrawScanline::CSetupPrim(const GSVertexSW* vertex, const u16* index, cons
 
 	if (has_t)
 	{
-		if (sel.fst)
-		{
-			LOCAL_STEP.stq = GSVector4::cast(GSVector4i(tstep));
-		}
-		else
-		{
-			LOCAL_STEP.stq = tstep;
-		}
+		// A triangle's texture coordinate trails the exact plane by less than a
+		// sixteenth in the direction of the walk: a forward-walking coordinate that
+		// lands exactly on a sixteenth reads the one below. A backward walk already
+		// floors correctly, and a still coordinate is exact. Sprites are exact and
+		// take no lag. Lines and points use the triangle rule (unverified).
+		// One unit of the 16.16 coordinate is the smallest bias that reproduces
+		// this; it only moves a pixel exactly on a boundary.
+		//
+		// Hazard: test the direction on the step the walk actually takes, not the
+		// exact plane's. On the affine route the step is floored onto the grid, so
+		// a gradient under one grid unit per pixel does not move and must not lag.
+		//
+		// Twice the triangle's area in 12.4 squared: when it is a power of two the
+		// setup's divide is exact and no axis trails. Lines and points keep the lag.
+		const bool inverts_exactly = sel.prim == GS_TRIANGLE_CLASS
+		    && GSSetupInvertsExactly(GSTriangleTwiceArea(
+		           vertex[index[0]].p, vertex[index[1]].p, vertex[index[2]].p));
 
-		VectorF dt(dscan.t);
-
-		for (int j = 0, k = sel.fst ? 2 : 3; j < k; j++)
+#ifdef ARCH_ARM64
+		if (sel.stqplane)
 		{
-			VectorF dstq;
+			// The steps arrive as integers in units of g/2^14, already what the accumulator
+			// adds per pixel (GSPerspectivePlane.h), so there is nothing to floor. A lane's
+			// offset is the step times its distance from the span's anchor, and the
+			// arithmetic wraps as the accumulator does.
+			//
+			// No coordinate lag: the plane already carries the shortfall the lag stands in
+			// for (the gradient truncated onto g/1024, the reciprocal a hair short of
+			// exact), so applying the lag as well would throw off the result. The lag stays
+			// on the routes it was measured on: the UV register and STQ at Q = 1.
+			const GSVector4i step = GSVector4i::cast(dscan.t);
 
-			switch (j)
-			{
-				case 0: dstq = dt.xxxx(); break;
-				case 1: dstq = dt.yyyy(); break;
-				case 2: dstq = dt.zzzz(); break;
-			}
+			const auto times = [](s32 a, s32 b) { return static_cast<s32>(static_cast<u32>(a) * static_cast<u32>(b)); };
+
+			local.tclag.u = VectorI(0);
+			local.tclag.v = VectorI(0);
+
+			LOCAL_STEP.stq = GSVector4::cast(GSVector4i(times(step.x, vlen), times(step.y, vlen), times(step.z, vlen), 0));
 
 			for (int i = 0; i < vlen; i++)
 			{
-				VectorF v = dstq * shift[1 + i];
+				alignas(sizeof(VectorI)) s32 ls[vlen], lt[vlen], lq[vlen];
 
-				if (sel.fst)
+				for (int l = 0; l < vlen; l++)
 				{
-					switch (j)
-					{
-						case 0: local.d[i].s = VectorF::cast(VectorI(v)); break;
-						case 1: local.d[i].t = VectorF::cast(VectorI(v)); break;
-					}
+					// Lane l is l - i pixels from the span's anchor (as m_shift / m_lane).
+					ls[l] = times(step.x, l - i);
+					lt[l] = times(step.y, l - i);
+					lq[l] = times(step.z, l - i);
 				}
-				else
+
+				local.d[i].s = VectorF::cast(VectorI::template load<true>(ls));
+				local.d[i].t = VectorF::cast(VectorI::template load<true>(lt));
+				local.d[i].q = VectorF::cast(VectorI::template load<true>(lq));
+			}
+		}
+		else
+#endif
+		if (sel.uvwalk)
+		{
+			// The GS texel accumulator is seed + n * floor(step) on a 12.15 grid
+			// (GSCoordinateWalk.h), so the step is floored once and every lane and
+			// vector offset is a multiple of it. floor(n * step) is not the same.
+			const s32 du = GSAffineCoordinateOnGrid(dscan.t.x);
+			const s32 dv = GSAffineCoordinateOnGrid(dscan.t.y);
+
+			if (sel.prim != GS_SPRITE_CLASS)
+			{
+				local.tclag.u = VectorI(GSCoordinateStepTrails(du, inverts_exactly) ? 1 : 0);
+				local.tclag.v = VectorI(GSCoordinateStepTrails(dv, inverts_exactly) ? 1 : 0);
+			}
+
+			LOCAL_STEP.stq = GSVector4::cast(GSVector4i(du * vlen, dv * vlen, 0, 0));
+
+			for (int i = 0; i < vlen; i++)
+			{
+				alignas(sizeof(VectorI)) s32 lu[vlen], lv[vlen];
+
+				for (int l = 0; l < vlen; l++)
 				{
-					switch (j)
+					// Lane l is l - i pixels from the span's anchor (as m_shift / m_lane).
+					lu[l] = du * (l - i);
+					lv[l] = dv * (l - i);
+				}
+
+				local.d[i].s = VectorF::cast(VectorI::template load<true>(lu));
+				local.d[i].t = VectorF::cast(VectorI::template load<true>(lv));
+			}
+		}
+		else
+		{
+			if (sel.prim != GS_SPRITE_CLASS)
+			{
+				// Same rule as the affine path, including the power-of-two area
+				// exemption, which comes from the setup divide.
+				local.tclag.u = VectorI(GSCoordinateStepTrails(dscan.t.x > 0.0f ? 1 : 0, inverts_exactly) ? 1 : 0);
+				local.tclag.v = VectorI(GSCoordinateStepTrails(dscan.t.y > 0.0f ? 1 : 0, inverts_exactly) ? 1 : 0);
+			}
+
+			const GSVector4 coord_tstep = dscan.t * coord_step_shift;
+
+			// A constant-Q triangle's ST plane also arrives as a 16.16 integer,
+			// but does not use the accumulator's grid; flooring its step onto the
+			// grid is wrong.
+			LOCAL_STEP.stq = sel.fst ? GSVector4::cast(GSVector4i(coord_tstep)) : coord_tstep;
+
+			const VectorF dt(dscan.t);
+
+			for (int j = 0, k = sel.fst ? 2 : 3; j < k; j++)
+			{
+				VectorF dstq;
+
+				switch (j)
+				{
+					case 0: dstq = dt.xxxx(); break;
+					case 1: dstq = dt.yyyy(); break;
+					case 2: dstq = dt.zzzz(); break;
+				}
+
+				for (int i = 0; i < vlen; i++)
+				{
+					const VectorF v = dstq * load_shift(i);
+
+					if (sel.fst)
 					{
-						case 0: local.d[i].s = v; break;
-						case 1: local.d[i].t = v; break;
-						case 2: local.d[i].q = v; break;
+						switch (j)
+						{
+							case 0: local.d[i].s = VectorF::cast(VectorI(v)); break;
+							case 1: local.d[i].t = VectorF::cast(VectorI(v)); break;
+						}
+					}
+					else
+					{
+						switch (j)
+						{
+							case 0: local.d[i].s = v; break;
+							case 1: local.d[i].t = v; break;
+							case 2: local.d[i].q = v; break;
+						}
 					}
 				}
 			}
@@ -323,39 +782,7 @@ void GSDrawScanline::CSetupPrim(const GSVertexSW* vertex, const u16* index, cons
 
 	if (has_c)
 	{
-		if (sel.iip)
-		{
-			constexpr VectorI mask16 = VectorI::cxpr(0xFFFF);
-#if _M_SSE >= 0x501
-			GSVector4i::storel(&local.d8.c, (GSVector4i(dscan.c * step_shift) & GSVector4i::cast(mask16)).xzyw().pu32());
-#else
-			local.d4.c = (GSVector4i(dscan.c * step_shift) & mask16).xzyw().pu32();
-#endif
-			VectorF dc(dscan.c);
-
-			VectorF dr = dc.xxxx();
-			VectorF db = dc.zzzz();
-
-			for (int i = 0; i < vlen; i++)
-			{
-				VectorI r = (VectorI(dr * shift[1 + i]) & mask16).pu32();
-				VectorI b = (VectorI(db * shift[1 + i]) & mask16).pu32();
-
-				local.d[i].rb = r.upl16(b);
-			}
-
-			VectorF dg = dc.yyyy();
-			VectorF da = dc.wwww();
-
-			for (int i = 0; i < vlen; i++)
-			{
-				VectorI g = (VectorI(dg * shift[1 + i]) & mask16).pu32();
-				VectorI a = (VectorI(da * shift[1 + i]) & mask16).pu32();
-
-				local.d[i].ga = g.upl16(a);
-			}
-		}
-		else
+		if (!sel.iip)
 		{
 			int last = 0;
 
@@ -454,7 +881,9 @@ __ri static bool TestAlpha(T& test, T& fm, T& zm, const T& ga, const GSScanlineG
 
 		case AFAIL_RGB_ONLY:
 			zm |= t;
-			fm |= t & T::xff000000(); // fpsm 16 bit => & 0xffff8000?
+			// Only reachable with a 32-bit frame: GetAFAIL degrades RGB_ONLY to
+			// FB_ONLY on every other format, as the GS does.
+			fm |= t & T::xff000000();
 			break;
 
 		default:
@@ -497,7 +926,7 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 	constexpr int vlen = sizeof(VectorF) / sizeof(float);
 
 #if _M_SSE < 0x501
-	const GSVector4i* const_test = (GSVector4i*)g_const.m_test_128b;
+	const GSVector4i* const_test = (GSVector4i*)g_const_128b.m_test;
 #endif
 	VectorI test;
 	VectorF z0, z1;
@@ -511,13 +940,24 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 
 	int skip, steps;
 
+	// The span's position inside its eight-pixel block (not its vector) indexes
+	// the colour and fog tables and, on four-lane hosts, the step pair. Taken
+	// from the true left edge, before vector alignment. See GSColourWalk.h.
+	const int cskip = left & 7;
+
+#if _M_SSE < 0x501
+	const bool block_split = GSBlockWalkIsSplit(vlen);
+	const GSScanlineLocalData::blockstep* const dw = local.dw[cskip];
+	int dwphase = 0;
+#endif
+
 	if (!sel.notest)
 	{
 		skip = left & (vlen - 1);
 		steps = pixels + skip - vlen;
 		left -= skip;
 #if _M_SSE >= 0x501
-		test = GSVector8i::i8to32(g_const.m_test_256b[skip]) | GSVector8i::i8to32(g_const.m_test_256b[15 + (steps & (steps >> 31))]);
+		test = GSVector8i::i8to32(&g_const_256b.m_test[16 - skip]) | GSVector8i::i8to32(&g_const_256b.m_test[0 - (steps & (steps >> 31))]);
 #else
 		test = const_test[skip] | const_test[7 + (steps & (steps >> 31))];
 #endif
@@ -538,9 +978,9 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 		if (sel.fwrite && sel.fge)
 		{
 #if _M_SSE >= 0x501
-			f = GSVector8i::broadcast16(GSVector4i(scan.t).srl<12>()).add16(local.d[skip].f);
+			f = GSVector8i::broadcast16(GSVector4i(scan.t).srl<12>()).add16(local.d[cskip].f);
 #else
-			f = GSVector4i(scan.t).zzzzh().zzzz().add16(local.d[skip].f);
+			f = GSVector4i(scan.t).zzzzh().zzzz().add16(local.d[cskip].f);
 #endif
 		}
 
@@ -575,7 +1015,11 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 		{
 			if (sel.fst)
 			{
-				VectorI vt = VectorI::broadcast128(GSVector4i(scan.t));
+				// An accumulator walk seeds on its grid, floored below the exact
+				// plane (GSCoordinateWalk.h); a triangle's ST plane converts directly.
+				VectorI vt = VectorI::broadcast128(sel.uvwalk
+						? (GSVector4i(scan.t.floor()) & GSVector4i(GS_UV_GRID_MASK))
+						: GSVector4i(scan.t));
 
 				VectorI u = vt.xxxx() + VectorI::cast(local.d[skip].s);
 				VectorI v = vt.yyyy();
@@ -586,12 +1030,22 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 				}
 				else if (sel.ltf)
 				{
-					vf = v.xxzzlh().srl16<12>();
+					vf = GSSaturateCoordinate(GSTruncateCoordinate(v)).xxzzlh().srl16<12>();
 				}
 
 				s = VectorF::cast(u);
 				t = VectorF::cast(v);
 			}
+#ifdef ARCH_ARM64
+			else if (sel.stqplane)
+			{
+				// Integer accumulators in units of g/2^14 (GSPerspectivePlane.h); the divide
+				// floors them to g/4 per pixel.
+				s = VectorF::cast(VectorI::cast(scan.t.xxxx()) + VectorI::cast(local.d[skip].s));
+				t = VectorF::cast(VectorI::cast(scan.t.yyyy()) + VectorI::cast(local.d[skip].t));
+				q = VectorF::cast(VectorI::cast(scan.t.zzzz()) + VectorI::cast(local.d[skip].q));
+			}
+#endif
 			else
 			{
 #if _M_SSE >= 0x501
@@ -615,11 +1069,11 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 				c = c.upl16(c.zwxy());
 
 #if _M_SSE >= 0x501
-				rbf = GSVector8i::broadcast32(&c.x).add16(local.d[skip].rb);
-				gaf = GSVector8i::broadcast32(&c.z).add16(local.d[skip].ga);
+				rbf = GSVector8i::broadcast32(&c.x).add16(local.d[cskip].rb);
+				gaf = GSVector8i::broadcast32(&c.z).add16(local.d[cskip].ga);
 #else
-				rbf = c.xxxx().add16(local.d[skip].rb);
-				gaf = c.zzzz().add16(local.d[skip].ga);
+				rbf = c.xxxx().add16(local.d[cskip].rb);
+				gaf = c.zzzz().add16(local.d[cskip].ga);
 #endif
 			}
 			else
@@ -724,6 +1178,27 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 
 			if (sel.fb && sel.tfx != TFX_NONE)
 			{
+				// What the divide reads. Legacy: the accumulators as floats, S and T
+				// already scaled to 16.16 texels. The plane rule (GSPerspectivePlane.h)
+				// carries integers: floor each to g/4 and convert, so S/Q is a quotient
+				// of counts and the power of two that takes it to 16.16 texels rides on
+				// the reciprocal. Q as the float the level of detail and the filter
+				// crossover want is the count times 2^(E - 16).
+				VectorF sh = s, th = t, qr = q, qf = q;
+				VectorF uscale(1.0f), vscale(1.0f);
+
+#ifdef ARCH_ARM64
+				if (sel.stqplane)
+				{
+					sh = VectorF(VectorI::cast(s).sra32<GS_PLANE_PIXEL_SHIFT>());
+					th = VectorF(VectorI::cast(t).sra32<GS_PLANE_PIXEL_SHIFT>());
+					qr = VectorF(VectorI::cast(q).sra32<GS_PLANE_PIXEL_SHIFT>());
+					qf = qr * VectorF(local.pwalk.qscale);
+					uscale = VectorF(local.pwalk.stscale).xxxx();
+					vscale = VectorF(local.pwalk.stscale).yyyy();
+				}
+#endif
+
 				VectorI u, v, uv[2];
 				VectorI lodi, lodf;
 				VectorI minuv, maxuv;
@@ -734,8 +1209,10 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 				{
 					if (!sel.fst)
 					{
-						u = VectorI(s / q);
-						v = VectorI(t / q);
+						const VectorF r = GSPerspectiveRecip(qr);
+
+						u = VectorI(sh * (r * uscale));
+						v = VectorI(th * (r * vscale));
 					}
 					else
 					{
@@ -743,11 +1220,28 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 						v = VectorI::cast(t);
 					}
 
+					// The DDA's lag, taken before the level shift divides it away.
+					if (sel.prim != GS_SPRITE_CLASS)
+					{
+						u -= local.tclag.u;
+						v -= local.tclag.v;
+					}
+
 					if (!sel.lcm)
 					{
-						VectorF tmp = q.log2(3) * global.l + global.k; // (-log2(Q) * (1 << L) + K) * 0x10000
+						// The GS logarithm is a table on Q's mantissa (GSLevelOfDetail.h).
+						// The level is in sixteenths, shifted up by twelve to 16.16, so the
+						// `+ 0x8000` round-off below is `(LOD16 + 8) >> 4` (ties up) and the
+						// trilinear weight from the fraction's top four bits is `LOD16 & 15`.
+						VectorI lod;
 
-						VectorI lod = VectorI(tmp.sat(VectorF::zero(), global.mxl), false);
+						for (int i = 0; i < vlen; i++)
+						{
+							const s32 lod16 = GSLevelOfDetail16(qf.F32[i], global.lodtab,
+								global.lodk, global.lodshift);
+
+							lod.I32[i] = std::min(std::max(lod16 << 12, 0), global.lodmxl);
+						}
 
 						if (sel.mmin == 1) // round-off mode
 						{
@@ -831,11 +1325,20 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 						maxuv = local.temp.uv_minmax[1];
 					}
 
+					u = GSTruncateCoordinate(u);
+					v = GSTruncateCoordinate(v);
+
 					if (sel.ltf)
 					{
 						u -= 0x8000;
 						v -= 0x8000;
+					}
 
+					u = GSSaturateCoordinate(u);
+					v = GSSaturateCoordinate(v);
+
+					if (sel.ltf)
+					{
 						uf = u.xxzzlh().srl16<12>();
 						vf = v.xxzzlh().srl16<12>();
 					}
@@ -952,11 +1455,20 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 						minuv = minuv.srl16<1>();
 						maxuv = maxuv.srl16<1>();
 
+						u = GSTruncateCoordinate(u);
+						v = GSTruncateCoordinate(v);
+
 						if (sel.ltf)
 						{
 							u -= 0x8000;
 							v -= 0x8000;
+						}
 
+						u = GSSaturateCoordinate(u);
+						v = GSSaturateCoordinate(v);
+
+						if (sel.ltf)
+						{
 							uf = u.xxzzlh().srl16<12>();
 							vf = v.xxzzlh().srl16<12>();
 						}
@@ -1064,6 +1576,10 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 						if (sel.lcm)
 							lodf = global.lod.f;
 
+						// The GS blends two mip levels on a four-bit weight (sixteen steps).
+						// Truncate to the top four bits before the fraction becomes a weight.
+						lodf = lodf.srl16<12>().sll16<12>();
+
 						lodf = lodf.srl16<1>();
 
 						rb = rb.lerp16<0>(rb2, lodf);
@@ -1072,22 +1588,67 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 				}
 				else
 				{
+					// Per-pixel MMAG/MMIN choice. lod > 0 is exactly Q < the crossing
+					// constant, so one compare names the pixels on the minifying side;
+					// ltfx_ge flips which side takes the linear filter. All-ones means
+					// "this pixel filters linearly".
+					VectorI lin;
+
+					if (sel.ltfx)
+					{
+						lin = VectorI::cast(qf < global.ltfx_q);
+
+						if (sel.ltfx_ge)
+							lin = ~lin;
+					}
+
 					if (!sel.fst)
 					{
-						u = VectorI(s / q);
-						v = VectorI(t / q);
+						const VectorF r = GSPerspectiveRecip(qr);
 
-						if (sel.ltf)
-						{
-							u -= 0x8000;
-							v -= 0x8000;
-						}
+						u = VectorI(sh * (r * uscale));
+						v = VectorI(th * (r * vscale));
 					}
 					else
 					{
 						u = VectorI::cast(s);
 						v = VectorI::cast(t);
 					}
+
+					// The DDA lag (zero unless the axis walks forward). It is part of
+					// the coordinate, so it comes before the truncation.
+					if (sel.prim != GS_SPRITE_CLASS)
+					{
+						u -= local.tclag.u;
+						v -= local.tclag.v;
+					}
+
+					u = GSTruncateCoordinate(u);
+					v = GSTruncateCoordinate(v);
+
+					if (!sel.fst && sel.ltf)
+					{
+						// Nearest reads at the coordinate; linear straddles the pair half
+						// a texel back, so the bias applies only where linear wins. It is
+						// eight sixteenths, so it moves the texel and never the weight,
+						// and it follows the truncation because it is not part of the
+						// GS coordinate.
+						if (sel.ltfx)
+						{
+							const VectorI half = VectorI(0x8000) & lin;
+
+							u -= half;
+							v -= half;
+						}
+						else
+						{
+							u -= 0x8000;
+							v -= 0x8000;
+						}
+					}
+
+					u = GSSaturateCoordinate(u);
+					v = GSSaturateCoordinate(v);
 
 					if (sel.ltf)
 					{
@@ -1096,6 +1657,18 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 						if (sel.prim != GS_SPRITE_CLASS)
 						{
 							vf = v.xxzzlh().srl16<12>();
+						}
+
+						// A zero weight turns the four-tap blend back into the nearest
+						// tap, so the nearest side needs no separate path.
+						if (sel.ltfx)
+						{
+							const VectorI lin16 = lin.xxzzlh();
+
+							uf &= lin16;
+
+							if (sel.prim != GS_SPRITE_CLASS)
+								vf &= lin16;
 						}
 					}
 
@@ -1199,23 +1772,23 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 				switch (sel.tfx)
 				{
 					case TFX_MODULATE:
-						ga = ga.modulate16<1>(gaf).clamp8();
+						ga = ga.modulate16<1>(GSStoredVertexColor(gaf)).clamp8();
 						if (!sel.tcc)
-							ga = ga.mix16(gaf.srl16<7>());
+							ga = ga.mix16(GSWalkColorByte(gaf));
 						break;
 					case TFX_DECAL:
 						if (!sel.tcc)
-							ga = ga.mix16(gaf.srl16<7>());
+							ga = ga.mix16(GSWalkColorByte(gaf));
 						break;
 					case TFX_HIGHLIGHT:
-						ga = ga.mix16(!sel.tcc ? gaf.srl16<7>() : ga.addus8(gaf.srl16<7>()));
+						ga = ga.mix16(!sel.tcc ? GSWalkColorByte(gaf) : ga.addus8(GSWalkColorByte(gaf)));
 						break;
 					case TFX_HIGHLIGHT2:
 						if (!sel.tcc)
-							ga = ga.mix16(gaf.srl16<7>());
+							ga = ga.mix16(GSWalkColorByte(gaf));
 						break;
 					case TFX_NONE:
-						ga = sel.iip ? gaf.srl16<7>() : gaf;
+						ga = sel.iip ? GSWalkColorByte(gaf) : gaf;
 						break;
 				}
 
@@ -1262,24 +1835,33 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 				switch (sel.tfx)
 				{
 					case TFX_MODULATE:
-						rb = rb.modulate16<1>(rbf).clamp8();
+						rb = rb.modulate16<1>(GSStoredVertexColor(rbf)).clamp8();
 						break;
 					case TFX_DECAL:
 						break;
 					case TFX_HIGHLIGHT:
 					case TFX_HIGHLIGHT2:
-						af = gaf.yywwlh().srl16<7>();
-						rb = rb.modulate16<1>(rbf).add16(af).clamp8();
-						ga = ga.modulate16<1>(gaf).add16(af).clamp8().mix16(ga);
+						af = GSWalkColorByte(gaf.yywwlh());
+						rb = rb.modulate16<1>(GSStoredVertexColor(rbf)).add16(af).clamp8();
+						ga = ga.modulate16<1>(GSStoredVertexColor(gaf)).add16(af).clamp8().mix16(ga);
 						break;
 					case TFX_NONE:
-						rb = sel.iip ? rbf.srl16<7>() : rbf;
+						rb = sel.iip ? GSWalkColorByte(rbf) : rbf;
 						break;
 				}
 			}
 
 			// Fog
-
+			//
+			//     stored = Cf + floor((Cv - Cf) * F / 256)
+			//
+			// i.e. (F*Cv + (256 - F)*Cf) >> 8: the fog colour's weight is 256 - F,
+			// not 255 - F, and the multiply floors. The two only differ when FOGCOL
+			// is non-zero. lerp16<0> already implements this (modulate16<0> takes
+			// the high half of a signed product, which floors).
+			//
+			// F is truncated to an integer before the multiply. The fog lane carries
+			// a 7-bit fraction, which must be dropped first.
 			if (sel.fwrite && sel.fge)
 			{
 #if _M_SSE >= 0x501
@@ -1293,6 +1875,10 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 				GSVector4i frb = global.frb;
 				GSVector4i fga = global.fga;
 #endif
+
+				// floor(F) on the walk's scale, so modulate16's >> 15 gives the >> 8
+				// above. Same pack as colour, so a negative fog saturates to 0.
+				fog = GSStoredVertexColor(fog);
 
 				rb = frb.lerp16<0>(rb, fog);
 				ga = fga.lerp16<0>(ga, fog).mix16(ga);
@@ -1576,7 +2162,11 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 
 			if (sel.fwrite)
 			{
-				if (sel.fpsm == 2 && sel.dthe)
+				// Dither applies to 32-bit and 24-bit destinations too, not only
+				// 16-bit: the GS adds DM[y & 3][x & 3] to the eight-bit colour after
+				// the blend and before the colour clamp. fmt 3 is not a frame format.
+				// Mirrored in both scanline code generators; the three must agree.
+				if (sel.dthe && sel.fpsm != 3)
 				{
 					int y = (top & 3) << 1;
 
@@ -1701,7 +2291,7 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 #if _M_SSE >= 0x501
 				f = f.add16(GSVector8i::broadcast16(&local.d8.p.f));
 #else
-				f = f.add16(local.d4.f);
+				f = f.add16(block_split ? dw[dwphase].f : local.d4.f);
 #endif
 			}
 		}
@@ -1721,6 +2311,16 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 						t = VectorF::cast(VectorI::cast(t) + stq.yyyy());
 					}
 				}
+#ifdef ARCH_ARM64
+				else if (sel.stqplane)
+				{
+					const VectorI stq = VectorI::cast(VectorF(LOCAL_STEP.stq));
+
+					s = VectorF::cast(VectorI::cast(s) + stq.xxxx());
+					t = VectorF::cast(VectorI::cast(t) + stq.yyyy());
+					q = VectorF::cast(VectorI::cast(q) + stq.zzzz());
+				}
+#endif
 				else
 				{
 					VectorF stq(LOCAL_STEP.stq);
@@ -1738,18 +2338,32 @@ __ri void GSDrawScanline::CDrawScanline(int pixels, int left, int top, const GSV
 			{
 #if _M_SSE >= 0x501
 				GSVector8i c = GSVector8i::broadcast64(&local.d8.c);
-#else
-				GSVector4i c = local.d4.c;
-#endif
 				rbf = rbf.add16(c.xxxx()).max_i16(VectorI::zero());
 				gaf = gaf.add16(c.yyyy()).max_i16(VectorI::zero());
+#else
+				if (block_split)
+				{
+					rbf = rbf.add16(dw[dwphase].rb).max_i16(VectorI::zero());
+					gaf = gaf.add16(dw[dwphase].ga).max_i16(VectorI::zero());
+				}
+				else
+				{
+					GSVector4i c = local.d4.c;
+					rbf = rbf.add16(c.xxxx()).max_i16(VectorI::zero());
+					gaf = gaf.add16(c.yyyy()).max_i16(VectorI::zero());
+				}
+#endif
 			}
 		}
+
+#if _M_SSE < 0x501
+		dwphase ^= 1;
+#endif
 
 		if (!sel.notest)
 		{
 #if _M_SSE >= 0x501
-			test = GSVector8i::i8to32(g_const.m_test_256b[15 + (steps & (steps >> 31))]);
+			test = GSVector8i::i8to32(&g_const_256b.m_test[0 - (steps & (steps >> 31))]);
 #else
 			test = const_test[7 + (steps & (steps >> 31))];
 #endif
@@ -1982,3 +2596,15 @@ void GSDrawScanline::DrawRect(const GSVector4i& r, const GSVertexSW& v, GSScanli
 		}
 	}
 }
+
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+#include "GSSWWalkerTests.inl"
+#endif
+
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+#include "GSSWWalkerExtendedTests.inl"
+#endif
+
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+#include "GSSWPalettedBlockTests.inl"
+#endif

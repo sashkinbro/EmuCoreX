@@ -275,3 +275,6 @@ u64 GSGetMaxPresentInterval();
 // a clean re-prime, no catch-up burst — as soon as fast-forward ends.
 void GSSetPresentCapSuspended(bool suspended);
 bool GSGetPresentCapSuspended();
+// Optional display-only composition elision; hosts must explicitly enable it.
+void GSSetPresentCapRenderSkip(bool enabled);
+bool GSGetPresentCapRenderSkip();

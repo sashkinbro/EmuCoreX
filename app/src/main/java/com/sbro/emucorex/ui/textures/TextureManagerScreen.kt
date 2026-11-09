@@ -33,6 +33,7 @@ import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -65,6 +66,7 @@ import com.sbro.emucorex.data.TexturePackRepository
 import com.sbro.emucorex.data.TexturePackSummary
 import com.sbro.emucorex.data.RemoteContentInstallState
 import com.sbro.emucorex.ui.common.ScreenTopBar
+import com.sbro.emucorex.ui.common.premiumFilterChipColors
 import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
@@ -96,6 +98,7 @@ fun TextureManagerScreen(
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
 
+    val textureUpscaleMode by preferences.textureUpscaleMode.collectAsState(initial = 0)
     val replacementsEnabled by preferences.textureReplacementsEnabled.collectAsState(initial = false)
     val asyncLoading by preferences.textureReplacementsAsync.collectAsState(initial = true)
     val precache by preferences.textureReplacementsPrecache.collectAsState(initial = false)
@@ -207,6 +210,8 @@ fun TextureManagerScreen(
 
             item {
                 TextureOptionsPanel(
+                    textureUpscaleMode = textureUpscaleMode,
+                    onTextureUpscaleChanged = { mode -> scope.launch { preferences.setTextureUpscaleMode(mode) } },
                     replacementsEnabled = replacementsEnabled,
                     asyncLoading = asyncLoading,
                     precache = precache,
@@ -398,8 +403,11 @@ private fun TextureManagerHeader(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TextureOptionsPanel(
+    textureUpscaleMode: Int,
+    onTextureUpscaleChanged: (Int) -> Unit,
     replacementsEnabled: Boolean,
     asyncLoading: Boolean,
     precache: Boolean,
@@ -430,6 +438,30 @@ private fun TextureOptionsPanel(
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onSurface
             )
+            Text(
+                text = stringResource(R.string.texture_manager_upscale),
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
+            )
+            Text(
+                text = stringResource(R.string.texture_manager_upscale_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    R.string.texture_manager_upscale_off,
+                    R.string.texture_manager_upscale_2x,
+                    R.string.texture_manager_upscale_4x
+                ).forEachIndexed { mode, label ->
+                    FilterChip(
+                        selected = textureUpscaleMode == mode,
+                        onClick = { onTextureUpscaleChanged(mode) },
+                        enabled = enabled,
+                        label = { Text(stringResource(label)) },
+                        colors = premiumFilterChipColors()
+                    )
+                }
+            }
             TextureSwitchRow(
                 title = stringResource(R.string.texture_manager_enable_replacements),
                 body = stringResource(R.string.texture_manager_enable_replacements_desc),

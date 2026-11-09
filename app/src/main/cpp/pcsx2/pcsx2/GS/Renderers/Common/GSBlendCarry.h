@@ -37,10 +37,10 @@ namespace GSBlendCarry
         const auto& p=c.ps;
         // Smooth fractional colors can round differently in fixed-function blending
         // even at exact As128. Keep their original unblended identity path.
-        return !p.iip&&p.dst_fmt==0&&!p.colclip&&!p.colclip_hw&&!p.dither&&!p.fbmask&&!p.shuffle&&!p.tex_is_fb&&
+        return !p.iip&&p.dst_fmt==0&&!p.colclip&&!p.colclip_hw&&!p.dither&&!p.fbmask&&!p.quantize_color&&!p.substitute_alpha&&!p.shuffle&&!p.tex_is_fb&&
             !p.no_color&&!p.abe&&!p.HasColorROV()&&!p.HasDepthROV()&&!p.IsFeedbackLoopRT()&&!p.IsFeedbackLoopDepth()&&
             !c.ds_as_rt&&!c.require_one_barrier&&!c.require_full_barrier&&!c.alpha_second_pass.enable&&
-            !c.blend_multi_pass.enable&&!c.line_expand&&!c.raster_order&&!c.offset_read_hits_write&&
+            !c.blend_multi_pass.enable&&!c.colormask.logic_op&&!c.date_copy&&!c.logic_op_split&&!c.line_expand&&!c.raster_order&&!c.offset_read_hits_write&&
             !c.drawlist&&!c.drawlist_bbox&&c.destination_alpha==GSHWDrawConfig::DestinationAlphaMode::Off&&
             c.tex_hazard==GSHWDrawConfig::TEX_HAZARD_NONE&&c.colclip_mode==GSHWDrawConfig::ColClipMode::NoModify&&
             !(c.tex&&(c.tex==c.rt||c.tex==c.ds||c.tex==c.ds_as_rt));

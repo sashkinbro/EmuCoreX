@@ -99,6 +99,7 @@ namespace HostMemoryMap
 namespace SysMemory
 {
 	bool Allocate();
+	bool HasCodeMemory();
 	void Reset();
 	void Release();
 

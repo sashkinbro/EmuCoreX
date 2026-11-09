@@ -80,7 +80,10 @@ public:
 		Last = ASTC12x12,
 	};
 
-	static bool ValidateUsageAndFormat(Usage usage, Format format);
+	struct BlockInfo { u32 width,height,bytes; };
+    static BlockInfo GetBlockInfo(Format format);
+    static bool IsASTCFormat(Format format);
+    static bool ValidateUsageAndFormat(Usage usage, Format format);
 
 	enum class State : u8
 	{

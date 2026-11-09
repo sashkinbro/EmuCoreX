@@ -22,6 +22,7 @@ private:
 	void Step();
 	void TestZ(oak::QReg temp1, oak::QReg temp2);
 	void SampleTexture();
+	void SaturateCoordinate(oak::QReg c, oak::QReg scratch);
 	void SampleTexture_TexelReadHelper(int mip_offset);
 	void Wrap(oak::QReg uv0);
 	void Wrap(oak::QReg uv0, oak::QReg uv1);
@@ -59,6 +60,8 @@ private:
 
 	void modulate16(oak::QReg d, oak::QReg a, oak::QReg f, u8 shift);
 	void modulate16(oak::QReg a, oak::QReg f, u8 shift);
+	void walkColorByte(oak::QReg d, oak::QReg c);
+	void storedVertexColor(oak::QReg d, oak::QReg c);
 	void lerp16(oak::QReg a, oak::QReg b, oak::QReg f, u8 shift);
 	void lerp16_4(oak::QReg a, oak::QReg b, oak::QReg f);
 	void mix16(oak::QReg a, oak::QReg b, oak::QReg temp);
@@ -74,5 +77,6 @@ private:
 
 	GSScanlineSelector m_sel;
 
+	bool m_block_split = false;
 	oak::Label m_step_label;
 };

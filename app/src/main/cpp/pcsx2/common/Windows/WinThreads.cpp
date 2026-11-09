@@ -287,3 +287,19 @@ void Threading::SetNameOfCurrentThread(const char* name)
 	}
 #endif
 }
+
+bool Threading::ThreadHandle::SetNicePriority(int nice) const
+{
+	if (!m_native_handle)
+		return false;
+	int win_priority = THREAD_PRIORITY_NORMAL;
+	if (nice <= -15)
+		win_priority = THREAD_PRIORITY_HIGHEST;
+	else if (nice <= -5)
+		win_priority = THREAD_PRIORITY_ABOVE_NORMAL;
+	else if (nice >= 15)
+		win_priority = THREAD_PRIORITY_LOWEST;
+	else if (nice >= 5)
+		win_priority = THREAD_PRIORITY_BELOW_NORMAL;
+	return SetThreadPriority(static_cast<HANDLE>(m_native_handle), win_priority) != 0;
+}

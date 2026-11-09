@@ -16,7 +16,21 @@ struct GSPackedBatchOracle final : GSState
     u32 vertexFlushes = 0;
     u32 autoFlushes = 0;
     bool captureTrace = false;
-    bool IsCoverageAlphaSupported() override { return true; }
+    bool coverageAlpha=true;
+    bool forceEngineLevel=false;
+    GSHWAutoFlushLevel engineLevel=GSHWAutoFlushLevel::Disabled;
+    mutable u32 engineLevelQueries=0;
+    bool IsCoverageAlphaSupported() override { return coverageAlpha; }
+    GSHWAutoFlushLevel GetAutoFlushLevel() const
+    {
+        ++engineLevelQueries;
+        return forceEngineLevel?engineLevel:(GSIsHardwareRenderer()?GSConfig.UserHacks_AutoFlush:
+            (GSConfig.AutoFlushSW?GSHWAutoFlushLevel::Enabled:GSHWAutoFlushLevel::Disabled));
+    }
+    void ForceEngineAutoFlush(GSHWAutoFlushLevel level)
+    {
+        forceEngineLevel=true;engineLevel=level;engineLevelQueries=0;ResetHandlers();UpdateVertexKick();
+    }
 
     GSPackedBatchOracle()
     {
@@ -171,6 +185,34 @@ struct GSPackedBatchOracle final : GSState
     }
 
     void SetCarryingNativePolicy() { m_nativeres = true; }
+    void SetAllScalePolicy()
+    {
+        m_nativeres=GSConfig.UpscaleMultiplier==1.0f;
+        SetCullGrid(ConfigCullGrid());
+    }
+    bool FusedCoverageComplete() const
+    {
+        const bool complete=m_index.tail && m_fused_trace.valid && m_fused_trace.indices==m_index.tail &&
+            m_fused_trace.vertexEnd<=m_vertex.tail && m_fused_trace.watermark<=m_fused_trace.vertexEnd;
+        static u32 reports=0;
+        if(!complete&&reports++<12)std::printf("GS_ALL_SCALE_FMM prim=%u valid=%u indices=%u/%u end=%u tail=%u watermark=%u key=%u/%u\n",
+            PRIM->PRIM,m_fused_trace.valid,m_fused_trace.indices,m_index.tail,m_fused_trace.vertexEnd,m_vertex.tail,
+            m_fused_trace.watermark,m_fused_trace.key,GSFusedVertexTrace::Key(*PRIM));
+        return complete;
+    }
+    void SeedAllScaleFeedback(bool live)
+    {
+        m_env.PRIM.TME=1; m_v.UV=160u|(208u<<16);
+        for(auto& ctx:m_env.CTXT)
+        {
+            ctx.FRAME.U64=0;ctx.FRAME.FBW=1;
+            ctx.TEX0.TBP0=live?0:64;ctx.TEX0.PSM=PSMCT32;ctx.TEX0.TBW=1;
+            ctx.TEX0.TW=5;ctx.TEX0.TH=5;ctx.TEX1.U64=0;
+            ctx.ZBUF.ZMSK=1;
+        }
+        m_prev_env=m_env;UpdateContext();UpdateVertexKick();
+    }
+
     u32 CarryingCurrentZ() const { return m_v.XYZ.Z; }
     void SeedCarryingAutoFlush()
     {

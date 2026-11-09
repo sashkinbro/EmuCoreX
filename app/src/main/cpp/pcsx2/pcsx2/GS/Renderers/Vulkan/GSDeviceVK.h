@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
+#include "GS/GSCacheFile.h"
+#include "GS/Renderers/Common/GSVulkanDevicePolicy.h"
 
 #include "GS/Renderers/Common/GSDevice.h"
 #include "GS/Renderers/Common/GSVulkanRoadDevicePolicy.h"
@@ -59,7 +61,15 @@ public:
 		bool vk_ext_attachment_feedback_loop_layout : 1;
 		bool vk_ext_attachment_feedback_loop_dynamic_state : 1;
 		bool vk_ext_fragment_shader_interlock : 1;
+		bool vk_khr_vulkan_memory_model : 1;
+		bool vk_ext_robustness2_null_descriptor : 1;
+		bool vk_khr_shader_float16_int8 : 1;
 	};
+
+    void SetGameIdentity(const std::string& serial,u32 crc) override;
+    void PrepareShaderCacheClear() override;
+    void RequestShaderCacheFlush() override;
+	bool PreferCoherentReadbackMemory() const { return m_platform_rules.prefer_coherent_readback; }
 
 	struct TFXShaderSourceCapabilities
 	{
@@ -68,6 +78,7 @@ public:
 		bool feedback_loop_layout = false;
 		bool scalarize_vector_bitwise_and = false;
 		bool provoking_vertex_last = false;
+		bool mali_depth_nudge = false;
 	};
 
 	enum class TFXPreparationResult : u8
@@ -131,9 +142,14 @@ public:
 	__fi VkDevice GetDevice() const { return m_device; }
 	__fi VkQueue GetGraphicsQueue() const { return m_graphics_queue; }
 	__fi VmaAllocator GetAllocator() const { return m_allocator; }
+	__fi bool UsesPushDescriptors() const { return m_use_push_descriptors; }
+	__fi VkPipeline GetImGuiPipeline() const { return m_imgui_pipeline; }
+	__fi VkPipelineLayout GetUtilityPipelineLayout() const { return m_utility_pipeline_layout; }
+	__fi VkDescriptorSetLayout GetUtilityDescriptorSetLayout() const { return m_utility_ds_layout; }
 	__fi u32 GetGraphicsQueueFamilyIndex() const { return m_graphics_queue_family_index; }
 	__fi u32 GetPresentQueueFamilyIndex() const { return m_present_queue_family_index; }
 	__fi const VkPhysicalDeviceProperties& GetDeviceProperties() const { return m_device_properties; }
+	__fi const VkPhysicalDeviceDriverPropertiesKHR& GetDeviceDriverProperties() const { return m_device_driver_properties; }
 	__fi const OptionalExtensions& GetOptionalExtensions() const { return m_optional_extensions; }
 
 	__fi bool UsesRasterizationOrderAttachmentAccessForFeedback() const
@@ -520,6 +536,7 @@ public:
 				u32 line_width : 1;
 				u32 feedback_loop_flags : 3;
 				u32 raster_order : 1;
+				u32 stencil_counter : 2;
 			};
 
 			u32 key;
@@ -598,6 +615,7 @@ public:
 		CONVERT_PUSH_CONSTANTS_SIZE = 96,
 
 		NUM_CAS_PIPELINES = 2,
+		NUM_FSR1_PIPELINES=2,
 	};
 	enum TFX_DESCRIPTOR_SET : u32
 	{
@@ -615,6 +633,9 @@ private:
 
 	VkDescriptorSetLayout m_utility_ds_layout = VK_NULL_HANDLE;
 	VkPipelineLayout m_utility_pipeline_layout = VK_NULL_HANDLE;
+	VkDescriptorSetLayout m_stencil_counter_ds_layout = VK_NULL_HANDLE;
+	VkPipelineLayout m_stencil_counter_pipeline_layout = VK_NULL_HANDLE;
+	std::array<VkPipeline, 8> m_stencil_counter_resolve_pipelines = {};
 	std::array<u8, CONVERT_PUSH_CONSTANTS_SIZE> m_utility_push_constants{};
 	u32 m_utility_push_constants_size = 0;
 
@@ -737,6 +758,13 @@ private:
 	VkDescriptorSetLayout m_cas_ds_layout = VK_NULL_HANDLE;
 	VkPipelineLayout m_cas_pipeline_layout = VK_NULL_HANDLE;
 	std::array<VkPipeline, NUM_CAS_PIPELINES> m_cas_pipelines = {};
+	VkDescriptorSetLayout m_fsr1_ds_layout = VK_NULL_HANDLE;
+	VkPipelineLayout m_fsr1_pipeline_layout = VK_NULL_HANDLE;
+	std::array<VkPipeline, NUM_FSR1_PIPELINES> m_fsr1_pipelines = {};
+	VkDescriptorSetLayout m_sgsr_ds_layout = VK_NULL_HANDLE;
+	VkPipelineLayout m_sgsr_pipeline_layout = VK_NULL_HANDLE;
+	/// One per variant: plain and edge-direction. Still one pass each.
+	std::array<VkPipeline, NUM_SGSR_PIPELINES> m_sgsr_pipelines = {};
 	VkPipeline m_imgui_pipeline = VK_NULL_HANDLE;
 
 	GSHWDrawConfig::VSConstantBuffer m_vs_cb_cache;
@@ -744,10 +772,16 @@ private:
 	GSHWDrawConfig::PSConstantBuffer m_ps_cb_cache;
 
 	std::string m_tfx_source;
+    std::shared_ptr<GSCacheFile::Pack> m_tfx_key_pack;
+    u32 m_tfx_key_session=0;
+    std::unordered_set<PipelineSelector, PipelineSelectorHash> m_tfx_session_seen;
+    std::string GetTFXPipelineKeyFingerprint() const;
 
 	GSTexture* CreateSurface(GSTexture::Usage usage, int width, int height, int levels, GSTexture::Format format) override;
 
 	void DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, GSVector4* dRect, const GSRegPMODE& PMODE,
+		const GSRegEXTBUF& EXTBUF, u32 c, const Filter filter) final;
+	void DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, GSVector4* dRect, const MergeTopBand* top_band, const GSRegPMODE& PMODE,
 		const GSRegEXTBUF& EXTBUF, u32 c, const Filter filter) final;
 	void DoInterlace(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
 		ShaderInterlace shader, Filter filter, const InterlaceConstantBuffer& cb) final;
@@ -789,6 +823,7 @@ private:
 	bool CreateBuffers();
 	void FlushStreamRingWrites();
 	bool CreatePipelineLayouts();
+	bool CreateStencilCounterLayouts();
 	bool CreateTFXPipelineLayouts();
 	bool CreateRenderPasses();
 	bool CreateTFXPreparationRenderPasses();
@@ -799,6 +834,17 @@ private:
 	bool CompileMergePipelines();
 	bool CompilePostProcessingPipelines();
 	bool CompileCASPipelines();
+	bool CompileFSR1Pipelines();
+	bool CompileSGSRPipeline();
+	bool DoFSR1EASU(GSTexture* sTex, GSTexture* dTex, const std::array<u32, NUM_FSR1_CONSTANTS>& constants) final;
+	bool DoFSR1RCAS(GSTexture* sTex, GSTexture* dTex, const std::array<u32, NUM_FSR1_CONSTANTS>& constants) final;
+	bool DoSGSR(GSTexture* sTex, GSTexture* dTex, const std::array<u32, NUM_SGSR_CONSTANTS>& constants,
+		bool edge_direction) final;
+	/// Shared body of the two above: same layout, same push range, different pipeline and
+	/// different input-side synchronisation.
+	bool DoFSR1Pass(
+		GSTexture* sTex, GSTexture* dTex, bool easu_pass, const std::array<u32, NUM_FSR1_CONSTANTS>& constants);
+
 
 	bool CompileImGuiPipeline();
 	void WarmupCommonTFXPipelines();
@@ -837,6 +883,7 @@ public:
 	__fi VkSampler GetLinearSampler() const { return m_linear_sampler; }
 
 	RenderAPI GetRenderAPI() const override;
+	DisplayRotation GetSurfacePreRotation() const override;
 	bool HasSurface() const override;
 
 	static std::string BuildTFXVertexShaderSource(std::string_view tfx_source,
@@ -867,6 +914,10 @@ public:
 	void TestRenderPassRestarts(void (*check)(bool, const char*));
 	void TestBlendCarryCapability(void (*check)(bool, const char*));
 	void TestDriverSafety(void (*check)(bool, const char*));
+	void TestPlatformParity(void (*check)(bool, const char*));
+	static void TestAlphaBitPipelines(void (*check)(bool,const char*));
+	void TestAlphaBitPixels(void (*check)(bool,const char*));
+	void TestStencilCounterPixels(void (*check)(bool,const char*));
 	void TestStreamRingActivation(void (*check)(bool, const char*));
 	void TestBlendCarryPixels(void (*check)(bool, const char*));
 	void TestDrawRoad(void (*check)(bool, const char*));
@@ -969,10 +1020,30 @@ public:
 	void DoRenderHW(GSHWDrawConfig& config) override;
 	GSVulkanRoad::Identity GetRoadIdentity() const;
 	GSVulkanRoad::Capabilities GetRoadCapabilities(u32 push_count = 0) const;
-	static void ConfigureTFXBlendPipeline(Vulkan::GraphicsPipelineBuilder& builder, const PipelineSelector& pipe,
+	void ConfigureTFXBlendPipeline(Vulkan::GraphicsPipelineBuilder& builder, const PipelineSelector& pipe,
 		const GSHWDrawConfig::BlendState& blend);
 	void ConfigureTFXFeedbackPipeline(Vulkan::GraphicsPipelineBuilder& builder, const PipelineSelector& pipe) const;
 	void DeclareDrawFeedbackLoop(const GSHWDrawConfig& config, const PipelineSelector& pipe);
+	GSVulkanDevicePolicy::Rules m_platform_rules;
+	u64 m_render_pass_serial = 0;
+
+	/// GSAlphaBitLogicOp: the destination-alpha stencil copy that DATE draws with
+	/// GSHWDrawConfig::date_copy share, while it stays true. Valid only inside the pass it was
+	/// built in, for these targets and this DATM.
+	struct DateCopy
+	{
+		bool valid = false;
+		const GSTexture* rt = nullptr;
+		const GSTexture* ds = nullptr;
+		SetDATM datm = SetDATM::DATM0;
+		u64 pass_serial = 0;
+	};
+	DateCopy m_date_copy;
+	/// The next DeclareDrawFeedbackLoop declares the colour loop although the draw does not read (see
+	/// the shared DATE copy's setup in DoRenderHW).
+	bool m_declare_rt_loop_without_read = false;
+	bool DateCopyLive(const GSHWDrawConfig& config);
+	bool m_broken_colormask_with_depth = false;
 	GSVulkanRoad::Facts m_road_facts;
 	u32 m_max_push_descriptors = 0;
 	std::string m_road_platform_hints;
@@ -981,6 +1052,8 @@ public:
 	bool m_loop_declared_in_pass = false;
 	bool HWDrawNeedsAttachmentRestart(const GSHWDrawConfig& config, const PipelineSelector& pipe) const;
 	void ApplyHWDrawFeedbackCarry(const GSHWDrawConfig& config, PipelineSelector& pipe, GSTextureVK* rt, GSTextureVK* ds);
+	bool DrawStencilCounter(GSHWDrawConfig& config);
+	VkPipeline GetStencilCounterResolvePipeline(u32 rgb_mask);
 	void UpdateHWPipelineSelector(GSHWDrawConfig& config, PipelineSelector& pipe);
 	void UploadHWDrawVerticesAndIndices(GSHWDrawConfig& config);
 	VkImageMemoryBarrier GetColorBufferFeedbackBarrier(GSTextureVK* rt) const;

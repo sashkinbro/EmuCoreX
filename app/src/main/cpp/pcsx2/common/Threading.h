@@ -74,6 +74,7 @@ namespace Threading
 		/// Sets the affinity for a thread to the specified processors.
 		/// Obviously, only works up to 64 processors.
 		bool SetAffinity(u64 processor_mask) const;
+        bool SetNicePriority(int nice) const;
 
 	protected:
 		void* m_native_handle = nullptr;
@@ -140,6 +141,7 @@ namespace Threading
 		~KernelSemaphore();
 		void Post();
 		void Wait();
+		bool TimedWait(u32 microseconds);
 		bool TryWait();
 	};
 

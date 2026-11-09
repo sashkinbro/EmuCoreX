@@ -853,7 +853,7 @@
     <string name="texture_manager_loading">Memuat paket tekstur…</string>
     <string name="texture_manager_options">Opsi Waktu Proses</string>
     <string name="texture_manager_enable_replacements">Muat tekstur pengganti</string>
-    <string name="texture_manager_enable_replacements_desc">Gunakan file PNG dan DDS / KTX2 dari setiap folder serial game.</string>
+    <string name="texture_manager_enable_replacements_desc">Gunakan file PNG dan DDS / KTX2 / ASTC / KTX dari setiap folder serial game.</string>
     <string name="texture_manager_async_loading">Pemuatan asinkron</string>
     <string name="texture_manager_async_loading_desc">Memuat tekstur pengganti pada thread pekerja saat game berjalan.</string>
     <string name="texture_manager_precache">Penggantian precache</string>

@@ -527,15 +527,18 @@ set(pcsx2GSSources
 	GS/Renderers/Common/GSDirtyRect.cpp
 	GS/Renderers/Common/GSFunctionMap.cpp
 	GS/Renderers/Common/GSGPUProfile.cpp
+	GS/Renderers/Common/GSFieldShiftDetector.cpp
 	GS/Renderers/Common/GSRenderer.cpp
 	GS/Renderers/Common/GSTexture.cpp
 	GS/Renderers/Common/GSVertexTrace.cpp
 	GS/Renderers/Null/GSRendererNull.cpp
 	GS/Renderers/HW/GSHwHack.cpp
+	GS/Renderers/HW/GSLineRuns.cpp
 	GS/Renderers/HW/GSRendererHW.cpp
 	GS/Renderers/HW/GSTextureCache.cpp
 	GS/Renderers/HW/GSTextureReplacementLoaders.cpp
 	GS/Renderers/HW/GSTextureReplacements.cpp
+	GS/Renderers/HW/GSTextureUpscaler.cpp
 	GS/Renderers/SW/GSTextureCacheSW.cpp
 	)
 
@@ -664,6 +667,8 @@ if(USE_VULKAN)
 	list(APPEND pcsx2GSSources
 		GS/Renderers/Vulkan/GSDeviceVK.cpp
 		GS/Renderers/Vulkan/GSLsfg.cpp
+		GS/Renderers/Vulkan/GSLsfgLegacy.cpp
+		GS/Renderers/Vulkan/GSLsfgNative.cpp
 		GS/Renderers/Vulkan/GSTextureVK.cpp
 		GS/Renderers/Vulkan/vk_mem_alloc.cpp
 		GS/Renderers/Vulkan/VKBakedShaderPack.cpp
@@ -673,6 +678,27 @@ if(USE_VULKAN)
 		GS/Renderers/Vulkan/VKStreamBuffer.cpp
 		GS/Renderers/Vulkan/VKSwapChain.cpp
 	)
+	if(EMUCOREX_HAVE_LSFG)
+		list(APPEND pcsx2GSSources
+			GS/Renderers/Vulkan/FrameGen/FrameGen.cpp
+			GS/Renderers/Vulkan/FrameGen/FrameGenPacer.cpp
+			GS/Renderers/Vulkan/FrameGen/LosslessDll.cpp
+			GS/Renderers/Vulkan/FrameGen/LsfgAlpha.cpp
+			GS/Renderers/Vulkan/FrameGen/LsfgBeta.cpp
+			GS/Renderers/Vulkan/FrameGen/LsfgChain.cpp
+			GS/Renderers/Vulkan/FrameGen/LsfgCommon.cpp
+			GS/Renderers/Vulkan/FrameGen/LsfgDelta.cpp
+			GS/Renderers/Vulkan/FrameGen/LsfgGamma.cpp
+			GS/Renderers/Vulkan/FrameGen/LsfgGenerate.cpp
+			GS/Renderers/Vulkan/FrameGen/LsfgMipmaps.cpp
+			GS/Renderers/Vulkan/FrameGen/LsfgShaders.cpp
+			GS/Renderers/Vulkan/FrameGen/LsfgTranslate.cpp
+			GS/Renderers/Vulkan/FrameGen/LsfgUtil.cpp
+			GS/Renderers/Vulkan/FrameGen/LsfgVkCompat.cpp
+		)
+	endif()
+	set_source_files_properties(GS/Renderers/Vulkan/GSLsfgLegacy.cpp PROPERTIES COMPILE_OPTIONS "-fexceptions" SKIP_PRECOMPILE_HEADERS ON)
+
 	list(APPEND pcsx2GSHeaders
 		GS/Renderers/Vulkan/GSDeviceVK.h
 		GS/Renderers/Vulkan/GSLsfg.h
@@ -1542,3 +1568,38 @@ source_group(Resources/GUI FILES ${pcsx2GuiResources})
 source_group(Resources/PAD FILES ${pcsx2PADResources})
 source_group(Resources/Recording FILES ${pcsx2RecordingVirtualPadResources})
 source_group(Resources REGULAR_EXPRESSION ${CMAKE_CURRENT_BINARY_DIR}/*)
+
+# Content identity for shader/pipeline packs, including uncommitted GS/shader changes.
+target_sources(PCSX2 PRIVATE GS/GSCacheFile.cpp GS/GSCacheFile.h GS/GSCompileStats.h)
+set(EMUCOREX_GS_CACHE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
+file(GLOB_RECURSE EMUCOREX_GS_CACHE_INPUTS CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/GS/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/GS/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/GS/*.inl" "${CMAKE_CURRENT_SOURCE_DIR}/GS/*.metal"
+    "${EMUCOREX_GS_CACHE_ROOT}/bin/resources/shaders/*")
+list(APPEND EMUCOREX_GS_CACHE_INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/ShaderCacheVersion.h")
+list(SORT EMUCOREX_GS_CACHE_INPUTS)
+set(EMUCOREX_GS_CACHE_ID_DIR "${CMAKE_CURRENT_BINARY_DIR}/gs_cache_id")
+file(MAKE_DIRECTORY "${EMUCOREX_GS_CACHE_ID_DIR}")
+set(EMUCOREX_GS_CACHE_INPUT_LIST "")
+foreach(input IN LISTS EMUCOREX_GS_CACHE_INPUTS)
+    file(RELATIVE_PATH relative "${EMUCOREX_GS_CACHE_ROOT}" "${input}")
+    string(APPEND EMUCOREX_GS_CACHE_INPUT_LIST "${relative}\n")
+endforeach()
+file(GENERATE OUTPUT "${EMUCOREX_GS_CACHE_ID_DIR}/inputs.list" CONTENT "${EMUCOREX_GS_CACHE_INPUT_LIST}")
+add_custom_command(OUTPUT "${EMUCOREX_GS_CACHE_ID_DIR}/gs_cache_build_id.h"
+    COMMAND ${CMAKE_COMMAND} -DOUT=${EMUCOREX_GS_CACHE_ID_DIR}/gs_cache_build_id.h
+        -DROOT=${EMUCOREX_GS_CACHE_ROOT} -DLIST=${EMUCOREX_GS_CACHE_ID_DIR}/inputs.list
+        -P "${EMUCOREX_GS_CACHE_ROOT}/cmake/GSCacheBuildId.cmake"
+    DEPENDS ${EMUCOREX_GS_CACHE_INPUTS} "${EMUCOREX_GS_CACHE_ID_DIR}/inputs.list"
+        "${EMUCOREX_GS_CACHE_ROOT}/cmake/GSCacheBuildId.cmake" VERBATIM)
+target_sources(PCSX2 PRIVATE "${EMUCOREX_GS_CACHE_ID_DIR}/gs_cache_build_id.h")
+set_source_files_properties(GS/GSCacheFile.cpp PROPERTIES
+    OBJECT_DEPENDS "${EMUCOREX_GS_CACHE_ID_DIR}/gs_cache_build_id.h"
+    INCLUDE_DIRECTORIES "${EMUCOREX_GS_CACHE_ID_DIR}")
+
+# Scalar and NEON RAISR paths perform the same explicitly fused operations.
+# Prevent the target-wide contraction setting from adding other FMAs on GCC.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    set_source_files_properties(GS/Renderers/HW/GSTextureUpscaler.cpp PROPERTIES
+        COMPILE_OPTIONS "-ffp-contract=off")
+endif()

@@ -53,7 +53,7 @@ class TexturePackRepository(
     private val preferences: AppPreferences,
     private val rootOverride: File? = null
 ) {
-    private val textureExtensions = setOf("png", "dds", "ktx2")
+    private val textureExtensions = setOf("png", "dds", "ktx2", "astc", "ktx")
     private val serialPattern = Regex("[A-Z]{4}[-_ ]?\\d{5}", RegexOption.IGNORE_CASE)
     private val compatibilityRepository = Pcsx2CompatibilityRepository(context.applicationContext)
     private val libraryCacheRepository = GameLibraryCacheRepository(context.applicationContext)

@@ -18,6 +18,7 @@
 #include "Elfheader.h"
 #include "FW.h"
 #include "GS.h"
+#include "GS/Renderers/Common/GSBackThreadPolicy.h"
 #include "GS/Renderers/HW/GSTextureReplacements.h"
 #include "GSDumpReplayer.h"
 #include "GameDatabase.h"
@@ -4331,6 +4332,47 @@ void VMManager::EnsureCPUInfoInitialized()
 	std::call_once(s_processor_list_initialized, InitializeProcessorList);
 }
 
+static std::mutex s_gs_back_thread_mutex;
+static Threading::ThreadHandle s_gs_back_thread_handle;
+static u64 s_gs_back_thread_affinity=0;
+static void SetGSBackThreadAffinityLocked(u64 mask)
+{
+	std::lock_guard lock(s_gs_back_thread_mutex);
+	s_gs_back_thread_affinity=mask;
+	if(s_gs_back_thread_handle)s_gs_back_thread_handle.SetAffinity(mask);
+}
+u64 VMManager::Internal::RegisterGSBackThread(const Threading::ThreadHandle* handle)
+{
+	std::lock_guard lock(s_gs_back_thread_mutex);
+	s_gs_back_thread_handle=handle?*handle:Threading::ThreadHandle();
+	if(s_gs_back_thread_handle)s_gs_back_thread_handle.SetAffinity(s_gs_back_thread_affinity);
+	return s_gs_back_thread_affinity;
+}
+static u64 ChooseGSBackThreadAffinity(u64 gs_mask,u64 occupied)
+{
+#if defined(__linux__) || defined(_WIN32)
+	if(!gs_mask)return 0;
+	u64 cluster=0,others=0;
+	const cpuinfo_cluster* gs_cluster=nullptr;
+	for(u32 i=0;i<cpuinfo_get_processors_count();i++)
+	{
+		const auto* p=cpuinfo_get_processor(i);if(!p)continue;
+		const u32 id=GetProcessorIdForProcessor(p);if(id>=64)continue;
+		if(gs_mask&(u64{1}<<id)){gs_cluster=p->cluster;break;}
+	}
+	for(u32 i=0;i<cpuinfo_get_processors_count();i++)
+	{
+		const auto* p=cpuinfo_get_processor(i);if(!p)continue;
+		const u32 id=GetProcessorIdForProcessor(p);if(id>=64)continue;
+		const u64 bit=u64{1}<<id;others|=bit;if(p->cluster==gs_cluster)cluster|=bit;
+	}
+	const u64 tier=IopThread::PerformanceCoreMask();
+	return GSPlaceBackThread((tier?cluster&tier:cluster)&~gs_mask,tier&~gs_mask,others&~gs_mask,occupied).mask;
+#else
+	return 0;
+#endif
+}
+
 void VMManager::SetEmuThreadAffinities()
 {
 	const bool new_pin_enable = (GetState() != VMState::Shutdown && EmuConfig.EnableThreadPinning);
@@ -4364,6 +4406,7 @@ void VMManager::SetEmuThreadAffinities()
 
 	if (s_processor_list.empty())
 	{
+		SetGSBackThreadAffinityLocked(0);
 		// not supported on this platform
 		return;
 	}
@@ -4422,6 +4465,8 @@ void VMManager::SetEmuThreadAffinities()
 #endif
 			IopThread::g_thread.GetThreadHandle().SetAffinity(iop_mask);
 		}
+		const u32 needed=2+(mtvu?1:0)+(iop_thread?1:0)+1;
+		SetGSBackThreadAffinityLocked(std::popcount(mask)>=needed?mask:0);
 		return;
 	}
 #endif
@@ -4435,6 +4480,7 @@ void VMManager::SetEmuThreadAffinities()
 		vu1Thread.GetThreadHandle().SetAffinity(0);
 		s_vm_thread_handle.SetAffinity(0);
 		s_software_renderer_processor_list = {};
+		SetGSBackThreadAffinityLocked(0);
 		return;
 	}
 
@@ -4471,6 +4517,10 @@ void VMManager::SetEmuThreadAffinities()
 		INFO_LOG("IOP thread processor mask 0x{:x}", iop_mask);
 	}
 
+	u64 occupied=ee_affinity|gs_affinity;
+	if(mtvu)occupied|=u64{1}<<vu_index;
+	if(iop_thread)occupied|=u64{1}<<s_processor_list[mtvu?3:2];
+	SetGSBackThreadAffinityLocked(ChooseGSBackThreadAffinity(gs_affinity,occupied));
 	// Try to find some threads for the software renderer.
 	// They should be in the same cluster as the main GS thread. If they're not, for example,
 	// we had 4 P cores and 6 E cores, let the OS schedule them instead.

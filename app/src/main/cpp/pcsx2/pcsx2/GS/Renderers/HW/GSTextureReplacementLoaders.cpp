@@ -7,11 +7,19 @@
 #include "common/Path.h"
 #include "common/StringUtil.h"
 #include "common/ScopedGuard.h"
+#include "common/TextureCodec.h"
+#include "common/TextureDecompress.h" // CPU BC1/2/3/BC7 decode when the GPU lacks BC support
 
 #include "GS/Renderers/HW/GSTextureReplacements.h"
+#include "GS/Renderers/HW/GSTextureASTC.h"
+#include "GS/Renderers/HW/GSTextureKTX.h"
 
-#include "common/TextureCodec.h"
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <cinttypes>
 #include <csetjmp>
+#include <cstring>
 #include <png.h>
 
 struct LoaderDefinition
@@ -22,12 +30,16 @@ struct LoaderDefinition
 
 static bool PNGLoader(const std::string& filename, GSTextureReplacements::ReplacementTexture* tex, bool only_base_image);
 static bool DDSLoader(const std::string& filename, GSTextureReplacements::ReplacementTexture* tex, bool only_base_image);
+static bool ASTCLoader(const std::string& filename, GSTextureReplacements::ReplacementTexture* tex, bool only_base_image);
+static bool KTXLoader(const std::string& filename, GSTextureReplacements::ReplacementTexture* tex, bool only_base_image);
 
 static bool KTX2Loader(const std::string& filename, GSTextureReplacements::ReplacementTexture* tex, bool only_base_image);
 
 static constexpr LoaderDefinition s_loaders[] = {
 	{"png", PNGLoader},
 	{"dds", DDSLoader},
+	{"astc", ASTCLoader},
+	{"ktx", KTXLoader},
 	{"ktx2", KTX2Loader},
 };
 
@@ -40,8 +52,13 @@ GSTextureReplacements::ReplacementTextureLoader GSTextureReplacements::GetLoader
 
 	for (const LoaderDefinition& defn : s_loaders)
 	{
-		if (StringUtil::Strncasecmp(extension.data(), defn.extension, extension.size()) == 0)
+		// Exact extension match. A bare Strncasecmp() against the caller's length would
+		// accept a prefix of a registered extension ("png" matching ".pngfoo").
+		if (extension.size() == std::strlen(defn.extension) &&
+			StringUtil::Strncasecmp(extension.data(), defn.extension, extension.size()) == 0)
+		{
 			return defn.loader;
+		}
 	}
 
 	return nullptr;
@@ -132,10 +149,9 @@ static void ConvertTexture_R8G8B8(u32 width, u32 height, std::vector<u8>& data, 
 
 		for (u32 x = 0; x < width; x++)
 		{
-			// This is BGR in memory.
-			u32 val;
-			std::memcpy(&val, rgb_data_ptr, sizeof(val));
-			val = ((val & 0x0000FF00) | ((val >> 16) & 0xFF) | ((val << 16) & 0xFF0000)) | 0xFF000000;
+			// BGR in memory, three bytes a pixel. A 4-byte load would read one byte past the end of the data at the last pixel.
+			const u32 val = static_cast<u32>(rgb_data_ptr[2]) | (static_cast<u32>(rgb_data_ptr[1]) << 8) |
+			                (static_cast<u32>(rgb_data_ptr[0]) << 16) | 0xFF000000u;
 			std::memcpy(data_ptr, &val, sizeof(u32));
 			data_ptr += sizeof(u32);
 			rgb_data_ptr += 3;
@@ -224,7 +240,6 @@ bool PNGLoader(const std::string& filename, GSTextureReplacements::ReplacementTe
 	return true;
 }
 
-#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 bool GSTextureReplacements::SavePNGImage(const std::string& filename, u32 width, u32 height, const u8* buffer, u32 pitch)
 {
 	const int compression = GSConfig.PNGCompressionLevel;
@@ -267,7 +282,6 @@ bool GSTextureReplacements::SavePNGImage(const std::string& filename, u32 width,
 	png_write_end(png_ptr, nullptr);
 	return true;
 }
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DDS Handler
@@ -402,6 +416,14 @@ struct DDSLoadInfo
 	u32 base_image_size = 0;
 	u32 base_image_pitch = 0;
 
+	// Set when the file is block-compressed but the GPU cannot sample that format, so the
+	// blocks are decoded to RGBA8 on the CPU at load time instead of the whole texture
+	// being rejected. `format` is then Color (the uploaded format) while `decompress_format`
+	// keeps the on-disk format the block reader has to decode. Sizes/pitches below stay in
+	// COMPRESSED units, because they describe how much to read out of the file.
+	bool decompress = false;
+	GSTexture::Format decompress_format = GSTexture::Format::Color;
+
 	std::function<void(u32 width, u32 height, std::vector<u8>& data, u32& pitch)> conversion_function;
 };
 
@@ -469,37 +491,53 @@ static bool ParseDDSHeader(std::FILE* fp, DDSLoadInfo* info)
 		}
 
 		const GSDevice::FeatureSupport features(g_gs_device->Features());
+		// Mobile GPUs frequently expose no BC/BPTC support at all (Vulkan
+		// textureCompressionBC false). It is driver-dependent rather than a property of the
+		// hardware: on Adreno 650 the Qualcomm blob gained BC at driver 512.614 (vulkan.gpuinfo.org
+		// splits cleanly across that revision), and Mesa Turnip reports it true. Rejecting the file
+		// on a driver that lacks it silently drops the ENTIRE pack — and for packs
+		// that also ship game-side data the result is worse than "no upscale": the P3P Slim
+		// Font mod pairs new FONT0.FNT glyph metrics with BC7 replacement glyphs, so with
+		// the textures dropped the game indexes the new narrow metrics into the old wide
+		// atlas and renders letters sliced in half. Decode on the CPU instead; the decoders
+		// are already built (common/TextureDecompress.cpp, used below for alpha min/max).
+		const auto set_bc = [&info](GSTexture::Format fmt, u32 bytes_per_block, bool gpu_supported) {
+			info->block_size = 4;
+			info->bytes_per_block = bytes_per_block;
+			if (gpu_supported)
+			{
+				info->format = fmt;
+			}
+			else
+			{
+				info->decompress = true;
+				info->decompress_format = fmt;
+				info->format = GSTexture::Format::Color;
+				static bool logged_once = false;
+				if (!logged_once)
+				{
+					logged_once = true;
+					Console.WriteLn("Texture replacements: GPU cannot sample this block-compressed "
+									"format, decoding to RGBA8 on the CPU (uses ~4x more memory per texture).");
+				}
+			}
+		};
+
 		if (header.ddspf.dwFourCC == MAKEFOURCC('D', 'X', 'T', '1') || dxt10_format == 71 /*DXGI_FORMAT_BC1_UNORM*/)
 		{
-			info->format = GSTexture::Format::BC1;
-			info->block_size = 4;
-			info->bytes_per_block = 8;
-			if (!features.dxt_textures)
-				return false;
+			set_bc(GSTexture::Format::BC1, 8, features.dxt_textures);
 		}
 		else if (header.ddspf.dwFourCC == MAKEFOURCC('D', 'X', 'T', '2') || header.ddspf.dwFourCC == MAKEFOURCC('D', 'X', 'T', '3') || dxt10_format == 74 /*DXGI_FORMAT_BC2_UNORM*/)
 		{
-			info->format = GSTexture::Format::BC2;
-			info->block_size = 4;
-			info->bytes_per_block = 16;
-			if (!features.dxt_textures)
-				return false;
+			set_bc(GSTexture::Format::BC2, 16, features.dxt_textures);
 		}
 		else if (header.ddspf.dwFourCC == MAKEFOURCC('D', 'X', 'T', '4') || header.ddspf.dwFourCC == MAKEFOURCC('D', 'X', 'T', '5') || dxt10_format == 77 /*DXGI_FORMAT_BC3_UNORM*/)
 		{
-			info->format = GSTexture::Format::BC3;
-			info->block_size = 4;
-			info->bytes_per_block = 16;
-			if (!features.dxt_textures)
-				return false;
+			set_bc(GSTexture::Format::BC3, 16, features.dxt_textures);
 		}
 		else if (dxt10_format == 98 /*DXGI_FORMAT_BC7_UNORM*/)
 		{
-			info->format = GSTexture::Format::BC7;
-			info->block_size = 4;
-			info->bytes_per_block = 16;
-			if (!features.bptc_textures)
-				return false;
+			set_bc(GSTexture::Format::BC7, 16, features.bptc_textures);
 		}
 		else
 		{
@@ -592,10 +630,322 @@ static bool ReadDDSMipLevel(std::FILE* fp, const std::string& filename, u32 mip_
 	if (std::fread(data.data(), size, 1, fp) != 1)
 		return false;
 
+	// CPU-side block decode when the GPU can't sample this compressed format (see the
+	// set_bc comment in ParseDDSHeader). Decode into a separate RGBA8 buffer and hand that
+	// back as the level's data, adjusting pitch to match. Levels smaller than one 4x4 block
+	// are stored padded, so decode a whole block grid and only keep the valid region.
+	if (info.decompress)
+	{
+		constexpr u32 BLOCK = 4;
+		const u32 blocks_wide = GetBlockCount(width, BLOCK);
+		const u32 blocks_high = GetBlockCount(height, BLOCK);
+		// Source stride is this level's COMPRESSED pitch as passed in — not a recomputed
+		// blocks_wide*bytes_per_block, because the base level may carry an explicit
+		// dwPitchOrLinearSize from the header.
+		const u32 src_pitch = pitch;
+		const u32 out_pitch = width * sizeof(u32);
+
+		std::vector<u8> rgba(static_cast<size_t>(out_pitch) * height);
+		alignas(16) u8 block_pixels[BLOCK * BLOCK * sizeof(u32)];
+
+		for (u32 by = 0; by < blocks_high; by++)
+		{
+			const u8* block_in = data.data() + (static_cast<size_t>(by) * src_pitch);
+			for (u32 bx = 0; bx < blocks_wide; bx++, block_in += info.bytes_per_block)
+			{
+				switch (info.decompress_format)
+				{
+					case GSTexture::Format::BC1:
+						DecompressBlockBC1(0, 0, sizeof(u32) * BLOCK, block_in, block_pixels);
+						break;
+					case GSTexture::Format::BC2:
+						DecompressBlockBC2(0, 0, sizeof(u32) * BLOCK, block_in, block_pixels);
+						break;
+					case GSTexture::Format::BC3:
+						DecompressBlockBC3(0, 0, sizeof(u32) * BLOCK, block_in, block_pixels);
+						break;
+					case GSTexture::Format::BC7:
+						bc7decomp::unpack_bc7(block_in, reinterpret_cast<bc7decomp::color_rgba*>(block_pixels));
+						break;
+					default:
+						return false;
+				}
+
+				// Copy the block's valid rows/columns into the destination image.
+				const u32 copy_w = std::min<u32>(BLOCK, width - (bx * BLOCK));
+				const u32 copy_h = std::min<u32>(BLOCK, height - (by * BLOCK));
+				for (u32 row = 0; row < copy_h; row++)
+				{
+					std::memcpy(rgba.data() + (static_cast<size_t>(by * BLOCK + row) * out_pitch) + (static_cast<size_t>(bx) * BLOCK * sizeof(u32)),
+						block_pixels + (static_cast<size_t>(row) * BLOCK * sizeof(u32)),
+						copy_w * sizeof(u32));
+				}
+			}
+		}
+
+		data = std::move(rgba);
+		pitch = out_pitch;
+		return true;
+	}
+
 	// Apply conversion function for uncompressed textures.
 	if (info.conversion_function)
 		info.conversion_function(width, height, data, pitch);
 
+	return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ASTC Handlers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static bool SupportsASTCReplacement(const std::string& filename)
+{
+	if (g_gs_device && g_gs_device->Features().astc_textures)
+		return true;
+
+	static std::atomic<bool> warned{false};
+	if (!warned.exchange(true))
+	{
+		Console.Warning("Skipping ASTC replacement textures (e.g. %s): the active GS backend "
+						"does not support native ASTC LDR compression.",
+			filename.c_str());
+	}
+	return false;
+}
+
+static bool ASTCLoader(const std::string& filename, GSTextureReplacements::ReplacementTexture* tex, bool only_base_image)
+{
+	if (!SupportsASTCReplacement(filename))
+		return false;
+
+	u8 header[ASTC::HEADER_SIZE];
+	{
+		auto fp = FileSystem::OpenManagedCFile(filename.c_str(), "rb");
+		if (!fp || std::fread(header, 1, ASTC::HEADER_SIZE, fp.get()) != ASTC::HEADER_SIZE)
+		{
+			Console.Warning("Failed to read ASTC replacement texture header %s", filename.c_str());
+			return false;
+		}
+	}
+
+	ASTC::HeaderInfo info;
+	const ASTC::ParseResult pres =
+		ASTC::ParseHeader(header, ASTC::HEADER_SIZE, &info, g_gs_device->GetMaxTextureSize());
+	if (pres != ASTC::ParseResult::Ok)
+	{
+		const char* reason;
+		switch (pres)
+		{
+			case ASTC::ParseResult::BadMagic:
+				reason = "bad magic";
+				break;
+			case ASTC::ParseResult::BadBlockFootprint:
+				reason = "unsupported block footprint";
+				break;
+			case ASTC::ParseResult::NotTwoDimensional:
+				reason = "not a 2D image";
+				break;
+			case ASTC::ParseResult::BadImageDimensions:
+				reason = "zero image dimension";
+				break;
+			case ASTC::ParseResult::TruncatedHeader:
+				reason = "truncated header";
+				break;
+			case ASTC::ParseResult::TooLarge:
+				reason = "dimensions exceed the device texture size limit";
+				break;
+			default:
+				reason = "unknown error";
+				break;
+		}
+		Console.Warning("Rejecting ASTC replacement texture %s: %s.", filename.c_str(), reason);
+		return false;
+	}
+
+	u32 pitch = 0;
+	u32 payload_size = 0;
+	if (!ASTC::CalculatePayloadSize(info, &pitch, &payload_size))
+	{
+		Console.Warning("Rejecting ASTC replacement texture %s: payload size overflows.", filename.c_str());
+		return false;
+	}
+
+	// Exact file size: a truncated payload or trailing bytes are both corrupt containers,
+	// and the header alone cannot tell us — it carries no size field.
+	const s64 expected_size = static_cast<s64>(ASTC::HEADER_SIZE) + static_cast<s64>(payload_size);
+	const s64 file_size = FileSystem::GetPathFileSize(filename.c_str());
+	if (!ASTC::ValidateFileSize(info, file_size))
+	{
+		Console.Warning("Rejecting ASTC replacement texture %s: file is %" PRId64
+						" bytes, expected %" PRId64 " for a %ux%u image at %ux%u blocks.",
+			filename.c_str(), file_size, expected_size, info.width, info.height, info.block_width,
+			info.block_height);
+		return false;
+	}
+
+	tex->width = info.width;
+	tex->height = info.height;
+	tex->format = info.format;
+	tex->pitch = pitch;
+	tex->data.resize(payload_size);
+
+	auto fp = FileSystem::OpenManagedCFile(filename.c_str(), "rb");
+	if (!fp || (std::fseek(fp.get(), ASTC::HEADER_SIZE, SEEK_SET) != 0) ||
+		std::fread(tex->data.data(), 1, payload_size, fp.get()) != payload_size)
+	{
+		Console.Warning("Failed to read ASTC replacement texture payload %s", filename.c_str());
+		return false;
+	}
+
+	return true;
+}
+
+static const char* KTXParseResultToString(KTX::ParseResult result)
+{
+	switch (result)
+	{
+		case KTX::ParseResult::Ok:
+			return "no error";
+		case KTX::ParseResult::TruncatedHeader:
+			return "truncated header";
+		case KTX::ParseResult::BadIdentifier:
+			return "bad KTX1 identifier";
+		case KTX::ParseResult::BadEndianness:
+			return "unsupported endianness";
+		case KTX::ParseResult::BadTypeFields:
+			return "invalid compressed-format fields";
+		case KTX::ParseResult::BadBaseFormat:
+			return "base format is not RGBA";
+		case KTX::ParseResult::BadInternalFormat:
+			return "unsupported or non-linear ASTC format";
+		case KTX::ParseResult::BadTextureType:
+			return "texture is not a single 2D image";
+		case KTX::ParseResult::BadDimensions:
+			return "invalid image dimensions";
+		case KTX::ParseResult::TooLarge:
+			return "dimensions exceed the device texture size limit";
+		case KTX::ParseResult::BadMipCount:
+			return "invalid mip count";
+		case KTX::ParseResult::BadKeyValueData:
+			return "malformed key/value data";
+		case KTX::ParseResult::BadOrientation:
+			return "missing, duplicate, or unsupported orientation";
+		case KTX::ParseResult::BadImageSize:
+			return "mip imageSize does not match its ASTC geometry";
+		case KTX::ParseResult::TruncatedLevel:
+			return "truncated mip chain";
+		case KTX::ParseResult::TrailingBytes:
+			return "trailing bytes after the mip chain";
+	}
+	return "unknown error";
+}
+
+static bool KTXLoader(const std::string& filename, GSTextureReplacements::ReplacementTexture* tex, bool only_base_image)
+{
+	(void)only_base_image; // KTX is the explicit-chain format; always load every supplied level.
+	if (!SupportsASTCReplacement(filename))
+		return false;
+	return GSTextureReplacements::LoadKTXTexture(filename, tex, g_gs_device->GetMaxTextureSize());
+}
+
+bool GSTextureReplacements::LoadKTXTexture(
+	const std::string& filename, GSTextureReplacements::ReplacementTexture* tex, u32 max_texture_size)
+{
+	auto fp = FileSystem::OpenManagedCFile(filename.c_str(), "rb");
+	if (!fp)
+		return false;
+
+	std::array<u8, KTX::HEADER_SIZE> header{};
+	if (std::fread(header.data(), 1, header.size(), fp.get()) != header.size())
+	{
+		Console.Warning("Rejecting KTX replacement texture %s: truncated header.", filename.c_str());
+		return false;
+	}
+
+	KTX::ContainerInfo info{};
+	KTX::ParseResult result = KTX::ParseHeader(header.data(), header.size(), &info, max_texture_size);
+	if (result != KTX::ParseResult::Ok)
+	{
+		Console.Warning("Rejecting KTX replacement texture %s: %s.", filename.c_str(), KTXParseResultToString(result));
+		return false;
+	}
+
+	const s64 file_size = FileSystem::FSize64(fp.get());
+	std::array<KTX::LevelInfo, KTX::MAX_MIP_LEVELS> levels{};
+	result = KTX::BuildLevelLayout(info, file_size, &levels);
+	if (result != KTX::ParseResult::Ok)
+	{
+		Console.Warning("Rejecting KTX replacement texture %s: %s.", filename.c_str(), KTXParseResultToString(result));
+		return false;
+	}
+
+	std::vector<u8> metadata(info.key_value_bytes);
+	if ((FileSystem::FSeek64(fp.get(), KTX::HEADER_SIZE, SEEK_SET) != 0) ||
+		(!metadata.empty() && std::fread(metadata.data(), 1, metadata.size(), fp.get()) != metadata.size()))
+	{
+		Console.Warning("Rejecting KTX replacement texture %s: truncated key/value data.", filename.c_str());
+		return false;
+	}
+
+	result = KTX::ValidateKeyValueData(metadata.data(), metadata.size());
+	if (result != KTX::ParseResult::Ok)
+	{
+		Console.Warning("Rejecting KTX replacement texture %s: %s.", filename.c_str(), KTXParseResultToString(result));
+		return false;
+	}
+
+	// Check every imageSize field before allocating any payload. A malformed
+	// later level must not leave the loader holding earlier mip buffers.
+	for (u32 level = 0; level < info.mip_count; level++)
+	{
+		const KTX::LevelInfo& level_info = levels[level];
+		if (FileSystem::FSeek64(fp.get(), static_cast<s64>(level_info.data_offset - sizeof(u32)), SEEK_SET) != 0)
+			return false;
+
+		std::array<u8, sizeof(u32)> image_size{};
+		if (std::fread(image_size.data(), 1, image_size.size(), fp.get()) != image_size.size() ||
+			KTX::ValidateLevelSize(image_size.data(), image_size.size(), level_info) != KTX::ParseResult::Ok)
+		{
+			Console.Warning("Rejecting KTX replacement texture %s: invalid imageSize for mip %u.", filename.c_str(), level);
+			return false;
+		}
+	}
+
+	GSTextureReplacements::ReplacementTexture loaded{};
+	loaded.width = info.width;
+	loaded.height = info.height;
+	loaded.format = info.format;
+	loaded.pitch = levels[0].pitch;
+	loaded.mips.reserve(info.mip_count - 1);
+
+	for (u32 level = 0; level < info.mip_count; level++)
+	{
+		const KTX::LevelInfo& level_info = levels[level];
+		std::vector<u8>* data;
+		if (level == 0)
+		{
+			data = &loaded.data;
+		}
+		else
+		{
+			auto& mip = loaded.mips.emplace_back();
+			mip.width = level_info.width;
+			mip.height = level_info.height;
+			mip.pitch = level_info.pitch;
+			data = &mip.data;
+		}
+
+		data->resize(level_info.payload_size);
+		if (FileSystem::FSeek64(fp.get(), static_cast<s64>(level_info.data_offset), SEEK_SET) != 0 ||
+			std::fread(data->data(), 1, data->size(), fp.get()) != data->size())
+		{
+			Console.Warning("Rejecting KTX replacement texture %s: truncated payload for mip %u.", filename.c_str(), level);
+			return false;
+		}
+	}
+
+	*tex = std::move(loaded);
 	return true;
 }
 
@@ -623,7 +973,24 @@ bool DDSLoader(const std::string& filename, GSTextureReplacements::ReplacementTe
 	// Read in any remaining mip levels in the file.
 	if (!only_base_image)
 	{
-		for (u32 level = 1; level <= info.mip_count; level++)
+		// info.mip_count is the DDS dwMipMapCount, which INCLUDES the base image
+		// (loaded above as level 0), so there are at most (mip_count - 1) EXTRA
+		// mip levels here. The old `level <= info.mip_count` bound loaded one
+		// level too many: many packs leave trailing padding after the last real
+		// mip (or over-declare dwMipMapCount), so that extra read succeeds and
+		// the texture is then created with mips.size()+1 levels — more than the
+		// dimensions allow — which trips GSDevice::CreateTexture's assert and
+		// aborts the GS thread (SIGABRT) in debug, or in a release build (assert
+		// compiled out) ships a garbage trailing mip that shows as corrupted
+		// graphics on minification. The whole DDS pack breaks even though BC
+		// support and the textures themselves are fine (works on NetherSX2, broken
+		// on us). Cap the level count at what the size can actually hold (the same
+		// bound the assert uses). Regressed when da04d9ef2 reverted the GS subsystem
+		// to canonical; restored here.
+		const u32 max_levels = static_cast<u32>(
+			GSDevice::GetMipmapLevelsForSize(static_cast<int>(info.width), static_cast<int>(info.height)));
+		const u32 mip_levels = std::min(info.mip_count, max_levels);
+		for (u32 level = 1; level < mip_levels; level++)
 		{
 			GSTextureReplacements::ReplacementTexture::MipData md;
 			u32 mip_size;

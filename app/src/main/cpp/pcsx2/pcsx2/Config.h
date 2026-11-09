@@ -228,6 +228,10 @@ enum class AspectRatioType : u8
 	R4_3,
 	R16_9,
 	R10_7,
+	R21_9,
+	R20_9,
+	R19_5_9,
+	Custom,
 	MaxCount
 };
 
@@ -238,6 +242,19 @@ enum class FMVAspectRatioSwitchType : u8
 	R4_3,
 	R16_9,
 	R10_7,
+	R21_9,
+	R20_9,
+	R19_5_9,
+	Custom,
+	MaxCount
+};
+
+enum class DisplayRotation : u8
+{
+	Rot0,
+	Rot90,
+	Rot180,
+	Rot270,
 	MaxCount
 };
 
@@ -420,12 +437,30 @@ enum class GSCASMode : u8
 	SharpenAndResize,
 };
 
+enum class GSUpscaler : u8
+{
+	Off,           ///< Plain bilinear present-time stretch (default).
+	MetalFXSpatial, ///< Apple MetalFX spatial upscaler (Metal backend, macOS 13+).
+	// Appended rather than inserted: this enum is persisted as an integer, so renumbering
+	// MetalFXSpatial would silently re-point every existing config at a different upscaler.
+	FSR1,          ///< AMD FidelityFX Super Resolution 1 (EASU + RCAS compute passes, Vulkan).
+	SGSR,          ///< Qualcomm Snapdragon Game Super Resolution 1 (single compute pass, Vulkan).
+	SGSREdge,      ///< SGSR's edge-direction variant: same pass, directional Lanczos, dearer.
+};
+
 enum class GSSGSRMode : u8
 {
 	Disabled,
 	Quality,
 	Balanced,
 	Performance,
+};
+
+enum class GSTextureUpscaleMode : u8
+{
+	Off,
+	Raisr2x, ///< One RAISR pass with the PS2-trained filters.
+	Raisr4x, ///< The same filters twice on textures up to 512 pixels per side; larger ones get one pass (2x).
 };
 
 enum class GSHWAutoFlushLevel : u8
@@ -721,6 +756,9 @@ struct Pcsx2Config
 	// ------------------------------------------------------------------------
 	struct GSOptions
 	{
+		bool BackThread=false;
+		bool BackThreadResolved=false;
+		static const char* DisplayRotationNames[(size_t)DisplayRotation::MaxCount + 1];
 		static const char* AspectRatioNames[];
 		static const char* FMVAspectRatioSwitchNames[];
 		static const char* BlendingLevelNames[];
@@ -778,6 +816,8 @@ struct Pcsx2Config
 					ExtendedUpscalingMultipliers : 1,
 					PCRTCAntiBlur : 1,
 					DisableInterlaceOffset : 1,
+					MovieCombDeinterlace : 1,
+					TrimUpscaledEdges : 1,
 					PCRTCOffsets : 1,
 					PCRTCOverscan : 1,
 					IntegerScaling : 1,
@@ -785,6 +825,7 @@ struct Pcsx2Config
 					UseDebugBlend : 1,
 					UseBlitSwapChain : 1,
 					DisableShaderCache : 1,
+					PrecompilePipelines : 1,
 					DisableAsyncTFXCompile : 1,
 					DisableFramebufferFetch : 1,
 					DisableVertexShaderExpand : 1,
@@ -834,6 +875,8 @@ struct Pcsx2Config
 					UserHacks_NativePaletteDraw : 1,
 					UserHacks_EstimateTextureRegion : 1,
 					UserHacks_DrawBuffering : 1,
+					UserHacks_RewriteLargeSTCoords : 1,
+					UserHacks_NativeCounterDraws : 1,
 					FXAA : 1,
 					ShadeBoost : 1,
 					DumpGSData : 1,
@@ -875,6 +918,16 @@ struct Pcsx2Config
 		GSInterlaceMode InterlaceMode = DEFAULT_INTERLACE_MODE;
 		GSPostBilinearMode LinearPresent = DEFAULT_BILINEAR_FILTERING_MODE;
 
+		DisplayRotation Rotation = DisplayRotation::Rot0;
+		bool DisableSwapChainPreRotation = false;
+		float CustomAspectRatio = 16.0f / 9.0f;
+		bool PortraitRenderTopAlign = true;
+		int PortraitRenderTopInset = 0;
+		bool LandscapeRenderTopAlign = false;
+		bool SideBySideVR = false;
+		int SideBySideVRSize = 80;
+		int SideBySideVRDistance = 0;
+		int SideBySideVRHeight = 0;
 		float StretchY = 100.0f;
 		int Crop[4] = {};
 		int LocalMultiplayerMode = 0;
@@ -896,10 +949,14 @@ struct Pcsx2Config
 		bool BlendingAccuracyUserOverride = false;
 		BiFiltering TextureFiltering = DEFAULT_TEXTURE_FILTERING_MODE;
 		TexturePreloadingLevel TexturePreloading = TexturePreloadingLevel::Full;
+        GSTextureUpscaleMode TextureUpscale = GSTextureUpscaleMode::Off;
 		GSDumpCompressionMethod GSDumpCompression = GSDumpCompressionMethod::Zstandard;
 		GSHardwareDownloadMode HWDownloadMode = GSHardwareDownloadMode::Enabled;
 		GSCASMode CASMode = DEFAULT_CAS_MODE;
 		GSSGSRMode SGSRMode = DEFAULT_SGSR_MODE;
+		GSUpscaler Upscaler=GSUpscaler::Off;
+		u8 FSR_Sharpness=50;
+		u8 SGSR_Sharpness=100;
 		u8 Dithering = 2;
 		u8 MaxAnisotropy = 0;
 		u8 TVShader = 0;
@@ -943,6 +1000,7 @@ struct Pcsx2Config
 		// that is already presenting the game, and the cheaper pipeline is what makes the
 		// feature pay for itself there. Falls back to 3.1 when the user's DLL predates 3.1p.
 		bool LsfgPerformance = true;
+		bool LsfgFp16 = false;
 		// Optical-flow resolution, as a percentage of the presented image (25..100). Lower is
 		// cheaper and blurrier. Handed to the library as a DIVISOR — see GSLsfg.cpp.
 		u8 LsfgFlowScale = 100;
