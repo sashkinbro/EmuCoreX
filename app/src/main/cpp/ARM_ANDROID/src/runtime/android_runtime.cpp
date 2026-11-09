@@ -130,13 +130,14 @@ static_assert(PadDualshock2::LENGTH <= 32);
 using PendingPadValues = std::array<std::atomic<u32>, PadDualshock2::LENGTH>;
 std::array<PendingPadValues, Pad::NUM_CONTROLLER_PORTS> s_pending_pad_values{};
 std::array<PendingPadValues, Pad::NUM_CONTROLLER_PORTS> s_pending_pad_press_values{};
-// Keyboard and mouse publish into separate source slots. The CPU poll merges those
-// values with the legacy gamepad/touch/network slot, so releasing one physical source
-// can never clear a button that another source is still holding.
+// Physical devices publish into separate source slots. The CPU poll merges those
+// values with the legacy touch/network slot, so releasing a touch control cannot
+// clear a physical stick/button which is still held (and vice versa).
 constexpr int PAD_INPUT_SOURCE_LEGACY = 0;
 constexpr int PAD_INPUT_SOURCE_KEYBOARD = 1;
 constexpr int PAD_INPUT_SOURCE_MOUSE = 2;
-constexpr int PAD_INPUT_SOURCE_COUNT = 3;
+constexpr int PAD_INPUT_SOURCE_GAMEPAD = 3;
+constexpr int PAD_INPUT_SOURCE_COUNT = PAD_INPUT_SOURCE_GAMEPAD + 1;
 static_assert(PAD_INPUT_SOURCE_COUNT <= 32);
 using PendingPadSourceValues =
 	std::array<std::array<std::atomic<u32>, PadDualshock2::LENGTH>, PAD_INPUT_SOURCE_COUNT>;
@@ -213,7 +214,7 @@ void PublishPadValue(u32 controller, u32 bind, float value, bool latch_press = f
 
 void PublishPadValueFromSource(u32 controller, u32 bind, float value, bool latch_press, int source)
 {
-	const int source_index = std::clamp(source, PAD_INPUT_SOURCE_KEYBOARD, PAD_INPUT_SOURCE_MOUSE);
+	const int source_index = std::clamp(source, PAD_INPUT_SOURCE_KEYBOARD, PAD_INPUT_SOURCE_COUNT - 1);
 	const u32 bits = FloatToBits(value);
 	s_pending_pad_source_values[controller][source_index][bind].store(bits, std::memory_order_relaxed);
 
@@ -224,7 +225,8 @@ void PublishPadValueFromSource(u32 controller, u32 bind, float value, bool latch
 			bits, std::memory_order_relaxed);
 		s_pending_pad_source_latches[controller][bind].fetch_or(
 			static_cast<u32>(1) << source_index, std::memory_order_relaxed);
-		event |= u64{1} << (bind + 32);
+		// The source-specific latch carries this edge; the upper event bits belong
+		// only to legacy presses, whose saved value may be from an older touch.
 	}
 	s_pending_pad_events[controller].fetch_or(event, std::memory_order_release);
 }
@@ -1677,7 +1679,7 @@ void AndroidRuntime::SetPadButtonFromSource(int pad_index, int index, int range,
 	if (!VMManager::HasValidVM())
 		return;
 
-	if (source != PAD_INPUT_SOURCE_KEYBOARD && source != PAD_INPUT_SOURCE_MOUSE)
+	if (source < PAD_INPUT_SOURCE_KEYBOARD || source >= PAD_INPUT_SOURCE_COUNT)
 	{
 		SetPadButton(pad_index, index, range, pressed);
 		return;
@@ -1752,6 +1754,25 @@ void AndroidRuntime::ResetPadState(int pad_index)
 		s_pending_pad_source_latches[controller][i].store(0, std::memory_order_relaxed);
 		PublishPadValue(controller, i, 0.0f);
 	}
+}
+
+void AndroidRuntime::ResetPadStateFromSource(int pad_index, int source)
+{
+	if (!VMManager::HasValidVM() || source < PAD_INPUT_SOURCE_KEYBOARD || source >= PAD_INPUT_SOURCE_COUNT)
+		return;
+
+	const u32 controller = static_cast<u32>(std::clamp(pad_index, 0, static_cast<int>(Pad::NUM_CONTROLLER_PORTS - 1)));
+	const u32 source_bit = u32{1} << source;
+	s_pending_arcade_source_buttons[controller][source].store(0, std::memory_order_release);
+	for (u32 bind = 0; bind < PadDualshock2::LENGTH; bind++)
+	{
+		s_pending_pad_source_values[controller][source][bind].store(0, std::memory_order_relaxed);
+		s_pending_pad_source_press_values[controller][source][bind].store(0, std::memory_order_relaxed);
+		s_pending_pad_source_latches[controller][bind].fetch_and(~source_bit, std::memory_order_relaxed);
+	}
+	// Recompute the merged values on the CPU thread. Other sources and ports retain
+	// both their held values and pending tap edges.
+	s_pending_pad_events[controller].fetch_or((u64{1} << PadDualshock2::LENGTH) - 1, std::memory_order_release);
 }
 
 void AndroidRuntime::ResetKeyStatus()
@@ -1861,7 +1882,7 @@ void PollPendingPadUpdatesOnCPUThread()
 				if ((source_latches & (static_cast<u32>(1) << source)) == 0)
 					continue;
 
-				// A complete keyboard/mouse press/release arrived between CPU polls. Expose
+				// A complete physical-source press/release arrived between CPU polls. Expose
 				// the press for this frame and republish the release for the next poll.
 				const float press_value = BitsToFloat(
 					s_pending_pad_source_press_values[controller][source][bind].load(

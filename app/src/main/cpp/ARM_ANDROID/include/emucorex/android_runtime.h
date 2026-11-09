@@ -78,6 +78,7 @@ public:
 	void SetPadButtonFromSource(int pad_index, int index, int range, bool pressed, int source);
 	void SetPadPressureModifierAmount(int amount_percent);
 	void ResetPadState(int pad_index);
+	void ResetPadStateFromSource(int pad_index, int source);
 	void ResetKeyStatus();
 	void OnHostKeyEvent(int key_code, bool pressed);
 	void OnHostMousePosition(float x, float y);

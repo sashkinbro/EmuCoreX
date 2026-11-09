@@ -114,6 +114,7 @@ object GamepadManager {
 
 private const val TAG = "GamepadManager"
 private const val MAX_PAD_SLOTS = 2
+    private const val PAD_INPUT_SOURCE_GAMEPAD = 3 // AndroidRuntime source slot.
     private const val START_TRANSPORT_HOLD_DELAY_MS = 360L
     private const val START_TAP_DURATION_MS = 70L
     private const val RUMBLE_UPDATE_INTERVAL_MS = 40L
@@ -828,7 +829,7 @@ private const val MAX_PAD_SLOTS = 2
             if (heldButton.padKey == PadKey.Start) {
                 return handleStartTransportEvent(heldButton.padIndex, event)
             }
-            EmulatorBridge.setPadButton(heldButton.padIndex, heldButton.padKey, 0, false)
+            setGamepadButton(heldButton.padIndex, heldButton.padKey, 0, false)
             return true
         }
         if (event.action == KeyEvent.ACTION_DOWN && heldButton != null) return true
@@ -877,7 +878,7 @@ private const val MAX_PAD_SLOTS = 2
         if (pressed && event.repeatCount == 0) {
             playGamepadButtonHaptic()
         }
-        EmulatorBridge.setPadButton(padIndex, padKey, range, pressed)
+        setGamepadButton(padIndex, padKey, range, pressed)
         return true
     }
 
@@ -894,9 +895,9 @@ private const val MAX_PAD_SLOTS = 2
                 val turboActive = endStartTransportHold(padIndex)
                 if (!turboActive) {
                     scope.launch {
-                        EmulatorBridge.setPadButton(padIndex, PadKey.Start, 0, true)
+                        setGamepadButton(padIndex, PadKey.Start, 0, true)
                         delay(START_TAP_DURATION_MS)
-                        EmulatorBridge.setPadButton(padIndex, PadKey.Start, 0, false)
+                        setGamepadButton(padIndex, PadKey.Start, 0, false)
                     }
                 }
                 true
@@ -1061,10 +1062,10 @@ private const val MAX_PAD_SLOTS = 2
         val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
         val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
         if (hatX != state.prevHatX || hatY != state.prevHatY) {
-            EmulatorBridge.setPadButton(padIndex, PadKey.Left, 0, hatX < -0.5f)
-            EmulatorBridge.setPadButton(padIndex, PadKey.Right, 0, hatX > 0.5f)
-            EmulatorBridge.setPadButton(padIndex, PadKey.Up, 0, hatY < -0.5f)
-            EmulatorBridge.setPadButton(padIndex, PadKey.Down, 0, hatY > 0.5f)
+            setGamepadButton(padIndex, PadKey.Left, 0, hatX < -0.5f)
+            setGamepadButton(padIndex, PadKey.Right, 0, hatX > 0.5f)
+            setGamepadButton(padIndex, PadKey.Up, 0, hatY < -0.5f)
+            setGamepadButton(padIndex, PadKey.Down, 0, hatY > 0.5f)
             state.prevHatX = hatX
             state.prevHatY = hatY
         }
@@ -1195,9 +1196,17 @@ private const val MAX_PAD_SLOTS = 2
         dispatchAnalogButton(padIndex, leftKey, (-x).coerceAtLeast(0f))
     }
 
+    private fun setGamepadButton(padIndex: Int, key: Int, range: Int, pressed: Boolean) {
+        EmulatorBridge.setPadButtonFromSource(padIndex, key, range, pressed, PAD_INPUT_SOURCE_GAMEPAD)
+    }
+
+    private fun resetGamepadPadState(padIndex: Int) {
+        EmulatorBridge.resetPadStateFromSource(padIndex, PAD_INPUT_SOURCE_GAMEPAD)
+    }
+
     private fun dispatchAnalogButton(padIndex: Int, key: Int, value: Float) {
         val range = (value.coerceIn(0f, 1f) * 255f).roundToInt().coerceIn(0, 255)
-        EmulatorBridge.setPadButton(padIndex, key, range, range > 0)
+        setGamepadButton(padIndex, key, range, range > 0)
     }
 
     private fun resetChangedBindingStates(
@@ -1218,7 +1227,7 @@ private const val MAX_PAD_SLOTS = 2
             changedDeviceIds.forEach(analogStatesByDeviceId::remove)
         }
         if (emulationInputEnabled) {
-            changedPadIndices.forEach(EmulatorBridge::resetPadState)
+            changedPadIndices.forEach(::resetGamepadPadState)
         }
     }
 
@@ -1243,14 +1252,14 @@ private const val MAX_PAD_SLOTS = 2
 
         resets.forEach { reset ->
             if (reset.releaseRightStickY) {
-                EmulatorBridge.setPadButton(reset.padIndex, PadKey.RightStickUp, 0, false)
-                EmulatorBridge.setPadButton(reset.padIndex, PadKey.RightStickDown, 0, false)
+                setGamepadButton(reset.padIndex, PadKey.RightStickUp, 0, false)
+                setGamepadButton(reset.padIndex, PadKey.RightStickDown, 0, false)
             }
             reset.releaseL2PadKey?.let { padKey ->
-                EmulatorBridge.setPadButton(reset.padIndex, padKey, 0, false)
+                setGamepadButton(reset.padIndex, padKey, 0, false)
             }
             reset.releaseR2PadKey?.let { padKey ->
-                EmulatorBridge.setPadButton(reset.padIndex, padKey, 0, false)
+                setGamepadButton(reset.padIndex, padKey, 0, false)
             }
         }
     }
@@ -1534,7 +1543,7 @@ private const val MAX_PAD_SLOTS = 2
             stopPhysicalGamepadVibrationForDevice(deviceId)
             clearFallbackPadVibration(padIndex)
             if (emulationInputEnabled) {
-                EmulatorBridge.resetPadState(padIndex)
+                resetGamepadPadState(padIndex)
             }
         }
 

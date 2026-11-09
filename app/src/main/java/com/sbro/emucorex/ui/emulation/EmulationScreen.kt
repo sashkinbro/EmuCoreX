@@ -3540,6 +3540,7 @@ internal fun TouchButtonGroup(
     fun releaseTouchscreenStick(target: TouchscreenStickGestureTarget) {
         when (target) {
             TouchscreenStickGestureTarget.LEFT -> {
+                if (leftGesturePointerId == null) return
                 updateLeftAnalogStick(
                     x = 0f,
                     y = 0f,
@@ -3549,6 +3550,7 @@ internal fun TouchButtonGroup(
                 leftGesturePointerId = null
             }
             TouchscreenStickGestureTarget.RIGHT -> {
+                if (rightGesturePointerId == null) return
                 updateRightAnalogStick(
                     x = 0f,
                     y = 0f,

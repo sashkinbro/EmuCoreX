@@ -360,6 +360,7 @@ object NativeApp {
     @JvmStatic external fun onHostMouseWheel(deltaX: Float, deltaY: Float)
     @JvmStatic external fun resetKeyStatus()
     @JvmStatic external fun resetPadState(padIndex: Int)
+    @JvmStatic external fun resetPadStateFromSource(padIndex: Int, source: Int)
     @JvmStatic external fun setAspectRatio(type: Int)
     @JvmStatic external fun renderUpscalemultiplier(value: Float)
     @JvmStatic external fun getMaxUpscaleMultiplier(renderer: Int): Int

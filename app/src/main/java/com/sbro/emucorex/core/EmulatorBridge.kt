@@ -1361,6 +1361,15 @@ object EmulatorBridge {
         } catch (_: Exception) { }
     }
 
+    fun resetPadStateFromSource(padIndex: Int, source: Int) {
+        if (!isNativeLoaded || !isVmActive) return
+        // Source state is published atomically, just like ordinary input. Keeping this
+        // synchronous prevents a queued disconnect reset from clearing a new assignment.
+        try {
+            NativeApp.resetPadStateFromSource(padIndex, source)
+        } catch (_: Exception) { }
+    }
+
     fun resetKeyStatus() {
         if (!isNativeLoaded || !isVmActive) return
         launchSerial {

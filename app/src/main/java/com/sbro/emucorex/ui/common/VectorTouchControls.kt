@@ -675,13 +675,16 @@ fun VectorAnalogStick(
     var lastSentY by remember { mutableIntStateOf(0) }
     var activePointerId by remember { mutableStateOf<Long?>(null) }
 
+    val currentOnValueChange by rememberUpdatedState(onValueChange)
+    val currentOnTouchStart by rememberUpdatedState(onTouchStart)
+
     fun dispatchStickValue(x: Float, y: Float) {
         val quantizedX = (x * 255f).roundToInt()
         val quantizedY = (y * 255f).roundToInt()
         if (quantizedX == lastSentX && quantizedY == lastSentY) return
         lastSentX = quantizedX
         lastSentY = quantizedY
-        onValueChange?.invoke(quantizedX / 255f, quantizedY / 255f)
+        currentOnValueChange?.invoke(quantizedX / 255f, quantizedY / 255f)
     }
 
     fun updateStickFromPosition(position: Offset) {
@@ -710,7 +713,7 @@ fun VectorAnalogStick(
     }
 
     val pointerModifier = if (interactive && onValueChange != null) {
-        Modifier.pointerInput(Unit) {
+        Modifier.pointerInput(interactive) {
             try {
                 awaitPointerEventScope {
                     while (true) {
@@ -728,7 +731,7 @@ fun VectorAnalogStick(
                             if (down != null) {
                                 pointerId = down.id.value
                                 activePointerId = pointerId
-                                onTouchStart?.invoke()
+                                currentOnTouchStart?.invoke()
                                 updateStickFromPosition(down.position)
                                 down.consume()
                             }
