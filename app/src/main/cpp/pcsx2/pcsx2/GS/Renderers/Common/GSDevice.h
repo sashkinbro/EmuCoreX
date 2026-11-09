@@ -1700,6 +1700,8 @@ protected:
 	}
 	void DoStretchRectWithAssertions(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, 
 		ShaderConvertSelector shader, Filter filter);
+	bool TryStretchRectAsCopy(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
+		ShaderConvertSelector shader);
 public:
 	GSDevice();
 	virtual ~GSDevice();
