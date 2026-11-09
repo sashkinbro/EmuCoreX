@@ -5839,7 +5839,8 @@ void GSTextureCache::InvalidateVideoMem(const GSOffset& off, const GSVector4i& r
 			}
 
 			const u32 bbp = bp + bw * 0x10;
-			if (bw >= 16 && bbp < 16384)
+			// This fixed half-target page was fully checked on the first iteration.
+			if (pgs == 0 && bw >= 16 && bbp < 16384)
 			{
 				// Detect half of the render target (fix snow engine game)
 				// Target Page (8KB) have always a width of 64 pixels
