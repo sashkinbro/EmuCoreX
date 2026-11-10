@@ -24,28 +24,30 @@ namespace IopThread
 	struct CpuCapacity
 	{
 		u32 processor_id = 0; // the OS's number for it (Linux: linux_id); the mask bit is this number
-		u32 capacity = 0; // cpu_capacity, else the maximum frequency, else cpuinfo's frequency: only ratios matter
+		u32 capacity = 0; // scheduler cpu_capacity; 0 when unavailable, never a frequency
 		bool first_thread = true; // false for the second hardware thread of a core, which is never pinned to
-		u64 frequency_hz = 0; // what cpuinfo reports, 0 when it cannot read it (the ROCKNIX and Android kernels leave it at 0)
+		u64 frequency_hz = 0; // cpuinfo_max_freq, else cpuinfo's frequency; 0 when unavailable
+		u32 microarchitecture = 0; // cpuinfo_uarch; unknown when the OS cannot identify the core
 	};
 
-	/// A processor is in the tier when its capacity is at least this fraction of the fastest one's.
-	/// 0.75 keeps a 4x A715 at 855 beside an X3 at 1024 (0.83), and drops an A510 at 280 (0.27).
-	/// Mid tiers on 1+2+2+3 parts sit around 0.80 to 0.90 and are kept on purpose.
-	inline constexpr double kPerformanceClusterRatio = 0.75;
+	/// Capacity fallback for unidentified cores. Oryon performance cores can rate 762/1024,
+	/// and all-big Dimensity parts also have a slower performance tier. Core types take priority:
+	/// known little cores are excluded on mixed CPUs even if their reported capacities are equal.
+	inline constexpr double kPerformanceClusterRatio = 0.50;
+	/// Frequencies do not compare different microarchitectures as well as scheduler capacities.
+	inline constexpr double kFrequencyClusterRatio = 0.75;
 
-	/// Every processor within kPerformanceClusterRatio of the fastest one. Deliberately not "the
-	/// cluster owning the fastest core": on any 1+3+4 flagship the prime core is a cluster of one,
-	/// and confining the emulation threads to a single core is worse than not confining them. The
-	/// prime and the big cores form one mask, which is what is meant by "performance cores".
-	///
-	/// 0 when no processor has a reading (the cores cannot be told apart): the caller must not
-	/// confine anything then, and ResolveMode takes it as "no spare big core".
+	/// Known performance cores plus unidentified cores supported by a complete capacity or
+	/// frequency reading. A homogeneous little-core CPU keeps its own cores (e.g. A523/A55).
+	/// Capacity and frequency units are never mixed. Missing readings do not discard known core
+	/// types, but an entirely unidentified CPU without a complete reading returns 0.
 	u64 PerformanceMask(const std::vector<CpuCapacity>& cpus);
 
 	/// What ResolveMode needs to know about a host, from the topology: the performance-core count is
 	/// the number of processors in the mask.
 	HostCpuInfo MakeHostInfo(bool is_arm64, u32 total_cores, u64 performance_mask);
+	/// One core per emulation worker, plus two for the OS/audio/GS back thread.
+	bool HasIopThreadCores(const HostCpuInfo& host, bool mtvu);
 
 	/// The processor numbers in the order pinned threads take them: fastest first, one entry per core (the second hardware
 	/// thread of a core is left out). The key is the capacity, then the frequency cpuinfo reports, then the processor number,

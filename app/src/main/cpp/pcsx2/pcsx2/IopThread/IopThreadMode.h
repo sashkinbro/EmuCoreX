@@ -65,8 +65,8 @@ namespace IopThread
 	{
 		bool is_arm64 = false; // both modes are ARM64-only: the x86 IOP JIT is not audited for a second thread
 		u32 total_cores = 0;
-		/// Cores of at least 0.75 of the fastest core's speed (GetPerformanceCoresMask() in
-		/// VMManager.cpp). 0 when the cores cannot be told apart or cannot be read.
+		/// Physical performance cores identified from microarchitecture or complete capacity /
+		/// frequency readings. Homogeneous CPUs use their own cores. 0 when topology is unknown.
 		u32 performance_cores = 0;
 	};
 

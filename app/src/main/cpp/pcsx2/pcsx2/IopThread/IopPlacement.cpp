@@ -2,26 +2,102 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "IopThread/IopPlacement.h"
+#include "cpuinfo.h"
 
 #include <algorithm>
 #include <bit>
 
+namespace
+{
+	enum class CoreKind { Unknown, Little, Performance };
+	CoreKind ClassifyCore(u32 uarch)
+	{
+		switch (uarch)
+		{
+			case cpuinfo_uarch_cortex_a5:
+			case cpuinfo_uarch_cortex_a7:
+			case cpuinfo_uarch_cortex_a32:
+			case cpuinfo_uarch_cortex_a35:
+			case cpuinfo_uarch_cortex_a53:
+			case cpuinfo_uarch_cortex_a55r0:
+			case cpuinfo_uarch_cortex_a55:
+			case cpuinfo_uarch_cortex_a510:
+			case cpuinfo_uarch_cortex_a520:
+			case cpuinfo_uarch_cortex_a320:
+			case cpuinfo_uarch_lumex_c1_nano:
+				return CoreKind::Little;
+			case cpuinfo_uarch_cortex_a57:
+			case cpuinfo_uarch_cortex_a65:
+			case cpuinfo_uarch_cortex_a72:
+			case cpuinfo_uarch_cortex_a73:
+			case cpuinfo_uarch_cortex_a75:
+			case cpuinfo_uarch_cortex_a76:
+			case cpuinfo_uarch_cortex_a77:
+			case cpuinfo_uarch_cortex_a78:
+			case cpuinfo_uarch_cortex_a710:
+			case cpuinfo_uarch_cortex_a715:
+			case cpuinfo_uarch_cortex_a720:
+			case cpuinfo_uarch_cortex_a725:
+			case cpuinfo_uarch_cortex_x1:
+			case cpuinfo_uarch_cortex_x2:
+			case cpuinfo_uarch_cortex_x3:
+			case cpuinfo_uarch_cortex_x4:
+			case cpuinfo_uarch_cortex_x925:
+			case cpuinfo_uarch_lumex_c1_ultra:
+			case cpuinfo_uarch_lumex_c1_premium:
+			case cpuinfo_uarch_lumex_c1_pro:
+			case cpuinfo_uarch_oryon:
+			case cpuinfo_uarch_oryon_v3:
+			case cpuinfo_uarch_exynos_m1:
+			case cpuinfo_uarch_exynos_m2:
+			case cpuinfo_uarch_exynos_m3:
+			case cpuinfo_uarch_exynos_m4:
+			case cpuinfo_uarch_exynos_m5:
+			case cpuinfo_uarch_denver:
+			case cpuinfo_uarch_denver2:
+			case cpuinfo_uarch_carmel:
+				return CoreKind::Performance;
+			default:
+				return CoreKind::Unknown;
+		}
+	}
+
+	bool IsUsableCore(const IopThread::CpuCapacity& cpu)
+	{
+		return cpu.first_thread && cpu.processor_id < 64;
+	}
+}
+
 u64 IopThread::PerformanceMask(const std::vector<CpuCapacity>& cpus)
 {
-	u32 peak = 0;
+	u64 peak_capacity = 0, peak_frequency = 0;
+	bool complete_capacity = true, complete_frequency = true, all_little = true;
 	for (const CpuCapacity& cpu : cpus)
-		peak = std::max(peak, cpu.capacity);
-	if (peak == 0)
-		return 0;
-
-	const u32 threshold = static_cast<u32>(static_cast<double>(peak) * kPerformanceClusterRatio);
+	{
+		if (!IsUsableCore(cpu))
+			continue;
+		peak_capacity = std::max(peak_capacity, static_cast<u64>(cpu.capacity));
+		peak_frequency = std::max(peak_frequency, cpu.frequency_hz);
+		complete_capacity &= cpu.capacity != 0;
+		complete_frequency &= cpu.frequency_hz != 0;
+		all_little &= ClassifyCore(cpu.microarchitecture) == CoreKind::Little;
+	}
+	const bool use_capacity = complete_capacity && peak_capacity != 0;
+	const bool use_frequency = !use_capacity && complete_frequency && peak_frequency != 0;
+	const long double threshold = use_capacity ? peak_capacity * kPerformanceClusterRatio :
+		peak_frequency * kFrequencyClusterRatio;
 
 	u64 mask = 0;
 	for (const CpuCapacity& cpu : cpus)
 	{
-		if (!cpu.first_thread || cpu.capacity < threshold || cpu.processor_id >= 64)
+		if (!IsUsableCore(cpu))
 			continue;
-		mask |= static_cast<u64>(1) << cpu.processor_id;
+		const CoreKind kind = ClassifyCore(cpu.microarchitecture);
+		const bool identified = kind == CoreKind::Performance || (kind == CoreKind::Little && all_little);
+		const bool inferred = kind == CoreKind::Unknown &&
+			((use_capacity && cpu.capacity >= threshold) || (use_frequency && cpu.frequency_hz >= threshold));
+		if (identified || inferred)
+			mask |= static_cast<u64>(1) << cpu.processor_id;
 	}
 	return mask;
 }
@@ -56,6 +132,12 @@ IopThread::HostCpuInfo IopThread::MakeHostInfo(bool is_arm64, u32 total_cores, u
 	host.total_cores = total_cores;
 	host.performance_cores = static_cast<u32>(std::popcount(performance_mask));
 	return host;
+}
+
+bool IopThread::HasIopThreadCores(const HostCpuInfo& host, bool mtvu)
+{
+	const u32 workers = 3 + (mtvu ? 1 : 0);
+	return host.performance_cores >= workers && host.total_cores >= workers + 2;
 }
 
 IopThread::TierPlan IopThread::PlanTier(u64 performance_mask, bool mtvu, bool iop_thread)

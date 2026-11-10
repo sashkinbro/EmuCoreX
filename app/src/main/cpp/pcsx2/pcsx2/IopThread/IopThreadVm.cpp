@@ -30,6 +30,7 @@
 #include "common/Console.h"
 
 #include "fmt/format.h"
+#include "cpuinfo.h"
 
 #include <algorithm>
 #include <fstream>
@@ -51,13 +52,35 @@ namespace IopThread
 	u64 PerformanceCoreMask()
 	{
 		std::vector<CpuCapacity> capacities;
-		for (u32 cpu = 0; cpu < std::min(64u, std::thread::hardware_concurrency()); ++cpu)
+		const bool have_cpuinfo = cpuinfo_initialize();
+		const u32 count = have_cpuinfo ? cpuinfo_get_processors_count() : std::thread::hardware_concurrency();
+		for (u32 index = 0; index < count; ++index)
 		{
-			const std::string path = "/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/cpu_capacity";
-			std::ifstream input(path);
-			u32 capacity = 0;
-			if (!(input >> capacity)) return 0;
-			capacities.push_back({cpu, capacity});
+			const cpuinfo_processor* processor = have_cpuinfo ? cpuinfo_get_processor(index) : nullptr;
+			if (processor && processor->smt_id != 0)
+				continue;
+#if defined(__linux__)
+			const u32 cpu = processor ? processor->linux_id : index;
+#else
+			const u32 cpu = index;
+#endif
+			if (cpu >= 64)
+				continue;
+			CpuCapacity reading;
+			reading.processor_id = cpu;
+			if (processor && processor->core)
+			{
+				reading.microarchitecture = processor->core->uarch;
+				reading.frequency_hz = processor->core->frequency;
+			}
+			const std::string base = "/sys/devices/system/cpu/cpu" + std::to_string(cpu);
+			std::ifstream capacity_input(base + "/cpu_capacity");
+			capacity_input >> reading.capacity;
+			std::ifstream frequency_input(base + "/cpufreq/cpuinfo_max_freq");
+			u64 frequency_khz = 0;
+			if (frequency_input >> frequency_khz && frequency_khz > 0 && frequency_khz < 1000000000)
+				reading.frequency_hz = frequency_khz * 1000;
+			capacities.push_back(reading);
 		}
 		return PerformanceMask(capacities);
 	}
