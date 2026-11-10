@@ -426,8 +426,7 @@ open class MainActivity : ComponentActivity() {
         if (isHostPadKeyCode(event.keyCode)) return true
 
         val device = event.device ?: return false
-        if (!device.supportsSource(android.view.InputDevice.SOURCE_KEYBOARD)) return false
-        return when (event.keyCode) {
+        return device.supportsSource(android.view.InputDevice.SOURCE_KEYBOARD) && when (event.keyCode) {
             KeyEvent.KEYCODE_BACK,
             KeyEvent.KEYCODE_HOME,
             KeyEvent.KEYCODE_APP_SWITCH,

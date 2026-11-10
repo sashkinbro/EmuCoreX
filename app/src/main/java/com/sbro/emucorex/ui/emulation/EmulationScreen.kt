@@ -4008,8 +4008,11 @@ private fun EmulationSidebarMenu(
     modifier: Modifier = Modifier
 ) {
     val sectionTitleColor = MaterialTheme.colorScheme.primary
-    16.dp
     val sectionSpacing = 16.dp
+    // This native capability is independent of tab visibility and scroll position.
+    val maxUpscaleMultiplier = remember(uiState.renderer) {
+        EmulatorBridge.getMaxUpscaleMultiplier(uiState.renderer)
+    }
     val sectionLabelInset = 4.dp
     val sectionLabelTopPadding = 8.dp
     val navPadding = WindowInsets.navigationBars.asPaddingValues()
@@ -4096,7 +4099,7 @@ private fun EmulationSidebarMenu(
     )
 
     val menuContent: LazyListScope.() -> Unit = {
-            item {
+            item(key = "game-header", contentType = "game-header") {
                 Surface(
                     shape = neonShape(22.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
@@ -4536,369 +4539,437 @@ private fun EmulationSidebarMenu(
                             GameMenuTabId.CONTROLS,
                             uiState.gameMenuSectionOrder
                         ).filterNot(uiState.hiddenGameMenuSections::contains)
-                        menuSection(controlsSections, sectionSpacing) { section ->
+                        menuRows(controlsSections) { section ->
                                 when (section) {
                                     GameMenuSectionId.CONTROLS_GENERAL -> {
-                        SidebarSectionTitle(
-                            text = stringResource(R.string.settings_controls_tab).uppercase(),
-                            color = sectionTitleColor,
-                            topPadding = sectionLabelTopPadding,
-                            horizontalInset = sectionLabelInset
-                        )
+                                        row("settings_controls_tab", "SidebarSectionTitle") {
+                                            SidebarSectionTitle(
+                                                text = stringResource(R.string.settings_controls_tab).uppercase(),
+                                                color = sectionTitleColor,
+                                                topPadding = sectionLabelTopPadding,
+                                                horizontalInset = sectionLabelInset
+                                            )
+                                        }
 
-                        MenuButton(
-                            icon = Icons.Rounded.TouchApp,
-                            text = stringResource(R.string.settings_edit_controls),
-                            onClick = onOpenControlsEditor,
-                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)
-                        )
+                                        row("settings_edit_controls", "MenuButton") {
+                                            MenuButton(
+                                                icon = Icons.Rounded.TouchApp,
+                                                text = stringResource(R.string.settings_edit_controls),
+                                                onClick = onOpenControlsEditor,
+                                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)
+                                            )
+                                        }
 
-                        MenuButton(
-                            icon = if (uiState.controlsVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                            text = stringResource(if (uiState.controlsVisible) R.string.emulation_hide_controls else R.string.emulation_show_controls),
-                            onClick = onToggleControls,
-                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.34f)
-                        )
+                                        row("emulation_hide_controls", "MenuButton") {
+                                            MenuButton(
+                                                icon = if (uiState.controlsVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                                                text = stringResource(if (uiState.controlsVisible) R.string.emulation_hide_controls else R.string.emulation_show_controls),
+                                                onClick = onToggleControls,
+                                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.34f)
+                                            )
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_gamepad_hide_overlay),
-                            checked = uiState.hideOverlayOnGamepad,
-                            onCheckedChange = onSetHideOverlayOnGamepad,
-                            helpText = stringResource(R.string.settings_help_hide_overlay_on_gamepad),
-                            onResetToDefault = { onSetHideOverlayOnGamepad(overlayDefaults.hideOverlayOnGamepad) }
-                        )
+                                        row("settings_gamepad_hide_overlay", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_gamepad_hide_overlay),
+                                                checked = uiState.hideOverlayOnGamepad,
+                                                onCheckedChange = onSetHideOverlayOnGamepad,
+                                                helpText = stringResource(R.string.settings_help_hide_overlay_on_gamepad),
+                                                onResetToDefault = { onSetHideOverlayOnGamepad(overlayDefaults.hideOverlayOnGamepad) }
+                                            )
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_compact_controls),
-                            checked = uiState.compactControls,
-                            onCheckedChange = onSetCompactControls,
-                            helpText = stringResource(R.string.settings_help_compact_controls),
-                            onResetToDefault = { onSetCompactControls(globalDefaults.compactControls) }
-                        )
+                                        row("settings_compact_controls", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_compact_controls),
+                                                checked = uiState.compactControls,
+                                                onCheckedChange = onSetCompactControls,
+                                                helpText = stringResource(R.string.settings_help_compact_controls),
+                                                onResetToDefault = { onSetCompactControls(globalDefaults.compactControls) }
+                                            )
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_keep_screen_on),
-                            checked = uiState.keepScreenOn,
-                            onCheckedChange = onSetKeepScreenOn,
-                            helpText = stringResource(R.string.settings_help_keep_screen_on),
-                            onResetToDefault = { onSetKeepScreenOn(globalDefaults.keepScreenOn) }
-                        )
-
+                                        row("settings_keep_screen_on", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_keep_screen_on),
+                                                checked = uiState.keepScreenOn,
+                                                onCheckedChange = onSetKeepScreenOn,
+                                                helpText = stringResource(R.string.settings_help_keep_screen_on),
+                                                onResetToDefault = { onSetKeepScreenOn(globalDefaults.keepScreenOn) }
+                                            )
+                                        }
                                     }
 
                                     GameMenuSectionId.CONTROLS_TOUCH -> {
+                                        row("settings_touch_controls_section", "OverlaySubsectionLabel") {
+                                            OverlaySubsectionLabel(text = stringResource(R.string.settings_touch_controls_section))
+                                        }
 
-                        OverlaySubsectionLabel(text = stringResource(R.string.settings_touch_controls_section))
+                                        row("settings_overlay_scale", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_overlay_scale),
+                                                valueLabelForValue = { "$it%" },
+                                                value = uiState.overlayScale.toFloat(),
+                                                range = 50f..150f,
+                                                steps = 99,
+                                                onValueChange = { onSetOverlayScale(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_overlay_scale),
+                                                onResetToDefault = { onSetOverlayScale(overlayDefaults.overlayScale) }
+                                            )
+                                        }
 
-                        LiveSliderRow(
-                            title = stringResource(R.string.settings_overlay_scale),
-                            valueLabelForValue = { "$it%" },
-                            value = uiState.overlayScale.toFloat(),
-                            range = 50f..150f,
-                            steps = 99,
-                            onValueChange = { onSetOverlayScale(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_overlay_scale),
-                            onResetToDefault = { onSetOverlayScale(overlayDefaults.overlayScale) }
-                        )
+                                        row("settings_overlay_opacity", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_overlay_opacity),
+                                                valueLabelForValue = { "$it%" },
+                                                value = uiState.overlayOpacity.toFloat(),
+                                                range = AppPreferences.OVERLAY_OPACITY_MIN.toFloat()..
+                                                    AppPreferences.OVERLAY_OPACITY_MAX.toFloat(),
+                                                steps = AppPreferences.OVERLAY_OPACITY_MAX -
+                                                    AppPreferences.OVERLAY_OPACITY_MIN - 1,
+                                                onValueChange = { onSetOverlayOpacity(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_overlay_opacity),
+                                                onResetToDefault = { onSetOverlayOpacity(overlayDefaults.overlayOpacity) }
+                                            )
+                                        }
 
-                        LiveSliderRow(
-                            title = stringResource(R.string.settings_overlay_opacity),
-                            valueLabelForValue = { "$it%" },
-                            value = uiState.overlayOpacity.toFloat(),
-                            range = AppPreferences.OVERLAY_OPACITY_MIN.toFloat()..
-                                AppPreferences.OVERLAY_OPACITY_MAX.toFloat(),
-                            steps = AppPreferences.OVERLAY_OPACITY_MAX -
-                                AppPreferences.OVERLAY_OPACITY_MIN - 1,
-                            onValueChange = { onSetOverlayOpacity(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_overlay_opacity),
-                            onResetToDefault = { onSetOverlayOpacity(overlayDefaults.overlayOpacity) }
-                        )
+                                        row("settings_stick_toggle_target", "LiveSelectionRow") {
+                                            LiveSelectionRow(
+                                                title = stringResource(R.string.settings_stick_toggle_target),
+                                                options = listOf(
+                                                    LiveSelectionOption(AppPreferences.STICK_TOGGLE_LEFT, stringResource(R.string.settings_stick_toggle_left)),
+                                                    LiveSelectionOption(AppPreferences.STICK_TOGGLE_RIGHT, stringResource(R.string.settings_stick_toggle_right))
+                                                ),
+                                                currentValue = uiState.stickToggleTarget,
+                                                onValueChange = onSetStickToggleTarget,
+                                                helpText = stringResource(R.string.settings_help_stick_toggle_target),
+                                                onResetToDefault = { onSetStickToggleTarget(globalDefaults.stickToggleTarget) }
+                                            )
+                                        }
 
-                        LiveSelectionRow(
-                            title = stringResource(R.string.settings_stick_toggle_target),
-                            options = listOf(
-                                LiveSelectionOption(AppPreferences.STICK_TOGGLE_LEFT, stringResource(R.string.settings_stick_toggle_left)),
-                                LiveSelectionOption(AppPreferences.STICK_TOGGLE_RIGHT, stringResource(R.string.settings_stick_toggle_right))
-                            ),
-                            currentValue = uiState.stickToggleTarget,
-                            onValueChange = onSetStickToggleTarget,
-                            helpText = stringResource(R.string.settings_help_stick_toggle_target),
-                            onResetToDefault = { onSetStickToggleTarget(globalDefaults.stickToggleTarget) }
-                        )
+                                        row("emulation_stick_scale", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.emulation_stick_scale),
+                                                valueLabelForValue = { "$it%" },
+                                                value = uiState.stickScale.toFloat(),
+                                                range = AppPreferences.OVERLAY_CONTROL_SCALE_MIN.toFloat()..
+                                                    AppPreferences.OVERLAY_CONTROL_SCALE_MAX.toFloat(),
+                                                steps = AppPreferences.OVERLAY_CONTROL_SCALE_MAX -
+                                                    AppPreferences.OVERLAY_CONTROL_SCALE_MIN - 1,
+                                                onValueChange = { onSetStickScale(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_stick_scale),
+                                                onResetToDefault = { onSetStickScale(overlayDefaults.stickScale) }
+                                            )
+                                        }
 
-                        LiveSliderRow(
-                            title = stringResource(R.string.emulation_stick_scale),
-                            valueLabelForValue = { "$it%" },
-                            value = uiState.stickScale.toFloat(),
-                            range = AppPreferences.OVERLAY_CONTROL_SCALE_MIN.toFloat()..
-                                AppPreferences.OVERLAY_CONTROL_SCALE_MAX.toFloat(),
-                            steps = AppPreferences.OVERLAY_CONTROL_SCALE_MAX -
-                                AppPreferences.OVERLAY_CONTROL_SCALE_MIN - 1,
-                            onValueChange = { onSetStickScale(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_stick_scale),
-                            onResetToDefault = { onSetStickScale(overlayDefaults.stickScale) }
-                        )
+                                        row("settings_left_stick_sensitivity", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_left_stick_sensitivity),
+                                                valueLabelForValue = { "$it%" },
+                                                value = uiState.leftStickSensitivity.toFloat(),
+                                                range = 50f..200f,
+                                                steps = 149,
+                                                onValueChange = { onSetLeftStickSensitivity(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_left_stick_sensitivity),
+                                                onResetToDefault = { onSetLeftStickSensitivity(overlayDefaults.leftStickSensitivity) }
+                                            )
+                                        }
 
-                        LiveSliderRow(
-                            title = stringResource(R.string.settings_left_stick_sensitivity),
-                            valueLabelForValue = { "$it%" },
-                            value = uiState.leftStickSensitivity.toFloat(),
-                            range = 50f..200f,
-                            steps = 149,
-                            onValueChange = { onSetLeftStickSensitivity(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_left_stick_sensitivity),
-                            onResetToDefault = { onSetLeftStickSensitivity(overlayDefaults.leftStickSensitivity) }
-                        )
+                                        row("settings_right_stick_sensitivity", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_right_stick_sensitivity),
+                                                valueLabelForValue = { "$it%" },
+                                                value = uiState.rightStickSensitivity.toFloat(),
+                                                range = 50f..200f,
+                                                steps = 149,
+                                                onValueChange = { onSetRightStickSensitivity(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_right_stick_sensitivity),
+                                                onResetToDefault = { onSetRightStickSensitivity(overlayDefaults.rightStickSensitivity) }
+                                            )
+                                        }
 
-                        LiveSliderRow(
-                            title = stringResource(R.string.settings_right_stick_sensitivity),
-                            valueLabelForValue = { "$it%" },
-                            value = uiState.rightStickSensitivity.toFloat(),
-                            range = 50f..200f,
-                            steps = 149,
-                            onValueChange = { onSetRightStickSensitivity(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_right_stick_sensitivity),
-                            onResetToDefault = { onSetRightStickSensitivity(overlayDefaults.rightStickSensitivity) }
-                        )
+                                        row("settings_invert_left_stick", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_invert_left_stick),
+                                                checked = uiState.invertLeftStick,
+                                                onCheckedChange = onSetInvertLeftStick,
+                                                helpText = stringResource(R.string.settings_help_invert_left_stick),
+                                                onResetToDefault = { onSetInvertLeftStick(overlayDefaults.invertLeftStick) }
+                                            )
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_invert_left_stick),
-                            checked = uiState.invertLeftStick,
-                            onCheckedChange = onSetInvertLeftStick,
-                            helpText = stringResource(R.string.settings_help_invert_left_stick),
-                            onResetToDefault = { onSetInvertLeftStick(overlayDefaults.invertLeftStick) }
-                        )
+                                        row("settings_invert_left_stick_horizontal", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_invert_left_stick_horizontal),
+                                                checked = uiState.invertLeftStickHorizontal,
+                                                onCheckedChange = onSetInvertLeftStickHorizontal,
+                                                helpText = stringResource(R.string.settings_help_invert_left_stick_horizontal),
+                                                onResetToDefault = { onSetInvertLeftStickHorizontal(overlayDefaults.invertLeftStickHorizontal) }
+                                            )
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_invert_left_stick_horizontal),
-                            checked = uiState.invertLeftStickHorizontal,
-                            onCheckedChange = onSetInvertLeftStickHorizontal,
-                            helpText = stringResource(R.string.settings_help_invert_left_stick_horizontal),
-                            onResetToDefault = { onSetInvertLeftStickHorizontal(overlayDefaults.invertLeftStickHorizontal) }
-                        )
+                                        row("settings_invert_right_stick", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_invert_right_stick),
+                                                checked = uiState.invertRightStick,
+                                                onCheckedChange = onSetInvertRightStick,
+                                                helpText = stringResource(R.string.settings_help_invert_right_stick),
+                                                onResetToDefault = { onSetInvertRightStick(overlayDefaults.invertRightStick) }
+                                            )
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_invert_right_stick),
-                            checked = uiState.invertRightStick,
-                            onCheckedChange = onSetInvertRightStick,
-                            helpText = stringResource(R.string.settings_help_invert_right_stick),
-                            onResetToDefault = { onSetInvertRightStick(overlayDefaults.invertRightStick) }
-                        )
-
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_invert_right_stick_horizontal),
-                            checked = uiState.invertRightStickHorizontal,
-                            onCheckedChange = onSetInvertRightStickHorizontal,
-                            helpText = stringResource(R.string.settings_help_invert_right_stick_horizontal),
-                            onResetToDefault = { onSetInvertRightStickHorizontal(overlayDefaults.invertRightStickHorizontal) }
-                        )
-
+                                        row("settings_invert_right_stick_horizontal", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_invert_right_stick_horizontal),
+                                                checked = uiState.invertRightStickHorizontal,
+                                                onCheckedChange = onSetInvertRightStickHorizontal,
+                                                helpText = stringResource(R.string.settings_help_invert_right_stick_horizontal),
+                                                onResetToDefault = { onSetInvertRightStickHorizontal(overlayDefaults.invertRightStickHorizontal) }
+                                            )
+                                        }
                                     }
 
                                     GameMenuSectionId.CONTROLS_GAMEPAD -> {
+                                        row("settings_gamepad_controls_section", "OverlaySubsectionLabel") {
+                                            OverlaySubsectionLabel(text = stringResource(R.string.settings_gamepad_controls_section))
+                                        }
 
-                        OverlaySubsectionLabel(text = stringResource(R.string.settings_gamepad_controls_section))
+                                        if (!gamepadConnected) {
+                                            row("settings_gamepad_controls_disconnected_hint", "Text") {
+                                                Text(
+                                                    text = stringResource(R.string.settings_gamepad_controls_disconnected_hint),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
 
-                        if (!gamepadConnected) {
-                            Text(
-                                text = stringResource(R.string.settings_gamepad_controls_disconnected_hint),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                                        row("settings_gamepad_stick_deadzone", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_gamepad_stick_deadzone),
+                                                valueLabelForValue = { "$it%" },
+                                                value = uiState.gamepadStickDeadzone.toFloat(),
+                                                range = 0f..35f,
+                                                steps = 34,
+                                                enabled = gamepadConnected,
+                                                onValueChange = { onSetGamepadStickDeadzone(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_gamepad_stick_deadzone),
+                                                onResetToDefault = { onSetGamepadStickDeadzone(globalDefaults.gamepadStickDeadzone) }
+                                            )
+                                        }
 
-                        LiveSliderRow(
-                            title = stringResource(R.string.settings_gamepad_stick_deadzone),
-                            valueLabelForValue = { "$it%" },
-                            value = uiState.gamepadStickDeadzone.toFloat(),
-                            range = 0f..35f,
-                            steps = 34,
-                            enabled = gamepadConnected,
-                            onValueChange = { onSetGamepadStickDeadzone(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_gamepad_stick_deadzone),
-                            onResetToDefault = { onSetGamepadStickDeadzone(globalDefaults.gamepadStickDeadzone) }
-                        )
+                                        row("settings_gamepad_left_stick_sensitivity", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_gamepad_left_stick_sensitivity),
+                                                valueLabelForValue = { "$it%" },
+                                                value = uiState.gamepadLeftStickSensitivity.toFloat(),
+                                                range = 50f..200f,
+                                                steps = 149,
+                                                enabled = gamepadConnected,
+                                                onValueChange = { onSetGamepadLeftStickSensitivity(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_gamepad_left_stick_sensitivity),
+                                                onResetToDefault = { onSetGamepadLeftStickSensitivity(globalDefaults.gamepadLeftStickSensitivity) }
+                                            )
+                                        }
 
-                        LiveSliderRow(
-                            title = stringResource(R.string.settings_gamepad_left_stick_sensitivity),
-                            valueLabelForValue = { "$it%" },
-                            value = uiState.gamepadLeftStickSensitivity.toFloat(),
-                            range = 50f..200f,
-                            steps = 149,
-                            enabled = gamepadConnected,
-                            onValueChange = { onSetGamepadLeftStickSensitivity(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_gamepad_left_stick_sensitivity),
-                            onResetToDefault = { onSetGamepadLeftStickSensitivity(globalDefaults.gamepadLeftStickSensitivity) }
-                        )
+                                        row("settings_gamepad_right_stick_sensitivity", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_gamepad_right_stick_sensitivity),
+                                                valueLabelForValue = { "$it%" },
+                                                value = uiState.gamepadRightStickSensitivity.toFloat(),
+                                                range = 50f..200f,
+                                                steps = 149,
+                                                enabled = gamepadConnected,
+                                                onValueChange = { onSetGamepadRightStickSensitivity(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_gamepad_right_stick_sensitivity),
+                                                onResetToDefault = { onSetGamepadRightStickSensitivity(globalDefaults.gamepadRightStickSensitivity) }
+                                            )
+                                        }
 
-                        LiveSliderRow(
-                            title = stringResource(R.string.settings_gamepad_right_stick_sensitivity),
-                            valueLabelForValue = { "$it%" },
-                            value = uiState.gamepadRightStickSensitivity.toFloat(),
-                            range = 50f..200f,
-                            steps = 149,
-                            enabled = gamepadConnected,
-                            onValueChange = { onSetGamepadRightStickSensitivity(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_gamepad_right_stick_sensitivity),
-                            onResetToDefault = { onSetGamepadRightStickSensitivity(globalDefaults.gamepadRightStickSensitivity) }
-                        )
+                                        row("settings_gamepad_left_stick_negative_deadzone", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_gamepad_left_stick_negative_deadzone),
+                                                valueLabelForValue = { "$it%" },
+                                                value = uiState.gamepadLeftStickNegativeDeadzone.toFloat(),
+                                                range = 0f..AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX.toFloat(),
+                                                steps = AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX - 1,
+                                                enabled = gamepadConnected,
+                                                onValueChange = { onSetGamepadLeftStickNegativeDeadzone(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_gamepad_stick_negative_deadzone),
+                                                onResetToDefault = { onSetGamepadLeftStickNegativeDeadzone(globalDefaults.gamepadLeftStickNegativeDeadzone) }
+                                            )
+                                        }
 
-                        LiveSliderRow(
-                            title = stringResource(R.string.settings_gamepad_left_stick_negative_deadzone),
-                            valueLabelForValue = { "$it%" },
-                            value = uiState.gamepadLeftStickNegativeDeadzone.toFloat(),
-                            range = 0f..AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX.toFloat(),
-                            steps = AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX - 1,
-                            enabled = gamepadConnected,
-                            onValueChange = { onSetGamepadLeftStickNegativeDeadzone(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_gamepad_stick_negative_deadzone),
-                            onResetToDefault = { onSetGamepadLeftStickNegativeDeadzone(globalDefaults.gamepadLeftStickNegativeDeadzone) }
-                        )
+                                        row("settings_gamepad_right_stick_negative_deadzone", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_gamepad_right_stick_negative_deadzone),
+                                                valueLabelForValue = { "$it%" },
+                                                value = uiState.gamepadRightStickNegativeDeadzone.toFloat(),
+                                                range = 0f..AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX.toFloat(),
+                                                steps = AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX - 1,
+                                                enabled = gamepadConnected,
+                                                onValueChange = { onSetGamepadRightStickNegativeDeadzone(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_gamepad_stick_negative_deadzone),
+                                                onResetToDefault = { onSetGamepadRightStickNegativeDeadzone(globalDefaults.gamepadRightStickNegativeDeadzone) }
+                                            )
+                                        }
 
-                        LiveSliderRow(
-                            title = stringResource(R.string.settings_gamepad_right_stick_negative_deadzone),
-                            valueLabelForValue = { "$it%" },
-                            value = uiState.gamepadRightStickNegativeDeadzone.toFloat(),
-                            range = 0f..AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX.toFloat(),
-                            steps = AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX - 1,
-                            enabled = gamepadConnected,
-                            onValueChange = { onSetGamepadRightStickNegativeDeadzone(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_gamepad_stick_negative_deadzone),
-                            onResetToDefault = { onSetGamepadRightStickNegativeDeadzone(globalDefaults.gamepadRightStickNegativeDeadzone) }
-                        )
+                                        row("settings_gamepad_left_stick_anti_deadzone", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_gamepad_left_stick_anti_deadzone),
+                                                valueLabelForValue = { "$it%" },
+                                                value = uiState.gamepadLeftStickAntiDeadzone.toFloat(),
+                                                range = 0f..AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX.toFloat(),
+                                                steps = AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX - 1,
+                                                enabled = gamepadConnected,
+                                                onValueChange = { onSetGamepadLeftStickAntiDeadzone(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_gamepad_stick_anti_deadzone),
+                                                onResetToDefault = { onSetGamepadLeftStickAntiDeadzone(globalDefaults.gamepadLeftStickAntiDeadzone) }
+                                            )
+                                        }
 
-                        LiveSliderRow(
-                            title = stringResource(R.string.settings_gamepad_left_stick_anti_deadzone),
-                            valueLabelForValue = { "$it%" },
-                            value = uiState.gamepadLeftStickAntiDeadzone.toFloat(),
-                            range = 0f..AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX.toFloat(),
-                            steps = AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX - 1,
-                            enabled = gamepadConnected,
-                            onValueChange = { onSetGamepadLeftStickAntiDeadzone(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_gamepad_stick_anti_deadzone),
-                            onResetToDefault = { onSetGamepadLeftStickAntiDeadzone(globalDefaults.gamepadLeftStickAntiDeadzone) }
-                        )
+                                        row("settings_gamepad_right_stick_anti_deadzone", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_gamepad_right_stick_anti_deadzone),
+                                                valueLabelForValue = { "$it%" },
+                                                value = uiState.gamepadRightStickAntiDeadzone.toFloat(),
+                                                range = 0f..AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX.toFloat(),
+                                                steps = AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX - 1,
+                                                enabled = gamepadConnected,
+                                                onValueChange = { onSetGamepadRightStickAntiDeadzone(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_gamepad_stick_anti_deadzone),
+                                                onResetToDefault = { onSetGamepadRightStickAntiDeadzone(globalDefaults.gamepadRightStickAntiDeadzone) }
+                                            )
+                                        }
 
-                        LiveSliderRow(
-                            title = stringResource(R.string.settings_gamepad_right_stick_anti_deadzone),
-                            valueLabelForValue = { "$it%" },
-                            value = uiState.gamepadRightStickAntiDeadzone.toFloat(),
-                            range = 0f..AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX.toFloat(),
-                            steps = AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX - 1,
-                            enabled = gamepadConnected,
-                            onValueChange = { onSetGamepadRightStickAntiDeadzone(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_gamepad_stick_anti_deadzone),
-                            onResetToDefault = { onSetGamepadRightStickAntiDeadzone(globalDefaults.gamepadRightStickAntiDeadzone) }
-                        )
+                                        row("settings_gamepad_left_stick_curve", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_gamepad_left_stick_curve),
+                                                valueLabelForValue = { "$it%" },
+                                                value = uiState.gamepadLeftStickCurve.toFloat(),
+                                                range = AppPreferences.GAMEPAD_STICK_CURVE_MIN.toFloat()..AppPreferences.GAMEPAD_STICK_CURVE_MAX.toFloat(),
+                                                steps = AppPreferences.GAMEPAD_STICK_CURVE_MAX - AppPreferences.GAMEPAD_STICK_CURVE_MIN - 1,
+                                                enabled = gamepadConnected,
+                                                onValueChange = { onSetGamepadLeftStickCurve(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_gamepad_stick_curve),
+                                                onResetToDefault = { onSetGamepadLeftStickCurve(globalDefaults.gamepadLeftStickCurve) }
+                                            )
+                                        }
 
-                        LiveSliderRow(
-                            title = stringResource(R.string.settings_gamepad_left_stick_curve),
-                            valueLabelForValue = { "$it%" },
-                            value = uiState.gamepadLeftStickCurve.toFloat(),
-                            range = AppPreferences.GAMEPAD_STICK_CURVE_MIN.toFloat()..AppPreferences.GAMEPAD_STICK_CURVE_MAX.toFloat(),
-                            steps = AppPreferences.GAMEPAD_STICK_CURVE_MAX - AppPreferences.GAMEPAD_STICK_CURVE_MIN - 1,
-                            enabled = gamepadConnected,
-                            onValueChange = { onSetGamepadLeftStickCurve(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_gamepad_stick_curve),
-                            onResetToDefault = { onSetGamepadLeftStickCurve(globalDefaults.gamepadLeftStickCurve) }
-                        )
+                                        row("settings_gamepad_right_stick_curve", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_gamepad_right_stick_curve),
+                                                valueLabelForValue = { "$it%" },
+                                                value = uiState.gamepadRightStickCurve.toFloat(),
+                                                range = AppPreferences.GAMEPAD_STICK_CURVE_MIN.toFloat()..AppPreferences.GAMEPAD_STICK_CURVE_MAX.toFloat(),
+                                                steps = AppPreferences.GAMEPAD_STICK_CURVE_MAX - AppPreferences.GAMEPAD_STICK_CURVE_MIN - 1,
+                                                enabled = gamepadConnected,
+                                                onValueChange = { onSetGamepadRightStickCurve(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_gamepad_stick_curve),
+                                                onResetToDefault = { onSetGamepadRightStickCurve(globalDefaults.gamepadRightStickCurve) }
+                                            )
+                                        }
 
-                        LiveSliderRow(
-                            title = stringResource(R.string.settings_gamepad_right_stick_curve),
-                            valueLabelForValue = { "$it%" },
-                            value = uiState.gamepadRightStickCurve.toFloat(),
-                            range = AppPreferences.GAMEPAD_STICK_CURVE_MIN.toFloat()..AppPreferences.GAMEPAD_STICK_CURVE_MAX.toFloat(),
-                            steps = AppPreferences.GAMEPAD_STICK_CURVE_MAX - AppPreferences.GAMEPAD_STICK_CURVE_MIN - 1,
-                            enabled = gamepadConnected,
-                            onValueChange = { onSetGamepadRightStickCurve(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_gamepad_stick_curve),
-                            onResetToDefault = { onSetGamepadRightStickCurve(globalDefaults.gamepadRightStickCurve) }
-                        )
+                                        row("settings_gamepad_right_stick_up_to_r2", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_gamepad_right_stick_up_to_r2),
+                                                checked = uiState.gamepadRightStickUpToR2,
+                                                onCheckedChange = onSetGamepadRightStickUpToR2,
+                                                helpText = stringResource(R.string.settings_help_gamepad_right_stick_up_to_r2),
+                                                onResetToDefault = { onSetGamepadRightStickUpToR2(globalDefaults.gamepadRightStickUpToR2) }
+                                            )
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_gamepad_right_stick_up_to_r2),
-                            checked = uiState.gamepadRightStickUpToR2,
-                            onCheckedChange = onSetGamepadRightStickUpToR2,
-                            helpText = stringResource(R.string.settings_help_gamepad_right_stick_up_to_r2),
-                            onResetToDefault = { onSetGamepadRightStickUpToR2(globalDefaults.gamepadRightStickUpToR2) }
-                        )
+                                        row("settings_gamepad_right_stick_down_to_l2", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_gamepad_right_stick_down_to_l2),
+                                                checked = uiState.gamepadRightStickDownToL2,
+                                                onCheckedChange = onSetGamepadRightStickDownToL2,
+                                                helpText = stringResource(R.string.settings_help_gamepad_right_stick_down_to_l2),
+                                                onResetToDefault = { onSetGamepadRightStickDownToL2(globalDefaults.gamepadRightStickDownToL2) }
+                                            )
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_gamepad_right_stick_down_to_l2),
-                            checked = uiState.gamepadRightStickDownToL2,
-                            onCheckedChange = onSetGamepadRightStickDownToL2,
-                            helpText = stringResource(R.string.settings_help_gamepad_right_stick_down_to_l2),
-                            onResetToDefault = { onSetGamepadRightStickDownToL2(globalDefaults.gamepadRightStickDownToL2) }
-                        )
+                                        row("settings_touchscreen_left_stick", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_touchscreen_left_stick),
+                                                checked = uiState.touchscreenLeftStick,
+                                                onCheckedChange = onSetTouchscreenLeftStick,
+                                                helpText = stringResource(R.string.settings_help_touchscreen_left_stick),
+                                                onResetToDefault = { onSetTouchscreenLeftStick(globalDefaults.touchscreenLeftStick) }
+                                            )
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_touchscreen_left_stick),
-                            checked = uiState.touchscreenLeftStick,
-                            onCheckedChange = onSetTouchscreenLeftStick,
-                            helpText = stringResource(R.string.settings_help_touchscreen_left_stick),
-                            onResetToDefault = { onSetTouchscreenLeftStick(globalDefaults.touchscreenLeftStick) }
-                        )
+                                        if (uiState.touchscreenLeftStick) {
+                                            row("settings_touchscreen_left_stick_sensitivity", "LiveSliderRow") {
+                                                LiveSliderRow(
+                                                    title = stringResource(R.string.settings_touchscreen_left_stick_sensitivity),
+                                                    valueLabelForValue = { "$it%" },
+                                                    value = uiState.touchscreenLeftStickSensitivity.toFloat(),
+                                                    range = AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN.toFloat()..
+                                                        AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX.toFloat(),
+                                                    steps = AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX -
+                                                        AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN - 1,
+                                                    onValueChange = { onSetTouchscreenLeftStickSensitivity(it.toInt()) },
+                                                    helpText = stringResource(R.string.settings_help_touchscreen_left_stick_sensitivity),
+                                                    onResetToDefault = {
+                                                        onSetTouchscreenLeftStickSensitivity(
+                                                            globalDefaults.touchscreenLeftStickSensitivity
+                                                        )
+                                                    }
+                                                )
+                                            }
+                                        }
 
-                        if (uiState.touchscreenLeftStick) {
-                            LiveSliderRow(
-                                title = stringResource(R.string.settings_touchscreen_left_stick_sensitivity),
-                                valueLabelForValue = { "$it%" },
-                                value = uiState.touchscreenLeftStickSensitivity.toFloat(),
-                                range = AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN.toFloat()..
-                                    AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX.toFloat(),
-                                steps = AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX -
-                                    AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN - 1,
-                                onValueChange = { onSetTouchscreenLeftStickSensitivity(it.toInt()) },
-                                helpText = stringResource(R.string.settings_help_touchscreen_left_stick_sensitivity),
-                                onResetToDefault = {
-                                    onSetTouchscreenLeftStickSensitivity(
-                                        globalDefaults.touchscreenLeftStickSensitivity
-                                    )
-                                }
-                            )
-                        }
+                                        row("settings_touchscreen_right_stick", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_touchscreen_right_stick),
+                                                checked = uiState.touchscreenRightStick,
+                                                onCheckedChange = onSetTouchscreenRightStick,
+                                                helpText = stringResource(R.string.settings_help_touchscreen_right_stick),
+                                                onResetToDefault = { onSetTouchscreenRightStick(globalDefaults.touchscreenRightStick) }
+                                            )
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_touchscreen_right_stick),
-                            checked = uiState.touchscreenRightStick,
-                            onCheckedChange = onSetTouchscreenRightStick,
-                            helpText = stringResource(R.string.settings_help_touchscreen_right_stick),
-                            onResetToDefault = { onSetTouchscreenRightStick(globalDefaults.touchscreenRightStick) }
-                        )
+                                        if (uiState.touchscreenRightStick) {
+                                            row("settings_touchscreen_right_stick_sensitivity", "LiveSliderRow") {
+                                                LiveSliderRow(
+                                                    title = stringResource(R.string.settings_touchscreen_right_stick_sensitivity),
+                                                    valueLabelForValue = { "$it%" },
+                                                    value = uiState.touchscreenRightStickSensitivity.toFloat(),
+                                                    range = AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN.toFloat()..
+                                                        AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX.toFloat(),
+                                                    steps = AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX -
+                                                        AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN - 1,
+                                                    onValueChange = { onSetTouchscreenRightStickSensitivity(it.toInt()) },
+                                                    helpText = stringResource(R.string.settings_help_touchscreen_right_stick_sensitivity),
+                                                    onResetToDefault = {
+                                                        onSetTouchscreenRightStickSensitivity(
+                                                            globalDefaults.touchscreenRightStickSensitivity
+                                                        )
+                                                    }
+                                                )
+                                            }
+                                        }
 
-                        if (uiState.touchscreenRightStick) {
-                            LiveSliderRow(
-                                title = stringResource(R.string.settings_touchscreen_right_stick_sensitivity),
-                                valueLabelForValue = { "$it%" },
-                                value = uiState.touchscreenRightStickSensitivity.toFloat(),
-                                range = AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN.toFloat()..
-                                    AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX.toFloat(),
-                                steps = AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX -
-                                    AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN - 1,
-                                onValueChange = { onSetTouchscreenRightStickSensitivity(it.toInt()) },
-                                helpText = stringResource(R.string.settings_help_touchscreen_right_stick_sensitivity),
-                                onResetToDefault = {
-                                    onSetTouchscreenRightStickSensitivity(
-                                        globalDefaults.touchscreenRightStickSensitivity
-                                    )
-                                }
-                            )
-                        }
+                                        row("settings_gamepad_mapping_title", "MenuButton") {
+                                            MenuButton(
+                                                icon = Icons.Rounded.Gamepad,
+                                                text = stringResource(R.string.settings_gamepad_mapping_title),
+                                                onClick = onOpenGamepadMapping,
+                                                enabled = gamepadConnected,
+                                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f)
+                                            )
+                                        }
 
-                        MenuButton(
-                            icon = Icons.Rounded.Gamepad,
-                            text = stringResource(R.string.settings_gamepad_mapping_title),
-                            onClick = onOpenGamepadMapping,
-                            enabled = gamepadConnected,
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f)
-                        )
-
-                        MenuButton(
-                            icon = Icons.Rounded.Keyboard,
-                            text = stringResource(R.string.settings_keyboard_mouse_section),
-                            onClick = onOpenKeyboardMouseSettings,
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f)
-                        )
+                                        row("settings_keyboard_mouse_section", "MenuButton") {
+                                            MenuButton(
+                                                icon = Icons.Rounded.Keyboard,
+                                                text = stringResource(R.string.settings_keyboard_mouse_section),
+                                                onClick = onOpenKeyboardMouseSettings,
+                                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f)
+                                            )
+                                        }
                                     }
 
                                     else -> Unit
@@ -4911,211 +4982,252 @@ private fun EmulationSidebarMenu(
                             GameMenuTabId.EMULATION,
                             uiState.gameMenuSectionOrder
                         ).filterNot(uiState.hiddenGameMenuSections::contains)
-                        menuSection(emulationSections, sectionSpacing) { section ->
+                        menuRows(emulationSections) { section ->
                                 when (section) {
                                     GameMenuSectionId.EMULATION_PERFORMANCE -> {
-                        SidebarSectionTitle(
-                            text = stringResource(R.string.settings_emulation_tab).uppercase(),
-                            color = sectionTitleColor,
-                            topPadding = sectionLabelTopPadding,
-                            horizontalInset = sectionLabelInset
-                        )
+                                        row("settings_emulation_tab", "SidebarSectionTitle") {
+                                            SidebarSectionTitle(
+                                                text = stringResource(R.string.settings_emulation_tab).uppercase(),
+                                                color = sectionTitleColor,
+                                                topPadding = sectionLabelTopPadding,
+                                                horizontalInset = sectionLabelInset
+                                            )
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.emulation_performance_stats),
-                            checked = uiState.showFps,
-                            onCheckedChange = { onToggleFps() },
-                            helpText = stringResource(R.string.settings_help_show_fps),
-                            onResetToDefault = {
-                                if (uiState.showFps != globalDefaults.showFps) {
-                                    onToggleFps()
-                                }
-                            }
-                        )
+                                        row("emulation_performance_stats", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.emulation_performance_stats),
+                                                checked = uiState.showFps,
+                                                onCheckedChange = { onToggleFps() },
+                                                helpText = stringResource(R.string.settings_help_show_fps),
+                                                onResetToDefault = {
+                                                    if (uiState.showFps != globalDefaults.showFps) {
+                                                        onToggleFps()
+                                                    }
+                                                }
+                                            )
+                                        }
 
-                        LiveSelectionRow(
-                            title = stringResource(R.string.settings_fps_overlay_mode),
-                            options = listOf(
-                                LiveSelectionOption(FPS_OVERLAY_MODE_SIMPLE, stringResource(R.string.settings_fps_overlay_mode_simple)),
-                                LiveSelectionOption(FPS_OVERLAY_MODE_DETAILED, stringResource(R.string.settings_fps_overlay_mode_detailed))
-                            ),
-                            currentValue = uiState.fpsOverlayMode,
-                            onValueChange = onSetFpsOverlayMode,
-                            helpText = stringResource(R.string.settings_help_fps_overlay_mode),
-                            onResetToDefault = { onSetFpsOverlayMode(globalDefaults.fpsOverlayMode) }
-                        )
+                                        row("settings_fps_overlay_mode", "LiveSelectionRow") {
+                                            LiveSelectionRow(
+                                                title = stringResource(R.string.settings_fps_overlay_mode),
+                                                options = listOf(
+                                                    LiveSelectionOption(FPS_OVERLAY_MODE_SIMPLE, stringResource(R.string.settings_fps_overlay_mode_simple)),
+                                                    LiveSelectionOption(FPS_OVERLAY_MODE_DETAILED, stringResource(R.string.settings_fps_overlay_mode_detailed))
+                                                ),
+                                                currentValue = uiState.fpsOverlayMode,
+                                                onValueChange = onSetFpsOverlayMode,
+                                                helpText = stringResource(R.string.settings_help_fps_overlay_mode),
+                                                onResetToDefault = { onSetFpsOverlayMode(globalDefaults.fpsOverlayMode) }
+                                            )
+                                        }
 
-                        LiveSelectionRow(
-                            title = stringResource(R.string.settings_fps_overlay_position),
-                            options = fpsOverlayCornerLiveOptions(),
-                            currentValue = uiState.fpsOverlayCorner,
-                            onValueChange = onSetFpsOverlayCorner,
-                            allowWrap = false,
-                            horizontalScrolling = true,
-                            helpText = stringResource(R.string.settings_help_fps_overlay_position),
-                            onResetToDefault = { onSetFpsOverlayCorner(globalDefaults.fpsOverlayCorner) }
-                        )
+                                        row("settings_fps_overlay_position", "LiveSelectionRow") {
+                                            LiveSelectionRow(
+                                                title = stringResource(R.string.settings_fps_overlay_position),
+                                                options = fpsOverlayCornerLiveOptions(),
+                                                currentValue = uiState.fpsOverlayCorner,
+                                                onValueChange = onSetFpsOverlayCorner,
+                                                allowWrap = false,
+                                                horizontalScrolling = true,
+                                                helpText = stringResource(R.string.settings_help_fps_overlay_position),
+                                                onResetToDefault = { onSetFpsOverlayCorner(globalDefaults.fpsOverlayCorner) }
+                                            )
+                                        }
 
-                        LiveSliderRow(
-                            title = stringResource(R.string.settings_fps_overlay_scale),
-                            valueLabelResId = R.string.settings_fps_overlay_scale_value,
-                            valueLabelForValue = { scale -> "$scale%" },
-                            value = uiState.fpsOverlayScale.toFloat(),
-                            range = AppPreferences.MIN_FPS_OVERLAY_SCALE.toFloat()..AppPreferences.MAX_FPS_OVERLAY_SCALE.toFloat(),
-                            steps = 24,
-                            onValueChange = { onSetFpsOverlayScale(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_fps_overlay_scale),
-                            onResetToDefault = { onSetFpsOverlayScale(globalDefaults.fpsOverlayScale) }
-                        )
+                                        row("settings_fps_overlay_scale", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_fps_overlay_scale),
+                                                valueLabelResId = R.string.settings_fps_overlay_scale_value,
+                                                valueLabelForValue = { scale -> "$scale%" },
+                                                value = uiState.fpsOverlayScale.toFloat(),
+                                                range = AppPreferences.MIN_FPS_OVERLAY_SCALE.toFloat()..AppPreferences.MAX_FPS_OVERLAY_SCALE.toFloat(),
+                                                steps = 24,
+                                                onValueChange = { onSetFpsOverlayScale(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_fps_overlay_scale),
+                                                onResetToDefault = { onSetFpsOverlayScale(globalDefaults.fpsOverlayScale) }
+                                            )
+                                        }
 
-                        if (uiState.fpsOverlayMode == FPS_OVERLAY_MODE_DETAILED) {
-                            LiveBitmaskChoiceRow(
-                                title = stringResource(R.string.settings_fps_overlay_metrics),
-                                options = fpsOverlayMetricLiveOptions(),
-                                selectedMask = uiState.fpsOverlayMetrics,
-                                onToggle = { metric -> onSetFpsOverlayMetrics(uiState.fpsOverlayMetrics xor metric) },
-                                helpText = stringResource(R.string.settings_help_fps_overlay_metrics),
-                                onResetToDefault = { onSetFpsOverlayMetrics(globalDefaults.fpsOverlayMetrics) }
-                            )
-                        }
-
+                                        if (uiState.fpsOverlayMode == FPS_OVERLAY_MODE_DETAILED) {
+                                            row("settings_fps_overlay_metrics", "LiveBitmaskChoiceRow") {
+                                                LiveBitmaskChoiceRow(
+                                                    title = stringResource(R.string.settings_fps_overlay_metrics),
+                                                    options = fpsOverlayMetricLiveOptions(),
+                                                    selectedMask = uiState.fpsOverlayMetrics,
+                                                    onToggle = { metric -> onSetFpsOverlayMetrics(uiState.fpsOverlayMetrics xor metric) },
+                                                    helpText = stringResource(R.string.settings_help_fps_overlay_metrics),
+                                                    onResetToDefault = { onSetFpsOverlayMetrics(globalDefaults.fpsOverlayMetrics) }
+                                                )
+                                            }
+                                        }
                                     }
 
                                     GameMenuSectionId.EMULATION_SPEED -> {
+                                        row("settings_speed_hacks", "SidebarSectionTitle") {
+                                            SidebarSectionTitle(
+                                                text = stringResource(R.string.settings_speed_hacks).uppercase(),
+                                                color = sectionTitleColor,
+                                                topPadding = sectionLabelTopPadding,
+                                                horizontalInset = sectionLabelInset
+                                            )
+                                        }
 
-                        SidebarSectionTitle(
-                            text = stringResource(R.string.settings_speed_hacks).uppercase(),
-                            color = sectionTitleColor,
-                            topPadding = sectionLabelTopPadding,
-                            horizontalInset = sectionLabelInset
-                        )
+                                        row("settings_ee_cycle_rate", "LiveSelectionRow") {
+                                            LiveSelectionRow(
+                                                title = stringResource(R.string.settings_ee_cycle_rate),
+                                                options = eeCycleRateLiveOptions(),
+                                                currentValue = uiState.eeCycleRate,
+                                                onValueChange = onSetEeCycleRate,
+                                                allowWrap = false,
+                                                horizontalScrolling = true,
+                                                helpText = stringResource(R.string.settings_help_ee_cycle_rate),
+                                                onResetToDefault = { onSetEeCycleRate(globalDefaults.eeCycleRate) }
+                                            )
+                                        }
 
-                        LiveSelectionRow(
-                            title = stringResource(R.string.settings_ee_cycle_rate),
-                            options = eeCycleRateLiveOptions(),
-                            currentValue = uiState.eeCycleRate,
-                            onValueChange = onSetEeCycleRate,
-                            allowWrap = false,
-                            horizontalScrolling = true,
-                            helpText = stringResource(R.string.settings_help_ee_cycle_rate),
-                            onResetToDefault = { onSetEeCycleRate(globalDefaults.eeCycleRate) }
-                        )
+                                        row("settings_ee_cycle_skip", "LiveSelectionRow") {
+                                            LiveSelectionRow(
+                                                title = stringResource(R.string.settings_ee_cycle_skip),
+                                                options = eeCycleSkipLiveOptions(),
+                                                currentValue = uiState.eeCycleSkip,
+                                                onValueChange = onSetEeCycleSkip,
+                                                allowWrap = false,
+                                                horizontalScrolling = true,
+                                                helpText = stringResource(R.string.settings_help_ee_cycle_skip),
+                                                onResetToDefault = { onSetEeCycleSkip(globalDefaults.eeCycleSkip) }
+                                            )
+                                        }
 
-                        LiveSelectionRow(
-                            title = stringResource(R.string.settings_ee_cycle_skip),
-                            options = eeCycleSkipLiveOptions(),
-                            currentValue = uiState.eeCycleSkip,
-                            onValueChange = onSetEeCycleSkip,
-                            allowWrap = false,
-                            horizontalScrolling = true,
-                            helpText = stringResource(R.string.settings_help_ee_cycle_skip),
-                            onResetToDefault = { onSetEeCycleSkip(globalDefaults.eeCycleSkip) }
-                        )
+                                        row("settings_frame_limiter", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_frame_limiter),
+                                                checked = uiState.frameLimitEnabled,
+                                                onCheckedChange = onSetFrameLimitEnabled,
+                                                helpText = stringResource(R.string.settings_help_frame_limiter),
+                                                onResetToDefault = { onSetFrameLimitEnabled(globalDefaults.frameLimitEnabled) }
+                                            )
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_frame_limiter),
-                            checked = uiState.frameLimitEnabled,
-                            onCheckedChange = onSetFrameLimitEnabled,
-                            helpText = stringResource(R.string.settings_help_frame_limiter),
-                            onResetToDefault = { onSetFrameLimitEnabled(globalDefaults.frameLimitEnabled) }
-                        )
-                        LiveSelectionRow(
-                            title = stringResource(R.string.settings_target_fps_mode),
-                            options = listOf(
-                                LiveSelectionOption(0, stringResource(R.string.settings_target_fps_auto)),
-                                LiveSelectionOption(1, stringResource(R.string.settings_target_fps_manual))
-                            ),
-                            currentValue = if (uiState.targetFps <= 0) 0 else 1,
-                            onValueChange = { mode ->
-                                onSetTargetFps(
-                                    if (mode == 0) 0 else resolveManualTargetFps(uiState.targetFps, globalDefaults.targetFps)
-                                )
-                            },
-                            allowWrap = false,
-                            helpText = stringResource(R.string.settings_help_target_fps),
-                            onResetToDefault = { onSetTargetFps(globalDefaults.targetFps) }
-                        )
-                        if (uiState.targetFps > 0) {
-                            LiveSliderRow(
-                                title = stringResource(R.string.settings_target_fps),
-                                valueLabelResId = R.string.settings_target_fps_desc,
-                                valueLabelForValue = { fps -> fps.toString() },
-                                value = uiState.targetFps.toFloat(),
-                                range = 20f..120f,
-                                steps = 99,
-                                onValueChange = { onSetTargetFps(it.toInt()) },
-                                helpText = stringResource(R.string.settings_help_target_fps),
-                                onResetToDefault = { onSetTargetFps(globalDefaults.targetFps) }
-                            )
-                        }
+                                        row("settings_target_fps_mode", "LiveSelectionRow") {
+                                            LiveSelectionRow(
+                                                title = stringResource(R.string.settings_target_fps_mode),
+                                                options = listOf(
+                                                    LiveSelectionOption(0, stringResource(R.string.settings_target_fps_auto)),
+                                                    LiveSelectionOption(1, stringResource(R.string.settings_target_fps_manual))
+                                                ),
+                                                currentValue = if (uiState.targetFps <= 0) 0 else 1,
+                                                onValueChange = { mode ->
+                                                    onSetTargetFps(
+                                                        if (mode == 0) 0 else resolveManualTargetFps(uiState.targetFps, globalDefaults.targetFps)
+                                                    )
+                                                },
+                                                allowWrap = false,
+                                                helpText = stringResource(R.string.settings_help_target_fps),
+                                                onResetToDefault = { onSetTargetFps(globalDefaults.targetFps) }
+                                            )
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_mtvu),
-                            checked = uiState.enableMtvu,
-                            onCheckedChange = onSetMtvu,
-                            helpText = stringResource(R.string.settings_help_mtvu),
-                            onResetToDefault = { onSetMtvu(globalDefaults.enableMtvu) }
-                        )
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_iop_thread),
-                            checked = uiState.enableIopThread,
-                            onCheckedChange = onSetIopThread,
-                            helpText = stringResource(R.string.settings_help_iop_thread),
-                            onResetToDefault = { onSetIopThread(globalDefaults.enableIopThread) }
-                        )
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_vu_aot),
-                            checked = uiState.enableVUAot,
-                            onCheckedChange = onSetVUAot,
-                            helpText = stringResource(R.string.settings_help_vu_aot),
-                            onResetToDefault = { onSetVUAot(globalDefaults.enableVUAot) }
-                        )
+                                        if (uiState.targetFps > 0) {
+                                            row("settings_target_fps", "LiveSliderRow") {
+                                                LiveSliderRow(
+                                                    title = stringResource(R.string.settings_target_fps),
+                                                    valueLabelResId = R.string.settings_target_fps_desc,
+                                                    valueLabelForValue = { fps -> fps.toString() },
+                                                    value = uiState.targetFps.toFloat(),
+                                                    range = 20f..120f,
+                                                    steps = 99,
+                                                    onValueChange = { onSetTargetFps(it.toInt()) },
+                                                    helpText = stringResource(R.string.settings_help_target_fps),
+                                                    onResetToDefault = { onSetTargetFps(globalDefaults.targetFps) }
+                                                )
+                                            }
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_thread_pinning),
-                            checked = uiState.enableThreadPinning,
-                            onCheckedChange = onSetThreadPinning,
-                            helpText = stringResource(R.string.settings_help_thread_pinning),
-                            onResetToDefault = { onSetThreadPinning(globalDefaults.enableThreadPinning) }
-                        )
+                                        row("settings_mtvu", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_mtvu),
+                                                checked = uiState.enableMtvu,
+                                                onCheckedChange = onSetMtvu,
+                                                helpText = stringResource(R.string.settings_help_mtvu),
+                                                onResetToDefault = { onSetMtvu(globalDefaults.enableMtvu) }
+                                            )
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_fast_cdvd),
-                            checked = uiState.enableFastCdvd,
-                            onCheckedChange = onSetFastCdvd,
-                            helpText = stringResource(R.string.settings_help_fast_cdvd),
-                            onResetToDefault = { onSetFastCdvd(globalDefaults.enableFastCdvd) }
-                        )
+                                        row("settings_iop_thread", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_iop_thread),
+                                                checked = uiState.enableIopThread,
+                                                onCheckedChange = onSetIopThread,
+                                                helpText = stringResource(R.string.settings_help_iop_thread),
+                                                onResetToDefault = { onSetIopThread(globalDefaults.enableIopThread) }
+                                            )
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_low_latency_mode),
-                            checked = uiState.lowLatencyMode,
-                            onCheckedChange = onSetLowLatencyMode,
-                            helpText = stringResource(R.string.settings_help_low_latency_mode),
-                            onResetToDefault = { onSetLowLatencyMode(globalDefaults.lowLatencyMode) }
-                        )
+                                        row("settings_vu_aot", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_vu_aot),
+                                                checked = uiState.enableVUAot,
+                                                onCheckedChange = onSetVUAot,
+                                                helpText = stringResource(R.string.settings_help_vu_aot),
+                                                onResetToDefault = { onSetVUAot(globalDefaults.enableVUAot) }
+                                            )
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_skip_duplicate_frames),
-                            checked = uiState.skipDuplicateFrames,
-                            onCheckedChange = onSetSkipDuplicateFrames,
-                            helpText = stringResource(R.string.settings_help_skip_duplicate_frames),
-                            onResetToDefault = { onSetSkipDuplicateFrames(globalDefaults.skipDuplicateFrames) }
-                        )
+                                        row("settings_thread_pinning", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_thread_pinning),
+                                                checked = uiState.enableThreadPinning,
+                                                onCheckedChange = onSetThreadPinning,
+                                                helpText = stringResource(R.string.settings_help_thread_pinning),
+                                                onResetToDefault = { onSetThreadPinning(globalDefaults.enableThreadPinning) }
+                                            )
+                                        }
 
-                        LiveSelectionRow(
-                            title = stringResource(R.string.settings_frame_skip),
-                            options = listOf(
-                                LiveSelectionOption(0, stringResource(R.string.settings_frame_skip_off)),
-                                LiveSelectionOption(1, "1/2"),
-                                LiveSelectionOption(2, "1/4")
-                            ),
-                            currentValue = uiState.frameSkip,
-                            onValueChange = onSetFrameSkip,
-                            helpText = stringResource(R.string.settings_help_frame_skip),
-                            onResetToDefault = { onSetFrameSkip(globalDefaults.frameSkip) }
-                        )
+                                        row("settings_fast_cdvd", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_fast_cdvd),
+                                                checked = uiState.enableFastCdvd,
+                                                onCheckedChange = onSetFastCdvd,
+                                                helpText = stringResource(R.string.settings_help_fast_cdvd),
+                                                onResetToDefault = { onSetFastCdvd(globalDefaults.enableFastCdvd) }
+                                            )
+                                        }
 
+                                        row("settings_low_latency_mode", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_low_latency_mode),
+                                                checked = uiState.lowLatencyMode,
+                                                onCheckedChange = onSetLowLatencyMode,
+                                                helpText = stringResource(R.string.settings_help_low_latency_mode),
+                                                onResetToDefault = { onSetLowLatencyMode(globalDefaults.lowLatencyMode) }
+                                            )
+                                        }
+
+                                        row("settings_skip_duplicate_frames", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_skip_duplicate_frames),
+                                                checked = uiState.skipDuplicateFrames,
+                                                onCheckedChange = onSetSkipDuplicateFrames,
+                                                helpText = stringResource(R.string.settings_help_skip_duplicate_frames),
+                                                onResetToDefault = { onSetSkipDuplicateFrames(globalDefaults.skipDuplicateFrames) }
+                                            )
+                                        }
+
+                                        row("settings_frame_skip", "LiveSelectionRow") {
+                                            LiveSelectionRow(
+                                                title = stringResource(R.string.settings_frame_skip),
+                                                options = listOf(
+                                                    LiveSelectionOption(0, stringResource(R.string.settings_frame_skip_off)),
+                                                    LiveSelectionOption(1, "1/2"),
+                                                    LiveSelectionOption(2, "1/4")
+                                                ),
+                                                currentValue = uiState.frameSkip,
+                                                onValueChange = onSetFrameSkip,
+                                                helpText = stringResource(R.string.settings_help_frame_skip),
+                                                onResetToDefault = { onSetFrameSkip(globalDefaults.frameSkip) }
+                                            )
+                                        }
                                     }
 
                                     else -> Unit
@@ -5202,457 +5314,518 @@ private fun EmulationSidebarMenu(
                             GameMenuTabId.GRAPHICS,
                             uiState.gameMenuSectionOrder
                         ).filterNot(uiState.hiddenGameMenuSections::contains)
-                        menuSection(graphicsSections, sectionSpacing) { section ->
+                        menuRows(graphicsSections) { section ->
                                 when (section) {
                                     GameMenuSectionId.GRAPHICS_DISPLAY -> {
-                        SidebarSectionTitle(
-                            text = stringResource(R.string.settings_graphics_tab).uppercase(),
-                            color = sectionTitleColor,
-                            topPadding = sectionLabelTopPadding,
-                            horizontalInset = sectionLabelInset
-                        )
+                                        row("settings_graphics_tab", "SidebarSectionTitle") {
+                                            SidebarSectionTitle(
+                                                text = stringResource(R.string.settings_graphics_tab).uppercase(),
+                                                color = sectionTitleColor,
+                                                topPadding = sectionLabelTopPadding,
+                                                horizontalInset = sectionLabelInset
+                                            )
+                                        }
 
-                        LiveSelectionRow(
-                            title = stringResource(R.string.settings_renderer),
-                            options = listOf(
-                                LiveSelectionOption(12, stringResource(R.string.settings_renderer_opengl)),
-                                LiveSelectionOption(14, stringResource(R.string.settings_renderer_vulkan)),
-                                LiveSelectionOption(13, stringResource(R.string.settings_renderer_software))
-                            ),
-                            currentValue = uiState.renderer,
-                            onValueChange = onSetRenderer,
-                            allowWrap = false,
-                            helpText = stringResource(R.string.settings_help_renderer),
-                            onResetToDefault = { onSetRenderer(globalDefaults.renderer) }
-                        )
+                                        row("settings_renderer", "LiveSelectionRow") {
+                                            LiveSelectionRow(
+                                                title = stringResource(R.string.settings_renderer),
+                                                options = listOf(
+                                                    LiveSelectionOption(12, stringResource(R.string.settings_renderer_opengl)),
+                                                    LiveSelectionOption(14, stringResource(R.string.settings_renderer_vulkan)),
+                                                    LiveSelectionOption(13, stringResource(R.string.settings_renderer_software))
+                                                ),
+                                                currentValue = uiState.renderer,
+                                                onValueChange = onSetRenderer,
+                                                allowWrap = false,
+                                                helpText = stringResource(R.string.settings_help_renderer),
+                                                onResetToDefault = { onSetRenderer(globalDefaults.renderer) }
+                                            )
+                                        }
 
-                        if (uiState.frameGenerationReady) {
-                            SettingsToggle(
-                                title = stringResource(R.string.frame_generation_enable),
-                                checked = uiState.frameGenerationEnabled,
-                                onCheckedChange = {
-                                    onSetFrameGeneration(
-                                        FrameGenerationSettings(
-                                            enabled = it,
-                                            multiplier = uiState.frameGenerationMultiplier,
-                                            performanceMode = uiState.frameGenerationPerformance,
-                                            flowScalePercent = uiState.frameGenerationFlowScale,
-                                            targetRefreshRate = uiState.frameGenerationTargetRate
-                                        )
-                                    )
-                                },
-                                helpText = stringResource(R.string.frame_generation_requirements_ready)
-                            )
-                            LiveChipsSelectionRow(
-                                title = stringResource(R.string.frame_generation_multiplier),
-                                options = listOf(2 to "×2", 3 to "×3", 4 to "×4"),
-                                currentValue = uiState.frameGenerationMultiplier,
-                                onValueChange = {
-                                    onSetFrameGeneration(
-                                        FrameGenerationSettings(
-                                            enabled = uiState.frameGenerationEnabled,
-                                            multiplier = it,
-                                            performanceMode = uiState.frameGenerationPerformance,
-                                            flowScalePercent = uiState.frameGenerationFlowScale,
-                                            targetRefreshRate = uiState.frameGenerationTargetRate
-                                        )
-                                    )
-                                }
-                            )
-                            LiveChipsSelectionRow(
-                                title = stringResource(R.string.frame_generation_flow_scale),
-                                options = listOf(25, 50, 75).map { it to "$it%" } +
-                                    listOf(100 to stringResource(R.string.settings_auto)),
-                                currentValue = uiState.frameGenerationFlowScale,
-                                onValueChange = {
-                                    onSetFrameGeneration(
-                                        FrameGenerationSettings(
-                                            enabled = uiState.frameGenerationEnabled,
-                                            multiplier = uiState.frameGenerationMultiplier,
-                                            performanceMode = uiState.frameGenerationPerformance,
-                                            flowScalePercent = it,
-                                            targetRefreshRate = uiState.frameGenerationTargetRate
-                                        )
-                                    )
-                                },
-                                helpText = stringResource(R.string.frame_generation_flow_hint)
-                            )
-                            SettingsToggle(
-                                title = stringResource(R.string.frame_generation_performance),
-                                checked = uiState.frameGenerationPerformance,
-                                onCheckedChange = {
-                                    onSetFrameGeneration(
-                                        FrameGenerationSettings(
-                                            enabled = uiState.frameGenerationEnabled,
-                                            multiplier = uiState.frameGenerationMultiplier,
-                                            performanceMode = it,
-                                            flowScalePercent = uiState.frameGenerationFlowScale,
-                                            targetRefreshRate = uiState.frameGenerationTargetRate
-                                        )
-                                    )
-                                },
-                                helpText = stringResource(R.string.frame_generation_performance_desc)
-                            )
-                            LiveChipsSelectionRow(
-                                title = stringResource(R.string.frame_generation_target_rate),
-                                options = listOf(0 to stringResource(R.string.frame_generation_fixed)) +
-                                    listOf(60, 90, 120, 144).map { it to "$it Hz" },
-                                currentValue = uiState.frameGenerationTargetRate,
-                                onValueChange = {
-                                    onSetFrameGeneration(
-                                        FrameGenerationSettings(
-                                            enabled = uiState.frameGenerationEnabled,
-                                            multiplier = uiState.frameGenerationMultiplier,
-                                            performanceMode = uiState.frameGenerationPerformance,
-                                            flowScalePercent = uiState.frameGenerationFlowScale,
-                                            targetRefreshRate = it
-                                        )
-                                    )
-                                }
-                            )
-                        }
+                                        if (uiState.frameGenerationReady) {
+                                            row("frame_generation_enable", "SettingsToggle") {
+                                                SettingsToggle(
+                                                    title = stringResource(R.string.frame_generation_enable),
+                                                    checked = uiState.frameGenerationEnabled,
+                                                    onCheckedChange = {
+                                                        onSetFrameGeneration(
+                                                            FrameGenerationSettings(
+                                                                enabled = it,
+                                                                multiplier = uiState.frameGenerationMultiplier,
+                                                                performanceMode = uiState.frameGenerationPerformance,
+                                                                flowScalePercent = uiState.frameGenerationFlowScale,
+                                                                targetRefreshRate = uiState.frameGenerationTargetRate
+                                                            )
+                                                        )
+                                                    },
+                                                    helpText = stringResource(R.string.frame_generation_requirements_ready)
+                                                )
+                                            }
 
-                        val maxUpscaleMultiplier = remember(uiState.renderer) {
-                            EmulatorBridge.getMaxUpscaleMultiplier(uiState.renderer)
-                        }
-                        val nativeUpscaleLabel = stringResource(R.string.settings_upscale_native)
-                        LiveChipsSelectionRow(
-                            title = stringResource(R.string.settings_upscale),
-                            options = buildUpscaleOptions(nativeUpscaleLabel, maxUpscaleMultiplier),
-                            currentValue = upscaleMultiplierValue(uiState.upscale),
-                            onValueChange = { onSetUpscale(upscaleKeyToMultiplier(it)) },
-                            helpText = stringResource(R.string.settings_help_upscale),
-                            onResetToDefault = { onSetUpscale(globalDefaults.upscaleMultiplier) }
-                        )
+                                            row("frame_generation_multiplier", "LiveChipsSelectionRow") {
+                                                LiveChipsSelectionRow(
+                                                    title = stringResource(R.string.frame_generation_multiplier),
+                                                    options = listOf(2 to "×2", 3 to "×3", 4 to "×4"),
+                                                    currentValue = uiState.frameGenerationMultiplier,
+                                                    onValueChange = {
+                                                        onSetFrameGeneration(
+                                                            FrameGenerationSettings(
+                                                                enabled = uiState.frameGenerationEnabled,
+                                                                multiplier = it,
+                                                                performanceMode = uiState.frameGenerationPerformance,
+                                                                flowScalePercent = uiState.frameGenerationFlowScale,
+                                                                targetRefreshRate = uiState.frameGenerationTargetRate
+                                                            )
+                                                        )
+                                                    }
+                                                )
+                                            }
 
-                        LiveSelectionRow(
-                            title = stringResource(R.string.settings_aspect_ratio).replace(":", ""),
-                            options = listOf(
-                                LiveSelectionOption(1, stringResource(R.string.emulation_aspect_auto)),
-                                LiveSelectionOption(2, "4:3"),
-                                LiveSelectionOption(3, "16:9"),
-                                LiveSelectionOption(4, stringResource(R.string.settings_aspect_ratio_107)),
-                                LiveSelectionOption(5, stringResource(R.string.settings_aspect_ratio_219)),
-                                LiveSelectionOption(6, stringResource(R.string.settings_aspect_ratio_209)),
-                                LiveSelectionOption(7, stringResource(R.string.settings_aspect_ratio_1959)),
-                                LiveSelectionOption(
-                                    value = 0,
-                                    icon = Icons.Rounded.Fullscreen,
-                                    contentDescription = stringResource(R.string.emulation_aspect_stretch)
-                                )
-                            ),
-                            currentValue = uiState.aspectRatio,
-                            onValueChange = onSetAspectRatio,
-                            allowWrap = false,
-                            horizontalScrolling = true,
-                            helpText = stringResource(R.string.settings_help_aspect_ratio),
-                            onResetToDefault = { onSetAspectRatio(globalDefaults.aspectRatio) }
-                        )
+                                            row("frame_generation_flow_scale", "LiveChipsSelectionRow") {
+                                                LiveChipsSelectionRow(
+                                                    title = stringResource(R.string.frame_generation_flow_scale),
+                                                    options = listOf(25, 50, 75).map { it to "$it%" } +
+                                                        listOf(100 to stringResource(R.string.settings_auto)),
+                                                    currentValue = uiState.frameGenerationFlowScale,
+                                                    onValueChange = {
+                                                        onSetFrameGeneration(
+                                                            FrameGenerationSettings(
+                                                                enabled = uiState.frameGenerationEnabled,
+                                                                multiplier = uiState.frameGenerationMultiplier,
+                                                                performanceMode = uiState.frameGenerationPerformance,
+                                                                flowScalePercent = it,
+                                                                targetRefreshRate = uiState.frameGenerationTargetRate
+                                                            )
+                                                        )
+                                                    },
+                                                    helpText = stringResource(R.string.frame_generation_flow_hint)
+                                                )
+                                            }
 
-                        LiveSelectionRow(
-                            title = stringResource(R.string.emulation_local_multiplayer_title),
-                            options = listOf(
-                                LiveSelectionOption(
-                                    AppPreferences.LOCAL_MULTIPLAYER_OFF,
-                                    stringResource(R.string.emulation_local_multiplayer_off)
-                                ),
-                                LiveSelectionOption(
-                                    AppPreferences.LOCAL_MULTIPLAYER_SIDE_BY_SIDE,
-                                    stringResource(R.string.emulation_local_multiplayer_side_by_side)
-                                ),
-                                LiveSelectionOption(
-                                    AppPreferences.LOCAL_MULTIPLAYER_STACKED,
-                                    stringResource(R.string.emulation_local_multiplayer_stacked)
-                                ),
-                                LiveSelectionOption(
-                                    AppPreferences.LOCAL_MULTIPLAYER_HORIZONTAL_CROP,
-                                    stringResource(R.string.emulation_local_multiplayer_crop)
-                                ),
-                                LiveSelectionOption(
-                                    AppPreferences.LOCAL_MULTIPLAYER_HORIZONTAL_CROP_SWAPPED,
-                                    stringResource(R.string.emulation_local_multiplayer_crop_swapped)
-                                )
-                            ),
-                            currentValue = uiState.localMultiplayerMode,
-                            onValueChange = onSetLocalMultiplayerMode,
-                            allowWrap = false,
-                            horizontalScrolling = true,
-                            helpText = stringResource(R.string.emulation_local_multiplayer_help),
-                            onResetToDefault = {
-                                onSetLocalMultiplayerMode(globalDefaults.localMultiplayerMode)
-                            }
-                        )
+                                            row("frame_generation_performance", "SettingsToggle") {
+                                                SettingsToggle(
+                                                    title = stringResource(R.string.frame_generation_performance),
+                                                    checked = uiState.frameGenerationPerformance,
+                                                    onCheckedChange = {
+                                                        onSetFrameGeneration(
+                                                            FrameGenerationSettings(
+                                                                enabled = uiState.frameGenerationEnabled,
+                                                                multiplier = uiState.frameGenerationMultiplier,
+                                                                performanceMode = it,
+                                                                flowScalePercent = uiState.frameGenerationFlowScale,
+                                                                targetRefreshRate = uiState.frameGenerationTargetRate
+                                                            )
+                                                        )
+                                                    },
+                                                    helpText = stringResource(R.string.frame_generation_performance_desc)
+                                                )
+                                            }
 
-                        val crop = uiState.displayCrop
-                        val cropPreset = when (crop) {
-                            DisplayCrop.None -> 0
-                            DisplayCrop.ThinEdges -> 2
-                            DisplayCrop.SafeEdges -> 4
-                            else -> -1
-                        }
-                        LiveChipsSelectionRow(
-                            title = stringResource(R.string.settings_display_crop),
-                            options = listOf(
-                                0 to stringResource(R.string.settings_display_crop_off),
-                                2 to stringResource(R.string.settings_display_crop_thin),
-                                4 to stringResource(R.string.settings_display_crop_safe),
-                                -1 to stringResource(R.string.settings_display_crop_custom)
-                            ),
-                            currentValue = cropPreset,
-                            onValueChange = { preset ->
-                                when (preset) {
-                                    0 -> onSetDisplayCrop(DisplayCrop.None)
-                                    2 -> onSetDisplayCrop(DisplayCrop.ThinEdges)
-                                    4 -> onSetDisplayCrop(DisplayCrop.SafeEdges)
-                                }
-                            },
-                            helpText = stringResource(R.string.settings_help_display_crop),
-                            onResetToDefault = { onSetDisplayCrop(globalDefaults.displayCrop) }
-                        )
+                                            row("frame_generation_target_rate", "LiveChipsSelectionRow") {
+                                                LiveChipsSelectionRow(
+                                                    title = stringResource(R.string.frame_generation_target_rate),
+                                                    options = listOf(0 to stringResource(R.string.frame_generation_fixed)) +
+                                                        listOf(60, 90, 120, 144).map { it to "$it Hz" },
+                                                    currentValue = uiState.frameGenerationTargetRate,
+                                                    onValueChange = {
+                                                        onSetFrameGeneration(
+                                                            FrameGenerationSettings(
+                                                                enabled = uiState.frameGenerationEnabled,
+                                                                multiplier = uiState.frameGenerationMultiplier,
+                                                                performanceMode = uiState.frameGenerationPerformance,
+                                                                flowScalePercent = uiState.frameGenerationFlowScale,
+                                                                targetRefreshRate = it
+                                                            )
+                                                        )
+                                                    }
+                                                )
+                                            }
+                                        }
+
+                                        row("settings_upscale", "LiveChipsSelectionRow") {
+                                            val nativeUpscaleLabel = stringResource(R.string.settings_upscale_native)
+                                            val upscaleOptions = remember(nativeUpscaleLabel, maxUpscaleMultiplier) {
+                                                buildUpscaleOptions(nativeUpscaleLabel, maxUpscaleMultiplier)
+                                            }
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_upscale),
+                                                options = upscaleOptions,
+                                                currentValue = upscaleMultiplierValue(uiState.upscale),
+                                                onValueChange = { onSetUpscale(upscaleKeyToMultiplier(it)) },
+                                                helpText = stringResource(R.string.settings_help_upscale),
+                                                onResetToDefault = { onSetUpscale(globalDefaults.upscaleMultiplier) }
+                                            )
+                                        }
+
+                                        row("settings_aspect_ratio", "LiveSelectionRow") {
+                                            LiveSelectionRow(
+                                                title = stringResource(R.string.settings_aspect_ratio).replace(":", ""),
+                                                options = listOf(
+                                                    LiveSelectionOption(1, stringResource(R.string.emulation_aspect_auto)),
+                                                    LiveSelectionOption(2, "4:3"),
+                                                    LiveSelectionOption(3, "16:9"),
+                                                    LiveSelectionOption(4, stringResource(R.string.settings_aspect_ratio_107)),
+                                                    LiveSelectionOption(5, stringResource(R.string.settings_aspect_ratio_219)),
+                                                    LiveSelectionOption(6, stringResource(R.string.settings_aspect_ratio_209)),
+                                                    LiveSelectionOption(7, stringResource(R.string.settings_aspect_ratio_1959)),
+                                                    LiveSelectionOption(
+                                                        value = 0,
+                                                        icon = Icons.Rounded.Fullscreen,
+                                                        contentDescription = stringResource(R.string.emulation_aspect_stretch)
+                                                    )
+                                                ),
+                                                currentValue = uiState.aspectRatio,
+                                                onValueChange = onSetAspectRatio,
+                                                allowWrap = false,
+                                                horizontalScrolling = true,
+                                                helpText = stringResource(R.string.settings_help_aspect_ratio),
+                                                onResetToDefault = { onSetAspectRatio(globalDefaults.aspectRatio) }
+                                            )
+                                        }
+
+                                        row("emulation_local_multiplayer_title", "LiveSelectionRow") {
+                                            LiveSelectionRow(
+                                                title = stringResource(R.string.emulation_local_multiplayer_title),
+                                                options = listOf(
+                                                    LiveSelectionOption(
+                                                        AppPreferences.LOCAL_MULTIPLAYER_OFF,
+                                                        stringResource(R.string.emulation_local_multiplayer_off)
+                                                    ),
+                                                    LiveSelectionOption(
+                                                        AppPreferences.LOCAL_MULTIPLAYER_SIDE_BY_SIDE,
+                                                        stringResource(R.string.emulation_local_multiplayer_side_by_side)
+                                                    ),
+                                                    LiveSelectionOption(
+                                                        AppPreferences.LOCAL_MULTIPLAYER_STACKED,
+                                                        stringResource(R.string.emulation_local_multiplayer_stacked)
+                                                    ),
+                                                    LiveSelectionOption(
+                                                        AppPreferences.LOCAL_MULTIPLAYER_HORIZONTAL_CROP,
+                                                        stringResource(R.string.emulation_local_multiplayer_crop)
+                                                    ),
+                                                    LiveSelectionOption(
+                                                        AppPreferences.LOCAL_MULTIPLAYER_HORIZONTAL_CROP_SWAPPED,
+                                                        stringResource(R.string.emulation_local_multiplayer_crop_swapped)
+                                                    )
+                                                ),
+                                                currentValue = uiState.localMultiplayerMode,
+                                                onValueChange = onSetLocalMultiplayerMode,
+                                                allowWrap = false,
+                                                horizontalScrolling = true,
+                                                helpText = stringResource(R.string.emulation_local_multiplayer_help),
+                                                onResetToDefault = {
+                                                    onSetLocalMultiplayerMode(globalDefaults.localMultiplayerMode)
+                                                }
+                                            )
+                                        }
+
+                                        row("settings_display_crop", "LiveChipsSelectionRow") {
+                                            val crop = uiState.displayCrop
+                                            val cropPreset = when (crop) {
+                                                DisplayCrop.None -> 0
+                                                DisplayCrop.ThinEdges -> 2
+                                                DisplayCrop.SafeEdges -> 4
+                                                else -> -1
+                                            }
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_display_crop),
+                                                options = listOf(
+                                                    0 to stringResource(R.string.settings_display_crop_off),
+                                                    2 to stringResource(R.string.settings_display_crop_thin),
+                                                    4 to stringResource(R.string.settings_display_crop_safe),
+                                                    -1 to stringResource(R.string.settings_display_crop_custom)
+                                                ),
+                                                currentValue = cropPreset,
+                                                onValueChange = { preset ->
+                                                    when (preset) {
+                                                        0 -> onSetDisplayCrop(DisplayCrop.None)
+                                                        2 -> onSetDisplayCrop(DisplayCrop.ThinEdges)
+                                                        4 -> onSetDisplayCrop(DisplayCrop.SafeEdges)
+                                                    }
+                                                },
+                                                helpText = stringResource(R.string.settings_help_display_crop),
+                                                onResetToDefault = { onSetDisplayCrop(globalDefaults.displayCrop) }
+                                            )
+                                        }
                                     }
 
                                     GameMenuSectionId.GRAPHICS_RENDERING -> {
+                                        row("settings_rendering_section", "SidebarSectionTitle") {
+                                            SidebarSectionTitle(
+                                                text = stringResource(R.string.settings_rendering_section).uppercase(),
+                                                color = sectionTitleColor,
+                                                topPadding = sectionLabelTopPadding,
+                                                horizontalInset = sectionLabelInset
+                                            )
+                                        }
 
-                        SidebarSectionTitle(
-                            text = stringResource(R.string.settings_rendering_section).uppercase(),
-                            color = sectionTitleColor,
-                            topPadding = sectionLabelTopPadding,
-                            horizontalInset = sectionLabelInset
-                        )
+                                        row("settings_hw_download_mode", "LiveSelectionRow") {
+                                            LiveSelectionRow(
+                                                title = stringResource(R.string.settings_hw_download_mode),
+                                                options = listOf(
+                                                    LiveSelectionOption(0, stringResource(R.string.settings_hw_download_mode_accurate)),
+                                                    LiveSelectionOption(1, stringResource(R.string.settings_hw_download_mode_force_full)),
+                                                    LiveSelectionOption(2, stringResource(R.string.settings_hw_download_mode_no_readbacks)),
+                                                    LiveSelectionOption(3, stringResource(R.string.settings_hw_download_mode_unsynchronized)),
+                                                    LiveSelectionOption(4, stringResource(R.string.settings_hw_download_mode_disabled)),
+                                                    LiveSelectionOption(5, stringResource(R.string.settings_hw_download_mode_asynchronous))
+                                                ),
+                                                currentValue = uiState.hwDownloadMode,
+                                                onValueChange = onSetHwDownloadMode,
+                                                allowWrap = false,
+                                                horizontalScrolling = true,
+                                                helpText = stringResource(R.string.settings_help_hw_download_mode),
+                                                onResetToDefault = { onSetHwDownloadMode(globalDefaults.hwDownloadMode) }
+                                            )
+                                        }
 
-                        LiveSelectionRow(
-                            title = stringResource(R.string.settings_hw_download_mode),
-                            options = listOf(
-                                LiveSelectionOption(0, stringResource(R.string.settings_hw_download_mode_accurate)),
-                                LiveSelectionOption(1, stringResource(R.string.settings_hw_download_mode_force_full)),
-                                LiveSelectionOption(2, stringResource(R.string.settings_hw_download_mode_no_readbacks)),
-                                LiveSelectionOption(3, stringResource(R.string.settings_hw_download_mode_unsynchronized)),
-                                LiveSelectionOption(4, stringResource(R.string.settings_hw_download_mode_disabled)),
-                                LiveSelectionOption(5, stringResource(R.string.settings_hw_download_mode_asynchronous))
-                            ),
-                            currentValue = uiState.hwDownloadMode,
-                            onValueChange = onSetHwDownloadMode,
-                            allowWrap = false,
-                            horizontalScrolling = true,
-                            helpText = stringResource(R.string.settings_help_hw_download_mode),
-                            onResetToDefault = { onSetHwDownloadMode(globalDefaults.hwDownloadMode) }
-                        )
+                                        row("settings_blending_accuracy", "LiveChipsSelectionRow") {
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_blending_accuracy),
+                                                options = listOf(
+                                                    0 to stringResource(R.string.settings_blending_accuracy_minimum),
+                                                    1 to stringResource(R.string.settings_blending_accuracy_basic),
+                                                    2 to stringResource(R.string.settings_blending_accuracy_medium),
+                                                    3 to stringResource(R.string.settings_blending_accuracy_high),
+                                                    4 to stringResource(R.string.settings_blending_accuracy_full),
+                                                    5 to stringResource(R.string.settings_blending_accuracy_maximum)
+                                                ),
+                                                currentValue = uiState.blendingAccuracy,
+                                                onValueChange = onSetBlendingAccuracy,
+                                                helpText = stringResource(R.string.settings_help_blending_accuracy),
+                                                onResetToDefault = { onSetBlendingAccuracy(globalDefaults.blendingAccuracy) }
+                                            )
+                                        }
 
-                        LiveChipsSelectionRow(
-                            title = stringResource(R.string.settings_blending_accuracy),
-                            options = listOf(
-                                0 to stringResource(R.string.settings_blending_accuracy_minimum),
-                                1 to stringResource(R.string.settings_blending_accuracy_basic),
-                                2 to stringResource(R.string.settings_blending_accuracy_medium),
-                                3 to stringResource(R.string.settings_blending_accuracy_high),
-                                4 to stringResource(R.string.settings_blending_accuracy_full),
-                                5 to stringResource(R.string.settings_blending_accuracy_maximum)
-                            ),
-                            currentValue = uiState.blendingAccuracy,
-                            onValueChange = onSetBlendingAccuracy,
-                            helpText = stringResource(R.string.settings_help_blending_accuracy),
-                            onResetToDefault = { onSetBlendingAccuracy(globalDefaults.blendingAccuracy) }
-                        )
+                                        row("settings_texture_preloading", "LiveChipsSelectionRow") {
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_texture_preloading),
+                                                options = listOf(
+                                                    0 to stringResource(R.string.settings_texture_preloading_none),
+                                                    1 to stringResource(R.string.settings_texture_preloading_partial),
+                                                    2 to stringResource(R.string.settings_texture_preloading_full)
+                                                ),
+                                                currentValue = uiState.texturePreloading,
+                                                onValueChange = onSetTexturePreloading,
+                                                helpText = stringResource(R.string.settings_help_texture_preloading),
+                                                onResetToDefault = { onSetTexturePreloading(globalDefaults.texturePreloading) }
+                                            )
+                                        }
 
-                        LiveChipsSelectionRow(
-                            title = stringResource(R.string.settings_texture_preloading),
-                            options = listOf(
-                                0 to stringResource(R.string.settings_texture_preloading_none),
-                                1 to stringResource(R.string.settings_texture_preloading_partial),
-                                2 to stringResource(R.string.settings_texture_preloading_full)
-                            ),
-                            currentValue = uiState.texturePreloading,
-                            onValueChange = onSetTexturePreloading,
-                            helpText = stringResource(R.string.settings_help_texture_preloading),
-                            onResetToDefault = { onSetTexturePreloading(globalDefaults.texturePreloading) }
-                        )
+                                        row("settings_bilinear_filtering", "LiveChipsSelectionRow") {
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_bilinear_filtering),
+                                                options = listOf(
+                                                    0 to stringResource(R.string.settings_bilinear_filtering_nearest),
+                                                    1 to stringResource(R.string.settings_bilinear_filtering_forced),
+                                                    2 to stringResource(R.string.settings_bilinear_filtering_ps2),
+                                                    3 to stringResource(R.string.settings_bilinear_filtering_no_sprite)
+                                                ),
+                                                currentValue = uiState.textureFiltering,
+                                                onValueChange = onSetTextureFiltering,
+                                                helpText = stringResource(R.string.settings_help_bilinear_filtering),
+                                                onResetToDefault = { onSetTextureFiltering(globalDefaults.textureFiltering) }
+                                            )
+                                        }
 
-                        LiveChipsSelectionRow(
-                            title = stringResource(R.string.settings_bilinear_filtering),
-                            options = listOf(
-                                0 to stringResource(R.string.settings_bilinear_filtering_nearest),
-                                1 to stringResource(R.string.settings_bilinear_filtering_forced),
-                                2 to stringResource(R.string.settings_bilinear_filtering_ps2),
-                                3 to stringResource(R.string.settings_bilinear_filtering_no_sprite)
-                            ),
-                            currentValue = uiState.textureFiltering,
-                            onValueChange = onSetTextureFiltering,
-                            helpText = stringResource(R.string.settings_help_bilinear_filtering),
-                            onResetToDefault = { onSetTextureFiltering(globalDefaults.textureFiltering) }
-                        )
+                                        row("settings_trilinear_filtering", "LiveChipsSelectionRow") {
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_trilinear_filtering),
+                                                options = listOf(
+                                                    -1 to stringResource(R.string.settings_trilinear_filtering_auto),
+                                                    0 to stringResource(R.string.settings_trilinear_filtering_off),
+                                                    1 to stringResource(R.string.settings_trilinear_filtering_ps2),
+                                                    2 to stringResource(R.string.settings_trilinear_filtering_forced)
+                                                ),
+                                                currentValue = uiState.trilinearFiltering,
+                                                onValueChange = onSetTrilinearFiltering,
+                                                helpText = stringResource(R.string.settings_help_trilinear_filtering),
+                                                onResetToDefault = { onSetTrilinearFiltering(globalDefaults.trilinearFiltering) }
+                                            )
+                                        }
 
-                        LiveChipsSelectionRow(
-                            title = stringResource(R.string.settings_trilinear_filtering),
-                            options = listOf(
-                                -1 to stringResource(R.string.settings_trilinear_filtering_auto),
-                                0 to stringResource(R.string.settings_trilinear_filtering_off),
-                                1 to stringResource(R.string.settings_trilinear_filtering_ps2),
-                                2 to stringResource(R.string.settings_trilinear_filtering_forced)
-                            ),
-                            currentValue = uiState.trilinearFiltering,
-                            onValueChange = onSetTrilinearFiltering,
-                            helpText = stringResource(R.string.settings_help_trilinear_filtering),
-                            onResetToDefault = { onSetTrilinearFiltering(globalDefaults.trilinearFiltering) }
-                        )
+                                        row("settings_anisotropic_filtering", "LiveChipsSelectionRow") {
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_anisotropic_filtering),
+                                                options = listOf(
+                                                    0 to stringResource(R.string.settings_aniso_off),
+                                                    2 to "2x",
+                                                    4 to "4x",
+                                                    8 to "8x",
+                                                    16 to "16x"
+                                                ),
+                                                currentValue = uiState.anisotropicFiltering,
+                                                onValueChange = onSetAnisotropicFiltering,
+                                                helpText = stringResource(R.string.settings_help_anisotropic_filtering),
+                                                onResetToDefault = { onSetAnisotropicFiltering(globalDefaults.anisotropicFiltering) }
+                                            )
+                                        }
 
-                        LiveChipsSelectionRow(
-                            title = stringResource(R.string.settings_anisotropic_filtering),
-                            options = listOf(
-                                0 to stringResource(R.string.settings_aniso_off),
-                                2 to "2x",
-                                4 to "4x",
-                                8 to "8x",
-                                16 to "16x"
-                            ),
-                            currentValue = uiState.anisotropicFiltering,
-                            onValueChange = onSetAnisotropicFiltering,
-                            helpText = stringResource(R.string.settings_help_anisotropic_filtering),
-                            onResetToDefault = { onSetAnisotropicFiltering(globalDefaults.anisotropicFiltering) }
-                        )
+                                        row("settings_fxaa", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_fxaa),
+                                                checked = uiState.enableFxaa,
+                                                onCheckedChange = onSetEnableFxaa,
+                                                helpText = stringResource(R.string.settings_help_fxaa),
+                                                onResetToDefault = { onSetEnableFxaa(globalDefaults.enableFxaa) }
+                                            )
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_fxaa),
-                            checked = uiState.enableFxaa,
-                            onCheckedChange = onSetEnableFxaa,
-                            helpText = stringResource(R.string.settings_help_fxaa),
-                            onResetToDefault = { onSetEnableFxaa(globalDefaults.enableFxaa) }
-                        )
+                                        row("settings_sgsr", "LiveChipsSelectionRow") {
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_sgsr),
+                                                options = listOf(
+                                                    0 to stringResource(R.string.settings_sgsr_off),
+                                                    1 to stringResource(R.string.settings_sgsr_quality),
+                                                    2 to stringResource(R.string.settings_sgsr_balanced),
+                                                    3 to stringResource(R.string.settings_sgsr_performance)
+                                                ),
+                                                currentValue = uiState.sgsrMode,
+                                                onValueChange = onSetSgsrMode,
+                                                helpText = stringResource(R.string.settings_help_sgsr),
+                                                onResetToDefault = { onSetSgsrMode(globalDefaults.sgsrMode) }
+                                            )
+                                        }
 
-                        LiveChipsSelectionRow(
-                            title = stringResource(R.string.settings_sgsr),
-                            options = listOf(
-                                0 to stringResource(R.string.settings_sgsr_off),
-                                1 to stringResource(R.string.settings_sgsr_quality),
-                                2 to stringResource(R.string.settings_sgsr_balanced),
-                                3 to stringResource(R.string.settings_sgsr_performance)
-                            ),
-                            currentValue = uiState.sgsrMode,
-                            onValueChange = onSetSgsrMode,
-                            helpText = stringResource(R.string.settings_help_sgsr),
-                            onResetToDefault = { onSetSgsrMode(globalDefaults.sgsrMode) }
-                        )
+                                        row("settings_cas", "LiveChipsSelectionRow") {
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_cas),
+                                                options = listOf(
+                                                    0 to stringResource(R.string.settings_cas_mode_off),
+                                                    1 to stringResource(R.string.settings_cas_mode_sharpen_only),
+                                                    2 to stringResource(R.string.settings_cas_mode_sharpen_resize)
+                                                ),
+                                                currentValue = uiState.casMode,
+                                                onValueChange = onSetCasMode,
+                                                helpText = stringResource(R.string.settings_help_cas),
+                                                onResetToDefault = { onSetCasMode(globalDefaults.casMode) }
+                                            )
+                                        }
 
-                        LiveChipsSelectionRow(
-                            title = stringResource(R.string.settings_cas),
-                            options = listOf(
-                                0 to stringResource(R.string.settings_cas_mode_off),
-                                1 to stringResource(R.string.settings_cas_mode_sharpen_only),
-                                2 to stringResource(R.string.settings_cas_mode_sharpen_resize)
-                            ),
-                            currentValue = uiState.casMode,
-                            onValueChange = onSetCasMode,
-                            helpText = stringResource(R.string.settings_help_cas),
-                            onResetToDefault = { onSetCasMode(globalDefaults.casMode) }
-                        )
+                                        if (uiState.casMode != 0) {
+                                            row("settings_cas_sharpness", "LiveSliderRow") {
+                                                LiveSliderRow(
+                                                    title = stringResource(R.string.settings_cas_sharpness),
+                                                    valueLabelForValue = { "$it%" },
+                                                    value = uiState.casSharpness.toFloat(),
+                                                    range = 0f..100f,
+                                                    steps = 99,
+                                                    onValueChange = { onSetCasSharpness(it.toInt()) },
+                                                    helpText = stringResource(R.string.settings_help_cas_sharpness),
+                                                    onResetToDefault = { onSetCasSharpness(globalDefaults.casSharpness) }
+                                                )
+                                            }
+                                        }
 
-                        if (uiState.casMode != 0) {
-                            LiveSliderRow(
-                                title = stringResource(R.string.settings_cas_sharpness),
-                                valueLabelForValue = { "$it%" },
-                                value = uiState.casSharpness.toFloat(),
-                                range = 0f..100f,
-                                steps = 99,
-                                onValueChange = { onSetCasSharpness(it.toInt()) },
-                                helpText = stringResource(R.string.settings_help_cas_sharpness),
-                                onResetToDefault = { onSetCasSharpness(globalDefaults.casSharpness) }
-                            )
-                        }
+                                        row("settings_tv_shader", "LiveChipsSelectionRow") {
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_tv_shader),
+                                                options = listOf(
+                                                    0 to stringResource(R.string.settings_tv_shader_none),
+                                                    1 to stringResource(R.string.settings_tv_shader_scanline),
+                                                    2 to stringResource(R.string.settings_tv_shader_diagonal),
+                                                    3 to stringResource(R.string.settings_tv_shader_triangular),
+                                                    4 to stringResource(R.string.settings_tv_shader_wave),
+                                                    5 to stringResource(R.string.settings_tv_shader_lottes_crt),
+                                                    6 to stringResource(R.string.settings_tv_shader_4x_rgss),
+                                                    7 to stringResource(R.string.settings_tv_shader_nx_agss)
+                                                ),
+                                                currentValue = uiState.tvShader,
+                                                onValueChange = onSetTvShader,
+                                                helpText = stringResource(R.string.settings_help_tv_shader),
+                                                onResetToDefault = { onSetTvShader(globalDefaults.tvShader) }
+                                            )
+                                        }
 
-                        LiveChipsSelectionRow(
-                            title = stringResource(R.string.settings_tv_shader),
-                            options = listOf(
-                                0 to stringResource(R.string.settings_tv_shader_none),
-                                1 to stringResource(R.string.settings_tv_shader_scanline),
-                                2 to stringResource(R.string.settings_tv_shader_diagonal),
-                                3 to stringResource(R.string.settings_tv_shader_triangular),
-                                4 to stringResource(R.string.settings_tv_shader_wave),
-                                5 to stringResource(R.string.settings_tv_shader_lottes_crt),
-                                6 to stringResource(R.string.settings_tv_shader_4x_rgss),
-                                7 to stringResource(R.string.settings_tv_shader_nx_agss)
-                            ),
-                            currentValue = uiState.tvShader,
-                            onValueChange = onSetTvShader,
-                            helpText = stringResource(R.string.settings_help_tv_shader),
-                            onResetToDefault = { onSetTvShader(globalDefaults.tvShader) }
-                        )
-
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_hw_mipmapping),
-                            checked = uiState.enableHwMipmapping,
-                            onCheckedChange = onSetEnableHwMipmapping,
-                            helpText = stringResource(R.string.settings_help_hw_mipmapping),
-                            onResetToDefault = { onSetEnableHwMipmapping(globalDefaults.enableHwMipmapping) }
-                        )
-
+                                        row("settings_hw_mipmapping", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_hw_mipmapping),
+                                                checked = uiState.enableHwMipmapping,
+                                                onCheckedChange = onSetEnableHwMipmapping,
+                                                helpText = stringResource(R.string.settings_help_hw_mipmapping),
+                                                onResetToDefault = { onSetEnableHwMipmapping(globalDefaults.enableHwMipmapping) }
+                                            )
+                                        }
                                     }
 
                                     GameMenuSectionId.GRAPHICS_SCREEN -> {
+                                        row("emulation_screen_tab", "SidebarSectionTitle") {
+                                            SidebarSectionTitle(
+                                                text = stringResource(R.string.emulation_screen_tab).uppercase(),
+                                                color = sectionTitleColor,
+                                                topPadding = sectionLabelTopPadding,
+                                                horizontalInset = sectionLabelInset
+                                            )
+                                        }
 
-                        SidebarSectionTitle(
-                            text = stringResource(R.string.emulation_screen_tab).uppercase(),
-                            color = sectionTitleColor,
-                            topPadding = sectionLabelTopPadding,
-                            horizontalInset = sectionLabelInset
-                        )
+                                        row("screen_settings_menu_desc", "Surface") {
+                                            Surface(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = neonShape(18.dp),
+                                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
+                                            ) {
+                                                Text(
+                                                    text = stringResource(R.string.screen_settings_menu_desc),
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
 
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = neonShape(18.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.screen_settings_menu_desc),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                                        row("settings_shadeboost_brightness", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_shadeboost_brightness),
+                                                valueLabelForValue = { it.toString() },
+                                                value = uiState.shadeBoostBrightness.toFloat(),
+                                                range = 1f..100f,
+                                                steps = 98,
+                                                onValueChange = { onSetShadeBoostBrightness(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_shadeboost_brightness),
+                                                onResetToDefault = { onSetShadeBoostBrightness(globalDefaults.shadeBoostBrightness) }
+                                            )
+                                        }
 
-                        LiveSliderRow(
-                            title = stringResource(R.string.settings_shadeboost_brightness),
-                            valueLabelForValue = { it.toString() },
-                            value = uiState.shadeBoostBrightness.toFloat(),
-                            range = 1f..100f,
-                            steps = 98,
-                            onValueChange = { onSetShadeBoostBrightness(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_shadeboost_brightness),
-                            onResetToDefault = { onSetShadeBoostBrightness(globalDefaults.shadeBoostBrightness) }
-                        )
+                                        row("settings_shadeboost_contrast", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_shadeboost_contrast),
+                                                valueLabelForValue = { it.toString() },
+                                                value = uiState.shadeBoostContrast.toFloat(),
+                                                range = 1f..100f,
+                                                steps = 98,
+                                                onValueChange = { onSetShadeBoostContrast(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_shadeboost_contrast),
+                                                onResetToDefault = { onSetShadeBoostContrast(globalDefaults.shadeBoostContrast) }
+                                            )
+                                        }
 
-                        LiveSliderRow(
-                            title = stringResource(R.string.settings_shadeboost_contrast),
-                            valueLabelForValue = { it.toString() },
-                            value = uiState.shadeBoostContrast.toFloat(),
-                            range = 1f..100f,
-                            steps = 98,
-                            onValueChange = { onSetShadeBoostContrast(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_shadeboost_contrast),
-                            onResetToDefault = { onSetShadeBoostContrast(globalDefaults.shadeBoostContrast) }
-                        )
+                                        row("settings_shadeboost_saturation", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_shadeboost_saturation),
+                                                valueLabelForValue = { it.toString() },
+                                                value = uiState.shadeBoostSaturation.toFloat(),
+                                                range = 1f..100f,
+                                                steps = 98,
+                                                onValueChange = { onSetShadeBoostSaturation(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_shadeboost_saturation),
+                                                onResetToDefault = { onSetShadeBoostSaturation(globalDefaults.shadeBoostSaturation) }
+                                            )
+                                        }
 
-                        LiveSliderRow(
-                            title = stringResource(R.string.settings_shadeboost_saturation),
-                            valueLabelForValue = { it.toString() },
-                            value = uiState.shadeBoostSaturation.toFloat(),
-                            range = 1f..100f,
-                            steps = 98,
-                            onValueChange = { onSetShadeBoostSaturation(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_shadeboost_saturation),
-                            onResetToDefault = { onSetShadeBoostSaturation(globalDefaults.shadeBoostSaturation) }
-                        )
-
-                        LiveSliderRow(
-                            title = stringResource(R.string.settings_shadeboost_gamma),
-                            valueLabelForValue = { it.toString() },
-                            value = uiState.shadeBoostGamma.toFloat(),
-                            range = 1f..100f,
-                            steps = 98,
-                            onValueChange = { onSetShadeBoostGamma(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_shadeboost_gamma),
-                            onResetToDefault = { onSetShadeBoostGamma(globalDefaults.shadeBoostGamma) }
-                        )
+                                        row("settings_shadeboost_gamma", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_shadeboost_gamma),
+                                                valueLabelForValue = { it.toString() },
+                                                value = uiState.shadeBoostGamma.toFloat(),
+                                                range = 1f..100f,
+                                                steps = 98,
+                                                onValueChange = { onSetShadeBoostGamma(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_shadeboost_gamma),
+                                                onResetToDefault = { onSetShadeBoostGamma(globalDefaults.shadeBoostGamma) }
+                                            )
+                                        }
                                     }
 
                                     else -> Unit
@@ -5665,332 +5838,408 @@ private fun EmulationSidebarMenu(
                             GameMenuTabId.FIXES,
                             uiState.gameMenuSectionOrder
                         ).filterNot(uiState.hiddenGameMenuSections::contains)
-                        menuSection(fixesSections, sectionSpacing) { section ->
+                        menuRows(fixesSections) { section ->
                                 when (section) {
                                     GameMenuSectionId.FIXES_PATCHES -> {
-                        SidebarSectionTitle(
-                            text = stringResource(R.string.settings_patches_section).uppercase(),
-                            color = sectionTitleColor,
-                            topPadding = sectionLabelTopPadding,
-                            horizontalInset = sectionLabelInset
-                        )
+                                        row("settings_patches_section", "SidebarSectionTitle") {
+                                            SidebarSectionTitle(
+                                                text = stringResource(R.string.settings_patches_section).uppercase(),
+                                                color = sectionTitleColor,
+                                                topPadding = sectionLabelTopPadding,
+                                                horizontalInset = sectionLabelInset
+                                            )
+                                        }
 
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_widescreen_patches),
-                            checked = uiState.widescreenPatches,
-                            onCheckedChange = onSetEnableWidescreenPatches,
-                            helpText = stringResource(R.string.settings_help_widescreen_patches),
-                            onResetToDefault = { onSetEnableWidescreenPatches(globalDefaults.enableWidescreenPatches) }
-                        )
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_no_interlacing_patches),
-                            checked = uiState.noInterlacingPatches,
-                            onCheckedChange = onSetEnableNoInterlacingPatches,
-                            helpText = stringResource(R.string.settings_help_no_interlacing_patches),
-                            onResetToDefault = { onSetEnableNoInterlacingPatches(globalDefaults.enableNoInterlacingPatches) }
-                        )
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_anti_blur),
-                            checked = uiState.antiBlur,
-                            onCheckedChange = onSetAntiBlur,
-                            helpText = stringResource(R.string.settings_help_anti_blur),
-                            onResetToDefault = { onSetAntiBlur(globalDefaults.antiBlur) }
-                        )
+                                        row("settings_widescreen_patches", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_widescreen_patches),
+                                                checked = uiState.widescreenPatches,
+                                                onCheckedChange = onSetEnableWidescreenPatches,
+                                                helpText = stringResource(R.string.settings_help_widescreen_patches),
+                                                onResetToDefault = { onSetEnableWidescreenPatches(globalDefaults.enableWidescreenPatches) }
+                                            )
+                                        }
 
+                                        row("settings_no_interlacing_patches", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_no_interlacing_patches),
+                                                checked = uiState.noInterlacingPatches,
+                                                onCheckedChange = onSetEnableNoInterlacingPatches,
+                                                helpText = stringResource(R.string.settings_help_no_interlacing_patches),
+                                                onResetToDefault = { onSetEnableNoInterlacingPatches(globalDefaults.enableNoInterlacingPatches) }
+                                            )
+                                        }
+
+                                        row("settings_anti_blur", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_anti_blur),
+                                                checked = uiState.antiBlur,
+                                                onCheckedChange = onSetAntiBlur,
+                                                helpText = stringResource(R.string.settings_help_anti_blur),
+                                                onResetToDefault = { onSetAntiBlur(globalDefaults.antiBlur) }
+                                            )
+                                        }
                                     }
 
                                     GameMenuSectionId.FIXES_HARDWARE -> {
+                                        row("settings_hardware_fixes", "SidebarSectionTitle") {
+                                            SidebarSectionTitle(
+                                                text = stringResource(R.string.settings_hardware_fixes).uppercase(),
+                                                color = sectionTitleColor,
+                                                topPadding = sectionLabelTopPadding,
+                                                horizontalInset = sectionLabelInset
+                                            )
+                                        }
 
-                        SidebarSectionTitle(
-                            text = stringResource(R.string.settings_hardware_fixes).uppercase(),
-                            color = sectionTitleColor,
-                            topPadding = sectionLabelTopPadding,
-                            horizontalInset = sectionLabelInset
-                        )
+                                        row("settings_cpu_sprite_render_size", "LiveChipsSelectionRow") {
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_cpu_sprite_render_size),
+                                                options = (0..10).map { value ->
+                                                    value to if (value == 0) {
+                                                        stringResource(R.string.settings_disabled_short)
+                                                    } else {
+                                                        value.toString()
+                                                    }
+                                                },
+                                                currentValue = uiState.cpuSpriteRenderSize,
+                                                onValueChange = onSetCpuSpriteRenderSize,
+                                                helpText = stringResource(R.string.settings_help_cpu_sprite_render_size),
+                                                onResetToDefault = { onSetCpuSpriteRenderSize(globalDefaults.cpuSpriteRenderSize) }
+                                            )
+                                        }
 
-                LiveChipsSelectionRow(
-                    title = stringResource(R.string.settings_cpu_sprite_render_size),
-                    options = (0..10).map { value ->
-                        value to if (value == 0) {
-                            stringResource(R.string.settings_disabled_short)
-                        } else {
-                            value.toString()
-                        }
-                    },
-                    currentValue = uiState.cpuSpriteRenderSize,
-                    onValueChange = onSetCpuSpriteRenderSize,
-                    helpText = stringResource(R.string.settings_help_cpu_sprite_render_size),
-                    onResetToDefault = { onSetCpuSpriteRenderSize(globalDefaults.cpuSpriteRenderSize) }
-                )
+                                        row("settings_cpu_sprite_render_level", "LiveChipsSelectionRow") {
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_cpu_sprite_render_level),
+                                                options = listOf(
+                                                    0 to stringResource(R.string.settings_cpu_sprite_render_level_sprites),
+                                                    1 to stringResource(R.string.settings_cpu_sprite_render_level_triangles),
+                                                    2 to stringResource(R.string.settings_cpu_sprite_render_level_blended)
+                                                ),
+                                                currentValue = uiState.cpuSpriteRenderLevel,
+                                                onValueChange = onSetCpuSpriteRenderLevel,
+                                                helpText = stringResource(R.string.settings_help_cpu_sprite_render_level),
+                                                onResetToDefault = { onSetCpuSpriteRenderLevel(globalDefaults.cpuSpriteRenderLevel) }
+                                            )
+                                        }
 
-                LiveChipsSelectionRow(
-                    title = stringResource(R.string.settings_cpu_sprite_render_level),
-                    options = listOf(
-                        0 to stringResource(R.string.settings_cpu_sprite_render_level_sprites),
-                        1 to stringResource(R.string.settings_cpu_sprite_render_level_triangles),
-                        2 to stringResource(R.string.settings_cpu_sprite_render_level_blended)
-                    ),
-                    currentValue = uiState.cpuSpriteRenderLevel,
-                    onValueChange = onSetCpuSpriteRenderLevel,
-                    helpText = stringResource(R.string.settings_help_cpu_sprite_render_level),
-                    onResetToDefault = { onSetCpuSpriteRenderLevel(globalDefaults.cpuSpriteRenderLevel) }
-                )
+                                        row("settings_software_clut_render", "LiveChipsSelectionRow") {
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_software_clut_render),
+                                                options = listOf(
+                                                    0 to stringResource(R.string.settings_disabled_short),
+                                                    1 to stringResource(R.string.settings_normal_short),
+                                                    2 to stringResource(R.string.settings_aggressive_short)
+                                                ),
+                                                currentValue = uiState.softwareClutRender,
+                                                onValueChange = onSetSoftwareClutRender,
+                                                helpText = stringResource(R.string.settings_help_software_clut_render),
+                                                onResetToDefault = { onSetSoftwareClutRender(globalDefaults.softwareClutRender) }
+                                            )
+                                        }
 
-                LiveChipsSelectionRow(
-                    title = stringResource(R.string.settings_software_clut_render),
-                    options = listOf(
-                        0 to stringResource(R.string.settings_disabled_short),
-                        1 to stringResource(R.string.settings_normal_short),
-                        2 to stringResource(R.string.settings_aggressive_short)
-                    ),
-                    currentValue = uiState.softwareClutRender,
-                    onValueChange = onSetSoftwareClutRender,
-                    helpText = stringResource(R.string.settings_help_software_clut_render),
-                    onResetToDefault = { onSetSoftwareClutRender(globalDefaults.softwareClutRender) }
-                )
+                                        row("settings_gpu_target_clut", "LiveChipsSelectionRow") {
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_gpu_target_clut),
+                                                options = listOf(
+                                                    0 to stringResource(R.string.settings_hw_download_mode_disabled),
+                                                    1 to stringResource(R.string.settings_gpu_target_clut_exact),
+                                                    2 to stringResource(R.string.settings_gpu_target_clut_inside)
+                                                ),
+                                                currentValue = uiState.gpuTargetClutMode,
+                                                onValueChange = onSetGpuTargetClutMode,
+                                                helpText = stringResource(R.string.settings_help_gpu_target_clut),
+                                                onResetToDefault = { onSetGpuTargetClutMode(globalDefaults.gpuTargetClutMode) }
+                                            )
+                                        }
 
-                LiveChipsSelectionRow(
-                    title = stringResource(R.string.settings_gpu_target_clut),
-                    options = listOf(
-                        0 to stringResource(R.string.settings_hw_download_mode_disabled),
-                        1 to stringResource(R.string.settings_gpu_target_clut_exact),
-                        2 to stringResource(R.string.settings_gpu_target_clut_inside)
-                    ),
-                    currentValue = uiState.gpuTargetClutMode,
-                    onValueChange = onSetGpuTargetClutMode,
-                    helpText = stringResource(R.string.settings_help_gpu_target_clut),
-                    onResetToDefault = { onSetGpuTargetClutMode(globalDefaults.gpuTargetClutMode) }
-                )
+                                        row("settings_auto_flush_hardware", "LiveChipsSelectionRow") {
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_auto_flush_hardware),
+                                                options = listOf(
+                                                    0 to stringResource(R.string.settings_hw_download_mode_disabled),
+                                                    1 to stringResource(R.string.settings_auto_flush_sprites),
+                                                    2 to stringResource(R.string.settings_auto_flush_all)
+                                                ),
+                                                currentValue = uiState.autoFlushHardware,
+                                                onValueChange = onSetAutoFlushHardware,
+                                                helpText = stringResource(R.string.settings_help_auto_flush_hardware),
+                                                onResetToDefault = { onSetAutoFlushHardware(globalDefaults.autoFlushHardware) }
+                                            )
+                                        }
 
-                LiveChipsSelectionRow(
-                    title = stringResource(R.string.settings_auto_flush_hardware),
-                    options = listOf(
-                        0 to stringResource(R.string.settings_hw_download_mode_disabled),
-                        1 to stringResource(R.string.settings_auto_flush_sprites),
-                        2 to stringResource(R.string.settings_auto_flush_all)
-                    ),
-                    currentValue = uiState.autoFlushHardware,
-                    onValueChange = onSetAutoFlushHardware,
-                    helpText = stringResource(R.string.settings_help_auto_flush_hardware),
-                    onResetToDefault = { onSetAutoFlushHardware(globalDefaults.autoFlushHardware) }
-                )
+                                        row("settings_skip_draw_start", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_skip_draw_start),
+                                                valueLabelForValue = { it.toString() },
+                                                value = uiState.skipDrawStart.toFloat(),
+                                                range = 0f..100f,
+                                                steps = 99,
+                                                onValueChange = { onSetSkipDrawStart(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_skip_draw_start),
+                                                onResetToDefault = { onSetSkipDrawStart(globalDefaults.skipDrawStart) }
+                                            )
+                                        }
 
-                LiveSliderRow(
-                    title = stringResource(R.string.settings_skip_draw_start),
-                    valueLabelForValue = { it.toString() },
-                    value = uiState.skipDrawStart.toFloat(),
-                    range = 0f..100f,
-                    steps = 99,
-                    onValueChange = { onSetSkipDrawStart(it.toInt()) },
-                    helpText = stringResource(R.string.settings_help_skip_draw_start),
-                    onResetToDefault = { onSetSkipDrawStart(globalDefaults.skipDrawStart) }
-                )
+                                        row("settings_skip_draw_end", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_skip_draw_end),
+                                                valueLabelForValue = { it.toString() },
+                                                value = uiState.skipDrawEnd.toFloat(),
+                                                range = 0f..100f,
+                                                steps = 99,
+                                                onValueChange = { onSetSkipDrawEnd(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_skip_draw_end),
+                                                onResetToDefault = { onSetSkipDrawEnd(globalDefaults.skipDrawEnd) }
+                                            )
+                                        }
 
-                LiveSliderRow(
-                    title = stringResource(R.string.settings_skip_draw_end),
-                    valueLabelForValue = { it.toString() },
-                    value = uiState.skipDrawEnd.toFloat(),
-                    range = 0f..100f,
-                    steps = 99,
-                    onValueChange = { onSetSkipDrawEnd(it.toInt()) },
-                    helpText = stringResource(R.string.settings_help_skip_draw_end),
-                    onResetToDefault = { onSetSkipDrawEnd(globalDefaults.skipDrawEnd) }
-                )
+                                        row("settings_cpu_framebuffer_conversion", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_cpu_framebuffer_conversion),
+                                                checked = uiState.cpuFramebufferConversion,
+                                                onCheckedChange = onSetCpuFramebufferConversion,
+                                                helpText = stringResource(R.string.settings_help_cpu_framebuffer_conversion),
+                                                onResetToDefault = { onSetCpuFramebufferConversion(globalDefaults.cpuFramebufferConversion) }
+                                            )
+                                        }
 
-                SettingsToggle(
-                    title = stringResource(R.string.settings_cpu_framebuffer_conversion),
-                    checked = uiState.cpuFramebufferConversion,
-                    onCheckedChange = onSetCpuFramebufferConversion,
-                    helpText = stringResource(R.string.settings_help_cpu_framebuffer_conversion),
-                    onResetToDefault = { onSetCpuFramebufferConversion(globalDefaults.cpuFramebufferConversion) }
-                )
-                SettingsToggle(
-                    title = stringResource(R.string.settings_disable_depth_conversion),
-                    checked = uiState.disableDepthConversion,
-                    onCheckedChange = onSetDisableDepthConversion,
-                    helpText = stringResource(R.string.settings_help_disable_depth_conversion),
-                    onResetToDefault = { onSetDisableDepthConversion(globalDefaults.disableDepthConversion) }
-                )
-                SettingsToggle(
-                    title = stringResource(R.string.settings_disable_safe_features),
-                    checked = uiState.disableSafeFeatures,
-                    onCheckedChange = onSetDisableSafeFeatures,
-                    helpText = stringResource(R.string.settings_help_disable_safe_features),
-                    onResetToDefault = { onSetDisableSafeFeatures(globalDefaults.disableSafeFeatures) }
-                )
-                SettingsToggle(
-                    title = stringResource(R.string.settings_disable_render_fixes),
-                    checked = uiState.disableRenderFixes,
-                    onCheckedChange = onSetDisableRenderFixes,
-                    helpText = stringResource(R.string.settings_help_disable_render_fixes),
-                    onResetToDefault = { onSetDisableRenderFixes(globalDefaults.disableRenderFixes) }
-                )
-                SettingsToggle(
-                    title = stringResource(R.string.settings_preload_frame_data),
-                    checked = uiState.preloadFrameData,
-                    onCheckedChange = onSetPreloadFrameData,
-                    helpText = stringResource(R.string.settings_help_preload_frame_data),
-                    onResetToDefault = { onSetPreloadFrameData(globalDefaults.preloadFrameData) }
-                )
-                SettingsToggle(
-                    title = stringResource(R.string.settings_disable_partial_invalidation),
-                    checked = uiState.disablePartialInvalidation,
-                    onCheckedChange = onSetDisablePartialInvalidation,
-                    helpText = stringResource(R.string.settings_help_disable_partial_invalidation),
-                    onResetToDefault = { onSetDisablePartialInvalidation(globalDefaults.disablePartialInvalidation) }
-                )
-                LiveChipsSelectionRow(
-                    title = stringResource(R.string.settings_texture_inside_rt),
-                    options = listOf(
-                        0 to stringResource(R.string.settings_hw_download_mode_disabled),
-                        1 to stringResource(R.string.settings_texture_inside_rt_inside),
-                        2 to stringResource(R.string.settings_texture_inside_rt_merge)
-                    ),
-                    currentValue = uiState.textureInsideRt,
-                    onValueChange = onSetTextureInsideRt,
-                    helpText = stringResource(R.string.settings_help_texture_inside_rt),
-                    onResetToDefault = { onSetTextureInsideRt(globalDefaults.textureInsideRt) }
-                )
-                SettingsToggle(
-                    title = stringResource(R.string.settings_read_targets_on_close),
-                    checked = uiState.readTargetsOnClose,
-                    onCheckedChange = onSetReadTargetsOnClose,
-                    helpText = stringResource(R.string.settings_help_read_targets_on_close),
-                    onResetToDefault = { onSetReadTargetsOnClose(globalDefaults.readTargetsOnClose) }
-                )
-                SettingsToggle(
-                    title = stringResource(R.string.settings_estimate_texture_region),
-                    checked = uiState.estimateTextureRegion,
-                    onCheckedChange = onSetEstimateTextureRegion,
-                    helpText = stringResource(R.string.settings_help_estimate_texture_region),
-                    onResetToDefault = { onSetEstimateTextureRegion(globalDefaults.estimateTextureRegion) }
-                )
-                SettingsToggle(
-                    title = stringResource(R.string.settings_gpu_palette_conversion),
-                    checked = uiState.gpuPaletteConversion,
-                    onCheckedChange = onSetGpuPaletteConversion,
-                    helpText = stringResource(R.string.settings_help_gpu_palette_conversion),
-                    onResetToDefault = { onSetGpuPaletteConversion(globalDefaults.gpuPaletteConversion) }
-                )
+                                        row("settings_disable_depth_conversion", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_disable_depth_conversion),
+                                                checked = uiState.disableDepthConversion,
+                                                onCheckedChange = onSetDisableDepthConversion,
+                                                helpText = stringResource(R.string.settings_help_disable_depth_conversion),
+                                                onResetToDefault = { onSetDisableDepthConversion(globalDefaults.disableDepthConversion) }
+                                            )
+                                        }
 
+                                        row("settings_disable_safe_features", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_disable_safe_features),
+                                                checked = uiState.disableSafeFeatures,
+                                                onCheckedChange = onSetDisableSafeFeatures,
+                                                helpText = stringResource(R.string.settings_help_disable_safe_features),
+                                                onResetToDefault = { onSetDisableSafeFeatures(globalDefaults.disableSafeFeatures) }
+                                            )
+                                        }
+
+                                        row("settings_disable_render_fixes", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_disable_render_fixes),
+                                                checked = uiState.disableRenderFixes,
+                                                onCheckedChange = onSetDisableRenderFixes,
+                                                helpText = stringResource(R.string.settings_help_disable_render_fixes),
+                                                onResetToDefault = { onSetDisableRenderFixes(globalDefaults.disableRenderFixes) }
+                                            )
+                                        }
+
+                                        row("settings_preload_frame_data", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_preload_frame_data),
+                                                checked = uiState.preloadFrameData,
+                                                onCheckedChange = onSetPreloadFrameData,
+                                                helpText = stringResource(R.string.settings_help_preload_frame_data),
+                                                onResetToDefault = { onSetPreloadFrameData(globalDefaults.preloadFrameData) }
+                                            )
+                                        }
+
+                                        row("settings_disable_partial_invalidation", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_disable_partial_invalidation),
+                                                checked = uiState.disablePartialInvalidation,
+                                                onCheckedChange = onSetDisablePartialInvalidation,
+                                                helpText = stringResource(R.string.settings_help_disable_partial_invalidation),
+                                                onResetToDefault = { onSetDisablePartialInvalidation(globalDefaults.disablePartialInvalidation) }
+                                            )
+                                        }
+
+                                        row("settings_texture_inside_rt", "LiveChipsSelectionRow") {
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_texture_inside_rt),
+                                                options = listOf(
+                                                    0 to stringResource(R.string.settings_hw_download_mode_disabled),
+                                                    1 to stringResource(R.string.settings_texture_inside_rt_inside),
+                                                    2 to stringResource(R.string.settings_texture_inside_rt_merge)
+                                                ),
+                                                currentValue = uiState.textureInsideRt,
+                                                onValueChange = onSetTextureInsideRt,
+                                                helpText = stringResource(R.string.settings_help_texture_inside_rt),
+                                                onResetToDefault = { onSetTextureInsideRt(globalDefaults.textureInsideRt) }
+                                            )
+                                        }
+
+                                        row("settings_read_targets_on_close", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_read_targets_on_close),
+                                                checked = uiState.readTargetsOnClose,
+                                                onCheckedChange = onSetReadTargetsOnClose,
+                                                helpText = stringResource(R.string.settings_help_read_targets_on_close),
+                                                onResetToDefault = { onSetReadTargetsOnClose(globalDefaults.readTargetsOnClose) }
+                                            )
+                                        }
+
+                                        row("settings_estimate_texture_region", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_estimate_texture_region),
+                                                checked = uiState.estimateTextureRegion,
+                                                onCheckedChange = onSetEstimateTextureRegion,
+                                                helpText = stringResource(R.string.settings_help_estimate_texture_region),
+                                                onResetToDefault = { onSetEstimateTextureRegion(globalDefaults.estimateTextureRegion) }
+                                            )
+                                        }
+
+                                        row("settings_gpu_palette_conversion", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_gpu_palette_conversion),
+                                                checked = uiState.gpuPaletteConversion,
+                                                onCheckedChange = onSetGpuPaletteConversion,
+                                                helpText = stringResource(R.string.settings_help_gpu_palette_conversion),
+                                                onResetToDefault = { onSetGpuPaletteConversion(globalDefaults.gpuPaletteConversion) }
+                                            )
+                                        }
                                     }
 
                                     GameMenuSectionId.FIXES_UPSCALING -> {
+                                        row("settings_upscaling_fixes", "SidebarSectionTitle") {
+                                            SidebarSectionTitle(
+                                                text = stringResource(R.string.settings_upscaling_fixes).uppercase(),
+                                                color = sectionTitleColor,
+                                                topPadding = sectionLabelTopPadding,
+                                                horizontalInset = sectionLabelInset
+                                            )
+                                        }
 
-                SidebarSectionTitle(
-                    text = stringResource(R.string.settings_upscaling_fixes).uppercase(),
-                    color = sectionTitleColor,
-                    topPadding = sectionLabelTopPadding,
-                    horizontalInset = sectionLabelInset
-                )
+                                        row("settings_half_pixel_offset", "LiveChipsSelectionRow") {
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_half_pixel_offset),
+                                                options = listOf(
+                                                    0 to stringResource(R.string.settings_half_pixel_off),
+                                                    1 to stringResource(R.string.settings_half_pixel_normal),
+                                                    2 to stringResource(R.string.settings_half_pixel_special),
+                                                    3 to stringResource(R.string.settings_half_pixel_special_aggressive),
+                                                    4 to stringResource(R.string.settings_half_pixel_native),
+                                                    5 to stringResource(R.string.settings_half_pixel_native_tex)
+                                                ),
+                                                currentValue = uiState.halfPixelOffset,
+                                                onValueChange = onSetHalfPixelOffset,
+                                                helpText = stringResource(R.string.settings_help_half_pixel_offset),
+                                                onResetToDefault = { onSetHalfPixelOffset(globalDefaults.halfPixelOffset) }
+                                            )
+                                        }
 
-                LiveChipsSelectionRow(
-                    title = stringResource(R.string.settings_half_pixel_offset),
-                    options = listOf(
-                        0 to stringResource(R.string.settings_half_pixel_off),
-                        1 to stringResource(R.string.settings_half_pixel_normal),
-                        2 to stringResource(R.string.settings_half_pixel_special),
-                        3 to stringResource(R.string.settings_half_pixel_special_aggressive),
-                        4 to stringResource(R.string.settings_half_pixel_native),
-                        5 to stringResource(R.string.settings_half_pixel_native_tex)
-                    ),
-                    currentValue = uiState.halfPixelOffset,
-                    onValueChange = onSetHalfPixelOffset,
-                    helpText = stringResource(R.string.settings_help_half_pixel_offset),
-                    onResetToDefault = { onSetHalfPixelOffset(globalDefaults.halfPixelOffset) }
-                )
+                                        row("settings_native_scaling", "LiveChipsSelectionRow") {
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_native_scaling),
+                                                options = listOf(
+                                                    0 to stringResource(R.string.settings_native_scaling_off),
+                                                    1 to stringResource(R.string.settings_native_scaling_normal),
+                                                    2 to stringResource(R.string.settings_native_scaling_aggressive),
+                                                    3 to stringResource(R.string.settings_native_scaling_normal_maintain_upscale),
+                                                    4 to stringResource(R.string.settings_native_scaling_aggressive_maintain_upscale)
+                                                ),
+                                                currentValue = uiState.nativeScaling,
+                                                onValueChange = onSetNativeScaling,
+                                                helpText = stringResource(R.string.settings_help_native_scaling),
+                                                onResetToDefault = { onSetNativeScaling(globalDefaults.nativeScaling) }
+                                            )
+                                        }
 
-                LiveChipsSelectionRow(
-                    title = stringResource(R.string.settings_native_scaling),
-                    options = listOf(
-                        0 to stringResource(R.string.settings_native_scaling_off),
-                        1 to stringResource(R.string.settings_native_scaling_normal),
-                        2 to stringResource(R.string.settings_native_scaling_aggressive),
-                        3 to stringResource(R.string.settings_native_scaling_normal_maintain_upscale),
-                        4 to stringResource(R.string.settings_native_scaling_aggressive_maintain_upscale)
-                    ),
-                    currentValue = uiState.nativeScaling,
-                    onValueChange = onSetNativeScaling,
-                    helpText = stringResource(R.string.settings_help_native_scaling),
-                    onResetToDefault = { onSetNativeScaling(globalDefaults.nativeScaling) }
-                )
+                                        row("settings_round_sprite", "LiveChipsSelectionRow") {
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_round_sprite),
+                                                options = listOf(
+                                                    0 to stringResource(R.string.settings_half_pixel_off),
+                                                    1 to stringResource(R.string.settings_round_sprite_half),
+                                                    2 to stringResource(R.string.settings_round_sprite_full)
+                                                ),
+                                                currentValue = uiState.roundSprite,
+                                                onValueChange = onSetRoundSprite,
+                                                helpText = stringResource(R.string.settings_help_round_sprite),
+                                                onResetToDefault = { onSetRoundSprite(globalDefaults.roundSprite) }
+                                            )
+                                        }
 
-                LiveChipsSelectionRow(
-                    title = stringResource(R.string.settings_round_sprite),
-                    options = listOf(
-                        0 to stringResource(R.string.settings_half_pixel_off),
-                        1 to stringResource(R.string.settings_round_sprite_half),
-                        2 to stringResource(R.string.settings_round_sprite_full)
-                    ),
-                    currentValue = uiState.roundSprite,
-                    onValueChange = onSetRoundSprite,
-                    helpText = stringResource(R.string.settings_help_round_sprite),
-                    onResetToDefault = { onSetRoundSprite(globalDefaults.roundSprite) }
-                )
+                                        row("settings_bilinear_upscale", "LiveChipsSelectionRow") {
+                                            LiveChipsSelectionRow(
+                                                title = stringResource(R.string.settings_bilinear_upscale),
+                                                options = listOf(
+                                                    0 to stringResource(R.string.settings_trilinear_filtering_auto),
+                                                    1 to stringResource(R.string.settings_bilinear_upscale_force_bilinear),
+                                                    2 to stringResource(R.string.settings_bilinear_upscale_force_nearest)
+                                                ),
+                                                currentValue = uiState.bilinearUpscale,
+                                                onValueChange = onSetBilinearUpscale,
+                                                helpText = stringResource(R.string.settings_help_bilinear_upscale),
+                                                onResetToDefault = { onSetBilinearUpscale(globalDefaults.bilinearUpscale) }
+                                            )
+                                        }
 
-                LiveChipsSelectionRow(
-                    title = stringResource(R.string.settings_bilinear_upscale),
-                    options = listOf(
-                        0 to stringResource(R.string.settings_trilinear_filtering_auto),
-                        1 to stringResource(R.string.settings_bilinear_upscale_force_bilinear),
-                        2 to stringResource(R.string.settings_bilinear_upscale_force_nearest)
-                    ),
-                    currentValue = uiState.bilinearUpscale,
-                    onValueChange = onSetBilinearUpscale,
-                    helpText = stringResource(R.string.settings_help_bilinear_upscale),
-                    onResetToDefault = { onSetBilinearUpscale(globalDefaults.bilinearUpscale) }
-                )
+                                        row("settings_texture_offset_x", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_texture_offset_x),
+                                                valueLabelForValue = { it.toString() },
+                                                value = uiState.textureOffsetX.toFloat(),
+                                                range = -512f..512f,
+                                                steps = 1023,
+                                                onValueChange = { onSetTextureOffsetX(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_texture_offset_x),
+                                                onResetToDefault = { onSetTextureOffsetX(globalDefaults.textureOffsetX) }
+                                            )
+                                        }
 
-                LiveSliderRow(
-                    title = stringResource(R.string.settings_texture_offset_x),
-                    valueLabelForValue = { it.toString() },
-                    value = uiState.textureOffsetX.toFloat(),
-                    range = -512f..512f,
-                    steps = 1023,
-                    onValueChange = { onSetTextureOffsetX(it.toInt()) },
-                    helpText = stringResource(R.string.settings_help_texture_offset_x),
-                    onResetToDefault = { onSetTextureOffsetX(globalDefaults.textureOffsetX) }
-                )
+                                        row("settings_texture_offset_y", "LiveSliderRow") {
+                                            LiveSliderRow(
+                                                title = stringResource(R.string.settings_texture_offset_y),
+                                                valueLabelForValue = { it.toString() },
+                                                value = uiState.textureOffsetY.toFloat(),
+                                                range = -512f..512f,
+                                                steps = 1023,
+                                                onValueChange = { onSetTextureOffsetY(it.toInt()) },
+                                                helpText = stringResource(R.string.settings_help_texture_offset_y),
+                                                onResetToDefault = { onSetTextureOffsetY(globalDefaults.textureOffsetY) }
+                                            )
+                                        }
 
-                LiveSliderRow(
-                    title = stringResource(R.string.settings_texture_offset_y),
-                    valueLabelForValue = { it.toString() },
-                    value = uiState.textureOffsetY.toFloat(),
-                    range = -512f..512f,
-                    steps = 1023,
-                    onValueChange = { onSetTextureOffsetY(it.toInt()) },
-                    helpText = stringResource(R.string.settings_help_texture_offset_y),
-                    onResetToDefault = { onSetTextureOffsetY(globalDefaults.textureOffsetY) }
-                )
+                                        row("settings_align_sprite", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_align_sprite),
+                                                checked = uiState.alignSprite,
+                                                onCheckedChange = onSetAlignSprite,
+                                                helpText = stringResource(R.string.settings_help_align_sprite),
+                                                onResetToDefault = { onSetAlignSprite(globalDefaults.alignSprite) }
+                                            )
+                                        }
 
-                SettingsToggle(
-                    title = stringResource(R.string.settings_align_sprite),
-                    checked = uiState.alignSprite,
-                    onCheckedChange = onSetAlignSprite,
-                    helpText = stringResource(R.string.settings_help_align_sprite),
-                    onResetToDefault = { onSetAlignSprite(globalDefaults.alignSprite) }
-                )
-                SettingsToggle(
-                    title = stringResource(R.string.settings_merge_sprite),
-                    checked = uiState.mergeSprite,
-                    onCheckedChange = onSetMergeSprite,
-                    helpText = stringResource(R.string.settings_help_merge_sprite),
-                    onResetToDefault = { onSetMergeSprite(globalDefaults.mergeSprite) }
-                )
-                SettingsToggle(
-                    title = stringResource(R.string.settings_force_even_sprite_position),
-                    checked = uiState.forceEvenSpritePosition,
-                    onCheckedChange = onSetForceEvenSpritePosition,
-                    helpText = stringResource(R.string.settings_help_force_even_sprite_position),
-                    onResetToDefault = { onSetForceEvenSpritePosition(globalDefaults.forceEvenSpritePosition) }
-                )
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_native_palette_draw),
-                            checked = uiState.nativePaletteDraw,
-                            onCheckedChange = onSetNativePaletteDraw,
-                            helpText = stringResource(R.string.settings_help_native_palette_draw),
-                            onResetToDefault = { onSetNativePaletteDraw(globalDefaults.nativePaletteDraw) }
-                        )
+                                        row("settings_merge_sprite", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_merge_sprite),
+                                                checked = uiState.mergeSprite,
+                                                onCheckedChange = onSetMergeSprite,
+                                                helpText = stringResource(R.string.settings_help_merge_sprite),
+                                                onResetToDefault = { onSetMergeSprite(globalDefaults.mergeSprite) }
+                                            )
+                                        }
+
+                                        row("settings_force_even_sprite_position", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_force_even_sprite_position),
+                                                checked = uiState.forceEvenSpritePosition,
+                                                onCheckedChange = onSetForceEvenSpritePosition,
+                                                helpText = stringResource(R.string.settings_help_force_even_sprite_position),
+                                                onResetToDefault = { onSetForceEvenSpritePosition(globalDefaults.forceEvenSpritePosition) }
+                                            )
+                                        }
+
+                                        row("settings_native_palette_draw", "SettingsToggle") {
+                                            SettingsToggle(
+                                                title = stringResource(R.string.settings_native_palette_draw),
+                                                checked = uiState.nativePaletteDraw,
+                                                onCheckedChange = onSetNativePaletteDraw,
+                                                helpText = stringResource(R.string.settings_help_native_palette_draw),
+                                                onResetToDefault = { onSetNativePaletteDraw(globalDefaults.nativePaletteDraw) }
+                                            )
+                                        }
                                     }
 
                                     else -> Unit
@@ -6253,8 +6502,25 @@ private fun GameMenuContentColumn(
     )
 }
 
+/** Each setting is its own lazy item; a long section never becomes a single expensive scroll item. */
+private class GameMenuSectionScope(
+    private val list: LazyListScope,
+    private val section: GameMenuSectionId
+) {
+    fun row(key: String, contentType: String, content: @Composable androidx.compose.foundation.lazy.LazyItemScope.() -> Unit) {
+        list.item(key = "${section.name}:$key", contentType = contentType, content = content)
+    }
+}
+
+private fun LazyListScope.menuRows(
+    sections: List<GameMenuSectionId>,
+    content: GameMenuSectionScope.(GameMenuSectionId) -> Unit
+) {
+    sections.forEach { section -> GameMenuSectionScope(this, section).content(section) }
+}
+
 /**
- * Emits one menu section per lazy item so a tab only composes the rows that are on screen.
+ * Emits a cohesive browser section as one item. Individual settings use [menuRows].
  *
  * The [Column] around each section reproduces the spacing the former single scrolling column
  * applied between every row, so the rendered layout is unchanged.
@@ -6264,7 +6530,7 @@ private fun LazyListScope.menuSection(
     spacing: Dp,
     content: @Composable (GameMenuSectionId) -> Unit
 ) {
-    items(sections) { section ->
+    items(sections, key = { it.name }, contentType = { "menu-section" }) { section ->
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(spacing)
@@ -6280,7 +6546,7 @@ private fun LazyListScope.menuSectionIndexed(
     spacing: Dp,
     content: @Composable (Int, GameMenuSectionId) -> Unit
 ) {
-    itemsIndexed(sections) { index, section ->
+    itemsIndexed(sections, key = { _, section -> section.name }, contentType = { _, _ -> "menu-section" }) { index, section ->
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(spacing)
@@ -7566,7 +7832,7 @@ private fun LiveChipsSelectionRow(
             contentPadding = PaddingValues(horizontal = 18.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(options) { (value, label) ->
+            items(options, key = { it.first }) { (value, label) ->
                 FilterChip(
                     shape = neonChipShape(),
                     selected = currentValue == value,
@@ -7626,7 +7892,7 @@ private fun LiveBitmaskChoiceRow(
             contentPadding = PaddingValues(horizontal = 18.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(options) { (metric, label) ->
+            items(options, key = { it.first }) { (metric, label) ->
                 FilterChip(
                     shape = neonChipShape(),
                     selected = PerformanceOverlayMetrics.isEnabled(selectedMask, metric),
