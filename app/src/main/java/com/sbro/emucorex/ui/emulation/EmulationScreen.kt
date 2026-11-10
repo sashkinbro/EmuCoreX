@@ -62,8 +62,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -4034,23 +4039,23 @@ private fun EmulationSidebarMenu(
     var autoSaveIntervalText by remember(uiState.autoSaveIntervalMinutes) {
         mutableStateOf(uiState.autoSaveIntervalMinutes.toString())
     }
-    val sessionScrollState = rememberScrollState()
-    val controlsScrollState = rememberScrollState()
-    val emulationScrollState = rememberScrollState()
-    val cheatsScrollState = rememberScrollState()
-    val shadersScrollState = rememberScrollState()
-    val graphicsScrollState = rememberScrollState()
-    val fixesScrollState = rememberScrollState()
-    val achievementsScrollState = rememberScrollState()
-    val selectedTabScrollState = when (selectedMenuTab) {
-        EmulationMenuTab.Session -> sessionScrollState
-        EmulationMenuTab.Controls -> controlsScrollState
-        EmulationMenuTab.Emulation -> emulationScrollState
-        EmulationMenuTab.Cheats -> cheatsScrollState
-        EmulationMenuTab.Shaders -> shadersScrollState
-        EmulationMenuTab.Graphics -> graphicsScrollState
-        EmulationMenuTab.Fixes -> fixesScrollState
-        EmulationMenuTab.Achievements -> achievementsScrollState
+    val sessionListState = rememberLazyListState()
+    val controlsListState = rememberLazyListState()
+    val emulationListState = rememberLazyListState()
+    val cheatsListState = rememberLazyListState()
+    val shadersListState = rememberLazyListState()
+    val graphicsListState = rememberLazyListState()
+    val fixesListState = rememberLazyListState()
+    val achievementsListState = rememberLazyListState()
+    val selectedTabListState = when (selectedMenuTab) {
+        EmulationMenuTab.Session -> sessionListState
+        EmulationMenuTab.Controls -> controlsListState
+        EmulationMenuTab.Emulation -> emulationListState
+        EmulationMenuTab.Cheats -> cheatsListState
+        EmulationMenuTab.Shaders -> shadersListState
+        EmulationMenuTab.Graphics -> graphicsListState
+        EmulationMenuTab.Fixes -> fixesListState
+        EmulationMenuTab.Achievements -> achievementsListState
     }
     LaunchedEffect(selectedMenuTab) {
         railFocusRequesters[selectedMenuTab]?.requestFocus()
@@ -4092,7 +4097,8 @@ private fun EmulationSidebarMenu(
         onNext = { selectRelativeMenuTab(1) }
     )
 
-    val menuContent: @Composable ColumnScope.() -> Unit = {
+    val menuContent: LazyListScope.() -> Unit = {
+            item {
                 Surface(
                     shape = neonShape(22.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
@@ -4169,9 +4175,11 @@ private fun EmulationSidebarMenu(
                         }
                     }
                 }
+            }
 
-                when (selectedMenuTab) {
+            when (selectedMenuTab) {
                     EmulationMenuTab.Session -> {
+                        item {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -4201,7 +4209,9 @@ private fun EmulationSidebarMenu(
                                 )
                             }
                         }
+                        }
 
+                        item {
                         MenuButton(
                             icon = Icons.Rounded.Album,
                             text = stringResource(R.string.emulation_swap_disc),
@@ -4210,13 +4220,14 @@ private fun EmulationSidebarMenu(
                             showProgress = uiState.actionLabel == "swapping_disc",
                             containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.34f)
                         )
+                        }
 
                         val visibleSessionSections = gameMenuSectionsForTab(
                             GameMenuTabId.SESSION,
                             uiState.gameMenuSectionOrder
                         )
                             .filterNot(uiState.hiddenGameMenuSections::contains)
-                        visibleSessionSections.forEachIndexed { index, section ->
+                        menuSectionIndexed(visibleSessionSections, sectionSpacing) { index, section ->
                         val includeFollowingAutoSave = section == GameMenuSectionId.SAVE_STATES &&
                             visibleSessionSections.getOrNull(index + 1) == GameMenuSectionId.AUTO_SAVE
                         val mergedIntoPreviousSaveStates = section == GameMenuSectionId.AUTO_SAVE &&
@@ -4523,9 +4534,11 @@ private fun EmulationSidebarMenu(
                     }
 
                     EmulationMenuTab.Controls -> {
-                        gameMenuSectionsForTab(GameMenuTabId.CONTROLS, uiState.gameMenuSectionOrder)
-                            .filterNot(uiState.hiddenGameMenuSections::contains)
-                            .forEach { section ->
+                        val controlsSections = gameMenuSectionsForTab(
+                            GameMenuTabId.CONTROLS,
+                            uiState.gameMenuSectionOrder
+                        ).filterNot(uiState.hiddenGameMenuSections::contains)
+                        menuSection(controlsSections, sectionSpacing) { section ->
                                 when (section) {
                                     GameMenuSectionId.CONTROLS_GENERAL -> {
                         SidebarSectionTitle(
@@ -4896,9 +4909,11 @@ private fun EmulationSidebarMenu(
                     }
 
                     EmulationMenuTab.Emulation -> {
-                        gameMenuSectionsForTab(GameMenuTabId.EMULATION, uiState.gameMenuSectionOrder)
-                            .filterNot(uiState.hiddenGameMenuSections::contains)
-                            .forEach { section ->
+                        val emulationSections = gameMenuSectionsForTab(
+                            GameMenuTabId.EMULATION,
+                            uiState.gameMenuSectionOrder
+                        ).filterNot(uiState.hiddenGameMenuSections::contains)
+                        menuSection(emulationSections, sectionSpacing) { section ->
                                 when (section) {
                                     GameMenuSectionId.EMULATION_PERFORMANCE -> {
                         SidebarSectionTitle(
@@ -5111,9 +5126,11 @@ private fun EmulationSidebarMenu(
                     }
 
                     EmulationMenuTab.Cheats -> {
-                        gameMenuSectionsForTab(GameMenuTabId.CHEATS, uiState.gameMenuSectionOrder)
-                            .filterNot(uiState.hiddenGameMenuSections::contains)
-                            .forEach { section ->
+                        val cheatsSections = gameMenuSectionsForTab(
+                            GameMenuTabId.CHEATS,
+                            uiState.gameMenuSectionOrder
+                        ).filterNot(uiState.hiddenGameMenuSections::contains)
+                        menuSection(cheatsSections, sectionSpacing) { section ->
                                 when (section) {
                                     GameMenuSectionId.EMULATION_CHEATS -> {
                         SidebarSectionTitle(
@@ -5153,9 +5170,11 @@ private fun EmulationSidebarMenu(
                     }
 
                     EmulationMenuTab.Shaders -> {
-                        gameMenuSectionsForTab(GameMenuTabId.SHADERS, uiState.gameMenuSectionOrder)
-                            .filterNot(uiState.hiddenGameMenuSections::contains)
-                            .forEach { section ->
+                        val shaderSections = gameMenuSectionsForTab(
+                            GameMenuTabId.SHADERS,
+                            uiState.gameMenuSectionOrder
+                        ).filterNot(uiState.hiddenGameMenuSections::contains)
+                        menuSection(shaderSections, sectionSpacing) { section ->
                                 when (section) {
                                     GameMenuSectionId.SHADERS_LIBRARY -> {
                                         SidebarSectionTitle(
@@ -5181,9 +5200,11 @@ private fun EmulationSidebarMenu(
                     }
 
                     EmulationMenuTab.Graphics -> {
-                        gameMenuSectionsForTab(GameMenuTabId.GRAPHICS, uiState.gameMenuSectionOrder)
-                            .filterNot(uiState.hiddenGameMenuSections::contains)
-                            .forEach { section ->
+                        val graphicsSections = gameMenuSectionsForTab(
+                            GameMenuTabId.GRAPHICS,
+                            uiState.gameMenuSectionOrder
+                        ).filterNot(uiState.hiddenGameMenuSections::contains)
+                        menuSection(graphicsSections, sectionSpacing) { section ->
                                 when (section) {
                                     GameMenuSectionId.GRAPHICS_DISPLAY -> {
                         SidebarSectionTitle(
@@ -5325,6 +5346,7 @@ private fun EmulationSidebarMenu(
                             currentValue = uiState.aspectRatio,
                             onValueChange = onSetAspectRatio,
                             allowWrap = false,
+                            horizontalScrolling = true,
                             helpText = stringResource(R.string.settings_help_aspect_ratio),
                             onResetToDefault = { onSetAspectRatio(globalDefaults.aspectRatio) }
                         )
@@ -5641,9 +5663,11 @@ private fun EmulationSidebarMenu(
                     }
 
                     EmulationMenuTab.Fixes -> {
-                        gameMenuSectionsForTab(GameMenuTabId.FIXES, uiState.gameMenuSectionOrder)
-                            .filterNot(uiState.hiddenGameMenuSections::contains)
-                            .forEach { section ->
+                        val fixesSections = gameMenuSectionsForTab(
+                            GameMenuTabId.FIXES,
+                            uiState.gameMenuSectionOrder
+                        ).filterNot(uiState.hiddenGameMenuSections::contains)
+                        menuSection(fixesSections, sectionSpacing) { section ->
                                 when (section) {
                                     GameMenuSectionId.FIXES_PATCHES -> {
                         SidebarSectionTitle(
@@ -5977,12 +6001,14 @@ private fun EmulationSidebarMenu(
                     }
 
                     EmulationMenuTab.Achievements -> {
+                        item {
                         if (GameMenuSectionId.ACHIEVEMENTS_PROGRESS !in uiState.hiddenGameMenuSections) {
                             OverlayAchievementsPane(
                                 gamePath = currentGamePath,
                                 currentGameTitle = uiState.currentGameTitle,
                                 retroState = retroState
                             )
+                        }
                         }
                     }
                 }
@@ -5993,7 +6019,7 @@ private fun EmulationSidebarMenu(
         modifier = modifier,
         menuTabs = menuTabs,
         selectedMenuTab = selectedMenuTab,
-        selectedTabScrollState = selectedTabScrollState,
+        selectedTabListState = selectedTabListState,
         railFocusRequesters = railFocusRequesters,
         contentBottomPadding = drawerBottomPadding + animatedBottomInset,
         rightInset = animatedRightInset,
@@ -6010,14 +6036,14 @@ private fun GameMenuLayoutHost(
     modifier: Modifier,
     menuTabs: List<EmulationMenuTab>,
     selectedMenuTab: EmulationMenuTab,
-    selectedTabScrollState: ScrollState,
+    selectedTabListState: LazyListState,
     railFocusRequesters: Map<EmulationMenuTab, FocusRequester>,
     contentBottomPadding: Dp,
     rightInset: Dp,
     sectionSpacing: Dp,
     onSelectTab: (EmulationMenuTab) -> Unit,
     onClose: () -> Unit,
-    content: @Composable ColumnScope.() -> Unit
+    content: LazyListScope.() -> Unit
 ) {
     val safeModifier = modifier
         .padding(WindowInsets.displayCutout.asPaddingValues())
@@ -6035,7 +6061,7 @@ private fun GameMenuLayoutHost(
                         .fillMaxHeight()
                         .widthIn(min = 300.dp, max = 420.dp),
                     shape = neonShape(28.dp),
-                    scrollState = selectedTabScrollState,
+                    listState = selectedTabListState,
                     bottomPadding = contentBottomPadding,
                     sectionSpacing = sectionSpacing,
                     content = content
@@ -6087,7 +6113,7 @@ private fun GameMenuLayoutHost(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight(),
-                            scrollState = selectedTabScrollState,
+                            listState = selectedTabListState,
                             bottomPadding = 18.dp,
                             sectionSpacing = sectionSpacing,
                             content = content
@@ -6127,7 +6153,7 @@ private fun GameMenuLayoutHost(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth(),
-                            scrollState = selectedTabScrollState,
+                            listState = selectedTabListState,
                             bottomPadding = 18.dp,
                             sectionSpacing = sectionSpacing,
                             content = content
@@ -6167,7 +6193,7 @@ private fun GameMenuLayoutHost(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth(),
-                            scrollState = selectedTabScrollState,
+                            listState = selectedTabListState,
                             bottomPadding = contentBottomPadding,
                             sectionSpacing = 10.dp,
                             horizontalPadding = 12.dp,
@@ -6185,10 +6211,10 @@ private fun GameMenuLayoutHost(
 private fun GameMenuContentSurface(
     modifier: Modifier,
     shape: Shape,
-    scrollState: ScrollState,
+    listState: LazyListState,
     bottomPadding: Dp,
     sectionSpacing: Dp,
-    content: @Composable ColumnScope.() -> Unit
+    content: LazyListScope.() -> Unit
 ) {
     Surface(
         modifier = modifier,
@@ -6197,7 +6223,7 @@ private fun GameMenuContentSurface(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
     ) {
         GameMenuContentColumn(
-            scrollState = scrollState,
+            listState = listState,
             bottomPadding = bottomPadding,
             sectionSpacing = sectionSpacing,
             content = content
@@ -6208,22 +6234,62 @@ private fun GameMenuContentSurface(
 @Composable
 private fun GameMenuContentColumn(
     modifier: Modifier = Modifier,
-    scrollState: ScrollState,
+    listState: LazyListState,
     bottomPadding: Dp,
     sectionSpacing: Dp,
     horizontalPadding: Dp = 18.dp,
     verticalPadding: Dp = 18.dp,
-    content: @Composable ColumnScope.() -> Unit
+    content: LazyListScope.() -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(horizontal = horizontalPadding, vertical = verticalPadding)
-            .padding(bottom = bottomPadding),
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        state = listState,
+        contentPadding = PaddingValues(
+            start = horizontalPadding,
+            top = verticalPadding,
+            end = horizontalPadding,
+            bottom = verticalPadding + bottomPadding
+        ),
         verticalArrangement = Arrangement.spacedBy(sectionSpacing),
         content = content
     )
+}
+
+/**
+ * Emits one menu section per lazy item so a tab only composes the rows that are on screen.
+ *
+ * The [Column] around each section reproduces the spacing the former single scrolling column
+ * applied between every row, so the rendered layout is unchanged.
+ */
+private fun LazyListScope.menuSection(
+    sections: List<GameMenuSectionId>,
+    spacing: Dp,
+    content: @Composable (GameMenuSectionId) -> Unit
+) {
+    items(sections) { section ->
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(spacing)
+        ) {
+            content(section)
+        }
+    }
+}
+
+/** [menuSection] for the tab that merges neighbouring sections and needs the section index. */
+private fun LazyListScope.menuSectionIndexed(
+    sections: List<GameMenuSectionId>,
+    spacing: Dp,
+    content: @Composable (Int, GameMenuSectionId) -> Unit
+) {
+    itemsIndexed(sections) { index, section ->
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(spacing)
+        ) {
+            content(index, section)
+        }
+    }
 }
 
 @Composable
