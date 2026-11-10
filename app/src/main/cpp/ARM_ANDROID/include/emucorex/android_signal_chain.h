@@ -4,11 +4,71 @@
 #include <cerrno>
 #include <csignal>
 #include <cstring>
+#include <cstdint>
 #include <ucontext.h>
 #include <unistd.h>
 
 namespace emucorex::android
 {
+// Record the faulting thread, not a backtrace of the signal handler. No allocator,
+// symbol lookup, unwinder or printf-family function is safe to call here.
+struct SignalMetadata
+{
+    uint64_t launch_id, phase_generation, tfx_valid, tfx_vs, tfx_ps_hi, tfx_ps_lo;
+};
+
+inline void WriteSignalContext(int fd, int signal, const siginfo_t* info, const void* context,
+    const SignalMetadata* metadata = nullptr)
+{
+    char buffer[2048];
+    size_t used = 0;
+    const auto append = [&](const char* text) {
+        while (*text && used < sizeof(buffer)) buffer[used++] = *text++;
+    };
+    const auto hex = [&](uint64_t value) {
+        append("0x");
+        for (int shift = 60; shift >= 0 && used < sizeof(buffer); shift -= 4)
+            buffer[used++] = "0123456789abcdef"[(value >> shift) & 15];
+    };
+    const auto field = [&](const char* name, uint64_t value) {
+        append(name); append("="); hex(value); append("\n");
+    };
+    append("NATIVE_CRASH_CONTEXT v=1\n");
+    field("signal", static_cast<uint64_t>(signal));
+    field("code", info ? static_cast<uint64_t>(info->si_code) : 0);
+    field("fault_addr", info ? reinterpret_cast<uintptr_t>(info->si_addr) : 0);
+    if (metadata)
+    {
+        field("launch_id", metadata->launch_id);
+        field("phase_generation", metadata->phase_generation);
+        if (metadata->tfx_valid)
+        {
+            field("tfx_vs", metadata->tfx_vs);
+            field("tfx_ps_hi", metadata->tfx_ps_hi);
+            field("tfx_ps_lo", metadata->tfx_ps_lo);
+        }
+    }
+    if (context)
+    {
+        const auto& regs = static_cast<const ucontext_t*>(context)->uc_mcontext;
+        field("PC", regs.pc); field("LR", regs.regs[30]); field("SP", regs.sp);
+        field("FP", regs.regs[29]); field("PSTATE", regs.pstate);
+        for (unsigned i = 0; i < 31; ++i)
+        {
+            char name[] = {'X', static_cast<char>('0' + i / 10), static_cast<char>('0' + i % 10), '\0'};
+            field(name, regs.regs[i]);
+        }
+    }
+    size_t sent = 0;
+    while (sent < used)
+    {
+        const ssize_t result = write(fd, buffer + sent, used - sent);
+        if (result < 0 && errno == EINTR) continue;
+        if (result <= 0) break;
+        sent += static_cast<size_t>(result);
+    }
+}
+
 // Never read the instruction at a faulting PC: instruction-fetch faults can point
 // at unmapped/non-readable memory. The kernel's bounded ESR record identifies writes.
 inline bool IsWriteSignalContext(const void* context)

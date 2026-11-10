@@ -33,7 +33,6 @@
 #include <signal.h>
 #include <stdarg.h>
 #include <unistd.h>
-#include <unwind.h>
 
 namespace emucorex::android
 {
@@ -109,152 +108,70 @@ void WriteToLogFileFmt(const char* level, const char* fmt, ...)
 	WriteToLogFile(level, buf);
 }
 
-const char* SignalName(int sig)
-{
-	switch (sig)
-	{
-		case SIGSEGV: return "SIGSEGV";
-		case SIGABRT: return "SIGABRT";
-		case SIGBUS:  return "SIGBUS";
-		case SIGFPE:  return "SIGFPE";
-		default:      return "SIGUNKNOWN";
-	}
-}
-
-struct UnwindState
-{
-	int fd;
-	int frame;
-};
-
-// Async-signal-safe: called by _Unwind_Backtrace for each frame
-_Unwind_Reason_Code UnwindCallback(struct _Unwind_Context* ctx, void* arg)
-{
-	UnwindState* state = reinterpret_cast<UnwindState*>(arg);
-	if (state->frame > 64)
-		return _URC_END_OF_STACK;
-
-	uintptr_t pc = _Unwind_GetIP(ctx);
-	if (pc == 0)
-		return _URC_END_OF_STACK;
-
-	// Resolve symbol via dladdr
-	Dl_info info = {};
-	char line[256];
-	int len;
-	if (dladdr(reinterpret_cast<void*>(pc), &info) && info.dli_fbase)
-	{
-		const uintptr_t offset = pc - reinterpret_cast<uintptr_t>(info.dli_fbase);
-		// Extract just the filename from full path
-		const char* fname = info.dli_fname ? info.dli_fname : "?";
-		const char* slash = __builtin_strrchr(fname, '/');
-		if (slash) fname = slash + 1;
-		len = snprintf(line, sizeof(line), "  #%02d  %s+0x%zx  %s",
-			state->frame, fname, static_cast<size_t>(offset),
-			info.dli_sname ? info.dli_sname : "?");
-	}
-	else
-	{
-		len = snprintf(line, sizeof(line), "  #%02d  0x%zx  <unmapped>",
-			state->frame, static_cast<size_t>(pc));
-	}
-
-	if (len > 0)
-	{
-		write(state->fd, line, static_cast<size_t>(len));
-		write(state->fd, "\n", 1);
-	}
-
-	state->frame++;
-	return _URC_NO_REASON;
-}
-
-void WriteStackTrace(int log_fd)
-{
-	const char* header = "NATIVE_CRASH: --- stack trace ---\n";
-	write(log_fd, header, strlen(header));
-	UnwindState state{log_fd, 0};
-	_Unwind_Backtrace(UnwindCallback, &state);
-	const char* footer = "NATIVE_CRASH: --- end of stack ---\n";
-	write(log_fd, footer, strlen(footer));
-}
-
 void NativeCrashSignalHandler(int sig, siginfo_t* info, void* ctx)
 {
-	// Guard against recursive crashes in the handler itself
-	if (s_in_signal_handler.exchange(true, std::memory_order_acq_rel))
-	{
-		_exit(sig);
-		return;
-	}
+    const int saved_errno = errno;
+    if (s_in_signal_handler.exchange(true, std::memory_order_acq_rel))
+    {
+        _exit(128 + sig);
+        return;
+    }
 
-	void* fault_addr = info ? info->si_addr : nullptr;
-	void* const exception_pc = ctx ? reinterpret_cast<void*>(static_cast<ucontext_t*>(ctx)->uc_mcontext.pc) : nullptr;
+    // Keep the fatal path independent of malloc, loader locks and stack unwinders.
+    // debuggerd receives the original ucontext below and owns the full tombstone.
+    if (s_log_file_path[0] != '\0')
+    {
+        const int fd = open(s_log_file_path, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644);
+        if (fd >= 0)
+        {
+            const SignalMetadata metadata{
+                s_launch_id.load(std::memory_order_relaxed), s_execute_generation.load(std::memory_order_relaxed),
+                s_tfx_selector_valid.load(std::memory_order_acquire) ? 1u : 0u,
+                s_tfx_vs_key.load(std::memory_order_relaxed), s_tfx_ps_key_hi.load(std::memory_order_relaxed),
+                s_tfx_ps_key_lo.load(std::memory_order_relaxed)};
+            WriteSignalContext(fd, sig, info, ctx, &metadata);
+            const int maps = open("/proc/self/maps", O_RDONLY | O_CLOEXEC);
+            if (maps >= 0)
+            {
+                static constexpr char header[] = "NATIVE_CRASH_MAPS\n";
+                (void)write(fd, header, sizeof(header) - 1);
+                char chunk[4096];
+                size_t remaining = 256 * 1024;
+                while (remaining)
+                {
+                    const ssize_t count = read(maps, chunk, remaining < sizeof(chunk) ? remaining : sizeof(chunk));
+                    if (count < 0 && errno == EINTR) continue;
+                    if (count <= 0) break;
+                    size_t sent = 0;
+                    while (sent < static_cast<size_t>(count))
+                    {
+                        const ssize_t result = write(fd, chunk + sent, static_cast<size_t>(count) - sent);
+                        if (result < 0 && errno == EINTR) continue;
+                        if (result <= 0) break;
+                        sent += static_cast<size_t>(result);
+                    }
+                    remaining -= static_cast<size_t>(count);
+                    if (sent < static_cast<size_t>(count)) break;
+                }
+                close(maps);
+            }
+            close(fd);
+        }
+    }
 
-	// Write summary line to log file (async-signal-safe)
-	WriteToLogFileFmt("NATIVE_CRASH",
-		"signal=%s(%d) code=%d pc=%p fault_addr=%p launch=%llu phase=%s game=\"%s\" serial=%s",
-		SignalName(sig), sig,
-		info ? info->si_code : 0, exception_pc,
-		fault_addr,
-		(unsigned long long)s_launch_id.load(std::memory_order_relaxed),
-		s_execute_phase,
-		s_game_title[0] ? s_game_title : "<unknown>",
-		s_game_serial[0] ? s_game_serial : "<unknown>");
-
-	if (s_tfx_selector_valid.load(std::memory_order_relaxed))
-	{
-		WriteToLogFileFmt("NATIVE_CRASH", "tfx_compile vs=%08x ps=%016llx_%016llx",
-			s_tfx_vs_key.load(std::memory_order_relaxed),
-			static_cast<unsigned long long>(s_tfx_ps_key_hi.load(std::memory_order_relaxed)),
-			static_cast<unsigned long long>(s_tfx_ps_key_lo.load(std::memory_order_relaxed)));
-	}
-
-	// Write module info for fault address
-	if (fault_addr)
-	{
-		Dl_info dl = {};
-		if (dladdr(fault_addr, &dl) != 0)
-		{
-			const auto offset = reinterpret_cast<std::uintptr_t>(fault_addr) -
-				reinterpret_cast<std::uintptr_t>(dl.dli_fbase);
-			WriteToLogFileFmt("NATIVE_CRASH",
-				"fault_addr module=%s+0x%zx symbol=%s",
-				dl.dli_fname ? dl.dli_fname : "<unknown>",
-				static_cast<size_t>(offset),
-				dl.dli_sname ? dl.dli_sname : "<unknown>");
-		}
-	}
-
-	// Write full stack trace to log file
-	if (s_log_file_path[0] != '\0')
-	{
-		int fd = open(s_log_file_path, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644);
-		if (fd >= 0)
-		{
-			WriteStackTrace(fd);
-			close(fd);
-		}
-	}
-
-	// Also run full diagnostics to logcat (existing behaviour)
-	EmuCoreXDumpNativeCrashDiagnostics(sig, exception_pc, fault_addr, IsWriteSignalContext(ctx), 0);
-
-	// Forward the original fault context; raise() would replace it with SI_TKILL
-	// and a PC inside the crash logger instead of the instruction that failed.
-	struct sigaction* prev = nullptr;
-	switch (sig)
-	{
-		case SIGSEGV: prev = &s_prev_sigsegv; break;
-		case SIGABRT: prev = &s_prev_sigabrt; break;
-		case SIGBUS:  prev = &s_prev_sigbus;  break;
-		case SIGFPE:  prev = &s_prev_sigfpe;  break;
-		default: break;
-	}
-
-	if (prev)
-		HandOffFatalSignal(sig, info, ctx, *prev);
-	s_in_signal_handler.store(false, std::memory_order_release);
+    struct sigaction* prev = nullptr;
+    switch (sig)
+    {
+        case SIGSEGV: prev = &s_prev_sigsegv; break;
+        case SIGABRT: prev = &s_prev_sigabrt; break;
+        case SIGBUS: prev = &s_prev_sigbus; break;
+        case SIGFPE: prev = &s_prev_sigfpe; break;
+        default: break;
+    }
+    errno = saved_errno;
+    if (prev)
+        HandOffFatalSignal(sig, info, ctx, *prev);
+    s_in_signal_handler.store(false, std::memory_order_release);
 }
 
 void CopyBreadcrumb(char* dest, size_t size, const char* source)
@@ -461,6 +378,9 @@ void RecordVmLaunchForCrashDiagnostics(const std::string& path, bool boot_elf, i
 	s_boot_elf.store(boot_elf, std::memory_order_relaxed);
 	s_probe_steps.store(probe_steps, std::memory_order_relaxed);
 	s_launch_id.fetch_add(1, std::memory_order_relaxed);
+	WriteToLogFileFmt("VM_LAUNCH", "launch=%llu path=%s bootElf=%d probeSteps=%d",
+		static_cast<unsigned long long>(s_launch_id.load(std::memory_order_relaxed)),
+		s_launch_path, boot_elf ? 1 : 0, probe_steps);
 	RecordVmExecutePhaseForCrashDiagnostics("prepared");
 }
 
@@ -476,6 +396,9 @@ void RecordGameForCrashDiagnostics(const std::string& title, const std::string& 
 	CopyBreadcrumb(s_game_serial, sizeof(s_game_serial), serial);
 	s_disc_crc.store(disc_crc, std::memory_order_relaxed);
 	s_current_crc.store(current_crc, std::memory_order_relaxed);
+	WriteToLogFileFmt("VM_GAME", "launch=%llu title=%s serial=%s disc_crc=%08x current_crc=%08x",
+		static_cast<unsigned long long>(s_launch_id.load(std::memory_order_relaxed)),
+		s_game_title, s_game_serial, disc_crc, current_crc);
 }
 
 void RecordNativeErrorForCrashDiagnostics(std::string_view title, std::string_view message)

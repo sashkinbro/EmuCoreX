@@ -191,6 +191,7 @@ void PageFaultHandler::SignalHandler(int sig, siginfo_t* info, void* ctx)
 		return;
 	}
 
+	#ifndef NDEBUG
 	__android_log_print(ANDROID_LOG_ERROR, "EmuCoreX",
 		"Unhandled native signal sig=%d pc=%p addr=%p write=%d handler_result=%d",
 		sig, exception_pc, exception_address, is_write ? 1 : 0, static_cast<int>(result));
@@ -216,6 +217,7 @@ void PageFaultHandler::SignalHandler(int sig, siginfo_t* info, void* ctx)
 		static_cast<unsigned long long>(uctx->uc_mcontext.regs[16]),
 		static_cast<unsigned long long>(uctx->uc_mcontext.regs[30]),
 		static_cast<unsigned long long>(uctx->uc_mcontext.sp));
+	#endif
 
 	errno = saved_errno;
 	emucorex::android::HandOffFatalSignal(sig, info, ctx,

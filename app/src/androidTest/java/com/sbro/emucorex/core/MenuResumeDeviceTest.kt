@@ -125,8 +125,16 @@ class MenuResumeDeviceTest {
             assertTrue("Hiding the SurfaceView must destroy its surface", !surface.holder.surface.isValid)
             instrumentation.runOnMainSync { surface.visibility = View.VISIBLE }
             Thread.sleep(500)
-            EmulatorBridge.resume()
+            // Surface recreation must recover by itself, without replacing a user's pause intent.
             Thread.sleep(1_000)
+            NativeApp.setPerformanceMetricsEnabled(false, false, false)
+            NativeApp.setPerformanceMetricsEnabled(true, true, false)
+            val surfaceRecoveryDeadline = SystemClock.elapsedRealtime() + 5_000
+            while (SystemClock.elapsedRealtime() < surfaceRecoveryDeadline &&
+                NativeApp.getPerformanceMetricsSnapshot().orEmpty().lineSequence().firstOrNull()?.toFloatOrNull()?.let { it > 0f } != true
+            ) Thread.sleep(50)
+            assertTrue("Surface recreation must resume a running VM automatically",
+                NativeApp.getPerformanceMetricsSnapshot().orEmpty().lineSequence().firstOrNull()?.toFloatOrNull()?.let { it > 0f } == true)
             assertRenderedSurface(surface)
             // A size change on the same native window must also reach GS.
             instrumentation.runOnMainSync { surface.holder.setFixedSize(1280, 720) }

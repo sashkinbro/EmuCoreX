@@ -821,18 +821,18 @@ extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_onNative
 	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_DEBUG, "EmuCoreX", "onNativeSurfaceCreated: JNI callback (no-op)");
 }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceChanged(
-	JNIEnv* env, jclass, jobject surface, jint width, jint height, jfloat refresh_rate)
+	JNIEnv* env, jclass, jobject surface, jint width, jint height, jfloat refresh_rate, jlong generation)
 {
 	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_DEBUG, "EmuCoreX", "onNativeSurfaceChanged: surface=%p width=%d height=%d rate=%.2f",
 		reinterpret_cast<void*>(surface), width, height, static_cast<double>(refresh_rate));
 	ANativeWindow* window = surface ? ANativeWindow_fromSurface(env, surface) : nullptr;
 	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_DEBUG, "EmuCoreX", "onNativeSurfaceChanged: ANativeWindow=%p",
 		reinterpret_cast<void*>(window));
-	AndroidRuntime::Instance().SetNativeSurface(window, width, height, refresh_rate);
+	AndroidRuntime::Instance().SetNativeSurface(window, width, height, refresh_rate, static_cast<uint64_t>(generation));
 }
-extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceDestroyed(JNIEnv*, jclass) {
+extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceDestroyed(JNIEnv*, jclass, jlong generation) {
 	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_DEBUG, "EmuCoreX", "onNativeSurfaceDestroyed: JNI callback");
-	AndroidRuntime::Instance().ClearSurface();
+	AndroidRuntime::Instance().ClearSurface(static_cast<uint64_t>(generation));
 }
 extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_checkShaderPreparationReadiness(JNIEnv*, jclass)
 {

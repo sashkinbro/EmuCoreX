@@ -134,6 +134,25 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunSignalChainTest
     std::memcpy(context.uc_mcontext.__reserved + 16, &esr, sizeof(esr));
     check(emucorex::android::IsWriteSignalContext(&context), "ESR lookup skips other bounded context records");
 
+    int record_pipe[2];
+    if (pipe(record_pipe) != 0) return 2;
+    context.uc_mcontext.pc = 0x34;
+    context.uc_mcontext.regs[30] = 0x12345678;
+    context.uc_mcontext.sp = 0xabcdef00;
+    siginfo_t record_info{};
+    record_info.si_code = SEGV_MAPERR;
+    record_info.si_addr = reinterpret_cast<void*>(0x34);
+    emucorex::android::WriteSignalContext(record_pipe[1], SIGSEGV, &record_info, &context);
+    close(record_pipe[1]);
+    char record[2049]{};
+    const ssize_t record_size = read(record_pipe[0], record, sizeof(record) - 1);
+    close(record_pipe[0]);
+    check(record_size > 0 && std::strstr(record, "PC=0x0000000000000034") &&
+        std::strstr(record, "LR=0x0000000012345678") &&
+        std::strstr(record, "SP=0x00000000abcdef00") &&
+        std::strstr(record, "X30=0x0000000012345678"),
+        "Crash record preserves fault PC, caller LR, SP and all registers without dereferencing PC");
+
     for (int mode = 0; mode < 4; ++mode)
     {
         const bool native_logger = (mode & 1) != 0;
@@ -181,6 +200,15 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunSignalChainTest
                 reinterpret_cast<void*>(expected_address), reinterpret_cast<void*>(report.pc), status);
         }
     }
+    const pid_t abort_child = fork();
+    if (abort_child == 0)
+        AbortWithMessage("EmuCoreX abort-message propagation test");
+    int abort_status = 0;
+    pid_t abort_waited = -1;
+    if (abort_child > 0)
+        do { abort_waited = waitpid(abort_child, &abort_status, 0); } while (abort_waited < 0 && errno == EINTR);
+    check(abort_waited == abort_child && abort_child > 0 && WIFSIGNALED(abort_status) &&
+        WTERMSIG(abort_status) == SIGABRT, "AbortWithMessage preserves SIGABRT and publishes the Android abort message");
     std::printf("RESULT checks=%d failures=%d\n", checks, failures);
     return failures ? 1 : 0;
 }

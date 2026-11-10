@@ -1190,15 +1190,13 @@ fun EmulationScreen(
             when (event) {
                 Lifecycle.Event.ON_START,
                 Lifecycle.Event.ON_RESUME -> {
-                    if (!showControlsEditor && !uiState.showMenu) {
-                        viewModel.onHostForegrounded()
-                    }
+                    viewModel.onHostForegrounded()
                 }
 
                 Lifecycle.Event.ON_PAUSE,
                 Lifecycle.Event.ON_STOP -> {
                     val activity = context as? android.app.Activity
-                    if (showControlsEditor || activity?.isChangingConfigurations == true) {
+                    if (activity?.isChangingConfigurations == true) {
                         return@LifecycleEventObserver
                     }
                     viewModel.onHostBackgrounded()

@@ -5,6 +5,10 @@
 #include "Console.h"
 #include "VectorIntrin.h"
 
+#ifdef __ANDROID__
+#include <android/set_abort_message.h>
+#endif
+
 #ifndef __APPLE__
 #include "cpuinfo.h"
 #endif
@@ -130,6 +134,11 @@ extern "C" crash_info_t gCRAnnotations CRASH_ANNOTATION = { CRASH_VERSION };
 
 void AbortWithMessage(const char* msg)
 {
+#ifdef __ANDROID__
+	// Logcat alone is not retained in Play's native reports. debuggerd reads this
+	// message into the tombstone, preserving the assertion's file, line and condition.
+	android_set_abort_message(msg ? msg : "EmuCoreX fatal error");
+#endif
 #ifdef __APPLE__
 	gCRAnnotations.message = reinterpret_cast<size_t>(msg);
 	// Some macOS's seem to have issues displaying non-static `message`s, so throw it in here too

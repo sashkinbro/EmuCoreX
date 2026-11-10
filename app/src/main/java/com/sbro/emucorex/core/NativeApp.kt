@@ -380,8 +380,8 @@ object NativeApp {
     @JvmStatic external fun setTurboModeEnabled(enabled: Boolean)
     @JvmStatic external fun reloadPatches()
     @JvmStatic external fun onNativeSurfaceCreated()
-    @JvmStatic external fun onNativeSurfaceChanged(surface: Surface, width: Int, height: Int, refreshRate: Float)
-    @JvmStatic external fun onNativeSurfaceDestroyed()
+    @JvmStatic external fun onNativeSurfaceChanged(surface: Surface, width: Int, height: Int, refreshRate: Float, generation: Long)
+    @JvmStatic external fun onNativeSurfaceDestroyed(generation: Long)
     @JvmStatic external fun runVMThread(path: String): Boolean
     /** Reason for the most recent native VM start failure, or null when none was recorded. */
     @JvmStatic external fun getLastBootError(): String?

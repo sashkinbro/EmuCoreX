@@ -6,6 +6,7 @@ import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.NativeApp
+import com.sbro.emucorex.core.NativeSettingsBatch
 import java.io.File
 import java.util.Locale
 import java.util.zip.ZipEntry
@@ -356,11 +357,9 @@ class MemoryCardRepository(
     private fun syncNativeMemoryCardDirectory() {
         val directory = memoryCardsDir().absolutePath
         runCatching {
-            NativeApp.beginSettingsBatch()
-            NativeApp.setSetting("Folders", "MemoryCards", "string", directory)
-        }
-        runCatching {
-            NativeApp.endSettingsBatch()
+            NativeSettingsBatch.run {
+                NativeApp.setSetting("Folders", "MemoryCards", "string", directory)
+            }
         }
     }
 

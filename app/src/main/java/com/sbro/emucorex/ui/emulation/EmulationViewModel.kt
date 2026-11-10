@@ -673,6 +673,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     private var shaderPreparationCancelRequested = false
     @Volatile
     private var pausedForBackground = false
+    private var hostInBackground = false
     @Volatile
     private var fastForwardRequested = false
     @Volatile
@@ -2742,17 +2743,20 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
             // VMManager restores the old image when opening the selected image fails.
             // Either way the tray cycle must continue, so close the menu and resume.
-            runCatching { EmulatorBridge.resume() }
-            pausedForBackground = false
-            _uiState.value = _uiState.value.copy(
-                isPaused = false,
-                showMenu = false,
-                isActionInProgress = false,
-                actionLabel = null,
-                toastMessage = if (success) "disc_swap_success" else "disc_swap_failed"
-            )
-            DiscordIntegration.setPaused(false)
-            updateCrashContext(launchState = "running")
+            withContext(Dispatchers.Main.immediate) {
+                if (isShuttingDown || !_uiState.value.isRunning) return@withContext
+                pausedForBackground = hostInBackground
+                _uiState.update { it.copy(
+                    isPaused = hostInBackground,
+                    showMenu = false,
+                    isActionInProgress = false,
+                    actionLabel = null,
+                    toastMessage = if (success) "disc_swap_success" else "disc_swap_failed"
+                ) }
+                DiscordIntegration.setPaused(hostInBackground)
+                updateCrashContext(launchState = if (hostInBackground) "paused" else "running")
+                synchronizePauseState()
+            }
             delay(3000.milliseconds)
             val expectedToast = if (success) "disc_swap_success" else "disc_swap_failed"
             if (_uiState.value.toastMessage == expectedToast) {
@@ -2762,10 +2766,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun closeMenu() {
-        pausedForBackground = false
-        _uiState.value = _uiState.value.copy(showMenu = false, isPaused = false)
-        DiscordIntegration.setPaused(false)
-        updateCrashContext(launchState = "running")
+        pausedForBackground = hostInBackground
+        _uiState.value = _uiState.value.copy(showMenu = false, isPaused = hostInBackground)
+        DiscordIntegration.setPaused(hostInBackground)
+        updateCrashContext(launchState = if (hostInBackground) "paused" else "running")
         synchronizePauseState()
     }
 
@@ -2776,7 +2780,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             lifecycleMutex.withLock {
                 val state = _uiState.value
                 if (!state.isRunning || state.isStarting || isShuttingDown) return@withLock
-                if (state.isPaused || state.showMenu) EmulatorBridge.pause() else EmulatorBridge.resume()
+                if (hostInBackground || state.isPaused || state.showMenu) EmulatorBridge.pause() else EmulatorBridge.resume()
             }
         }
     }
@@ -5964,8 +5968,13 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun onHostBackgrounded() {
         viewModelScope.launch(Dispatchers.Main.immediate) {
+            hostInBackground = true
             val state = _uiState.value
-            if (!state.isRunning || state.isStarting || state.isPaused || state.showMenu || isShuttingDown) {
+            if (!state.isRunning || state.isStarting || isShuttingDown) {
+                return@launch
+            }
+            if (state.isPaused || state.showMenu) {
+                synchronizePauseState()
                 return@launch
             }
             pausedForBackground = true
@@ -5979,20 +5988,18 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun onHostForegrounded() {
         viewModelScope.launch(Dispatchers.Main.immediate) {
+            val wasInBackground = hostInBackground
+            hostInBackground = false
             val state = _uiState.value
-            if (!pausedForBackground ||
-                !state.isRunning ||
-                state.isStarting ||
-                !state.isPaused ||
-                state.showMenu ||
-                isShuttingDown
-            ) {
+            if ((!wasInBackground && !pausedForBackground) || !state.isRunning || state.isStarting || isShuttingDown) {
                 return@launch
             }
-            pausedForBackground = false
-            _uiState.update { it.copy(isPaused = false) }
-            DiscordIntegration.setPaused(false)
-            updateCrashContext(launchState = "running")
+            if (pausedForBackground && !state.showMenu) {
+                pausedForBackground = false
+                _uiState.update { it.copy(isPaused = false) }
+                DiscordIntegration.setPaused(false)
+                updateCrashContext(launchState = "running")
+            }
             synchronizePauseState()
         }
     }

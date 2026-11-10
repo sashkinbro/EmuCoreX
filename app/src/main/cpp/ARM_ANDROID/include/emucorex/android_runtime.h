@@ -47,8 +47,8 @@ public:
 	void SetFrameLimitEnabled(bool enabled);
 	void SetTurboModeEnabled(bool enabled);
 	void ReloadPatches();
-	void SetNativeSurface(void* window, int width, int height, float refresh_rate);
-	void ClearSurface();
+	void SetNativeSurface(void* window, int width, int height, float refresh_rate, uint64_t generation);
+	void ClearSurface(uint64_t generation = 0);
 	bool GetNativeSurface(void** window, int* width, int* height, float* refresh_rate) const;
 
 	bool StartVm(std::string path, bool boot_elf, int probe_steps, bool boot_irx = false);
@@ -107,6 +107,7 @@ private:
 	void VmThreadMain(VmLaunchConfig config);
 	void TFXPreparationThreadMain(VmLaunchConfig config, std::shared_ptr<TFXPreparationJob> job);
 	void NotifyVmStartup(bool succeeded);
+	void ApplyPauseStateOnCPUThread();
 	static void NotifyVmStartupThunk(void* userdata, bool succeeded);
 
 	// Completion records survive VM shutdown until their owning caller consumes them.
@@ -120,6 +121,8 @@ private:
 	bool settings_batch_ = false;
 	bool vm_active_ = false;
 	bool paused_ = false;
+	bool surface_suspended_ = false;
+	uint64_t surface_generation_ = 0;
 	VmStartupState startup_state_ = VmStartupState::Idle;
 	int api_version_ = 0;
 	void* native_window_ = nullptr;

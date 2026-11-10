@@ -228,15 +228,15 @@ class FrameGenerationManager(context: Context) {
     fun applySettingsToNative(settings: FrameGenerationSettings, setup: FrameGenerationSetup = snapshot()) {
         val enabled = settings.enabled && setup.isReady
         runCatching {
-            NativeApp.beginSettingsBatch()
-            NativeApp.setSetting(SECTION, "LsfgDllPath", "string", setup.dllPath.orEmpty())
-            NativeApp.setSetting(SECTION, "LsfgMultiplier", "int", settings.multiplier.coerceIn(2, 4).toString())
-            NativeApp.setSetting(SECTION, "LsfgPerformance", "bool", settings.performanceMode.toString())
-            NativeApp.setSetting(SECTION, "LsfgFlowScale", "int", normalizeFlowScale(settings.flowScalePercent).toString())
-            NativeApp.setSetting(SECTION, "LsfgTargetRate", "int", settings.targetRefreshRate.coerceIn(0, 240).toString())
-            NativeApp.setSetting(SECTION, "LsfgEnabled", "bool", enabled.toString())
-            NativeApp.endSettingsBatch()
-        }.onFailure { runCatching { NativeApp.endSettingsBatch() } }
+            NativeSettingsBatch.run {
+                NativeApp.setSetting(SECTION, "LsfgDllPath", "string", setup.dllPath.orEmpty())
+                NativeApp.setSetting(SECTION, "LsfgMultiplier", "int", settings.multiplier.coerceIn(2, 4).toString())
+                NativeApp.setSetting(SECTION, "LsfgPerformance", "bool", settings.performanceMode.toString())
+                NativeApp.setSetting(SECTION, "LsfgFlowScale", "int", normalizeFlowScale(settings.flowScalePercent).toString())
+                NativeApp.setSetting(SECTION, "LsfgTargetRate", "int", settings.targetRefreshRate.coerceIn(0, 240).toString())
+                NativeApp.setSetting(SECTION, "LsfgEnabled", "bool", enabled.toString())
+            }
+        }
     }
 
     private fun downloadManifest(): ByteArray {

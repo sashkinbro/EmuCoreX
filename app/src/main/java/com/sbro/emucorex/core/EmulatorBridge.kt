@@ -56,17 +56,12 @@ object EmulatorBridge {
     @Volatile
     private var isVmActive: Boolean = false
 
-    @Volatile
-    private var lastSurface: Surface? = null
+    private data class BoundSurface(
+        val surface: Surface, val width: Int, val height: Int, val refreshRate: Float, val generation: Long
+    )
 
     @Volatile
-    private var lastSurfaceWidth: Int = 0
-
-    @Volatile
-    private var lastSurfaceHeight: Int = 0
-
-    @Volatile
-    private var lastSurfaceRefreshRate: Float = 0f
+    private var lastSurface: BoundSurface? = null
 
     @Volatile
     private var surfaceEventVersion: Long = 0
@@ -281,8 +276,7 @@ object EmulatorBridge {
     private suspend fun performRuntimeOps(ops: List<RuntimeOp>) {
         if (!isNativeLoaded || ops.isEmpty()) return
         runSerial {
-            NativeApp.beginSettingsBatch()
-            try {
+            NativeSettingsBatch.run {
                 ops.forEach { op ->
                     when (op.kind) {
                         "setting" -> {
@@ -327,8 +321,6 @@ object EmulatorBridge {
                         }
                     }
                 }
-            } finally {
-                NativeApp.endSettingsBatch()
             }
         }
     }
@@ -1456,10 +1448,7 @@ object EmulatorBridge {
         val eventVersion = ++surfaceEventVersion
         val safeRefreshRate = refreshRate.takeIf { it.isFinite() && it > 0f }?.coerceAtMost(240f) ?: 0f
         Log.i(TAG, "onSurfaceChanged: width=$width height=$height refreshRate=$safeRefreshRate valid=${surface.isValid} eventVersion=$eventVersion")
-        lastSurface = surface
-        lastSurfaceWidth = width
-        lastSurfaceHeight = height
-        lastSurfaceRefreshRate = safeRefreshRate
+        lastSurface = BoundSurface(surface, width, height, safeRefreshRate, eventVersion)
         NativeApp.setCrashContextString("emu_surface_state", "changed")
         NativeApp.setCrashContextInt("emu_surface_width", width)
         NativeApp.setCrashContextInt("emu_surface_height", height)
@@ -1471,7 +1460,7 @@ object EmulatorBridge {
                 return@launchSerial
             }
             try {
-                NativeApp.onNativeSurfaceChanged(surface, width, height, safeRefreshRate)
+                NativeApp.onNativeSurfaceChanged(surface, width, height, safeRefreshRate, eventVersion)
                 Log.i(TAG, "onSurfaceChanged: native callback done")
             } catch (e: Exception) {
                 Log.e(TAG, "onSurfaceChanged: native callback failed", e)
@@ -1482,20 +1471,15 @@ object EmulatorBridge {
     fun onSurfaceDestroyed() {
         if (!isNativeLoaded) return
         val oldVersion = surfaceEventVersion
-        ++surfaceEventVersion
+        val eventVersion = ++surfaceEventVersion
         lastSurface = null
-        lastSurfaceWidth = 0
-        lastSurfaceHeight = 0
-        lastSurfaceRefreshRate = 0f
         Log.i(TAG, "onSurfaceDestroyed: called, version $oldVersion -> $surfaceEventVersion")
         NativeApp.setCrashContextString("emu_surface_state", "destroyed")
         NativeApp.logCrashBreadcrumb("surfaceDestroyed")
-        runCatching { NativeApp.pause() }
-        Log.i(TAG, "onSurfaceDestroyed: pause done, calling native destroy")
         // Android invalidates the BufferQueue as soon as this callback returns.
-        // Detach GS synchronously so it cannot keep presenting to an abandoned Surface.
+        // Native owns a separate surface suspension; it must not replace the user's pause intent.
         try {
-            NativeApp.onNativeSurfaceDestroyed()
+            NativeApp.onNativeSurfaceDestroyed(eventVersion)
             Log.i(TAG, "onSurfaceDestroyed: native destroy done")
         } catch (e: Exception) {
             Log.e(TAG, "onSurfaceDestroyed: native destroy failed", e)
@@ -1503,10 +1487,11 @@ object EmulatorBridge {
     }
 
     private fun rebindSurface() {
-        val surface = lastSurface ?: return
-        val width = lastSurfaceWidth
-        val height = lastSurfaceHeight
-        val refreshRate = lastSurfaceRefreshRate
+        val binding = lastSurface ?: return
+        val surface = binding.surface
+        val width = binding.width
+        val height = binding.height
+        val refreshRate = binding.refreshRate
         if (!surface.isValid || width <= 0 || height <= 0) {
             Log.w(TAG, "rebindSurface: skipped (valid=${surface.isValid} w=$width h=$height)")
             return
@@ -1514,7 +1499,7 @@ object EmulatorBridge {
         Log.i(TAG, "rebindSurface: width=$width height=$height")
         NativeApp.logCrashBreadcrumb("rebindSurface width=$width height=$height")
         try {
-            NativeApp.onNativeSurfaceChanged(surface, width, height, refreshRate)
+            NativeApp.onNativeSurfaceChanged(surface, width, height, refreshRate, binding.generation)
         } catch (_: Exception) { }
     }
 

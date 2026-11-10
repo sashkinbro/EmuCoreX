@@ -685,7 +685,7 @@ void AndroidRuntime::ReloadPatches()
 	}, false);
 }
 
-void AndroidRuntime::SetNativeSurface(void* window, int width, int height, float refresh_rate)
+void AndroidRuntime::SetNativeSurface(void* window, int width, int height, float refresh_rate, uint64_t generation)
 {
 	const EmuCoreXLatency::Span span("native.surface.rebind");
 	const float safe_refresh_rate =
@@ -693,9 +693,17 @@ void AndroidRuntime::SetNativeSurface(void* window, int width, int height, float
 	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_DEBUG, LOG_TAG, "SetNativeSurface: window=%p size=%dx%d rate=%.2f",
 		window, width, height, safe_refresh_rate);
 	bool update_display_window = false;
+	bool update_pause_state = false;
 	ANativeWindow* old_window = nullptr;
 	{
 		std::lock_guard lock(mutex_);
+		if (generation < surface_generation_)
+		{
+			if (window)
+				ANativeWindow_release(static_cast<ANativeWindow*>(window));
+			return;
+		}
+		surface_generation_ = generation;
 		old_window = static_cast<ANativeWindow*>(native_window_);
 		if (native_window_ == window && surface_width_ == width && surface_height_ == height &&
 			surface_refresh_rate_ == safe_refresh_rate)
@@ -711,13 +719,16 @@ void AndroidRuntime::SetNativeSurface(void* window, int width, int height, float
 		surface_width_ = width;
 		surface_height_ = height;
 		surface_refresh_rate_ = safe_refresh_rate;
+		const bool suspended = vm_active_ && (!window || width <= 0 || height <= 0);
+		update_pause_state = vm_active_ && (surface_suspended_ != suspended);
+		surface_suspended_ = suspended;
 		// Also update when a valid old surface is replaced by an invalid/zero-sized
 		// one, so GS is detached instead of continuing to present to old_window.
 		update_display_window = MTGS::IsOpen() &&
 			(old_window || (native_window_ && surface_width_ > 0 && surface_height_ > 0));
 	}
 
-	if (update_display_window)
+	if (update_display_window || update_pause_state)
 	{
 		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_DEBUG, LOG_TAG, "SetNativeSurface: scheduling MTGS::UpdateDisplayWindow (old_window=%p)", old_window);
 		// Surface callbacks run on Android's UI/Binder threads, while the MTGS ring
@@ -728,7 +739,7 @@ void AndroidRuntime::SetNativeSurface(void* window, int width, int height, float
 				ANativeWindow_release(value);
 		});
 		EmuCoreXLatency::Event(EmuCoreXLatency::Current(), "surface.update.enqueue");
-		Host::RunOnCPUThread(EmuCoreXLatency::Carry([old_window_ref = std::move(old_window_ref)]() {
+		Host::RunOnCPUThread(EmuCoreXLatency::Carry([this, old_window_ref = std::move(old_window_ref)]() {
 			const EmuCoreXLatency::Span display_span("surface.update.gs_wait");
 			(void)old_window_ref;
 			if (MTGS::IsOpen())
@@ -736,6 +747,7 @@ void AndroidRuntime::SetNativeSurface(void* window, int width, int height, float
 				MTGS::UpdateDisplayWindow();
 				MTGS::WaitGS(false, false, false);
 			}
+			ApplyPauseStateOnCPUThread();
 		}), false);
 		return;
 	}
@@ -744,36 +756,44 @@ void AndroidRuntime::SetNativeSurface(void* window, int width, int height, float
 		ANativeWindow_release(old_window);
 }
 
-void AndroidRuntime::ClearSurface()
+void AndroidRuntime::ClearSurface(uint64_t generation)
 {
 	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_DEBUG, LOG_TAG, "ClearSurface: clearing native window");
 	ANativeWindow* old_window = nullptr;
 	bool update_display_window = false;
+	bool update_pause_state = false;
 	{
 		std::lock_guard lock(mutex_);
+		if (generation && generation < surface_generation_)
+			return;
+		if (generation)
+			surface_generation_ = generation;
 		old_window = static_cast<ANativeWindow*>(native_window_);
 		native_window_ = nullptr;
 		surface_width_ = 0;
 		surface_height_ = 0;
 		surface_refresh_rate_ = 0.0f;
+		surface_suspended_ = vm_active_;
+		update_pause_state = vm_active_;
 		update_display_window = (old_window && MTGS::IsOpen());
 	}
 
-	if (update_display_window)
+	if (update_display_window || update_pause_state)
 	{
 		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_DEBUG, LOG_TAG, "ClearSurface: scheduling MTGS::UpdateDisplayWindow (old_window=%p)", old_window);
 		auto old_window_ref = std::shared_ptr<ANativeWindow>(old_window, [](ANativeWindow* value) {
 			if (value)
 				ANativeWindow_release(value);
 		});
-		Host::RunOnCPUThread([old_window_ref = std::move(old_window_ref)]() {
+		Host::RunOnCPUThread([this, old_window_ref = std::move(old_window_ref)]() {
 			(void)old_window_ref;
+			ApplyPauseStateOnCPUThread();
 			if (MTGS::IsOpen())
 			{
 				MTGS::UpdateDisplayWindow();
 				MTGS::WaitGS(false, false, false);
 			}
-		}, true);
+		}, update_display_window);
 		return;
 	}
 
@@ -1312,6 +1332,7 @@ bool AndroidRuntime::StartVm(std::string path, bool boot_elf, int probe_steps, b
 		current_path_ = config.path;
 		vm_active_ = true;
 		paused_ = false;
+		surface_suspended_ = false;
 		startup_state_ = VmStartupState::Pending;
 		vm_thread_ = std::thread(&AndroidRuntime::VmThreadMain, this, std::move(config));
 
@@ -1359,6 +1380,20 @@ bool AndroidRuntime::ChangeDisc(std::string path)
 	return *result;
 }
 
+void AndroidRuntime::ApplyPauseStateOnCPUThread()
+{
+	bool pause;
+	{
+		std::lock_guard lock(mutex_);
+		if (!vm_active_)
+			return;
+		pause = paused_ || surface_suspended_;
+	}
+	const VMState state = VMManager::GetState();
+	if ((state == VMState::Running || state == VMState::Paused) && (state == VMState::Paused) != pause)
+		VMManager::SetPaused(pause);
+}
+
 void AndroidRuntime::Pause()
 {
 	const EmuCoreXLatency::Span native_span("native.pause");
@@ -1379,9 +1414,9 @@ void AndroidRuntime::Pause()
 	// It must only run on the CPU thread. Its message pump sees this queued task at
 	// the next input poll, requests the exit there, then applies the pause outside Execute().
 	EmuCoreXLatency::Event(EmuCoreXLatency::Current(), "cpu.enqueue");
-	Host::RunOnCPUThread(EmuCoreXLatency::Carry([]() {
+	Host::RunOnCPUThread(EmuCoreXLatency::Carry([this]() {
 		const EmuCoreXLatency::Span cpu_span("cpu.pause");
-		VMManager::SetPaused(true);
+		ApplyPauseStateOnCPUThread();
 	}), false);
 }
 
@@ -1397,9 +1432,9 @@ void AndroidRuntime::Resume()
 
 	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "VM resume requested");
 	EmuCoreXLatency::Event(EmuCoreXLatency::Current(), "cpu.enqueue");
-	Host::RunOnCPUThread(EmuCoreXLatency::Carry([]() {
+	Host::RunOnCPUThread(EmuCoreXLatency::Carry([this]() {
 		const EmuCoreXLatency::Span cpu_span("cpu.resume");
-		VMManager::SetPaused(false);
+		ApplyPauseStateOnCPUThread();
 	}), false);
 }
 

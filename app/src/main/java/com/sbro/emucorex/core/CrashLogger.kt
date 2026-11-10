@@ -32,7 +32,7 @@ object CrashLogger {
     fun init(context: Context) {
         logFile = resolveLogFile(context)
         installUncaughtExceptionHandler()
-        if (BuildConfig.DEBUG) writeStartupLine(context)
+        writeStartupLine(context)
     }
 
     fun logError(tag: String, message: String, throwable: Throwable? = null) {
@@ -96,6 +96,7 @@ object CrashLogger {
         }
     }
 
+    @Synchronized
     private fun writeEntry(level: String, body: String) {
         val file = logFile ?: return
         val timestamp = dateFmt.format(Date())
