@@ -619,6 +619,7 @@ public:
 	{
 		None,
 		AfterLibraryLoad,
+		InstanceCreation,
 		AfterInstanceCreate,
 		AfterDeviceCreate,
 		AfterTFXLayouts,

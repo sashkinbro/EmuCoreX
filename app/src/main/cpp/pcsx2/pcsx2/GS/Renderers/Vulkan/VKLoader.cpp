@@ -285,6 +285,9 @@ void Vulkan::UnloadVulkanLibrary()
 
 bool Vulkan::LoadVulkanInstanceFunctions(VkInstance instance)
 {
+	if (instance == VK_NULL_HANDLE)
+		return false;
+
 	bool required_functions_missing = false;
 	auto LoadFunction = [&required_functions_missing, instance](PFN_vkVoidFunction* func_ptr, const char* name, bool is_required) {
 		*func_ptr = vkGetInstanceProcAddr(instance, name);

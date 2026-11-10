@@ -3436,23 +3436,27 @@ bool GSDeviceVK::CreateVulkanInstanceAndDevice(bool force_surfaceless, VkSurface
 		return false;
 	}
 
-	m_instance = CreateVulkanInstance(m_window_info, &m_optional_extensions, enable_debug_utils, enable_validation_layer);
+	const auto create_instance = [&]() -> VkInstance {
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (force_surfaceless && m_tfx_preparation_failure_stage == TFXPreparationFailureStage::InstanceCreation)
+			return VK_NULL_HANDLE;
+#endif
+		return CreateVulkanInstance(m_window_info, &m_optional_extensions, enable_debug_utils, enable_validation_layer);
+	};
+	m_instance = create_instance();
+	if (m_instance == VK_NULL_HANDLE && (enable_debug_utils || enable_validation_layer))
+	{
+		// Try again without the validation layer.
+		enable_debug_utils = false;
+		enable_validation_layer = false;
+		m_instance = create_instance();
+		if (m_instance != VK_NULL_HANDLE)
+			ERROR_LOG("VK: validation/debug layers requested but are unavailable. Creating non-debug device.");
+	}
 	if (m_instance == VK_NULL_HANDLE)
 	{
-		if (enable_debug_utils || enable_validation_layer)
-		{
-			// Try again without the validation layer.
-			enable_debug_utils = false;
-			enable_validation_layer = false;
-			m_instance = CreateVulkanInstance(m_window_info, &m_optional_extensions, enable_debug_utils, enable_validation_layer);
-			if (m_instance == VK_NULL_HANDLE)
-			{
-				Host::ReportErrorAsync("Error", "Failed to create Vulkan instance. Does your GPU and/or driver support Vulkan?");
-				return false;
-			}
-
-			ERROR_LOG("VK: validation/debug layers requested but are unavailable. Creating non-debug device.");
-		}
+		Host::ReportErrorAsync("Error", "Failed to create Vulkan instance. Does your GPU and/or driver support Vulkan?");
+		return false;
 	}
 
 	if (!Vulkan::LoadVulkanInstanceFunctions(m_instance))

@@ -365,7 +365,7 @@ void GSPreparationDeviceTests()
         g_gs_device.reset();
     }
     using FailureStage = GSDeviceVK::TFXPreparationFailureStage;
-    for (FailureStage stage : {FailureStage::AfterLibraryLoad, FailureStage::AfterInstanceCreate,
+    for (FailureStage stage : {FailureStage::AfterLibraryLoad, FailureStage::InstanceCreation, FailureStage::AfterInstanceCreate,
         FailureStage::AfterDeviceCreate, FailureStage::AfterTFXLayouts, FailureStage::AfterTFXRenderPasses})
     {
         g_gs_device = std::make_unique<GSDeviceVK>();
@@ -380,6 +380,50 @@ void GSPreparationDeviceTests()
 }
 
 #include "jit_oracle_block_cache.inl"
+
+void GSInitializationFailureTests()
+{
+    Check(!g_gs_device && !Vulkan::IsVulkanLibraryLoaded(), "GS initialization failure fixture starts without a graphics owner");
+    if (g_gs_device || Vulkan::IsVulkanLibraryLoaded()) return;
+
+    static u32 invalid_instance_lookups = 0;
+    const auto previous_lookup = vkGetInstanceProcAddr;
+    vkGetInstanceProcAddr = [](VkInstance, const char*) -> PFN_vkVoidFunction {
+        ++invalid_instance_lookups;
+        return nullptr;
+    };
+    const bool invalid_instance_loaded = Vulkan::LoadVulkanInstanceFunctions(VK_NULL_HANDLE);
+    vkGetInstanceProcAddr = previous_lookup;
+    Check(!invalid_instance_loaded && invalid_instance_lookups == 0,
+        "GS rejects a failed instance before any instance function lookup");
+
+    const auto previous_config = GSConfig;
+    ScopedGuard cleanup([&]() {
+        if (g_gs_device) {
+            static_cast<GSDeviceVK*>(g_gs_device.get())->DestroyTFXPreparationDevice();
+            g_gs_device.reset();
+        }
+        GSConfig = previous_config;
+    });
+    for (bool debug : {false, true})
+    {
+        GSConfig.UseDebugDevice = debug;
+        g_gs_device = std::make_unique<GSDeviceVK>();
+        auto& device = *static_cast<GSDeviceVK*>(g_gs_device.get());
+        device.SetTFXPreparationFailureStageForTesting(GSDeviceVK::TFXPreparationFailureStage::InstanceCreation);
+        Check(!device.CreateTFXPreparationDevice("unused shader source"),
+            "GS reports failed instance creation with validation both disabled and enabled");
+        const auto released = [&]() {
+            return device.GetDevice() == VK_NULL_HANDLE && device.GetVulkanInstance() == VK_NULL_HANDLE &&
+                device.GetAllocator() == nullptr && !device.HasSurface() && !g_vulkan_shader_cache &&
+                !Vulkan::IsVulkanLibraryLoaded();
+        };
+        Check(released(), "GS failed instance creation immediately releases its Vulkan library");
+        device.DestroyTFXPreparationDevice();
+        Check(released(), "GS failed instance teardown remains safe when repeated");
+        g_gs_device.reset();
+    }
+}
 
 void ClassifierTests()
 {
@@ -12812,6 +12856,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         GSSTQPackTests();
     else if (std::strcmp(suite, "gs-masked-fill") == 0)
         GSMaskedFillTests();
+    else if (std::strcmp(suite, "gs-init-failure") == 0)
+        GSInitializationFailureTests();
     else if (std::strcmp(suite, "gs-prepare") == 0)
         GSPreparationDeviceTests();
     else
