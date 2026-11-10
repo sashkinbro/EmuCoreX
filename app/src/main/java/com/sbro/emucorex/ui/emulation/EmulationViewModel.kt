@@ -747,17 +747,20 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             persistGlobal()
         } else {
             val overrides = normalized.overridesComparedWith(globalInterfaceSettings)
-            val existing = perGameSettingsRepository.get(gameKey)
-            val keys = existing?.providedKeys
-                ?.minus("interfaceSettings")
-                ?.let { if (overrides != null) it + "interfaceSettings" else it }
-            profileActive = existing != null || overrides != null
-            if (profileActive) {
-                perGameSettingsRepository.save((existing ?: PerGameSettings(
-                    gameKey = gameKey,
-                    gameTitle = resolvePerGameTitle(updatedState),
-                    gameSerial = currentGameSerial.takeIf { it.isNotBlank() }
-                )).copy(interfaceSettings = overrides, providedKeys = keys))
+            profileActive = perGameSettingsRepository.transaction {
+                val existing = perGameSettingsRepository.get(gameKey)
+                val keys = existing?.providedKeys
+                    ?.minus("interfaceSettings")
+                    ?.let { if (overrides != null) it + "interfaceSettings" else it }
+                val active = existing != null || overrides != null
+                if (active) {
+                    perGameSettingsRepository.save((existing ?: PerGameSettings(
+                        gameKey = gameKey,
+                        gameTitle = resolvePerGameTitle(updatedState),
+                        gameSerial = currentGameSerial.takeIf { it.isNotBlank() }
+                    )).copy(interfaceSettings = overrides, providedKeys = keys))
+                }
+                active
             }
             currentInterfaceSettingsProfile = overrides
         }
@@ -771,10 +774,12 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         refreshKeyboardMouseOverride()
     }
 
-    private fun refreshKeyboardMouseOverride() {
-        val override = activePerGameKey()
-            ?.let(perGameSettingsRepository::get)
-            ?.keyboardMouse
+    private suspend fun refreshKeyboardMouseOverride() {
+        val override = perGameSettingsRepository.transaction {
+            activePerGameKey()
+                ?.let(perGameSettingsRepository::get)
+                ?.keyboardMouse
+        }
         _keyboardMouseOverride.value = override
         KeyboardMouseManager.setPerGameOverride(override)
     }
@@ -782,13 +787,13 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     fun setKeyboardMouseSettings(settings: KeyboardMouseSettings?) {
         viewModelScope.launch {
             val gameKey = activePerGameKey() ?: return@launch
-            val existing = withContext(Dispatchers.IO) { perGameSettingsRepository.get(gameKey) }
-            val base = existing ?: PerGameSettings(
-                gameKey = gameKey,
-                gameTitle = resolvePerGameTitle(_uiState.value),
-                gameSerial = currentGameSerial.takeIf { it.isNotBlank() }
-            )
-            withContext(Dispatchers.IO) {
+            perGameSettingsRepository.transaction {
+                val existing = perGameSettingsRepository.get(gameKey)
+                val base = existing ?: PerGameSettings(
+                    gameKey = gameKey,
+                    gameTitle = resolvePerGameTitle(_uiState.value),
+                    gameSerial = currentGameSerial.takeIf { it.isNotBlank() }
+                )
                 perGameSettingsRepository.save(base.withKeyboardMouseSettings(settings))
             }
             refreshKeyboardMouseOverride()
@@ -1486,7 +1491,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
         viewModelScope.launch {
             preferences.stickToggleTarget.collect { value ->
-                val profile = activePerGameKey()?.let(perGameSettingsRepository::get)
+                val profile = withContext(Dispatchers.IO) {
+                    activePerGameKey()?.let(perGameSettingsRepository::get)
+                }
                 if (profile == null || profile.providedKeys?.contains("stickToggleTarget") == false) {
                     _uiState.value = _uiState.value.copy(stickToggleTarget = value)
                 }
@@ -2289,7 +2296,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 val frameGenerationManager = FrameGenerationManager(getApplication())
                 val frameGenerationProfile = path
                     ?.takeIf { !bootToBios && !autotestMode }
-                    ?.let(perGameSettingsRepository::get)
+                    ?.let { gameKey -> withContext(Dispatchers.IO) { perGameSettingsRepository.get(gameKey) } }
                     ?.takeIf { profile ->
                         profile.providedKeys == null || "frameGenerationEnabled" in profile.providedKeys
                     }
@@ -2384,7 +2391,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     )
                 } else {
                     val safePath = path.orEmpty()
-                    val existingProfile = currentGamePath?.let(perGameSettingsRepository::get)
+                    val existingProfile = withContext(Dispatchers.IO) {
+                        currentGamePath?.let(perGameSettingsRepository::get)
+                    }
                     hasPerGameProfile = existingProfile != null
                     refreshKeyboardMouseOverride()
                     currentInterfaceSettingsProfile = existingProfile?.interfaceSettings
@@ -2837,20 +2846,19 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 AppPreferences.OVERLAY_CONTROL_SCALE_MIN,
                 AppPreferences.OVERLAY_CONTROL_SCALE_MAX
             )
-            val current = _uiState.value
-            val updatedLayouts = current.controlLayouts.toMutableMap()
-            listOf("left_stick", "right_stick").forEach { id ->
-                val existing = updatedLayouts[id]
-                if (existing != null) {
-                    updatedLayouts[id] = existing.copy(scale = scaledValue)
+            persistTouchControlsLayout { current ->
+                val updatedLayouts = current.controlLayouts.toMutableMap()
+                listOf("left_stick", "right_stick").forEach { id ->
+                    val existing = updatedLayouts[id]
+                    if (existing != null) {
+                        updatedLayouts[id] = existing.copy(scale = scaledValue)
+                    }
                 }
-            }
-            persistTouchControlsLayout(
                 current.copy(
                     stickScale = scaledValue,
                     controlLayouts = updatedLayouts
                 )
-            )
+            }
         }
     }
 
@@ -3054,9 +3062,14 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     fun setGamepadBindingsByPad(bindingsByPad: Map<Int, Map<String, Int>>) {
         viewModelScope.launch {
             val newState = _uiState.value.copy(gamepadBindingsByPad = bindingsByPad)
-            val existingProfile = activePerGameKey()?.let(perGameSettingsRepository::get)
-            if (existingProfile != null) {
+            val saved = perGameSettingsRepository.transaction {
+                val gameKey = activePerGameKey() ?: return@transaction false
+                val existingProfile = perGameSettingsRepository.get(gameKey)
+                    ?: return@transaction false
                 perGameSettingsRepository.save(existingProfile.withGamepadBindingsByPad(bindingsByPad))
+                true
+            }
+            if (saved) {
                 _uiState.value = newState
             } else {
                 persistRuntimeState(newState)
@@ -3081,114 +3094,92 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun toggleSelectedStick() {
         viewModelScope.launch {
-            val current = _uiState.value
-            val layout = current.toTouchControlsLayoutProfile().toggleStick(current.stickToggleTarget)
-            persistTouchControlsLayout(current.withTouchControlsLayout(layout))
+            persistTouchControlsLayout { state ->
+                state.withTouchControlsLayout(
+                    state.toTouchControlsLayoutProfile().toggleStick(state.stickToggleTarget)
+                )
+            }
         }
     }
 
     fun updateTouchControlOffset(controlId: String, offset: Pair<Float, Float>) {
-        viewModelScope.launch {
-            val current = _uiState.value
-            val updatedLayouts = current.controlLayouts.toMutableMap()
-            val defaults = AppPreferences.defaultOverlayControlLayouts(current.stickScale)
-            val control = updatedLayouts[controlId] ?: defaults[controlId] ?: OverlayControlLayout()
-            updatedLayouts[controlId] = control.copy(offset = offset)
-            persistTouchControlsLayout(current.copy(controlLayouts = updatedLayouts))
-        }
+        updateTouchControlLayouts(listOf(controlId)) { _, layout -> layout.copy(offset = offset) }
     }
 
     fun updateTouchControlOffsets(offsets: Map<String, Pair<Float, Float>>) {
         if (offsets.isEmpty()) return
-        viewModelScope.launch {
-            val current = _uiState.value
-            val updatedLayouts = current.controlLayouts.toMutableMap()
-            val defaults = AppPreferences.defaultOverlayControlLayouts(current.stickScale)
-            offsets.forEach { (controlId, offset) ->
-                val control = updatedLayouts[controlId] ?: defaults[controlId] ?: OverlayControlLayout()
-                updatedLayouts[controlId] = control.copy(offset = offset)
-            }
-            persistTouchControlsLayout(current.copy(controlLayouts = updatedLayouts))
+        updateTouchControlLayouts(offsets.keys) { controlId, layout ->
+            layout.copy(offset = offsets.getValue(controlId))
         }
     }
 
     fun updateTouchControlScale(controlId: String, scale: Int) {
-        viewModelScope.launch {
-            val current = _uiState.value
-            val updatedLayouts = current.controlLayouts.toMutableMap()
-            val defaults = AppPreferences.defaultOverlayControlLayouts(current.stickScale)
-            val control = updatedLayouts[controlId] ?: defaults[controlId] ?: OverlayControlLayout()
-            updatedLayouts[controlId] = control.copy(
+        updateTouchControlLayouts(listOf(controlId)) { _, layout ->
+            layout.copy(
                 scale = scale.coerceIn(
                     AppPreferences.OVERLAY_CONTROL_SCALE_MIN,
                     AppPreferences.OVERLAY_CONTROL_SCALE_MAX
                 )
             )
-            persistTouchControlsLayout(current.copy(controlLayouts = updatedLayouts))
         }
     }
 
     fun updateTouchControlWidthScale(controlId: String, widthScale: Int) {
-        viewModelScope.launch {
-            val current = _uiState.value
-            val updatedLayouts = current.controlLayouts.toMutableMap()
-            val defaults = AppPreferences.defaultOverlayControlLayouts(current.stickScale)
-            val control = updatedLayouts[controlId] ?: defaults[controlId] ?: OverlayControlLayout()
-            updatedLayouts[controlId] = control.copy(widthScale = widthScale.coerceIn(100, 240))
-            persistTouchControlsLayout(current.copy(controlLayouts = updatedLayouts))
+        updateTouchControlLayouts(listOf(controlId)) { _, layout ->
+            layout.copy(widthScale = widthScale.coerceIn(100, 240))
         }
     }
 
     fun updateTouchControlOpacity(controlId: String, opacity: Int) {
-        viewModelScope.launch {
-            val current = _uiState.value
-            val updatedLayouts = current.controlLayouts.toMutableMap()
-            val defaults = AppPreferences.defaultOverlayControlLayouts(current.stickScale)
-            val control = updatedLayouts[controlId] ?: defaults[controlId] ?: OverlayControlLayout()
-            updatedLayouts[controlId] = control.copy(
+        updateTouchControlLayouts(listOf(controlId)) { _, layout ->
+            layout.copy(
                 opacity = opacity.coerceIn(
                     AppPreferences.OVERLAY_CONTROL_OPACITY_MIN,
                     AppPreferences.OVERLAY_CONTROL_OPACITY_MAX
                 )
             )
-            persistTouchControlsLayout(current.copy(controlLayouts = updatedLayouts))
         }
     }
 
     fun updateTouchControlSecondaryAction(controlId: String, secondaryActionId: String?) {
-        viewModelScope.launch {
-            val current = _uiState.value
-            val updatedLayouts = current.controlLayouts.toMutableMap()
-            val defaults = AppPreferences.defaultOverlayControlLayouts(current.stickScale)
-            val control = updatedLayouts[controlId] ?: defaults[controlId] ?: OverlayControlLayout()
-            updatedLayouts[controlId] = control.copy(
+        updateTouchControlLayouts(listOf(controlId)) { _, layout ->
+            layout.copy(
                 secondaryActionId = secondaryActionId
                     ?.takeIf { it in CustomTouchControl.ALLOWED_ACTION_IDS }
             )
-            persistTouchControlsLayout(current.copy(controlLayouts = updatedLayouts))
         }
     }
 
     fun setTouchControlVisible(controlId: String, visible: Boolean) {
-        viewModelScope.launch {
-            val current = _uiState.value
-            val updatedLayouts = current.controlLayouts.toMutableMap()
-            val defaults = AppPreferences.defaultOverlayControlLayouts(current.stickScale)
-            val control = updatedLayouts[controlId] ?: defaults[controlId] ?: OverlayControlLayout()
-            updatedLayouts[controlId] = control.copy(visible = visible)
-            persistTouchControlsLayout(current.copy(controlLayouts = updatedLayouts))
-        }
+        updateTouchControlLayouts(listOf(controlId)) { _, layout -> layout.copy(visible = visible) }
     }
 
     fun setTouchStickSurfaceMode(controlId: String, enabled: Boolean) {
         if (controlId != "left_stick" && controlId != "right_stick") return
+        updateTouchControlLayouts(listOf(controlId)) { _, layout -> layout.copy(surfaceOnly = enabled) }
+    }
+
+    /**
+     * Applies [transform] to the stored layouts of [controlIds] and persists the result.
+     *
+     * The transform runs inside [PerGameSettingsRepository.transaction], so the snapshot
+     * it edits and the file it writes form one ordered read-modify-write. Without that a
+     * slider tick could write a snapshot taken before a newer edit and discard it.
+     */
+    private fun updateTouchControlLayouts(
+        controlIds: Collection<String>,
+        transform: (controlId: String, layout: OverlayControlLayout) -> OverlayControlLayout
+    ) {
         viewModelScope.launch {
-            val current = _uiState.value
-            val updatedLayouts = current.controlLayouts.toMutableMap()
-            val defaults = AppPreferences.defaultOverlayControlLayouts(current.stickScale)
-            val control = updatedLayouts[controlId] ?: defaults[controlId] ?: OverlayControlLayout()
-            updatedLayouts[controlId] = control.copy(surfaceOnly = enabled)
-            persistTouchControlsLayout(current.copy(controlLayouts = updatedLayouts))
+            persistTouchControlsLayout { state ->
+                val layouts = state.controlLayouts.toMutableMap()
+                val defaults = AppPreferences.defaultOverlayControlLayouts(state.stickScale)
+                controlIds.forEach { controlId ->
+                    val current = layouts[controlId] ?: defaults[controlId] ?: OverlayControlLayout()
+                    layouts[controlId] = transform(controlId, current)
+                }
+                state.copy(controlLayouts = layouts)
+            }
         }
     }
 
@@ -3203,7 +3194,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             val sanitized = library.sanitized()
             val gameKey = activePerGameKey()
             if (gameKey != null) {
-                withContext(Dispatchers.IO) {
+                perGameSettingsRepository.transaction {
                     val existing = perGameSettingsRepository.get(gameKey)
                     perGameSettingsRepository.save(
                         existing.withCustomTouchControls(
@@ -3719,7 +3710,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     private suspend fun loadShaderSelection(): ShaderChainSelection {
         val settings = preferences.settingsSnapshot.first()
-        val profile = activePerGameKey()?.let(perGameSettingsRepository::get)
+        val profile = withContext(Dispatchers.IO) {
+            activePerGameKey()?.let(perGameSettingsRepository::get)
+        }
         return resolveShaderChainSelection(
             globalEnabled = settings.shaderChainEnabled,
             globalPreset = settings.shaderChainPreset,
@@ -4784,29 +4777,39 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         preferences.saveTouchControlsLayout(state.toTouchControlsLayoutProfile())
     }
 
-    private suspend fun persistTouchControlsLayout(updatedState: EmulationUiState): EmulationUiState {
+    /**
+     * Applies [transform] to the live state and persists the touch layout it produces.
+     *
+     * The read-modify-write runs inside [PerGameSettingsRepository.transaction] so the
+     * disk write is off the main thread and ordered after every earlier edit, which is
+     * what keeps rapid slider moves from overwriting each other.
+     */
+    private suspend fun persistTouchControlsLayout(transform: (EmulationUiState) -> EmulationUiState) {
         val gameKey = activePerGameKey()
-        return if (gameKey != null) {
-            val layout = updatedState.toTouchControlsLayoutProfile()
+        if (gameKey == null) {
+            val updatedState = transform(_uiState.value)
+            persistGlobalTouchControlsLayout(updatedState)
+            currentTouchControlsLayoutProfile = null
+            _uiState.value = updatedState
+            return
+        }
+
+        val (layout, finalState) = perGameSettingsRepository.transaction {
+            val updatedState = transform(_uiState.value)
+            val updatedLayout = updatedState.toTouchControlsLayoutProfile()
             val existing = perGameSettingsRepository.get(gameKey)
             perGameSettingsRepository.save(
                 existing.withTouchControlsLayout(
                     gameKey = gameKey,
                     gameTitle = resolvePerGameTitle(updatedState),
                     gameSerial = currentGameSerial.takeIf { it.isNotBlank() },
-                    layout = layout
+                    layout = updatedLayout
                 )
             )
-            currentTouchControlsLayoutProfile = layout
-            val finalState = updatedState.copy(gameSettingsProfileActive = true)
-            _uiState.value = finalState
-            finalState
-        } else {
-            persistGlobalTouchControlsLayout(updatedState)
-            currentTouchControlsLayoutProfile = null
-            _uiState.value = updatedState
-            updatedState
+            updatedLayout to updatedState.copy(gameSettingsProfileActive = true)
         }
+        currentTouchControlsLayoutProfile = layout
+        _uiState.value = finalState
     }
 
     private suspend fun resetTouchControlsLayoutForCurrentScope() {
@@ -4821,19 +4824,21 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             return
         }
 
-        val existing = perGameSettingsRepository.get(gameKey)
         // Reset to the built-in defaults for this game; dropping the override would
         // silently inherit the customized global layout.
         val resetLayout = TouchControlsLayoutProfile()
-        perGameSettingsRepository.save(
-            existing.withTouchControlsLayout(
-                gameKey = gameKey,
-                gameTitle = resolvePerGameTitle(_uiState.value),
-                gameSerial = currentGameSerial.takeIf { it.isNotBlank() },
-                layout = resetLayout
+        val existing = perGameSettingsRepository.transaction {
+            val profile = perGameSettingsRepository.get(gameKey)
+            perGameSettingsRepository.save(
+                profile.withTouchControlsLayout(
+                    gameKey = gameKey,
+                    gameTitle = resolvePerGameTitle(_uiState.value),
+                    gameSerial = currentGameSerial.takeIf { it.isNotBlank() },
+                    layout = resetLayout
+                )
             )
-        )
-
+            profile
+        }
         currentTouchControlsLayoutProfile = resetLayout
         currentCustomTouchControlsProfile = existing?.customTouchControls
         _uiState.value = _uiState.value
@@ -4854,104 +4859,19 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     ): EmulationUiState {
         val gameKey = activePerGameKey()
         return if (gameKey != null) {
-            val existingProfile = perGameSettingsRepository.get(gameKey)
-            val touchControlsLayout = existingProfile?.touchControlsLayout ?: currentTouchControlsLayoutProfile
-            val customTouchControls = existingProfile?.customTouchControls
-                ?: currentCustomTouchControlsProfile
-            val runtimeProfile = updatedState.toPerGameSettings(
-            preferences = preferences,
-            frameGenerationManager = frameGenerationManager,
-                gameKey = gameKey,
-                gameTitle = resolvePerGameTitle(updatedState),
-                gameSerial = currentGameSerial.takeIf { it.isNotBlank() }
-            )
-            val visualStyleOverride = existingProfile?.touchControlVisualStyle
-                ?: runtimeProfile.touchControlVisualStyle
-            val pressEffectOverride = existingProfile?.touchControlPressEffect
-                ?: runtimeProfile.touchControlPressEffect
-            val driverOverrideKeys = when {
-                existingProfile == null -> emptySet()
-                existingProfile.providedKeys == null -> PER_GAME_GPU_DRIVER_KEYS
-                else -> existingProfile.providedKeys.intersect(PER_GAME_GPU_DRIVER_KEYS)
-            }
-            val memoryCardOverrideKeys = when {
-                existingProfile == null -> emptySet()
-                existingProfile.providedKeys == null -> PER_GAME_MEMORY_CARD_KEYS
-                else -> existingProfile.providedKeys.intersect(PER_GAME_MEMORY_CARD_KEYS)
-            }
-            val dedicatedCardOverrideKeys = when {
-                existingProfile == null -> emptySet()
-                existingProfile.providedKeys == null -> PER_GAME_DEDICATED_CARD_KEYS
-                else -> existingProfile.providedKeys.intersect(PER_GAME_DEDICATED_CARD_KEYS)
-            }
-            val visualOverrideKeys = buildSet {
-                if (visualStyleOverride != null) add("touchControlVisualStyle")
-                if (pressEffectOverride != null) add("touchControlPressEffect")
-            }
-            val providedKeys = when {
-                runtimeProfile.providedKeys == null -> null
-                else -> mergePerGameGsProvidedKeys(
-                    runtimeKeys = buildSet<String> {
-                        addAll(runtimeProfile.providedKeys)
-                        addAll(visualOverrideKeys)
-                        addAll(driverOverrideKeys)
-                        addAll(memoryCardOverrideKeys)
-                        addAll(dedicatedCardOverrideKeys)
-                        if (touchControlsLayout != null) add(PER_GAME_TOUCH_CONTROLS_LAYOUT_KEY)
-                        if (customTouchControls != null) add(PER_GAME_CUSTOM_TOUCH_CONTROLS_KEY)
-                    },
-                    existingKeys = if (existingProfile == null) emptySet() else existingProfile.providedKeys,
-                    explicitlyClaimedGsKeys = explicitlyClaimedGsKeys
+            val finalState = perGameSettingsRepository.transaction {
+                val existingProfile = perGameSettingsRepository.get(gameKey)
+                perGameSettingsRepository.save(
+                    buildRuntimeProfile(
+                        gameKey = gameKey,
+                        updatedState = updatedState,
+                        existingProfile = existingProfile,
+                        explicitlyClaimedGsKeys = explicitlyClaimedGsKeys,
+                        shaderChainUpdate = shaderChainUpdate
+                    )
                 )
+                applyInterfaceSettings(updatedState.copy(gameSettingsProfileActive = true))
             }
-            // Shader fields are absent from EmulationUiState, so an unrelated
-            // in-game change preserves the stored selection. A shader action
-            // passes its new override explicitly and claims the matching keys.
-            val resolvedShaderOverrideEnabled = if (shaderChainUpdate != null) {
-                shaderChainUpdate.overrideEnabled
-            } else {
-                existingProfile?.shaderChainOverrideEnabled
-            }
-            val resolvedShaderPreset = if (shaderChainUpdate != null) {
-                shaderChainUpdate.preset
-            } else {
-                existingProfile?.shaderChainPreset.orEmpty()
-            }
-            val finalProvidedKeys = if (shaderChainUpdate != null && providedKeys != null) {
-                val shaderKeys = setOf("shaderChainOverrideEnabled", "shaderChainPreset")
-                val base = providedKeys - shaderKeys
-                if (shaderChainUpdate.overrideEnabled != null) base + shaderKeys else base
-            } else {
-                providedKeys
-            }
-            // keyboardMouse is not part of EmulationUiState. Preserve both its
-            // value and its override marker so an unrelated in-game change
-            // (including a shader switch) cannot erase it.
-            val retainedProvidedKeys = if (existingProfile?.keyboardMouse != null) {
-                finalProvidedKeys?.plus("keyboardMouse")
-            } else {
-                finalProvidedKeys
-            }
-            perGameSettingsRepository.save(
-                runtimeProfile.copy(
-                    touchControlsLayout = touchControlsLayout,
-                    customTouchControls = customTouchControls,
-                    touchControlVisualStyle = visualStyleOverride,
-                    touchControlPressEffect = pressEffectOverride,
-                    keyboardMouse = existingProfile?.keyboardMouse ?: runtimeProfile.keyboardMouse,
-                    gpuDriverType = existingProfile?.gpuDriverType ?: runtimeProfile.gpuDriverType,
-                    customDriverPath = existingProfile?.customDriverPath ?: runtimeProfile.customDriverPath,
-                    memoryCardSlot1 = existingProfile?.memoryCardSlot1 ?: runtimeProfile.memoryCardSlot1,
-                    memoryCardSlot2 = existingProfile?.memoryCardSlot2 ?: runtimeProfile.memoryCardSlot2,
-                    dedicatedMemoryCards = existingProfile?.dedicatedMemoryCards ?: runtimeProfile.dedicatedMemoryCards,
-                    mediatekAngleOpenGl = existingProfile?.mediatekAngleOpenGl ?: runtimeProfile.mediatekAngleOpenGl,
-                    interfaceSettings = perGameSettingsRepository.get(gameKey)?.interfaceSettings,
-                    shaderChainOverrideEnabled = resolvedShaderOverrideEnabled,
-                    shaderChainPreset = resolvedShaderPreset,
-                    providedKeys = retainedProvidedKeys
-                )
-            )
-            val finalState = applyInterfaceSettings(updatedState.copy(gameSettingsProfileActive = true))
             _uiState.value = finalState
             syncGamepadAnalogSettings(finalState)
             syncNativePerformanceOverlayState(finalState)
@@ -4964,25 +4884,142 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    private fun syncCurrentGameProfileMetadata() {
-        val gameKey = activePerGameKey() ?: return
-        val profile = perGameSettingsRepository.get(gameKey) ?: return
-        val resolvedTitle = resolvePerGameTitle(_uiState.value)
-        val serial = currentGameSerial.takeIf { it.isNotBlank() }
-        if (profile.gameTitle != resolvedTitle || profile.gameSerial != serial) {
-            perGameSettingsRepository.save(
-                profile.copy(
-                    gameTitle = resolvedTitle,
-                    gameSerial = serial
-                )
+    /**
+     * Merges [updatedState] over [existingProfile].
+     *
+     * Pure apart from the DataStore snapshots read by [toPerGameSettings], so it stays
+     * inside the caller's transaction and cannot read a profile newer than the one it
+     * writes back.
+     */
+    private suspend fun buildRuntimeProfile(
+        gameKey: String,
+        updatedState: EmulationUiState,
+        existingProfile: PerGameSettings?,
+        explicitlyClaimedGsKeys: Set<String>,
+        shaderChainUpdate: ShaderChainUpdate?
+    ): PerGameSettings {
+        val touchControlsLayout = existingProfile?.touchControlsLayout ?: currentTouchControlsLayoutProfile
+        val customTouchControls = existingProfile?.customTouchControls
+            ?: currentCustomTouchControlsProfile
+        val runtimeProfile = updatedState.toPerGameSettings(
+            preferences = preferences,
+            frameGenerationManager = frameGenerationManager,
+            gameKey = gameKey,
+            gameTitle = resolvePerGameTitle(updatedState),
+            gameSerial = currentGameSerial.takeIf { it.isNotBlank() }
+        )
+        val visualStyleOverride = existingProfile?.touchControlVisualStyle
+            ?: runtimeProfile.touchControlVisualStyle
+        val pressEffectOverride = existingProfile?.touchControlPressEffect
+            ?: runtimeProfile.touchControlPressEffect
+        val driverOverrideKeys = when {
+            existingProfile == null -> emptySet()
+            existingProfile.providedKeys == null -> PER_GAME_GPU_DRIVER_KEYS
+            else -> existingProfile.providedKeys.intersect(PER_GAME_GPU_DRIVER_KEYS)
+        }
+        val memoryCardOverrideKeys = when {
+            existingProfile == null -> emptySet()
+            existingProfile.providedKeys == null -> PER_GAME_MEMORY_CARD_KEYS
+            else -> existingProfile.providedKeys.intersect(PER_GAME_MEMORY_CARD_KEYS)
+        }
+        val dedicatedCardOverrideKeys = when {
+            existingProfile == null -> emptySet()
+            existingProfile.providedKeys == null -> PER_GAME_DEDICATED_CARD_KEYS
+            else -> existingProfile.providedKeys.intersect(PER_GAME_DEDICATED_CARD_KEYS)
+        }
+        val visualOverrideKeys = buildSet {
+            if (visualStyleOverride != null) add("touchControlVisualStyle")
+            if (pressEffectOverride != null) add("touchControlPressEffect")
+        }
+        val providedKeys = when {
+            runtimeProfile.providedKeys == null -> null
+            else -> mergePerGameGsProvidedKeys(
+                runtimeKeys = buildSet<String> {
+                    addAll(runtimeProfile.providedKeys)
+                    addAll(visualOverrideKeys)
+                    addAll(driverOverrideKeys)
+                    addAll(memoryCardOverrideKeys)
+                    addAll(dedicatedCardOverrideKeys)
+                    if (touchControlsLayout != null) add(PER_GAME_TOUCH_CONTROLS_LAYOUT_KEY)
+                    if (customTouchControls != null) add(PER_GAME_CUSTOM_TOUCH_CONTROLS_KEY)
+                },
+                existingKeys = if (existingProfile == null) emptySet() else existingProfile.providedKeys,
+                explicitlyClaimedGsKeys = explicitlyClaimedGsKeys
             )
+        }
+        // Shader fields are absent from EmulationUiState, so an unrelated
+        // in-game change preserves the stored selection. A shader action
+        // passes its new override explicitly and claims the matching keys.
+        val resolvedShaderOverrideEnabled = if (shaderChainUpdate != null) {
+            shaderChainUpdate.overrideEnabled
+        } else {
+            existingProfile?.shaderChainOverrideEnabled
+        }
+        val resolvedShaderPreset = if (shaderChainUpdate != null) {
+            shaderChainUpdate.preset
+        } else {
+            existingProfile?.shaderChainPreset.orEmpty()
+        }
+        val finalProvidedKeys = if (shaderChainUpdate != null && providedKeys != null) {
+            val shaderKeys = setOf("shaderChainOverrideEnabled", "shaderChainPreset")
+            val base = providedKeys - shaderKeys
+            if (shaderChainUpdate.overrideEnabled != null) base + shaderKeys else base
+        } else {
+            providedKeys
+        }
+        // keyboardMouse is not part of EmulationUiState. Preserve both its
+        // value and its override marker so an unrelated in-game change
+        // (including a shader switch) cannot erase it.
+        val retainedProvidedKeys = if (existingProfile?.keyboardMouse != null) {
+            finalProvidedKeys?.plus("keyboardMouse")
+        } else {
+            finalProvidedKeys
+        }
+        // The profile was just read inside the same transaction, so this is the same
+        // value the previous code obtained with a second, redundant file read.
+        return runtimeProfile.copy(
+            touchControlsLayout = touchControlsLayout,
+            customTouchControls = customTouchControls,
+            touchControlVisualStyle = visualStyleOverride,
+            touchControlPressEffect = pressEffectOverride,
+            keyboardMouse = existingProfile?.keyboardMouse ?: runtimeProfile.keyboardMouse,
+            gpuDriverType = existingProfile?.gpuDriverType ?: runtimeProfile.gpuDriverType,
+            customDriverPath = existingProfile?.customDriverPath ?: runtimeProfile.customDriverPath,
+            memoryCardSlot1 = existingProfile?.memoryCardSlot1 ?: runtimeProfile.memoryCardSlot1,
+            memoryCardSlot2 = existingProfile?.memoryCardSlot2 ?: runtimeProfile.memoryCardSlot2,
+            dedicatedMemoryCards = existingProfile?.dedicatedMemoryCards ?: runtimeProfile.dedicatedMemoryCards,
+            mediatekAngleOpenGl = existingProfile?.mediatekAngleOpenGl ?: runtimeProfile.mediatekAngleOpenGl,
+            interfaceSettings = existingProfile?.interfaceSettings,
+            shaderChainOverrideEnabled = resolvedShaderOverrideEnabled,
+            shaderChainPreset = resolvedShaderPreset,
+            providedKeys = retainedProvidedKeys
+        )
+    }
+
+    private suspend fun syncCurrentGameProfileMetadata() {
+        val gameKey = activePerGameKey() ?: return
+        perGameSettingsRepository.transaction {
+            val profile = perGameSettingsRepository.get(gameKey) ?: return@transaction
+            val resolvedTitle = resolvePerGameTitle(_uiState.value)
+            val serial = currentGameSerial.takeIf { it.isNotBlank() }
+            if (profile.gameTitle != resolvedTitle || profile.gameSerial != serial) {
+                perGameSettingsRepository.save(
+                    profile.copy(
+                        gameTitle = resolvedTitle,
+                        gameSerial = serial
+                    )
+                )
+            }
         }
     }
 
-    private fun resetCurrentGameProfile() {
+    private suspend fun resetCurrentGameProfile() {
         val gameKey = activePerGameKey() ?: return
-        val previousProfile = perGameSettingsRepository.get(gameKey)
-        perGameSettingsRepository.delete(gameKey)
+        val previousProfile = perGameSettingsRepository.transaction {
+            val profile = perGameSettingsRepository.get(gameKey)
+            perGameSettingsRepository.delete(gameKey)
+            profile
+        }
         currentInterfaceSettingsProfile = null
         currentTouchControlsLayoutProfile = null
         currentCustomTouchControlsProfile = null
@@ -5194,7 +5231,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private suspend fun loadLaunchConfig(): EmulationLaunchConfig {
-        val profile = activePerGameKey()?.let(perGameSettingsRepository::get)
+        val profile = withContext(Dispatchers.IO) {
+            activePerGameKey()?.let(perGameSettingsRepository::get)
+        }
         val ensuredAssignments = memoryCardRepository.ensureDefaultCardsAssigned()
         val settings = preferences.settingsSnapshot.first()
         // Optional light-gun USB peripheral for disc-based games. Arcade manifests
@@ -5382,7 +5421,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private suspend fun loadLiveRuntimeSnapshot(): LiveRuntimeSnapshot {
-        val profile = activePerGameKey()?.let(perGameSettingsRepository::get)
+        val profile = withContext(Dispatchers.IO) {
+            activePerGameKey()?.let(perGameSettingsRepository::get)
+        }
         val settings = preferences.settingsSnapshot.first()
         val frameGeneration = frameGenerationManager.snapshot()
         return LiveRuntimeSnapshot(

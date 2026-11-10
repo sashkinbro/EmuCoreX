@@ -6,6 +6,10 @@ import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.GsHackDefaults
 import com.sbro.emucorex.core.RendererDefaults
 import com.sbro.emucorex.core.normalizeUpscale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -191,10 +195,27 @@ data class TouchControlsLayoutProfile(
 class PerGameSettingsRepository(context: Context) {
     private val file = File(EmulatorStorage.appStateDir(context), "per-game-settings.json")
 
+    /**
+     * Runs [block] on [Dispatchers.IO] with exclusive access to the settings file.
+     *
+     * Every mutation rewrites the whole profile list, so a read-modify-write pair that
+     * overlaps another one drops the other's update. The lock lives in the companion
+     * because screens, workers and the emulation view model each create their own
+     * repository instance for the same file.
+     *
+     * [get] and [save] are blocking by design; call them inside this block for anything
+     * that runs on the main thread.
+     */
+    suspend fun <T> transaction(block: suspend () -> T): T =
+        withContext(Dispatchers.IO) { fileMutex.withLock { block() } }
+
+    /** Blocking read: call off the main thread, or inside [transaction]. */
     fun get(gameKey: String): PerGameSettings? = loadAll().firstOrNull { it.gameKey == gameKey }
 
+    /** Blocking read: call off the main thread, or inside [transaction]. */
     fun getAll(): List<PerGameSettings> = loadAll()
 
+    /** Blocking rewrite: call off the main thread, or inside [transaction]. */
     fun save(settings: PerGameSettings) {
         val items = loadAll()
             .filterNot { it.gameKey == settings.gameKey } +
@@ -273,6 +294,11 @@ class PerGameSettingsRepository(context: Context) {
                 }
             ).toString(2)
         )
+    }
+
+    private companion object {
+        /** Serialises read-modify-write sequences for the single profiles file. */
+        val fileMutex = Mutex()
     }
 }
 
