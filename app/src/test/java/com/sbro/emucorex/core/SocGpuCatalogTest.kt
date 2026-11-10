@@ -98,10 +98,33 @@ class SocGpuCatalogTest {
     @Test
     fun `returns null for unknown SoCs and blank input`() {
         assertNull(SocGpuCatalog.forSoc("Unknown SoC"))
-        assertNull(SocGpuCatalog.forSoc("Allwinner H618"))
+        assertNull(SocGpuCatalog.forSoc("Allwinner A999"))
         assertEquals("Mali-450 MP2", SocGpuCatalog.forSoc("Rockchip RK3528")?.displayName)
         assertNull(SocGpuCatalog.forSoc(null))
         assertNull(SocGpuCatalog.forSoc(""))
         assertNull(SocGpuCatalog.forSoc("   "))
+    }
+
+    @Test
+    fun `maps Allwinner G57 chips and shared platform names`() {
+        listOf("A523", "A527", "T527", "H728", "A333", "A537").forEach { part ->
+            assertEquals("Mali-G57 MC1", SocGpuCatalog.forSoc("Allwinner $part")?.displayName)
+        }
+        assertEquals("Mali-G57 MC1", SocGpuCatalog.forSoc("Allwinner A523/A527/H728/T527")?.displayName)
+        assertEquals("Mali-G31 MP2", SocGpuCatalog.forSoc("Allwinner H616/H618/H700")?.displayName)
+        assertEquals("PowerVR GE8300", SocGpuCatalog.forSoc("Allwinner A133P")?.displayName)
+    }
+
+    @Test
+    fun `maps G52 SoCs and keeps execution engines distinct from cores`() {
+        mapOf(
+            "Helio P65" to "Mali-G52 MC2", "Helio G92" to "Mali-G52 MC2",
+            "Helio P65/G80/G85" to "Mali-G52 MC2",
+            "MediaTek MT8168" to "Mali-G52 MC1", "MediaTek Genio 350" to "Mali-G52 MC1",
+            "Unisoc T700" to "Mali-G52",
+            "Amlogic A311D2" to "Mali-G52 MP8", "Amlogic A311D" to "Mali-G52 MP4",
+            "Rockchip RK3566" to "Mali-G52 2EE", "Rockchip RK3568" to "Mali-G52 2EE",
+            "Rockchip RK3326" to "Mali-G31 2EE"
+        ).forEach { (soc, gpu) -> assertEquals(soc, gpu, SocGpuCatalog.forSoc(soc)?.displayName) }
     }
 }

@@ -46,8 +46,34 @@ internal object DeviceGpuInfoResolver {
             .lowercase()
 }
 
+/** A slow preferences read must never overwrite an already-completed GL probe. */
+internal class DeviceGpuSnapshotCache {
+    private val monitor = Any()
+    @Volatile private var cached: DeviceGpuSnapshot? = null
+    private val state = MutableStateFlow<DeviceGpuSnapshot?>(null)
+    val snapshot: StateFlow<DeviceGpuSnapshot?> = state.asStateFlow()
+
+    fun peek(): DeviceGpuSnapshot? = cached
+
+    fun getOrResolve(resolve: () -> DeviceGpuSnapshot): DeviceGpuSnapshot {
+        cached?.let { return it }
+        val candidate = resolve()
+        return synchronized(monitor) {
+            cached ?: candidate.also {
+                cached = it
+                state.value = it
+            }
+        }
+    }
+
+    fun publish(value: DeviceGpuSnapshot) = synchronized(monitor) {
+        cached = value
+        state.value = value
+    }
+}
+
 object DeviceGpuInfoProvider {
-    const val CLASSIFIER_VERSION = 2
+    const val CLASSIFIER_VERSION = 4
 
     private const val PREFS_NAME = "device_gpu_profile"
     private const val KEY_VERSION = "classifier_version"
@@ -59,29 +85,22 @@ object DeviceGpuInfoProvider {
 
     private val lock = Mutex()
 
-    @Volatile
-    private var cached: DeviceGpuSnapshot? = null
-
-    private val _snapshot = MutableStateFlow<DeviceGpuSnapshot?>(null)
-    val snapshot: StateFlow<DeviceGpuSnapshot?> = _snapshot.asStateFlow()
+    private val cache = DeviceGpuSnapshotCache()
+    val snapshot: StateFlow<DeviceGpuSnapshot?> = cache.snapshot
 
     internal var rendererProvider: () -> String? = { GpuRendererQuery.query() }
     internal var socNameProvider: () -> String = { MobileSocNameMapper.currentDeviceName() }
 
-    fun get(context: Context): DeviceGpuSnapshot {
-        cached?.let { return it }
+    fun get(context: Context): DeviceGpuSnapshot = cache.getOrResolve {
         val stored = runCatching { readStored(context) }.getOrNull()
-        val resolved = stored ?: DeviceGpuInfoResolver.resolve(
+        stored ?: DeviceGpuInfoResolver.resolve(
             renderer = null,
             socName = runCatching { socNameProvider() }.getOrNull()
         )
-        cached = resolved
-        _snapshot.compareAndSet(null, resolved)
-        return resolved
     }
 
     suspend fun preload(context: Context): DeviceGpuSnapshot = lock.withLock {
-        cached?.takeIf { it.source == GpuInfoSource.GL_RENDERER }?.let { return it }
+        cache.peek()?.takeIf { it.source == GpuInfoSource.GL_RENDERER }?.let { return it }
         val resolved = runCatching {
             DeviceGpuInfoResolver.resolve(
                 renderer = rendererProvider(),
@@ -90,8 +109,7 @@ object DeviceGpuInfoProvider {
         }.getOrElse {
             DeviceGpuInfoResolver.resolve(renderer = null, socName = null)
         }
-        cached = resolved
-        _snapshot.value = resolved
+        cache.publish(resolved)
         runCatching { writeStored(context, resolved) }
         resolved
     }

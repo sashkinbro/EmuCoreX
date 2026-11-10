@@ -7,6 +7,13 @@ import org.junit.Test
 
 class GpuHardwareProfileTest {
     @Test
+    fun classifiesAllwinnerAndEliteFromTheSocCatalog() {
+        assertEquals(GpuHardwareProfiles.POWERVR, GpuHardwareProfiles.classifyHardwareProfile("Allwinner A133P"))
+        assertEquals(GpuHardwareProfiles.MALI, GpuHardwareProfiles.classifyHardwareProfile("sun55iw3p1"))
+        assertEquals(GpuHardwareProfiles.ADRENO, GpuHardwareProfiles.classifyHardwareProfile("sun"))
+    }
+
+    @Test
     fun classifiesKnownSocVendorsWithoutBroadSubstringMatches() {
         assertEquals(GpuHardwareProfiles.MALI, GpuHardwareProfiles.classifyHardwareProfile("MediaTek MT6989"))
         assertEquals(GpuHardwareProfiles.MALI, GpuHardwareProfiles.classifyHardwareProfile("board mt6897"))

@@ -3368,10 +3368,7 @@ private fun GpuBackendProfileControls(
     onDraftChange: (PerGameSettings) -> Unit
 ) {
     val context = LocalContext.current
-    val supportsCustomDrivers = remember {
-        GpuDriverCompatibility.supportsAdrenoToolsCustomDrivers() &&
-            !GpuHardwareProfiles.isMediaTekHardware()
-    }
+    val supportsCustomDrivers = customGpuDriversSupported()
     val angleOpenGlSupported = remember {
         GpuHardwareProfiles.isMediatekProfile(GpuHardwareProfiles.detectHardwareProfile())
     }
@@ -3381,10 +3378,11 @@ private fun GpuBackendProfileControls(
     if (supportsCustomDrivers) {
         val lifecycleOwner = LocalLifecycleOwner.current
         val driverManager = remember(context) { GpuDriverManager(context) }
-        var installedDrivers by remember(context) {
+        val deviceGpuSnapshot by com.sbro.emucorex.core.DeviceGpuInfoProvider.snapshot.collectAsState()
+        var installedDrivers by remember(context, deviceGpuSnapshot) {
             mutableStateOf(driverManager.listInstalledDrivers().filter { it.isUsable })
         }
-        DisposableEffect(lifecycleOwner, driverManager) {
+        DisposableEffect(lifecycleOwner, driverManager, deviceGpuSnapshot) {
             val observer = LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
                     installedDrivers = driverManager.listInstalledDrivers().filter { it.isUsable }

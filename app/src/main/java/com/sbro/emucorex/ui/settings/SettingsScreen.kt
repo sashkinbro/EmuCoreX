@@ -1549,7 +1549,7 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_renderer),
                             onResetToDefault = { viewModel.setRenderer(defaults.renderer) }
                         )
-                        if (GpuDriverCompatibility.supportsCustomDrivers()) {
+                        if (customGpuDriversSupported()) {
                             val activeDriverName = uiState.customDriverPath
                                 ?.takeIf { uiState.gpuDriverType == 1 }
                                 ?.let { java.io.File(it).parentFile?.name ?: java.io.File(it).name }

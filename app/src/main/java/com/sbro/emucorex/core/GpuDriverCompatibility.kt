@@ -219,7 +219,24 @@ object GpuDriverCompatibility {
         RegexOption.IGNORE_CASE
     )
 
-    fun deviceVendor(): GpuDriverVendor = deviceVendor(currentDeviceInfo())
+    fun deviceVendor(): GpuDriverVendor = resolveDeviceVendor(
+        currentDeviceInfo(), MobileSocNameMapper.currentDeviceName(), DeviceGpuInfoProvider.snapshot.value
+    )
+
+    internal fun resolveDeviceVendor(
+        deviceInfo: String,
+        socName: String? = null,
+        deviceGpu: DeviceGpuSnapshot? = null
+    ): GpuDriverVendor {
+        // A real renderer is stronger evidence than ROM/vendor branding. This
+        // also covers new Allwinner parts without another device whitelist.
+        if (deviceGpu?.source == GpuInfoSource.GL_RENDERER) {
+            vendorOfGpu(deviceGpu.model).takeIf { it != GpuDriverVendor.UNKNOWN }?.let { return it }
+        }
+        vendorOfGpu(SocGpuCatalog.forSoc(socName))
+            .takeIf { it != GpuDriverVendor.UNKNOWN }?.let { return it }
+        return deviceVendor(deviceInfo)
+    }
 
     fun vendorOfGpu(model: GpuModelInfo?): GpuDriverVendor = when (model?.vendor) {
         GpuVendor.ADRENO -> GpuDriverVendor.ADRENO
@@ -230,6 +247,12 @@ object GpuDriverCompatibility {
     }
 
     internal fun deviceVendor(deviceInfo: String): GpuDriverVendor {
+        vendorOfGpu(GpuModelParser.parse(deviceInfo))
+            .takeIf { it != GpuDriverVendor.UNKNOWN }?.let { return it }
+        val socName = MobileSocNameMapper.resolveKnownCode(deviceInfo)
+            ?: MobileSocNameMapper.resolvePlatformFamily(deviceInfo)
+        vendorOfGpu(SocGpuCatalog.forSoc(socName))
+            .takeIf { it != GpuDriverVendor.UNKNOWN }?.let { return it }
         val info = deviceInfo.lowercase(Locale.US)
         if (QUALCOMM_SIGNALS.any { it in info }) return GpuDriverVendor.ADRENO
         if (XCLIPSE_SIGNALS.any { it in info }) return GpuDriverVendor.XCLIPSE
@@ -304,8 +327,10 @@ object GpuDriverCompatibility {
         val socName = MobileSocNameMapper.currentDeviceName()
             .takeIf { it.isNotBlank() }
             ?: socLabel().ifBlank { vendor.displayName }
+        val detectedModel = DeviceGpuInfoProvider.snapshot.value
+            ?.takeIf { it.source == GpuInfoSource.GL_RENDERER }?.model
         val catalogModel = SocGpuCatalog.forSoc(socName)
-        val gpuName = catalogModel?.displayName ?: when (vendor) {
+        val gpuName = detectedModel?.displayName ?: catalogModel?.displayName ?: when (vendor) {
             GpuDriverVendor.ADRENO ->
                 GpuDriverRecommendations.currentDeviceProfile()?.adrenoName ?: vendor.displayName
             else -> vendor.displayName

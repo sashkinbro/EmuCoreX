@@ -135,6 +135,9 @@ fun GpuDriverScreen(
     val initialDeviceGpu = remember(context) { DeviceGpuInfoProvider.get(context) }
     val deviceGpuSnapshot by DeviceGpuInfoProvider.snapshot.collectAsState()
     val deviceGpu = deviceGpuSnapshot ?: initialDeviceGpu
+    LaunchedEffect(deviceGpu) {
+        viewModel.refreshInstalledGpuDrivers()
+    }
     val buildDeviceVendor = remember { GpuDriverCompatibility.deviceVendor() }
     val deviceVendor = GpuDriverCompatibility.vendorOfGpu(deviceGpu.model)
         .takeIf { it != GpuDriverVendor.UNKNOWN }
@@ -143,8 +146,8 @@ fun GpuDriverScreen(
         GpuDriverRecommendations.profileForGpu(deviceSummary.socName, deviceGpu.model)
     }
     val detectedGpuName = deviceGpu.model?.displayName?.takeIf { it.isNotBlank() }
-    val deviceGpuName = SocGpuCatalog.forSoc(deviceSummary.socName)?.displayName
-        ?: detectedGpuName
+    val deviceGpuName = detectedGpuName
+        ?: SocGpuCatalog.forSoc(deviceSummary.socName)?.displayName
         ?: deviceSummary.gpuName
     val isAdrenoDevice = deviceVendor == GpuDriverVendor.ADRENO
     val deviceHintRes = if (isAdrenoDevice) {

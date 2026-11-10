@@ -54,4 +54,16 @@ class GpuModelParserTest {
         assertNull(GpuModelParser.parse("Android Emulator OpenGL ES Translator"))
         assertNull(GpuModelParser.parse("Mesa OffScreen"))
     }
+
+    @Test
+    fun `parses Mali revisions and execution engines without losing the real core count`() {
+        assertEquals("Mali-G52 MC2", GpuModelParser.parse("Mali-G52 r1 MC2")?.displayName)
+        assertEquals("Mali-G52 MC1", GpuModelParser.parse("Mali-G52 3EE MC1")?.displayName)
+        assertEquals("Mali-G52 MC1", GpuModelParser.parse("Mali-G52 r1p0 2EE MC1")?.displayName)
+        assertEquals("Mali-G52", GpuModelParser.parse("Mali-G52-2EE")?.displayName)
+        assertEquals("Mali-G52", GpuModelParser.parse("Mali-G52 r1")?.displayName)
+        assertNull(GpuModelParser.parse("Mali-G52000"))
+        assertNull(GpuModelParser.parse("Adreno 8300"))
+        assertEquals("Mali-G100", GpuModelParser.parse("Mali-G100")?.displayName)
+    }
 }

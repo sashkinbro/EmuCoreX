@@ -53,7 +53,7 @@ object GpuHardwareProfiles {
         val deviceModel = listOf(Build.MANUFACTURER, Build.MODEL)
             .filterNot { it.isNullOrBlank() }
             .joinToString(" ")
-        val hints = listOf(socManufacturer, socModel, hardware, deviceModel)
+        val hints = listOf(socManufacturer, socModel, hardware, deviceModel, MobileSocNameMapper.currentDeviceName())
             .joinToString(" ")
             .lowercase()
         return hints
@@ -66,6 +66,14 @@ object GpuHardwareProfiles {
     }
 
     internal fun classifyHardwareProfile(rawHints: String): Int {
+        val soc = MobileSocNameMapper.resolveKnownCode(rawHints) ?: MobileSocNameMapper.resolvePlatformFamily(rawHints)
+        val model = GpuModelParser.parse(rawHints) ?: SocGpuCatalog.forSoc(soc)
+        when (model?.vendor) {
+            GpuVendor.ADRENO -> return ADRENO
+            GpuVendor.POWERVR -> return POWERVR
+            GpuVendor.MALI, GpuVendor.XCLIPSE -> return MALI
+            else -> Unit
+        }
         val hints = rawHints.lowercase()
         return when {
             listOf("powervr", "imgtec", "imagination technologies").any(hints::contains) -> POWERVR
