@@ -366,8 +366,6 @@ void VMManager::SetState(VMState state)
 		}
 		else
 		{
-			PerformanceMetrics::Reset();
-			ResetFrameLimiter();
 			const EmuCoreXLatency::Span span("resume.audio");
 			SPU2::SetOutputPaused(false);
 		}
@@ -387,6 +385,10 @@ void VMManager::SetState(VMState state)
 			FullscreenUI::OnVMResumed();
 			Host::OnVMResumed();
 			ResetResumeTimestamp();
+			// AAudio may wait for an asynchronous pause or a device recovery. Count frame
+			// time only once that wait and the rest of the resume transition have finished.
+			PerformanceMetrics::Reset();
+			ResetFrameLimiter();
 		}
 	}
 	else if (state == VMState::Stopping && old_state == VMState::Running)

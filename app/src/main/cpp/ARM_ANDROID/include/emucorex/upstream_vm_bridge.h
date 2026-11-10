@@ -21,6 +21,7 @@ struct TFXPreparationBridgeResult
 
 TFXPreparationBridgeResult RunTFXPreparation(const VmLaunchConfig& config, TFXPreparationJob& job, bool validation_only = false);
 void ApplyRuntimeSettingsToUpstream(const VmLaunchConfig& config);
+int QueryMaxUpscaleMultiplier(int renderer);
 void InitializeSettingsLayer();
 
 // Human-readable reason for the most recent failed VM start, exposed to the UI so

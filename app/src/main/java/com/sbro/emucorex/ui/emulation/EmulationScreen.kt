@@ -7299,13 +7299,14 @@ private fun LiveSelectionChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val iconOnly = option.icon != null && option.label.isNullOrBlank()
     FilterChip(
         shape = neonChipShape(),
-        modifier = modifier,
+        modifier = modifier.then(if (iconOnly) Modifier.widthIn(min = 60.dp) else Modifier),
         selected = selected,
         onClick = onClick,
         colors = premiumFilterChipColors(),
-        leadingIcon = option.icon?.let { icon ->
+        leadingIcon = option.icon?.takeUnless { iconOnly }?.let { icon ->
             {
                 Icon(
                     imageVector = icon,
@@ -7315,13 +7316,23 @@ private fun LiveSelectionChip(
             }
         },
         label = {
-            Text(
-                text = option.label.orEmpty(),
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Clip
-            )
+            if (iconOnly) {
+                Box(modifier = Modifier.width(28.dp), contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = requireNotNull(option.icon),
+                        contentDescription = option.contentDescription,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            } else {
+                Text(
+                    text = option.label.orEmpty(),
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Clip
+                )
+            }
         }
     )
 }

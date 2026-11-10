@@ -82,6 +82,23 @@ static bool ShouldTrackGSPerfMonCounters()
 }
 
 static GSRendererType GSCurrentRenderer;
+// OpenGL/Vulkan limits remain readable while their devices are being recreated.
+static std::atomic<u32> s_ogl_max_upscale_multiplier{12};
+static std::atomic<u32> s_vk_max_upscale_multiplier{12};
+
+static void CacheMaxUpscaleMultiplier(GSRendererType renderer, u32 multiplier)
+{
+	if (renderer == GSRendererType::OGL)
+		s_ogl_max_upscale_multiplier.store(multiplier, std::memory_order_relaxed);
+	else if (renderer == GSRendererType::VK)
+		s_vk_max_upscale_multiplier.store(multiplier, std::memory_order_relaxed);
+}
+
+u32 GSGetCachedMaxUpscaleMultiplier(GSRendererType renderer)
+{
+	return (renderer == GSRendererType::VK ? s_vk_max_upscale_multiplier : s_ogl_max_upscale_multiplier)
+		.load(std::memory_order_relaxed);
+}
 
 GSRendererType GSGetCurrentRenderer()
 {
@@ -203,6 +220,11 @@ static bool OpenGSDevice(GSRendererType renderer, bool clear_state_on_fail, bool
 	GSConfig.OsdShowGPU = GSConfig.OsdShowGPU && g_gs_device->SetGPUTimingEnabled(true);
 #endif
 
+	if (new_api == RenderAPI::OpenGL || new_api == RenderAPI::Vulkan)
+	{
+		CacheMaxUpscaleMultiplier(new_api == RenderAPI::OpenGL ? GSRendererType::OGL : GSRendererType::VK,
+			GSGetMaxUpscaleMultiplier(g_gs_device->GetMaxTextureSize()));
+	}
 	Console.WriteLn(Color_StrongGreen, "%s Graphics Driver Info:", GSDevice::RenderAPIToString(new_api));
 	Console.WriteLn(g_gs_device->GetDriverInfo());
 
@@ -889,6 +911,8 @@ std::vector<GSAdapterInfo> GSGetAdapterInfo(GSRendererType renderer)
 			break;
 	}
 
+	if (!ret.empty())
+		CacheMaxUpscaleMultiplier(renderer, std::max(ret.front().max_upscale_multiplier, 1u));
 	return ret;
 }
 

@@ -94,6 +94,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -762,13 +763,17 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 active
             }
+            if (activePerGameKey() != gameKey) return
             currentInterfaceSettingsProfile = overrides
         }
-        val finalState = updatedState.withInterfaceSettings(normalized).copy(
-            gameSettingsProfileActive = gameKey != null && profileActive
-        )
-        if (!_uiState.value.autoSaveEnabled && finalState.autoSaveEnabled) lastAutoSavePlayTimeMs = finalState.activePlayTimeMs
-        _uiState.value = finalState
+        if (activePerGameKey() != gameKey) return
+        val autoSaveWasEnabled = _uiState.value.autoSaveEnabled
+        val finalState = _uiState.updateAndGet { current ->
+            current.withInterfaceSettings(normalized).copy(
+                gameSettingsProfileActive = gameKey != null && profileActive
+            )
+        }
+        if (!autoSaveWasEnabled && finalState.autoSaveEnabled) lastAutoSavePlayTimeMs = finalState.activePlayTimeMs
         syncNativePerformanceOverlayState(finalState)
         syncGamepadAnalogSettings(finalState)
         refreshKeyboardMouseOverride()
@@ -2679,15 +2684,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         )
         DiscordIntegration.setPaused(!isPaused)
         updateCrashContext(launchState = if (!isPaused) "paused" else "running")
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                if (isPaused) {
-                    EmulatorBridge.resume()
-                } else {
-                    EmulatorBridge.pause()
-                }
-            } catch (_: Exception) { }
-        }
+        synchronizePauseState()
     }
 
     fun toggleMenu() {
@@ -2699,11 +2696,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             _uiState.value = _uiState.value.copy(showMenu = true, isPaused = true)
             DiscordIntegration.setPaused(true)
             updateCrashContext(launchState = "paused")
-            viewModelScope.launch(Dispatchers.IO) {
-                try {
-                    EmulatorBridge.pause()
-                } catch (_: Exception) { }
-            }
+            synchronizePauseState()
         } else {
             closeMenu()
         }
@@ -2773,10 +2766,18 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.value = _uiState.value.copy(showMenu = false, isPaused = false)
         DiscordIntegration.setPaused(false)
         updateCrashContext(launchState = "running")
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                EmulatorBridge.resume()
-            } catch (_: Exception) { }
+        synchronizePauseState()
+    }
+
+    private fun synchronizePauseState() {
+        // Enter on Main before dispatching native work. Independent IO launches can reach the
+        // bridge in the reverse order, leaving an old pause behind a newer menu close/resume.
+        viewModelScope.launch(Dispatchers.Main.immediate) {
+            lifecycleMutex.withLock {
+                val state = _uiState.value
+                if (!state.isRunning || state.isStarting || isShuttingDown) return@withLock
+                if (state.isPaused || state.showMenu) EmulatorBridge.pause() else EmulatorBridge.resume()
+            }
         }
     }
 
@@ -4789,12 +4790,13 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         if (gameKey == null) {
             val updatedState = transform(_uiState.value)
             persistGlobalTouchControlsLayout(updatedState)
+            if (activePerGameKey() != gameKey) return
             currentTouchControlsLayoutProfile = null
-            _uiState.value = updatedState
+            _uiState.update { current -> current.withTouchControlsLayout(updatedState.toTouchControlsLayoutProfile()) }
             return
         }
 
-        val (layout, finalState) = perGameSettingsRepository.transaction {
+        val layout = perGameSettingsRepository.transaction {
             val updatedState = transform(_uiState.value)
             val updatedLayout = updatedState.toTouchControlsLayoutProfile()
             val existing = perGameSettingsRepository.get(gameKey)
@@ -4806,10 +4808,12 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     layout = updatedLayout
                 )
             )
-            updatedLayout to updatedState.copy(gameSettingsProfileActive = true)
+            updatedLayout
         }
-        currentTouchControlsLayoutProfile = layout
-        _uiState.value = finalState
+        if (activePerGameKey() == gameKey) {
+            currentTouchControlsLayoutProfile = layout
+            _uiState.update { current -> current.withTouchControlsLayout(layout).copy(gameSettingsProfileActive = true) }
+        }
     }
 
     private suspend fun resetTouchControlsLayoutForCurrentScope() {
@@ -4872,15 +4876,17 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 )
                 applyInterfaceSettings(updatedState.copy(gameSettingsProfileActive = true))
             }
-            _uiState.value = finalState
-            syncGamepadAnalogSettings(finalState)
-            syncNativePerformanceOverlayState(finalState)
-            finalState
+            if (activePerGameKey() != gameKey) return _uiState.value
+            val published = _uiState.updateAndGet { current -> finalState.withCurrentSession(current) }
+            syncGamepadAnalogSettings(published)
+            syncNativePerformanceOverlayState(published)
+            published
         } else {
             persistGlobal()
-            _uiState.value = updatedState
-            syncNativePerformanceOverlayState(updatedState)
-            updatedState
+            if (activePerGameKey() != gameKey) return _uiState.value
+            val published = _uiState.updateAndGet { current -> updatedState.withCurrentSession(current) }
+            syncNativePerformanceOverlayState(published)
+            published
         }
     }
 
@@ -5957,45 +5963,37 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun onHostBackgrounded() {
-        viewModelScope.launch(Dispatchers.IO) {
-            lifecycleMutex.withLock {
-                val state = _uiState.value
-                if (!state.isRunning || state.isStarting || state.isPaused || state.showMenu || isShuttingDown) {
-                    return@withLock
-                }
-                try {
-                    EmulatorBridge.pause()
-                    pausedForBackground = true
-                    _uiState.value = state.copy(isPaused = true)
-                    DiscordIntegration.setPaused(true)
-                    syncPendingPlayTime(forceCloud = false)
-                    updateCrashContext(launchState = "paused")
-                } catch (_: Exception) { }
+        viewModelScope.launch(Dispatchers.Main.immediate) {
+            val state = _uiState.value
+            if (!state.isRunning || state.isStarting || state.isPaused || state.showMenu || isShuttingDown) {
+                return@launch
             }
+            pausedForBackground = true
+            _uiState.update { it.copy(isPaused = true) }
+            DiscordIntegration.setPaused(true)
+            updateCrashContext(launchState = "paused")
+            synchronizePauseState()
+            viewModelScope.launch(Dispatchers.IO) { syncPendingPlayTime(forceCloud = false) }
         }
     }
 
     fun onHostForegrounded() {
-        viewModelScope.launch(Dispatchers.IO) {
-            lifecycleMutex.withLock {
-                val state = _uiState.value
-                if (!pausedForBackground ||
-                    !state.isRunning ||
-                    state.isStarting ||
-                    !state.isPaused ||
-                    state.showMenu ||
-                    isShuttingDown
-                ) {
-                    return@withLock
-                }
-                try {
-                    EmulatorBridge.resume()
-                    pausedForBackground = false
-                    _uiState.value = state.copy(isPaused = false)
-                    DiscordIntegration.setPaused(false)
-                    updateCrashContext(launchState = "running")
-                } catch (_: Exception) { }
+        viewModelScope.launch(Dispatchers.Main.immediate) {
+            val state = _uiState.value
+            if (!pausedForBackground ||
+                !state.isRunning ||
+                state.isStarting ||
+                !state.isPaused ||
+                state.showMenu ||
+                isShuttingDown
+            ) {
+                return@launch
             }
+            pausedForBackground = false
+            _uiState.update { it.copy(isPaused = false) }
+            DiscordIntegration.setPaused(false)
+            updateCrashContext(launchState = "running")
+            synchronizePauseState()
         }
     }
 

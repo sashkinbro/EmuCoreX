@@ -99,14 +99,15 @@ std::unique_ptr<GLContext> GLContext::Create(const WindowInfo& wi, std::span<con
 	if (!context)
 		return nullptr;
 
-	// NOTE: Not thread-safe. But this is okay, since we're not going to be creating more than one context at a time.
-	static GLContext* context_being_created;
-	context_being_created = context.get();
-
-	const auto load_proc = [](const char* name) { return reinterpret_cast<GLADapiproc>(context_being_created->GetProcAddress(name)); };
+	// Bind the resolver to this invocation. A shared context pointer can be replaced
+	// or cleared by an adapter probe while a renderer is still loading its functions.
+	// GLAD's function tables are global, so callers must still serialize GL loading.
+	const auto load_proc = [](void* userdata, const char* name) {
+		return reinterpret_cast<GLADapiproc>(static_cast<GLContext*>(userdata)->GetProcAddress(name));
+	};
 	if (!context->IsGLES())
 	{
-		if (!gladLoadGL(load_proc))
+		if (!gladLoadGLUserPtr(load_proc, context.get()))
 		{
 			Error::SetStringView(error, "Failed to load GL functions for GLAD");
 			return nullptr;
@@ -114,14 +115,12 @@ std::unique_ptr<GLContext> GLContext::Create(const WindowInfo& wi, std::span<con
 	}
 	else
 	{
-		if (!gladLoadGLES2(load_proc))
+		if (!gladLoadGLES2UserPtr(load_proc, context.get()))
 		{
 			Error::SetStringView(error, "Failed to load GLES functions for GLAD");
 			return nullptr;
 		}
 	}
-
-	context_being_created = nullptr;
 
 	return context;
 }

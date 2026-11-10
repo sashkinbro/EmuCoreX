@@ -30,6 +30,7 @@
 #include "common/FileSystem.h"
 #include "common/MemorySettingsInterface.h"
 #include "common/Path.h"
+#include "common/ScopedGuard.h"
 #include "common/SettingsWrapper.h"
 #include "common/StringUtil.h"
 #include "common/Threading.h"
@@ -747,7 +748,6 @@ bool RunUpstreamVm(const VmLaunchConfig& config, VmStartupCallback startup_callb
 	}
 #endif
 	QueryAndNotifyAchievementsState();
-	bool cache_flush_requested_for_pause = false;
 	for (;;)
 	{
 		Host::PumpMessagesOnCPUThread();
@@ -757,18 +757,14 @@ bool RunUpstreamVm(const VmLaunchConfig& config, VmStartupCallback startup_callb
 
 		if (state == VMState::Paused)
 		{
-			if (!cache_flush_requested_for_pause)
-			{
-				GSRequestShaderCacheFlush();
-				cache_flush_requested_for_pause = true;
-			}
+			// Cache writers already persist periodically and on renderer shutdown. A menu
+			// pause must not force driver pipeline-cache extraction alongside the next resume.
 			Host::PumpMessagesOnCPUThread();
 			VMManager::IdlePollUpdate();
 			std::this_thread::sleep_for(std::chrono::milliseconds(8));
 			continue;
 		}
 
-		cache_flush_requested_for_pause = false;
 		RecordVmExecutePhaseForCrashDiagnostics("execute");
 		VMManager::Execute();
 		RecordVmExecutePhaseForCrashDiagnostics("execute-returned");
@@ -940,8 +936,32 @@ TFXPreparationBridgeResult RunTFXPreparation(const VmLaunchConfig& config, TFXPr
 	return result;
 }
 
+int QueryMaxUpscaleMultiplier(int renderer)
+{
+	const GSRendererType resolved_renderer = renderer <= 0 ? GSRendererType::OGL : static_cast<GSRendererType>(renderer);
+	// The VM and offline shader preparation own this gate throughout their GS lifetime.
+	// A Compose capability query must not reload global GLAD/EGL tables or touch a
+	// live GS device from the UI thread, including while a renderer is being reopened.
+	const std::unique_lock bridge_lock(s_vm_bridge_mutex, std::try_to_lock);
+	if (!bridge_lock.owns_lock())
+		return static_cast<int>(GSGetCachedMaxUpscaleMultiplier(resolved_renderer));
+
+	const std::vector<GSAdapterInfo> adapters = GSGetAdapterInfo(resolved_renderer);
+	return adapters.empty() ? static_cast<int>(GSGetCachedMaxUpscaleMultiplier(resolved_renderer)) :
+		static_cast<int>(std::max<u32>(adapters.front().max_upscale_multiplier, 1));
+}
+
 void ApplyRuntimeSettingsToUpstream(const VmLaunchConfig& config)
 {
+	// A settings write can finish after the user closes the menu. Keep audio stopped
+	// throughout IOP/GS synchronization and renderer recreation in that case as well.
+	const bool was_running = VMManager::GetState() == VMState::Running;
+	if (was_running)
+		VMManager::SetPaused(true);
+	const ScopedGuard resume_vm([was_running]() {
+		if (was_running && VMManager::GetState() == VMState::Paused)
+			VMManager::SetPaused(false);
+	});
 	InstallHostSettings(config);
 	VMManager::ApplySettings();
 }

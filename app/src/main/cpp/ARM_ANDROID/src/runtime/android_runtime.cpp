@@ -1343,11 +1343,6 @@ bool AndroidRuntime::ChangeDisc(std::string path)
 		paused_ = true;
 	}
 
-	// Wake the CPU loop so it drains the blocking task even when it was executing
-	// recompiled guest code when Android delivered the picker result.
-	if (Cpu)
-		Cpu->ExitExecution();
-
 	auto result = std::make_shared<bool>(false);
 	Host::RunOnCPUThread([path, result]() mutable {
 		if (!VMManager::HasValidVM())
@@ -1380,13 +1375,12 @@ void AndroidRuntime::Pause()
 		return;
 
 	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "VM pause requested");
-	if (Cpu)
-		Cpu->ExitExecution();
+	// ExitExecution touches EE/IOP scheduler state (and the interpreter can longjmp).
+	// It must only run on the CPU thread. Its message pump sees this queued task at
+	// the next input poll, requests the exit there, then applies the pause outside Execute().
 	EmuCoreXLatency::Event(EmuCoreXLatency::Current(), "cpu.enqueue");
 	Host::RunOnCPUThread(EmuCoreXLatency::Carry([]() {
 		const EmuCoreXLatency::Span cpu_span("cpu.pause");
-		if (Cpu)
-			Cpu->ExitExecution();
 		VMManager::SetPaused(true);
 	}), false);
 }

@@ -108,6 +108,8 @@ bool GSWantsExclusiveFullscreen();
 std::optional<float> GSGetHostRefreshRate();
 std::vector<GSAdapterInfo> GSGetAdapterInfo(GSRendererType renderer);
 u32 GSGetMaxUpscaleMultiplier(u32 max_texture_size);
+// Thread-safe UI snapshot; does not create contexts or access the live GS device.
+u32 GSGetCachedMaxUpscaleMultiplier(GSRendererType renderer);
 GSVideoMode GSgetDisplayMode();
 void GSgetInternalResolution(int* width, int* height);
 void GSgetStats(SmallStringBase& info);
