@@ -8430,6 +8430,7 @@ void EEIrScalarReadBenchmark()
 }
 
 #include "jit_oracle_ee_stores.inl"
+#include "jit_oracle_ee_manual_page.inl"
 
 void EEIrMergeMemoryTests()
 {
@@ -10199,6 +10200,7 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     if (direct_suite && std::strcmp(direct_suite, "ee-direct-stores") == 0)
     {
         EELegacyCachedBaseStoreTests();
+        EEManualPageSmcTests();
         return;
     }
     if (branch_immediates_only)
@@ -10424,6 +10426,7 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
         EEUnmappedCompatibilityTests();
         EETlbRestoreTests();
         EELegacyCachedBaseStoreTests();
+        EEManualPageSmcTests();
         std::printf("DIRECT EE: interpreter/direct coverage only; experimental IR integration omitted\n");
         return;
     }

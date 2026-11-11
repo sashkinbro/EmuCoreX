@@ -1339,13 +1339,6 @@ static void recJumpDispatcherEvent_emit_oaknut()
 	recEndOaknutEmit();
 }
 
-static void recJumpDispatcherReg_emit_oaknut()
-{
-	recBeginOaknutEmit();
-	oakEmitJmp(DispatcherReg);
-	recEndOaknutEmit();
-}
-
 static void iBranchTestWaitLoopCycles_emit_oaknut(u32 scaled_cycles)
 {
 	recBeginOaknutEmit();
@@ -1400,7 +1393,14 @@ static void iBranchTest(u32 newpc)
 		u8* event_branch = recEventBranchPatchpoint_emit_oaknut();
 
 		if (newpc == 0xffffffff) {
-			recJumpDispatcherReg_emit_oaknut();
+			// Indirect exit (JR/JALR): inline the DispatcherReg lookup here
+			// (same recLUT walk, same JITCompile-stub semantics after recClear)
+			// to save the extra taken branch. The event test above still runs
+			// first; the PL path goes to DispatcherEvent, which falls through
+			// into DispatcherReg exactly as before.
+			recBeginOaknutEmit();
+			oakEmitDispatcherRegBody();
+			recEndOaknutEmit();
         }
 		else {
 //            recBlocks.Link(HWADDR(newpc), xJcc32(Jcc_Signed));
@@ -1675,6 +1675,45 @@ static void recManualPageCompareWord_emit_oaknut(u32 lpc_addr)
 	oakAsm->MOV(oak::util::W3, *static_cast<u32*>(vtlb_GetPhyPtr(lpc_addr)));
 	oakAsm->CMP(oak::util::W2, oak::util::W3);
 	oakEmitCondBranch(oak::Cond::NE, DispatchBlockDiscard);
+	recEndOaknutEmit();
+}
+
+// NEON compare of 4*chunks guest words against an inline literal pool (skipped by a
+// branch). Any mismatch leaves a non-zero lane in the OR-reduced XOR and takes the
+// same discard handler as the scalar path. Needs X17 = pmap; clobbers X16, W2 and
+// Q29-Q31 (W0/W1 stay intact for dyna_block_discard).
+static void recManualPageCompareRun_emit_oaknut(u32 lpc_addr, u32 chunks)
+{
+	recBeginOaknutEmit();
+	oak::Label after;
+	oakAsm->MOV(oak::util::X16, lpc_addr);
+	oakAsm->ADD(oak::util::X16, oak::util::X17, oak::util::X16);
+	oakAsm->B(after);
+	const void* pool = oakGetCurrentCodePointer();
+	const u32* src = static_cast<const u32*>(vtlb_GetPhyPtr(lpc_addr));
+	for (u32 i = 0; i < chunks * 4; i++)
+		oakAsm->dw(src[i]);
+	oakAsm->l(after);
+	for (u32 c = 0; c < chunks; c++)
+	{
+		const void* lit = static_cast<const u8*>(pool) + c * 16;
+		if (c == 0)
+		{
+			oakAsm->LDR(OAK_QSCRATCH3, oak::util::X16);
+			oakAsm->LDR(OAK_QSCRATCH2, lit);
+			oakAsm->EOR(OAK_QSCRATCH3.B16(), OAK_QSCRATCH3.B16(), OAK_QSCRATCH2.B16());
+		}
+		else
+		{
+			oakAsm->LDR(OAK_QSCRATCH, oak::util::X16, c * 16);
+			oakAsm->LDR(OAK_QSCRATCH2, lit);
+			oakAsm->EOR(OAK_QSCRATCH.B16(), OAK_QSCRATCH.B16(), OAK_QSCRATCH2.B16());
+			oakAsm->ORR(OAK_QSCRATCH3.B16(), OAK_QSCRATCH3.B16(), OAK_QSCRATCH.B16());
+		}
+	}
+	oakAsm->UMAXV(OAK_SSCRATCH3, OAK_QSCRATCH3.S4());
+	oakAsm->FMOV(oak::util::W2, OAK_SSCRATCH3);
+	oakEmitCbnz(oak::util::W2, DispatchBlockDiscard);
 	recEndOaknutEmit();
 }
 
@@ -2218,6 +2257,14 @@ static void memory_protect_recompiled_code(u32 startpc, u32 size)
             u32 lpc_addr;
 			u32 lpc = inpage_ptr;
 			u32 stg = inpage_sz;
+
+			if (stg >= 16)
+			{
+				const u32 chunks = stg >> 4;
+				recManualPageCompareRun_emit_oaknut(lpc & 0x1fffffff, chunks);
+				stg -= chunks * 16;
+				lpc += chunks * 16;
+			}
 
 			while (stg > 0)
 			{
