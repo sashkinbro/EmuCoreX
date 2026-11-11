@@ -3,6 +3,7 @@ package com.sbro.emucorex.ui.common
 import android.os.SystemClock
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import com.sbro.emucorex.core.UiSoundManager
 
 @Composable
 fun rememberDebouncedClick(
@@ -13,6 +14,8 @@ fun rememberDebouncedClick(
     return remember(onClick, debounceMillis) {
         {
             if (gate.tryAcquire()) {
+                // Central UI press sound; a no-op unless the user enabled one in Settings.
+                UiSoundManager.onUiInteraction()
                 onClick()
             }
         }

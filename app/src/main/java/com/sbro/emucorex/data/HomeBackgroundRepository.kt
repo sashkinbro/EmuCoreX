@@ -45,7 +45,7 @@ class HomeBackgroundRepository(context: Context) {
                 validateContent(temporaryFile, type)
                 val targetFile = fileFor(type)
                 backgroundDirectory.listFiles()?.forEach { file ->
-                    if (file != temporaryFile && file != targetFile) file.delete()
+                    if (file != temporaryFile && file != targetFile && file.name.startsWith(FILE_NAME)) file.delete()
                 }
                 if (targetFile.exists()) targetFile.delete()
                 check(temporaryFile.renameTo(targetFile)) { "Unable to save selected background" }
@@ -101,7 +101,8 @@ class HomeBackgroundRepository(context: Context) {
     }
 
     fun clear() {
-        backgroundDirectory.listFiles()?.forEach(File::delete)
+        // Only our own files: the directory is shared with the custom font.
+        backgroundDirectory.listFiles()?.forEach { if (it.name.startsWith(FILE_NAME)) it.delete() }
     }
 
     private fun resolveType(uri: Uri): HomeBackgroundType {

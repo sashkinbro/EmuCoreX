@@ -24,6 +24,7 @@ class SettingsBackupRepository(
 ) {
     private val homeBackgroundRepository = HomeBackgroundRepository(context)
     private val customFontRepository = CustomFontRepository(context)
+    private val uiSoundRepository = UiSoundRepository(context)
 
     suspend fun backup(destination: Uri, includeSaveStates: Boolean = false): Boolean {
         return runCatching {
@@ -80,12 +81,18 @@ class SettingsBackupRepository(
             customFontRepository.installedFile()?.let { file ->
                 zip.writeFileEntry(CustomFontRepository.BACKUP_ENTRY, file)
             }
+            UiSoundKind.entries.forEach { kind ->
+                uiSoundRepository.installedFile(kind)?.let { file ->
+                    zip.writeFileEntry(UiSoundRepository.backupEntry(kind), file)
+                }
+            }
         }
     }
 
     internal suspend fun restoreBackup(input: InputStream) {
         var restoredBackgroundType: HomeBackgroundType? = null
         var restoredCustomFont = false
+        val restoredUiSounds = mutableSetOf<UiSoundKind>()
         ZipInputStream(input).use { zip ->
             generateSequence { zip.nextEntry }.forEach { entry ->
                 when (entry.name) {
@@ -98,8 +105,15 @@ class SettingsBackupRepository(
                         restoredCustomFont = true
                     }
                     else -> {
+                        val soundKind = UiSoundRepository.kindForBackupEntry(entry.name)
                         val backgroundType = entry.name.toBackgroundBackupType()
-                        if (backgroundType != null && !entry.isDirectory) {
+                        if (soundKind != null && !entry.isDirectory) {
+                            // A bad sound entry must not abort the whole restore; reconcile below
+                            // falls back to the default sound for that kind.
+                            uiSoundRepository.restoreFromBackup(soundKind, zip)
+                                .onSuccess { restoredUiSounds += soundKind }
+                                .onFailure { Log.w(TAG, "Skipping invalid sound entry ${entry.name}", it) }
+                        } else if (backgroundType != null && !entry.isDirectory) {
                             homeBackgroundRepository.restoreFromBackup(backgroundType, zip).getOrThrow()
                             restoredBackgroundType = backgroundType
                         } else if (entry.name.startsWith("memory-cards/") && !entry.isDirectory) {
@@ -137,6 +151,21 @@ class SettingsBackupRepository(
                     }
                 }
                 zip.closeEntry()
+            }
+        }
+
+        // A restored settings.json may name a custom sound whose file is not in the archive.
+        // Settings are imported before files, so reconcile: no file means the built-in default.
+        val restoredSounds = preferences.uiSoundSettings.first()
+        UiSoundKind.entries.forEach { kind ->
+            if (restoredSounds[kind].usesCustom) {
+                if (kind !in restoredUiSounds) {
+                    uiSoundRepository.clear(kind)
+                    preferences.clearUiSoundCustom(kind)
+                }
+            } else {
+                // Stale local file from before the restore that the restored settings do not use.
+                uiSoundRepository.clear(kind)
             }
         }
 

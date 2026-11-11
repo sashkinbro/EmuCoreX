@@ -66,6 +66,7 @@ data class SettingsSnapshot(
     val appFontScale: Float = AppPreferences.DEFAULT_APP_FONT_SCALE,
     val customFontName: String? = null,
     val customFontRevision: Int = 0,
+    val uiSounds: UiSoundSettings = UiSoundSettings(),
     val homeGridScale: Float = AppPreferences.DEFAULT_HOME_GRID_SCALE,
     val homeBackgroundType: HomeBackgroundType = HomeBackgroundType.NONE,
     val homeBackgroundPreset: HomeBackgroundPreset = HomeBackgroundPreset.OLYMPUS,
@@ -265,20 +266,7 @@ data class SettingsSnapshot(
     val gpuDriverType: Int = 0,
     val mediatekAngleOpenGl: Boolean = false,
     val customDriverPath: String? = null,
-    val dev9EthernetEnabled: Boolean = false,
-    val dev9EthernetDevice: String = "Auto",
-    val dev9InterceptDhcp: Boolean = false,
-    val dev9Dns1Mode: String = AppPreferences.DEV9_DNS_MODE_AUTO,
-    val dev9Dns1: String = "0.0.0.0",
-    val dev9Dns2Mode: String = AppPreferences.DEV9_DNS_MODE_AUTO,
-    val dev9Dns2: String = "0.0.0.0",
-    val dev9LogDhcp: Boolean = false,
-    val dev9LogDns: Boolean = false,
-    val dev9LocalLinkMode: Int = AppPreferences.DEV9_LOCAL_LINK_OFF,
-    val dev9LocalLinkAddress: String = "192.168.43.1",
-    val dev9LocalLinkPort: Int = AppPreferences.DEFAULT_LOCAL_LINK_PORT,
-    val dev9LocalLinkPeerId: Int = 2,
-    val dev9LocalLinkRoomCode: String = "",
+    val dev9: Dev9Settings = Dev9Settings(),
     val frameLimitEnabled: Boolean = true,
     val vSyncEnabled: Boolean = false,
     val fastForwardSpeed: Float = AppPreferences.DEFAULT_FAST_FORWARD_SPEED,
@@ -306,6 +294,20 @@ data class SettingsSnapshot(
     val gyroStickTarget: Int get() = gyro.stickTarget
     val lightGunAim: Int get() = gyro.lightGunAim
     val lightGunCursorEnabled: Boolean get() = gyro.lightGunCursorEnabled
+    val dev9EthernetEnabled: Boolean get() = dev9.ethernetEnabled
+    val dev9EthernetDevice: String get() = dev9.ethernetDevice
+    val dev9InterceptDhcp: Boolean get() = dev9.interceptDhcp
+    val dev9Dns1Mode: String get() = dev9.dns1Mode
+    val dev9Dns1: String get() = dev9.dns1
+    val dev9Dns2Mode: String get() = dev9.dns2Mode
+    val dev9Dns2: String get() = dev9.dns2
+    val dev9LogDhcp: Boolean get() = dev9.logDhcp
+    val dev9LogDns: Boolean get() = dev9.logDns
+    val dev9LocalLinkMode: Int get() = dev9.localLinkMode
+    val dev9LocalLinkAddress: String get() = dev9.localLinkAddress
+    val dev9LocalLinkPort: Int get() = dev9.localLinkPort
+    val dev9LocalLinkPeerId: Int get() = dev9.localLinkPeerId
+    val dev9LocalLinkRoomCode: String get() = dev9.localLinkRoomCode
 }
 
 data class OverlayLayoutSnapshot(
@@ -625,6 +627,12 @@ class AppPreferences(private val context: Context) {
         private val APP_FONT_SCALE = floatPreferencesKey("app_font_scale")
         private val CUSTOM_FONT_NAME = stringPreferencesKey("custom_font_name")
         private val CUSTOM_FONT_REVISION = intPreferencesKey("custom_font_revision")
+        private fun uiSoundEnabledKey(kind: UiSoundKind) = booleanPreferencesKey("ui_sound_${kind.id}_enabled")
+        private fun uiSoundVolumeKey(kind: UiSoundKind) = intPreferencesKey("ui_sound_${kind.id}_volume")
+        private fun uiSoundCustomNameKey(kind: UiSoundKind) = stringPreferencesKey("ui_sound_${kind.id}_custom_name")
+        private fun uiSoundCustomKey(kind: UiSoundKind) = booleanPreferencesKey("ui_sound_${kind.id}_custom")
+        private fun uiSoundPresetKey(kind: UiSoundKind) = stringPreferencesKey("ui_sound_${kind.id}_preset")
+        private fun uiSoundRevisionKey(kind: UiSoundKind) = intPreferencesKey("ui_sound_${kind.id}_revision")
         private val HOME_GRID_SCALE = floatPreferencesKey("home_grid_scale")
         private val HOME_BACKGROUND_TYPE = intPreferencesKey("home_background_type")
         private val HOME_BACKGROUND_PRESET = intPreferencesKey("home_background_preset")
@@ -1003,6 +1011,10 @@ class AppPreferences(private val context: Context) {
         .map { prefs -> (prefs[CUSTOM_FONT_REVISION] ?: 0).coerceAtLeast(0) }
         .distinctUntilChanged()
 
+    val uiSoundSettings: Flow<UiSoundSettings> = context.dataStore.data
+        .map { prefs -> readUiSoundSettings(prefs) }
+        .distinctUntilChanged()
+
     val homeGridScale: Flow<Float> = context.dataStore.data
         .map { prefs -> (prefs[HOME_GRID_SCALE] ?: DEFAULT_HOME_GRID_SCALE).coerceIn(MIN_HOME_GRID_SCALE, MAX_HOME_GRID_SCALE) }
         .distinctUntilChanged()
@@ -1177,6 +1189,102 @@ class AppPreferences(private val context: Context) {
         }
     }
 
+    suspend fun setUiSoundEnabled(kind: UiSoundKind, enabled: Boolean) {
+        context.dataStore.edit { it[uiSoundEnabledKey(kind)] = enabled }
+    }
+
+    suspend fun setUiSoundVolume(kind: UiSoundKind, volume: Int) {
+        context.dataStore.edit {
+            it[uiSoundVolumeKey(kind)] = volume.coerceIn(UiSoundSettings.MIN_VOLUME, UiSoundSettings.MAX_VOLUME)
+        }
+    }
+
+    /** Selects a built-in preset; this also drops any custom file selection for [kind]. */
+    suspend fun setUiSoundPreset(kind: UiSoundKind, presetId: String) {
+        context.dataStore.edit { prefs ->
+            prefs[uiSoundPresetKey(kind)] = UiSoundPresets.sanitizeId(kind, presetId)
+            prefs.remove(uiSoundCustomNameKey(kind))
+            prefs.remove(uiSoundCustomKey(kind))
+            prefs[uiSoundRevisionKey(kind)] = (prefs[uiSoundRevisionKey(kind)] ?: 0) + 1
+        }
+    }
+
+    suspend fun setUiSoundCustomInstalled(kind: UiSoundKind, displayName: String?) {
+        context.dataStore.edit { prefs ->
+            prefs[uiSoundCustomKey(kind)] = true
+            val cleanName = displayName?.trim()?.takeIf(String::isNotEmpty)
+            if (cleanName == null) prefs.remove(uiSoundCustomNameKey(kind)) else prefs[uiSoundCustomNameKey(kind)] = cleanName
+            prefs[uiSoundRevisionKey(kind)] = (prefs[uiSoundRevisionKey(kind)] ?: 0) + 1
+        }
+    }
+
+    suspend fun clearUiSoundCustom(kind: UiSoundKind) {
+        context.dataStore.edit { prefs ->
+            prefs.remove(uiSoundCustomNameKey(kind))
+            prefs.remove(uiSoundCustomKey(kind))
+            prefs[uiSoundRevisionKey(kind)] = (prefs[uiSoundRevisionKey(kind)] ?: 0) + 1
+        }
+    }
+
+    suspend fun resetUiSounds() {
+        context.dataStore.edit { prefs ->
+            UiSoundKind.entries.forEach { kind ->
+                prefs.remove(uiSoundEnabledKey(kind))
+                prefs.remove(uiSoundVolumeKey(kind))
+                prefs.remove(uiSoundCustomNameKey(kind))
+                prefs.remove(uiSoundCustomKey(kind))
+                prefs.remove(uiSoundPresetKey(kind))
+                prefs[uiSoundRevisionKey(kind)] = (prefs[uiSoundRevisionKey(kind)] ?: 0) + 1
+            }
+        }
+    }
+
+    private fun readUiSoundSettings(prefs: Preferences): UiSoundSettings {
+        fun read(kind: UiSoundKind) = UiSoundSetting(
+            enabled = prefs[uiSoundEnabledKey(kind)] ?: false,
+            volume = (prefs[uiSoundVolumeKey(kind)] ?: UiSoundSettings.DEFAULT_VOLUME)
+                .coerceIn(UiSoundSettings.MIN_VOLUME, UiSoundSettings.MAX_VOLUME),
+            custom = prefs[uiSoundCustomKey(kind)] ?: false,
+            customName = prefs[uiSoundCustomNameKey(kind)]?.takeIf(String::isNotBlank),
+            preset = UiSoundPresets.sanitizeId(kind, prefs[uiSoundPresetKey(kind)]),
+            revision = (prefs[uiSoundRevisionKey(kind)] ?: 0).coerceAtLeast(0)
+        )
+        return UiSoundSettings(
+            music = read(UiSoundKind.BACKGROUND_MUSIC),
+            click = read(UiSoundKind.BUTTON_CLICK),
+            menu = read(UiSoundKind.GAME_MENU)
+        )
+    }
+
+    private fun encodeUiSounds(settings: UiSoundSettings): JSONObject = JSONObject().apply {
+        UiSoundKind.entries.forEach { kind ->
+            val setting = settings[kind]
+            put(kind.id, JSONObject().apply {
+                put("enabled", setting.enabled)
+                put("volume", setting.volume)
+                put("custom", setting.custom)
+                put("customName", setting.customName)
+                put("preset", setting.preset)
+            })
+        }
+    }
+
+    private fun importUiSounds(prefs: MutablePreferences, json: JSONObject?) {
+        UiSoundKind.entries.forEach { kind ->
+            val entry = json?.optJSONObject(kind.id)
+            prefs[uiSoundEnabledKey(kind)] = entry?.optBoolean("enabled", false) ?: false
+            prefs[uiSoundVolumeKey(kind)] = (entry?.optInt("volume", UiSoundSettings.DEFAULT_VOLUME)
+                ?: UiSoundSettings.DEFAULT_VOLUME)
+                .coerceIn(UiSoundSettings.MIN_VOLUME, UiSoundSettings.MAX_VOLUME)
+            val importedName = entry?.optString("customName")?.trim()?.takeIf(String::isNotEmpty)
+            if (importedName != null) prefs[uiSoundCustomNameKey(kind)] = importedName else prefs.remove(uiSoundCustomNameKey(kind))
+            // Backups made before presets existed have no "preset" field: fall back to the default.
+            prefs[uiSoundPresetKey(kind)] = UiSoundPresets.sanitizeId(kind, entry?.optString("preset", null))
+            val importedCustom = entry?.optBoolean("custom", importedName != null) ?: false
+            if (importedCustom) prefs[uiSoundCustomKey(kind)] = true else prefs.remove(uiSoundCustomKey(kind))
+            prefs[uiSoundRevisionKey(kind)] = (prefs[uiSoundRevisionKey(kind)] ?: 0) + 1
+        }
+    }
     suspend fun setAppFontScale(scale: Float) {
         context.dataStore.edit { it[APP_FONT_SCALE] = scale.coerceIn(MIN_APP_FONT_SCALE, MAX_APP_FONT_SCALE) }
     }
@@ -1872,6 +1980,7 @@ class AppPreferences(private val context: Context) {
                     .coerceIn(MIN_APP_FONT_SCALE, MAX_APP_FONT_SCALE),
                 customFontName = prefs[CUSTOM_FONT_NAME]?.takeIf(String::isNotBlank),
                 customFontRevision = (prefs[CUSTOM_FONT_REVISION] ?: 0).coerceAtLeast(0),
+                uiSounds = readUiSoundSettings(prefs),
                 homeGridScale = (prefs[HOME_GRID_SCALE] ?: DEFAULT_HOME_GRID_SCALE)
                     .coerceIn(MIN_HOME_GRID_SCALE, MAX_HOME_GRID_SCALE),
                 homeBackgroundType = HomeBackgroundType.fromPreference(prefs[HOME_BACKGROUND_TYPE]),
@@ -2166,20 +2275,22 @@ class AppPreferences(private val context: Context) {
                 gpuDriverType = prefs[GPU_DRIVER_TYPE] ?: 0,
                 mediatekAngleOpenGl = prefs[MEDIATEK_ANGLE_OPENGL] ?: false,
                 customDriverPath = prefs[CUSTOM_DRIVER_PATH],
-                dev9EthernetEnabled = prefs[DEV9_ETHERNET_ENABLED] ?: false,
-                dev9EthernetDevice = prefs[DEV9_ETHERNET_DEVICE]?.takeIf(String::isNotBlank) ?: "Auto",
-                dev9InterceptDhcp = prefs[DEV9_INTERCEPT_DHCP] ?: false,
-                dev9Dns1Mode = sanitizeDev9DnsMode(prefs[DEV9_DNS1_MODE]),
-                dev9Dns1 = sanitizeIpv4(prefs[DEV9_DNS1]),
-                dev9Dns2Mode = sanitizeDev9DnsMode(prefs[DEV9_DNS2_MODE]),
-                dev9Dns2 = sanitizeIpv4(prefs[DEV9_DNS2]),
-                dev9LogDhcp = prefs[DEV9_LOG_DHCP] ?: false,
-                dev9LogDns = prefs[DEV9_LOG_DNS] ?: false,
-                dev9LocalLinkMode = sanitizeLocalLinkMode(prefs[DEV9_LOCAL_LINK_MODE]),
-                dev9LocalLinkAddress = sanitizeIpv4(prefs[DEV9_LOCAL_LINK_ADDRESS], "192.168.43.1"),
-                dev9LocalLinkPort = (prefs[DEV9_LOCAL_LINK_PORT] ?: DEFAULT_LOCAL_LINK_PORT).coerceIn(1024, 65535),
-                dev9LocalLinkPeerId = (prefs[DEV9_LOCAL_LINK_PEER_ID] ?: defaultLocalLinkPeerId()).coerceIn(2, 65533),
-                dev9LocalLinkRoomCode = sanitizeLocalLinkRoomCode(prefs[DEV9_LOCAL_LINK_ROOM_CODE]),
+                dev9 = Dev9Settings(
+                    ethernetEnabled = prefs[DEV9_ETHERNET_ENABLED] ?: false,
+                    ethernetDevice = prefs[DEV9_ETHERNET_DEVICE]?.takeIf(String::isNotBlank) ?: "Auto",
+                    interceptDhcp = prefs[DEV9_INTERCEPT_DHCP] ?: false,
+                    dns1Mode = sanitizeDev9DnsMode(prefs[DEV9_DNS1_MODE]),
+                    dns1 = sanitizeIpv4(prefs[DEV9_DNS1]),
+                    dns2Mode = sanitizeDev9DnsMode(prefs[DEV9_DNS2_MODE]),
+                    dns2 = sanitizeIpv4(prefs[DEV9_DNS2]),
+                    logDhcp = prefs[DEV9_LOG_DHCP] ?: false,
+                    logDns = prefs[DEV9_LOG_DNS] ?: false,
+                    localLinkMode = sanitizeLocalLinkMode(prefs[DEV9_LOCAL_LINK_MODE]),
+                    localLinkAddress = sanitizeIpv4(prefs[DEV9_LOCAL_LINK_ADDRESS], "192.168.43.1"),
+                    localLinkPort = (prefs[DEV9_LOCAL_LINK_PORT] ?: DEFAULT_LOCAL_LINK_PORT).coerceIn(1024, 65535),
+                    localLinkPeerId = (prefs[DEV9_LOCAL_LINK_PEER_ID] ?: defaultLocalLinkPeerId()).coerceIn(2, 65533),
+                    localLinkRoomCode = sanitizeLocalLinkRoomCode(prefs[DEV9_LOCAL_LINK_ROOM_CODE])
+                ),
                 frameLimitEnabled = prefs[FRAME_LIMIT_ENABLED] ?: true,
                 vSyncEnabled = prefs[VSYNC_ENABLED] ?: false,
                 fastForwardSpeed = sanitizeFastForwardSpeed(prefs[FAST_FORWARD_SPEED]),
@@ -4647,6 +4758,7 @@ class AppPreferences(private val context: Context) {
             put("appFontChoice", prefs[APP_FONT_CHOICE] ?: AppFontChoice.SYSTEM.preferenceValue)
             put("appFontScale", (prefs[APP_FONT_SCALE] ?: DEFAULT_APP_FONT_SCALE).toDouble())
             put("customFontName", prefs[CUSTOM_FONT_NAME])
+            put("uiSounds", encodeUiSounds(readUiSoundSettings(prefs)))
             put("homeGridScale", (prefs[HOME_GRID_SCALE] ?: DEFAULT_HOME_GRID_SCALE).toDouble())
             put("homeBackgroundDim", prefs[HOME_BACKGROUND_DIM] ?: DEFAULT_HOME_BACKGROUND_DIM)
             put(
@@ -5067,6 +5179,7 @@ class AppPreferences(private val context: Context) {
             json.optString("customFontName").trim().takeIf(String::isNotEmpty)?.let {
                 prefs[CUSTOM_FONT_NAME] = it
             } ?: prefs.remove(CUSTOM_FONT_NAME)
+            importUiSounds(prefs, json.optJSONObject("uiSounds"))
             prefs[HOME_GRID_SCALE] = json.optDouble("homeGridScale", DEFAULT_HOME_GRID_SCALE.toDouble())
                 .toFloat().coerceIn(MIN_HOME_GRID_SCALE, MAX_HOME_GRID_SCALE)
             prefs[HOME_BACKGROUND_DIM] = json.optInt("homeBackgroundDim", DEFAULT_HOME_BACKGROUND_DIM)

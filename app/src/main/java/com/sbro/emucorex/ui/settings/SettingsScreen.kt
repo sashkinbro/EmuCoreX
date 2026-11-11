@@ -169,6 +169,7 @@ import com.sbro.emucorex.R
 import com.sbro.emucorex.core.AndroidGyroscopeInput
 import com.sbro.emucorex.core.AudioDefaults
 import com.sbro.emucorex.core.DocumentPathResolver
+import com.sbro.emucorex.core.UiSoundManager
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.GamepadManager
@@ -186,6 +187,9 @@ import com.sbro.emucorex.core.upscaleKeyToMultiplier
 import com.sbro.emucorex.core.upscaleMultiplierValue
 import com.sbro.emucorex.data.AppFontChoice
 import com.sbro.emucorex.data.AppPreferences
+import com.sbro.emucorex.data.UiSoundKind
+import com.sbro.emucorex.data.UiSoundPresets
+import com.sbro.emucorex.data.UiSoundSettings
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_SIMPLE
 import com.sbro.emucorex.data.CheatRepository
@@ -406,6 +410,15 @@ fun SettingsScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? -> uri?.let(viewModel::installCustomFont) }
 
+    var pendingSoundKindId by rememberSaveable { mutableStateOf<String?>(null) }
+    val customSoundPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        val kind = UiSoundKind.fromId(pendingSoundKindId)
+        pendingSoundKindId = null
+        if (uri != null && kind != null) viewModel.installUiSound(kind, uri)
+    }
+
     val shaderPackPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? -> uri?.let(viewModel::importShaderPack) }
@@ -598,6 +611,10 @@ fun SettingsScreen(
                             "application/octet-stream"
                         )
                     )
+                },
+                launchCustomSoundPicker = { kind ->
+                    pendingSoundKindId = kind.id
+                    customSoundPicker.launch(arrayOf("audio/*", "application/ogg"))
                 },
                 launchShaderPackPicker = {
                     shaderPackPicker.launch(arrayOf("application/zip", "application/octet-stream"))
@@ -1261,6 +1278,7 @@ private fun SettingsContent(
     launchHomeBackgroundPicker: () -> Unit,
     launchSideArtworkPicker: () -> Unit,
     launchCustomFontPicker: () -> Unit,
+    launchCustomSoundPicker: (UiSoundKind) -> Unit,
     launchShaderPackPicker: () -> Unit,
     onOpenCoverUrlEditor: () -> Unit,
     onOpenArcadeCoverUrlEditor: () -> Unit,
@@ -1525,6 +1543,7 @@ private fun SettingsContent(
                         onPickBackground = launchHomeBackgroundPicker,
                         onPickSideArtwork = launchSideArtworkPicker,
                         onPickCustomFont = launchCustomFontPicker,
+                        onPickCustomSound = launchCustomSoundPicker,
                         onOpenTouchControlCreator = onOpenTouchControlCreator,
                         viewModel = viewModel
                     )
@@ -3765,6 +3784,7 @@ private fun CustomizationSettingsTab(
     onPickBackground: () -> Unit,
     onPickSideArtwork: () -> Unit,
     onPickCustomFont: () -> Unit,
+    onPickCustomSound: (UiSoundKind) -> Unit,
     onOpenTouchControlCreator: (() -> Unit)?,
     viewModel: SettingsViewModel
 ) {
@@ -4371,6 +4391,38 @@ private fun CustomizationSettingsTab(
         )
     }
 
+    UiSoundSettingsSection(
+        kind = UiSoundKind.BACKGROUND_MUSIC,
+        icon = Icons.Rounded.GraphicEq,
+        sectionTitle = stringResource(R.string.settings_customization_music_section),
+        enableSubtitle = stringResource(R.string.settings_customization_music_desc),
+        helpText = stringResource(R.string.settings_customization_music_help),
+        uiState = uiState,
+        viewModel = viewModel,
+        onPickSound = onPickCustomSound
+    )
+
+    UiSoundSettingsSection(
+        kind = UiSoundKind.BUTTON_CLICK,
+        icon = Icons.Rounded.TouchApp,
+        sectionTitle = stringResource(R.string.settings_customization_click_sound_section),
+        enableSubtitle = stringResource(R.string.settings_customization_click_sound_desc),
+        helpText = stringResource(R.string.settings_customization_click_sound_help),
+        uiState = uiState,
+        viewModel = viewModel,
+        onPickSound = onPickCustomSound
+    )
+
+    UiSoundSettingsSection(
+        kind = UiSoundKind.GAME_MENU,
+        icon = Icons.Rounded.Gamepad,
+        sectionTitle = stringResource(R.string.settings_customization_menu_sound_section),
+        enableSubtitle = stringResource(R.string.settings_customization_menu_sound_desc),
+        helpText = stringResource(R.string.settings_customization_menu_sound_help),
+        uiState = uiState,
+        viewModel = viewModel,
+        onPickSound = onPickCustomSound
+    )
     SettingsSection(title = stringResource(R.string.settings_customization_reset_section)) {
         SettingsItem(
             icon = Icons.Rounded.Restore,
@@ -4381,6 +4433,75 @@ private fun CustomizationSettingsTab(
     }
 }
 
+@Composable
+private fun UiSoundSettingsSection(
+    kind: UiSoundKind,
+    icon: ImageVector,
+    sectionTitle: String,
+    enableSubtitle: String,
+    helpText: String,
+    uiState: SettingsUiState,
+    viewModel: SettingsViewModel,
+    onPickSound: (UiSoundKind) -> Unit
+) {
+    val setting = uiState.uiSounds[kind]
+    SettingsSection(title = sectionTitle) {
+        ToggleItem(
+            icon = icon,
+            title = sectionTitle,
+            subtitle = enableSubtitle,
+            checked = setting.enabled,
+            onCheckedChange = { viewModel.setUiSoundEnabled(kind, it) },
+            helpText = helpText,
+            onResetToDefault = { viewModel.setUiSoundEnabled(kind, false) }
+        )
+        val presets = UiSoundPresets.forKind(kind)
+        val customIndex = presets.size
+        ChoiceSection(
+            title = stringResource(R.string.settings_customization_sound_file),
+            options = presets.mapIndexed { index, preset -> index to stringResource(preset.labelRes) } +
+                (customIndex to stringResource(R.string.ui_sound_preset_custom)),
+            selectedValue = if (setting.usesCustom) {
+                customIndex
+            } else {
+                presets.indexOfFirst { it.id == setting.preset }.coerceAtLeast(0)
+            },
+            onSelect = { index ->
+                if (index >= customIndex) {
+                    onPickSound(kind)
+                } else {
+                    val preset = presets[index]
+                    viewModel.selectUiSoundPreset(kind, preset.id)
+                    UiSoundManager.previewPreset(kind, preset.id, setting.volume)
+                }
+            },
+            helpText = stringResource(R.string.settings_customization_sound_file_help),
+            onResetToDefault = { viewModel.selectUiSoundPreset(kind, UiSoundPresets.DEFAULT_ID) }
+        )
+        if (setting.usesCustom) {
+            SettingsItem(
+                icon = Icons.Rounded.FolderOpen,
+                label = stringResource(R.string.ui_sound_preset_custom),
+                value = setting.customName ?: stringResource(R.string.settings_customization_sound_custom_unnamed),
+                onClick = { onPickSound(kind) }
+            )
+        }
+        SliderItem(
+            icon = Icons.AutoMirrored.Rounded.VolumeUp,
+            title = stringResource(R.string.settings_customization_sound_volume),
+            subtitle = "",
+            value = setting.volume.toFloat(),
+            range = UiSoundSettings.MIN_VOLUME.toFloat()..UiSoundSettings.MAX_VOLUME.toFloat(),
+            steps = 19,
+            onValueChange = { viewModel.setUiSoundVolume(kind, it.roundToInt()) },
+            onValueChangeFinished = { UiSoundManager.preview(kind, it.roundToInt()) },
+            valueLabel = { "${it.roundToInt()}%" },
+            onResetToDefault = {
+                viewModel.setUiSoundVolume(kind, UiSoundSettings.DEFAULT_VOLUME)
+            }
+        )
+    }
+}
 @Composable
 private fun GameMenuSettingsTab(
     uiState: SettingsUiState,
@@ -5739,6 +5860,9 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Customization, R.string.settings_customization_grid_size),
         entry(SettingsTab.Customization, R.string.settings_customization_font),
         entry(SettingsTab.Customization, R.string.settings_customization_font_size),
+        entry(SettingsTab.Customization, R.string.settings_customization_music_section),
+        entry(SettingsTab.Customization, R.string.settings_customization_click_sound_section),
+        entry(SettingsTab.Customization, R.string.settings_customization_menu_sound_section),
         entry(SettingsTab.Customization, R.string.settings_customization_touch_controls_style),
         entry(SettingsTab.Customization, R.string.settings_customization_drawer_style),
         entry(SettingsTab.Customization, R.string.settings_customization_touch_press_effect),
@@ -6056,7 +6180,10 @@ internal fun ToggleItem(
                 interactionSource = interactionSource,
                 indication = null,
                 enabled = enabled,
-                onClick = { onCheckedChange(!checked) },
+                onClick = {
+                    UiSoundManager.onUiInteraction()
+                    onCheckedChange(!checked)
+                },
                 onLongClick = onResetToDefault?.let {
                     {
                         it()

@@ -55,6 +55,11 @@ import com.sbro.emucorex.data.CustomGameCoverRepository
 import com.sbro.emucorex.data.CoverArtRepository
 import com.sbro.emucorex.data.CoverCacheClearResult
 import com.sbro.emucorex.data.CustomFontRepository
+import com.sbro.emucorex.data.Dev9Settings
+import com.sbro.emucorex.data.GamepadStickTuning
+import com.sbro.emucorex.data.UiSoundKind
+import com.sbro.emucorex.data.UiSoundRepository
+import com.sbro.emucorex.data.UiSoundSettings
 import com.sbro.emucorex.data.CustomThemeConfig
 import com.sbro.emucorex.data.CustomThemeLibrary
 import com.sbro.emucorex.data.CustomTouchControlLibrary
@@ -105,6 +110,7 @@ data class SettingsUiState(
     val appFontScale: Float = AppPreferences.DEFAULT_APP_FONT_SCALE,
     val customFontName: String? = null,
     val customFontRevision: Int = 0,
+    val uiSounds: UiSoundSettings = UiSoundSettings(),
     val homeGridScale: Float = AppPreferences.DEFAULT_HOME_GRID_SCALE,
     val homeBackgroundType: HomeBackgroundType = HomeBackgroundType.NONE,
     val homeBackgroundPreset: HomeBackgroundPreset = HomeBackgroundPreset.OLYMPUS,
@@ -299,15 +305,7 @@ data class SettingsUiState(
     val enableAutoGamepad: Boolean = true,
     val preferExternalGamepadPlayerOne: Boolean = AppPreferences.DEFAULT_PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE,
     val hideOverlayOnGamepad: Boolean = true,
-    val gamepadStickDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_DEADZONE,
-    val gamepadLeftStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
-    val gamepadRightStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
-    val gamepadLeftStickNegativeDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE,
-    val gamepadRightStickNegativeDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE,
-    val gamepadLeftStickAntiDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE,
-    val gamepadRightStickAntiDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE,
-    val gamepadLeftStickCurve: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_CURVE,
-    val gamepadRightStickCurve: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_CURVE,
+    val gamepadSticks: GamepadStickTuning = GamepadStickTuning(),
     val gamepadRightStickUpToR2: Boolean = false,
     val gamepadRightStickDownToL2: Boolean = false,
     val gamepadButtonHaptics: Boolean = false,
@@ -317,20 +315,7 @@ data class SettingsUiState(
     val gpuDriverType: Int = 0,
     val mediatekAngleOpenGl: Boolean = false,
     val customDriverPath: String? = null,
-    val dev9EthernetEnabled: Boolean = false,
-    val dev9EthernetDevice: String = "Auto",
-    val dev9InterceptDhcp: Boolean = false,
-    val dev9Dns1Mode: String = AppPreferences.DEV9_DNS_MODE_AUTO,
-    val dev9Dns1: String = "0.0.0.0",
-    val dev9Dns2Mode: String = AppPreferences.DEV9_DNS_MODE_AUTO,
-    val dev9Dns2: String = "0.0.0.0",
-    val dev9LogDhcp: Boolean = false,
-    val dev9LogDns: Boolean = false,
-    val dev9LocalLinkMode: Int = AppPreferences.DEV9_LOCAL_LINK_OFF,
-    val dev9LocalLinkAddress: String = "192.168.43.1",
-    val dev9LocalLinkPort: Int = AppPreferences.DEFAULT_LOCAL_LINK_PORT,
-    val dev9LocalLinkPeerId: Int = 2,
-    val dev9LocalLinkRoomCode: String = "",
+    val dev9: Dev9Settings = Dev9Settings(),
     val installedGpuDrivers: List<InstalledGpuDriver> = emptyList(),
     val remoteGpuDrivers: List<RemoteGpuDriver> = emptyList(),
     val gpuDriverCatalogLoading: Boolean = false,
@@ -362,6 +347,29 @@ data class SettingsUiState(
     val gyroStickTarget: Int get() = gyro.stickTarget
     val lightGunAim: Int get() = gyro.lightGunAim
     val lightGunCursorEnabled: Boolean get() = gyro.lightGunCursorEnabled
+    val gamepadStickDeadzone: Int get() = gamepadSticks.stickDeadzone
+    val gamepadLeftStickSensitivity: Int get() = gamepadSticks.leftStickSensitivity
+    val gamepadRightStickSensitivity: Int get() = gamepadSticks.rightStickSensitivity
+    val gamepadLeftStickNegativeDeadzone: Int get() = gamepadSticks.leftStickNegativeDeadzone
+    val gamepadRightStickNegativeDeadzone: Int get() = gamepadSticks.rightStickNegativeDeadzone
+    val gamepadLeftStickAntiDeadzone: Int get() = gamepadSticks.leftStickAntiDeadzone
+    val gamepadRightStickAntiDeadzone: Int get() = gamepadSticks.rightStickAntiDeadzone
+    val gamepadLeftStickCurve: Int get() = gamepadSticks.leftStickCurve
+    val gamepadRightStickCurve: Int get() = gamepadSticks.rightStickCurve
+    val dev9EthernetEnabled: Boolean get() = dev9.ethernetEnabled
+    val dev9EthernetDevice: String get() = dev9.ethernetDevice
+    val dev9InterceptDhcp: Boolean get() = dev9.interceptDhcp
+    val dev9Dns1Mode: String get() = dev9.dns1Mode
+    val dev9Dns1: String get() = dev9.dns1
+    val dev9Dns2Mode: String get() = dev9.dns2Mode
+    val dev9Dns2: String get() = dev9.dns2
+    val dev9LogDhcp: Boolean get() = dev9.logDhcp
+    val dev9LogDns: Boolean get() = dev9.logDns
+    val dev9LocalLinkMode: Int get() = dev9.localLinkMode
+    val dev9LocalLinkAddress: String get() = dev9.localLinkAddress
+    val dev9LocalLinkPort: Int get() = dev9.localLinkPort
+    val dev9LocalLinkPeerId: Int get() = dev9.localLinkPeerId
+    val dev9LocalLinkRoomCode: String get() = dev9.localLinkRoomCode
 }
 
 data class AppUpdateUiState(
@@ -374,6 +382,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private val preferences = AppPreferences(application)
     private val customFontRepository = CustomFontRepository(application)
+    private val uiSoundRepository = UiSoundRepository(application)
     private val homeBackgroundRepository = HomeBackgroundRepository(application)
     private val emulationSideArtworkRepository = EmulationSideArtworkRepository(application)
     private val retroArchShaderRepository = RetroArchShaderRepository(application)
@@ -454,6 +463,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             appFontScale = snapshot.appFontScale,
             customFontName = snapshot.customFontName,
             customFontRevision = snapshot.customFontRevision,
+            uiSounds = snapshot.uiSounds,
             homeGridScale = snapshot.homeGridScale,
             homeBackgroundType = snapshot.homeBackgroundType,
             homeBackgroundPreset = snapshot.homeBackgroundPreset,
@@ -633,15 +643,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             enableAutoGamepad = snapshot.enableAutoGamepad,
             preferExternalGamepadPlayerOne = snapshot.preferExternalGamepadPlayerOne,
             hideOverlayOnGamepad = snapshot.hideOverlayOnGamepad,
-            gamepadStickDeadzone = snapshot.gamepadStickDeadzone,
-            gamepadLeftStickSensitivity = snapshot.gamepadLeftStickSensitivity,
-            gamepadRightStickSensitivity = snapshot.gamepadRightStickSensitivity,
-            gamepadLeftStickNegativeDeadzone = snapshot.gamepadLeftStickNegativeDeadzone,
-            gamepadRightStickNegativeDeadzone = snapshot.gamepadRightStickNegativeDeadzone,
-            gamepadLeftStickAntiDeadzone = snapshot.gamepadLeftStickAntiDeadzone,
-            gamepadRightStickAntiDeadzone = snapshot.gamepadRightStickAntiDeadzone,
-            gamepadLeftStickCurve = snapshot.gamepadLeftStickCurve,
-            gamepadRightStickCurve = snapshot.gamepadRightStickCurve,
+            gamepadSticks = GamepadStickTuning(
+                stickDeadzone = snapshot.gamepadStickDeadzone,
+                leftStickSensitivity = snapshot.gamepadLeftStickSensitivity,
+                rightStickSensitivity = snapshot.gamepadRightStickSensitivity,
+                leftStickNegativeDeadzone = snapshot.gamepadLeftStickNegativeDeadzone,
+                rightStickNegativeDeadzone = snapshot.gamepadRightStickNegativeDeadzone,
+                leftStickAntiDeadzone = snapshot.gamepadLeftStickAntiDeadzone,
+                rightStickAntiDeadzone = snapshot.gamepadRightStickAntiDeadzone,
+                leftStickCurve = snapshot.gamepadLeftStickCurve,
+                rightStickCurve = snapshot.gamepadRightStickCurve
+            ),
             gamepadRightStickUpToR2 = snapshot.gamepadRightStickUpToR2,
             gamepadRightStickDownToL2 = snapshot.gamepadRightStickDownToL2,
             gamepadButtonHaptics = snapshot.gamepadButtonHaptics,
@@ -651,20 +663,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             gpuDriverType = snapshot.gpuDriverType,
             mediatekAngleOpenGl = snapshot.mediatekAngleOpenGl,
             customDriverPath = snapshot.customDriverPath,
-            dev9EthernetEnabled = snapshot.dev9EthernetEnabled,
-            dev9EthernetDevice = snapshot.dev9EthernetDevice,
-            dev9InterceptDhcp = snapshot.dev9InterceptDhcp,
-            dev9Dns1Mode = snapshot.dev9Dns1Mode,
-            dev9Dns1 = snapshot.dev9Dns1,
-            dev9Dns2Mode = snapshot.dev9Dns2Mode,
-            dev9Dns2 = snapshot.dev9Dns2,
-            dev9LogDhcp = snapshot.dev9LogDhcp,
-            dev9LogDns = snapshot.dev9LogDns,
-            dev9LocalLinkMode = snapshot.dev9LocalLinkMode,
-            dev9LocalLinkAddress = snapshot.dev9LocalLinkAddress,
-            dev9LocalLinkPort = snapshot.dev9LocalLinkPort,
-            dev9LocalLinkPeerId = snapshot.dev9LocalLinkPeerId,
-            dev9LocalLinkRoomCode = snapshot.dev9LocalLinkRoomCode,
+            dev9 = snapshot.dev9,
             frameLimitEnabled = snapshot.frameLimitEnabled,
             vSyncEnabled = snapshot.vSyncEnabled,
             fastForwardSpeed = snapshot.fastForwardSpeed,
@@ -770,6 +769,43 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         preferences.clearCustomFont()
         _uiState.update { it.copy(
             customizationMessageResId = com.sbro.emucorex.R.string.settings_customization_custom_font_removed
+        ) }
+    }
+
+    fun setUiSoundEnabled(kind: UiSoundKind, enabled: Boolean) = viewModelScope.launch {
+        preferences.setUiSoundEnabled(kind, enabled)
+    }
+
+    fun setUiSoundVolume(kind: UiSoundKind, volume: Int) = viewModelScope.launch {
+        preferences.setUiSoundVolume(kind, volume)
+    }
+
+    fun selectUiSoundPreset(kind: UiSoundKind, presetId: String) = viewModelScope.launch(Dispatchers.IO) {
+        // A built-in preset replaces any imported file, so the private copy is deleted.
+        preferences.setUiSoundPreset(kind, presetId)
+        uiSoundRepository.clear(kind)
+    }
+
+    fun installUiSound(kind: UiSoundKind, uri: Uri) = viewModelScope.launch {
+        _uiState.update { it.copy(customizationMessageResId = null) }
+        val result = uiSoundRepository.install(kind, uri)
+        result.getOrNull()?.let { installed ->
+            preferences.setUiSoundCustomInstalled(kind, installed.displayName)
+        }
+        _uiState.update { it.copy(
+            customizationMessageResId = if (result.isSuccess) {
+                com.sbro.emucorex.R.string.settings_customization_sound_applied
+            } else {
+                com.sbro.emucorex.R.string.settings_customization_sound_failed
+            }
+        ) }
+    }
+
+    fun clearUiSoundCustom(kind: UiSoundKind) = viewModelScope.launch(Dispatchers.IO) {
+        uiSoundRepository.clear(kind)
+        preferences.clearUiSoundCustom(kind)
+        _uiState.update { it.copy(
+            customizationMessageResId = com.sbro.emucorex.R.string.settings_customization_sound_removed
         ) }
     }
 
@@ -1045,6 +1081,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         homeBackgroundRepository.clear()
         emulationSideArtworkRepository.clear()
         customFontRepository.clear()
+        uiSoundRepository.clearAll()
+        preferences.resetUiSounds()
         preferences.setHomeBackgroundType(HomeBackgroundType.NONE)
         preferences.setHomeBackgroundDim(AppPreferences.DEFAULT_HOME_BACKGROUND_DIM)
         preferences.setEmulationSideArtwork(EmulationSideArtwork.NONE)
