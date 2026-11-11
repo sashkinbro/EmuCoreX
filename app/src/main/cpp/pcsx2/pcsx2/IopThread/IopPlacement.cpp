@@ -137,7 +137,11 @@ IopThread::HostCpuInfo IopThread::MakeHostInfo(bool is_arm64, u32 total_cores, u
 bool IopThread::HasIopThreadCores(const HostCpuInfo& host, bool mtvu)
 {
 	const u32 workers = 3 + (mtvu ? 1 : 0);
-	return host.performance_cores >= workers && host.total_cores >= workers + 2;
+	// One performance core stays free for the GPU driver / GS back thread. On a 4+4 SoC (Unisoc T820, MTVU on) the IOP
+	// thread shared the four big cores with EE/GS/MTVU and the Mali driver, and its 500 us WFE idle watch counts as
+	// runnable load; keeping IOP on the EE thread there measured NFS MW 33.9 -> 42.3 FPS, GoW2 neutral. Matches
+	// PlanTier's back_thread_fits (tier >= threads_to_place + 1).
+	return host.performance_cores >= workers + 1 && host.total_cores >= workers + 2;
 }
 
 IopThread::TierPlan IopThread::PlanTier(u64 performance_mask, bool mtvu, bool iop_thread)

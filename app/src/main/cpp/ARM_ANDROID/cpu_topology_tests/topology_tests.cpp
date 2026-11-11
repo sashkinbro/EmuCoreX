@@ -57,7 +57,7 @@ int main()
 
     auto flagship = Cores({300, 300, 300, 300, 800, 800, 800, 1024});
     Check(PerformanceMask(flagship) == 0xf0, "unidentified 1+3+4 topology still excludes the little cluster");
-    Check(IopAllowed(flagship), "four performance cores leave room for threaded IOP");
+    Check(!IopAllowed(flagship) && IopAllowed(flagship, false), "four performance cores leave no spare for the GPU driver with MTVU");
     for (u32 i = 0; i < flagship.size(); ++i)
     {
         flagship[i].microarchitecture = i < 4 ? cpuinfo_uarch_cortex_a520 : cpuinfo_uarch_cortex_a720;
@@ -68,7 +68,7 @@ int main()
     Check(PerformanceMask(flagship) == 0xf0, "a high-rated A520 is never promoted to a big core");
 
     auto rg556 = Cores({336, 336, 336, 336, 869, 869, 869, 1024});
-    Check(PerformanceMask(rg556) == 0xf0 && IopAllowed(rg556), "RG556 retains its four-core performance tier");
+    Check(PerformanceMask(rg556) == 0xf0 && !IopAllowed(rg556), "RG556 keeps its four-core tier but rejects IOP with MTVU");
     auto tablet = Cores({379, 867, 867, 867, 867, 1024});
     Check(PerformanceMask(tablet) == 0x3e && IopAllowed(tablet), "six-core tablet retains its five-core performance tier");
 
@@ -89,7 +89,7 @@ int main()
     Check(PerformanceMask(missing) == 0 && !IopAllowed(missing), "completely unknown topology fails closed");
     for (u32 i = 0; i < missing.size(); ++i)
         missing[i].frequency_hz = i < 4 ? 1800000000ull : 2800000000ull;
-    Check(PerformanceMask(missing) == 0xf0 && IopAllowed(missing), "complete maximum-frequency data is a fallback");
+    Check(PerformanceMask(missing) == 0xf0 && !IopAllowed(missing), "complete maximum-frequency data is a fallback (four big cores reject IOP with MTVU)");
     missing[0].capacity = 1024;
     Check(PerformanceMask(missing) == 0xf0, "partial capacities are never mixed with frequency units");
     missing[0].frequency_hz = 0;
@@ -105,7 +105,10 @@ int main()
     Check(PerformanceMask(sparse) == 0x222, "out-of-range IDs and SMT siblings cannot distort the threshold");
     Check(PerformanceMask({}) == 0, "empty topology has no performance mask");
     Check(!HasIopThreadCores(MakeHostInfo(true, 8, 0x07), true), "three performance cores reject IOP with MTVU");
-    Check(HasIopThreadCores(MakeHostInfo(true, 8, 0x07), false), "three performance cores allow IOP without MTVU");
+    Check(!HasIopThreadCores(MakeHostInfo(true, 8, 0x07), false), "three performance cores reject IOP without MTVU");
+    Check(!HasIopThreadCores(MakeHostInfo(true, 8, 0x0f), true), "4 perf cores with MTVU reject IOP");
+    Check(HasIopThreadCores(MakeHostInfo(true, 8, 0x0f), false), "4 perf cores without MTVU allow IOP");
+    Check(HasIopThreadCores(MakeHostInfo(true, 8, 0x1f), true), "5 perf cores with MTVU allow IOP (Tensor G3 style)");
     Check(!HasIopThreadCores(MakeHostInfo(true, 5, 0x1f), true), "five total cores reject four workers plus two spare cores");
     Check(HasIopThreadCores(MakeHostInfo(true, 5, 0x1f), false), "five total cores can support three workers plus two spare cores");
 

@@ -46,7 +46,8 @@ namespace IopThread
 	/// What ResolveMode needs to know about a host, from the topology: the performance-core count is
 	/// the number of processors in the mask.
 	HostCpuInfo MakeHostInfo(bool is_arm64, u32 total_cores, u64 performance_mask);
-	/// One core per emulation worker, plus two for the OS/audio/GS back thread.
+	/// One performance core per emulation worker plus one spare performance core for the GPU driver / GS back thread,
+	/// and two spare cores overall for the OS/audio.
 	bool HasIopThreadCores(const HostCpuInfo& host, bool mtvu);
 
 	/// The processor numbers in the order pinned threads take them: fastest first, one entry per core (the second hardware
