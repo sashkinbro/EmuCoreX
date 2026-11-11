@@ -228,11 +228,55 @@ static u32 s_pass_timing_barriers = 0;
 #define EMUCOREX_PASS_TIMING_BARRIER() do { if (s_pass_timing_active) s_pass_timing_barriers++; } while (0)
 #define EMUCOREX_PASS_TIMING_BEGIN(...) do { if (s_pass_timing) PassTimingBegin(__VA_ARGS__); } while (0)
 #define EMUCOREX_PASS_TIMING_END(...) do { if (s_pass_timing) PassTimingEnd(__VA_ARGS__); } while (0)
+// Render passes begun, by reason (logged per 60 frames as GS_PASS_REASONS, totals in GS_PASS_TIME_TOTAL).
+// A call site labels the next Begin*RenderPass with EMUCOREX_PASS_REASON; unlabeled begins count as copy/utility.
+enum class PassReason : u32
+{
+	Copy = 0, MainDraw, MainClear, DateSetup, PrimidSetup, ColclipResolve, StencilCounter, CmdBufRestart, Present, Count
+};
+static constexpr const char* const s_pass_reason_names[] = {"copy", "main", "main_clear", "date_setup", "primid_setup",
+	"colclip_resolve", "stencil_counter", "cmdbuf_restart", "present"};
+static PassReason s_pass_reason = PassReason::Copy;
+static u64 s_pass_frame_counts[static_cast<u32>(PassReason::Count)] = {};
+static u64 s_pass_total_counts[static_cast<u32>(PassReason::Count)] = {};
+static void PassReasonCount(PassReason r)
+{
+	s_pass_frame_counts[static_cast<u32>(r)]++;
+	s_pass_reason = PassReason::Copy;
+}
+static void PassReasonLine(const char* tag, u64 frame, const u64* counts, u64 div)
+{
+	u64 total = 0;
+	std::string s;
+	for (u32 i = 0; i < static_cast<u32>(PassReason::Count); i++)
+	{
+		total += counts[i];
+		s += std::string(" ") + s_pass_reason_names[i] + "=" + std::to_string(counts[i] / div);
+	}
+	std::fprintf(stderr, "GS_PASS_REASONS %s frame=%llu total=%llu%s\n", tag, static_cast<unsigned long long>(frame),
+		static_cast<unsigned long long>(total / div), s.c_str());
+}
+static void PassReasonFrameEnd(u64 frame)
+{
+	if (frame % 60 == 0)
+		PassReasonLine("frame", frame, s_pass_frame_counts, 1);
+	for (u32 i = 0; i < static_cast<u32>(PassReason::Count); i++)
+	{
+		s_pass_total_counts[i] += s_pass_frame_counts[i];
+		s_pass_frame_counts[i] = 0;
+	}
+}
+#define EMUCOREX_PASS_REASON(r) do { if (s_pass_timing) s_pass_reason = (r); } while (0)
+#define EMUCOREX_PASS_COUNT() do { if (s_pass_timing) PassReasonCount(s_pass_reason); } while (0)
+#define EMUCOREX_PASS_COUNT_AS(r) do { if (s_pass_timing) PassReasonCount(r); } while (0)
 #else
 #define EMUCOREX_PASS_TIMING_DRAW() do { } while (0)
 #define EMUCOREX_PASS_TIMING_BARRIER() do { } while (0)
 #define EMUCOREX_PASS_TIMING_BEGIN(...) do { } while (0)
 #define EMUCOREX_PASS_TIMING_END(...) do { } while (0)
+#define EMUCOREX_PASS_REASON(r) do { } while (0)
+#define EMUCOREX_PASS_COUNT() do { } while (0)
+#define EMUCOREX_PASS_COUNT_AS(r) do { } while (0)
 #endif
 
 // Surface support requires swapchain separately. The shaders use gl_VertexIndex
@@ -3310,6 +3354,7 @@ GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
 		fb,
 		{{0, 0}, {static_cast<u32>(swap_chain_texture->GetWidth()), static_cast<u32>(swap_chain_texture->GetHeight())}},
 		1u, &s_present_clear_color};
+	EMUCOREX_PASS_COUNT_AS(PassReason::Present);
 	EMUCOREX_PASS_TIMING_BEGIN(GetCurrentCommandBuffer(), rp.renderPass,
 		GSVector4i(0, 0, swap_chain_texture->GetWidth(), swap_chain_texture->GetHeight()),
 		static_cast<u32>(swap_chain_texture->GetWidth()), static_cast<u32>(swap_chain_texture->GetHeight()));
@@ -9109,6 +9154,7 @@ void GSDeviceVK::ExecuteCommandBufferAndRestartRenderPass(bool wait_for_completi
 		OMSetRenderTargets(current_rt, current_ds, scissor, current_feedback_loop);
 
 		// restart render pass
+		EMUCOREX_PASS_REASON(PassReason::CmdBufRestart);
 		BeginRenderPass(GetRenderPassForRestarting(render_pass), render_pass_area);
 	}
 
@@ -9159,6 +9205,7 @@ void GSDeviceVK::ExecuteCommandBufferAndRestartPresent(bool wait_for_completion,
 		fb,
 		{{0, 0}, {static_cast<u32>(swap_chain_texture->GetWidth()), static_cast<u32>(swap_chain_texture->GetHeight())}},
 		0u, nullptr};
+	EMUCOREX_PASS_COUNT_AS(PassReason::Present);
 	EMUCOREX_PASS_TIMING_BEGIN(GetCurrentCommandBuffer(), rp.renderPass,
 		GSVector4i(0, 0, swap_chain_texture->GetWidth(), swap_chain_texture->GetHeight()),
 		static_cast<u32>(swap_chain_texture->GetWidth()), static_cast<u32>(swap_chain_texture->GetHeight()));
@@ -9471,6 +9518,7 @@ void GSDeviceVK::BeginRenderPass(VkRenderPass rp, const GSVector4i& rect)
 		nullptr};
 
 	m_command_buffer_render_passes++;
+	EMUCOREX_PASS_COUNT();
 	EMUCOREX_PASS_TIMING_BEGIN(GetCurrentCommandBuffer(), rp, rect);
 	vkCmdBeginRenderPass(GetCurrentCommandBuffer(), &begin_info, VK_SUBPASS_CONTENTS_INLINE);
 }
@@ -9488,6 +9536,7 @@ void GSDeviceVK::BeginClearRenderPass(VkRenderPass rp, const GSVector4i& rect, c
 		m_current_framebuffer, {{rect.x, rect.y}, {static_cast<u32>(rect.width()), static_cast<u32>(rect.height())}},
 		cv_count, cv};
 
+	EMUCOREX_PASS_COUNT();
 	EMUCOREX_PASS_TIMING_BEGIN(GetCurrentCommandBuffer(), rp, rect);
 	vkCmdBeginRenderPass(GetCurrentCommandBuffer(), &begin_info, VK_SUBPASS_CONTENTS_INLINE);
 }
@@ -9698,7 +9747,10 @@ void GSDeviceVK::PassTimingBegin(VkCommandBuffer cmdbuf, VkRenderPass rp, const 
 void GSDeviceVK::PassTimingEnd(VkCommandBuffer cmdbuf, uintptr_t caller, bool present)
 {
 	if (present)
+	{
 		s_pt.frames++;
+	PassReasonFrameEnd(s_pt.frames);
+	}
 	if (!s_pass_timing_active)
 		return;
 	s_pass_timing_active = false;
@@ -9815,6 +9867,8 @@ void GSDeviceVK::PassTimingDump()
 	}
 	if (s_pt.overflow)
 		std::fprintf(stderr, "GS_PASS_TIME_SKIPPED overflow_passes=%llu\n", static_cast<unsigned long long>(s_pt.overflow));
+	if (s_pt.frames)
+		PassReasonLine("avg_per_frame", s_pt.frames, s_pass_total_counts, s_pt.frames);
 	if (s_pt.passes || s_pt.frames)
 		std::fprintf(stderr, "GS_PASS_TIME_TOTAL frames=%llu passes=%llu gpu_us=%llu\n", static_cast<unsigned long long>(s_pt.frames),
 			static_cast<unsigned long long>(s_pt.passes), static_cast<unsigned long long>(s_pt.total_us));
@@ -10299,6 +10353,7 @@ bool GSDeviceVK::DrawStencilCounter(GSHWDrawConfig& config)
 		ds->GetVkFormat(), writes_alpha ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 		writes_alpha ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE, ds_load,
 		VK_ATTACHMENT_STORE_OP_STORE, ds_load, VK_ATTACHMENT_STORE_OP_STORE);
+	EMUCOREX_PASS_REASON(PassReason::StencilCounter);
 	BeginRenderPass(count_rp, area);
 	{
 		const VkClearAttachment ca = {VK_IMAGE_ASPECT_STENCIL_BIT, 0u, {.depthStencil = {0.0f, 0u}}};
@@ -10323,6 +10378,7 @@ bool GSDeviceVK::DrawStencilCounter(GSHWDrawConfig& config)
 	ds->SetUseFenceCounter(GetCurrentFenceCounter());
 	cd->SetUseFenceCounter(GetCurrentFenceCounter());
 	OMSetRenderTargets(rt, nullptr, area);
+	EMUCOREX_PASS_REASON(PassReason::StencilCounter);
 	BeginRenderPass(m_utility_color_render_pass_load, area);
 
 	VkCommandBuffer cmdbuf = GetCurrentCommandBuffer();
@@ -10401,6 +10457,7 @@ void GSDeviceVK::SetupDATE(GSTexture* rt, GSTexture* ds, SetDATM datm, const GSV
 	OMSetRenderTargets(nullptr, ds, bbox);
 	IASetVertexBuffer(vertices, sizeof(vertices[0]), 4);
 	SetPipeline(GetConvertPipeline(SetDATMShader(datm)));
+	EMUCOREX_PASS_REASON(PassReason::DateSetup);
 	BeginClearRenderPass(m_date_setup_render_pass, bbox, 0.0f, 0);
 	if (ApplyUtilityState())
 		DrawPrimitive();
@@ -10437,6 +10494,7 @@ GSTextureVK* GSDeviceVK::SetupPrimitiveTrackingDATE(GSHWDrawConfig& config)
 	const VkAttachmentLoadOp ds_load_op = GetLoadOpForTexture(static_cast<GSTextureVK*>(config.ds));
 	const u32 ds = (config.ds ? 1 : 0);
 
+	EMUCOREX_PASS_REASON(PassReason::PrimidSetup);
 	if (ds_load_op == VK_ATTACHMENT_LOAD_OP_CLEAR)
 	{
 		VkClearValue cv[2] = {};
@@ -10690,6 +10748,7 @@ void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 			OMSetRenderTargets(draw_rt, draw_ds, GSVector4i::loadh(draw_size), static_cast<FeedbackLoopFlag>(pipe.feedback_loop_flags), draw_size);
 
 			// if this target was cleared and never drawn to, perform the clear as part of the resolve here.
+			EMUCOREX_PASS_REASON(PassReason::ColclipResolve);
 			if (draw_rt->GetState() == GSTexture::State::Cleared)
 			{
 				alignas(16) VkClearValue cvs[2];
@@ -10974,6 +11033,7 @@ void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 		                             ? to_draw_size(config.drawarea)
 		                             : GSVector4i::loadh(draw_size);
 
+		EMUCOREX_PASS_REASON(is_clearing_rt ? PassReason::MainClear : PassReason::MainDraw);
 		if (is_clearing_rt)
 		{
 			// when we're clearing, we set the draw area to the whole fb, otherwise part of it will be undefined
@@ -11134,6 +11194,7 @@ void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 			OMSetRenderTargets(draw_rt, draw_ds, (config.colclip_mode == GSHWDrawConfig::ColClipMode::ResolveOnly) ? GSVector4i::loadh(rtsize) : config.scissor, static_cast<FeedbackLoopFlag>(pipe.feedback_loop_flags));
 
 			// if this target was cleared and never drawn to, perform the clear as part of the resolve here.
+			EMUCOREX_PASS_REASON(PassReason::ColclipResolve);
 			if (draw_rt->GetState() == GSTexture::State::Cleared)
 			{
 				alignas(16) VkClearValue cvs[2];
