@@ -332,9 +332,13 @@ void main(){vec2 p=vec2((gl_VertexIndex<<1)&2,gl_VertexIndex&2);gl_Position=vec4
             PipelineSelector selected{};
             UpdateHWPipelineSelector(plain, selected);
             ApplyHWDrawFeedbackCarry(plain, selected, output, nullptr);
-            check(selected.IsRTFeedbackLoop(), "GS actual ROAA reader to non-reader preserves the compatible feedback pass");
-            plain_fragment = g_vulkan_shader_cache->GetFragmentShader(R"(#version 450
-layout(location=0) out vec4 color;void main(){color=vec4(222.0,188.0,154.0,255.0)/255.0;})");
+            // Devices whose policy never carries (Qualcomm proprietary) keep non-reader bits draw-local.
+            const bool carries = plain.road.carry_rt;
+            check(carries ? selected.IsRTFeedbackLoop() : !selected.IsRTFeedbackLoop(), carries ?
+                "GS actual ROAA reader to non-reader preserves the compatible feedback pass" :
+                "GS actual ROAA without carry keeps the non-reader loop bit draw-local");
+            plain_fragment = carries ? g_vulkan_shader_cache->GetFragmentShader(R"(#version 450
+layout(location=0) out vec4 color;void main(){color=vec4(222.0,188.0,154.0,255.0)/255.0;})") : VK_NULL_HANDLE;
             if (selected.IsRTFeedbackLoop() && plain_fragment)
             {
                 Vulkan::GraphicsPipelineBuilder gp;
@@ -345,7 +349,8 @@ layout(location=0) out vec4 color;void main(){color=vec4(222.0,188.0,154.0,255.0
                 gp.AddBlendFlags(VK_PIPELINE_COLOR_BLEND_STATE_CREATE_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_BIT_EXT);
                 plain_pipeline = gp.Create(m_device);
             }
-            check(plain_pipeline != VK_NULL_HANDLE, "GS actual ROAA non-reader builds the matching render-pass/pipeline schema");
+            if (carries)
+                check(plain_pipeline != VK_NULL_HANDLE, "GS actual ROAA non-reader builds the matching render-pass/pipeline schema");
             if (plain_pipeline)
             {
                 const auto active = m_current_render_pass;

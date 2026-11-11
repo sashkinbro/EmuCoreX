@@ -54,7 +54,11 @@ void GSDeviceVK::TestRoadFamilies(void (*check)(bool, const char*))
     {
         auto r40 = mali; r40.info = "v1.r40p0-01eac0";
         auto rc = caps(); rc.mobile_profile = true;
-        test("GPU road stock r40p0 G57 barrier road carries the pass loop bit onto non-readers", r40, rc, {true,false,false,nonread,false,false,false});
+        test("GPU road stock r40p0 G57 reads in tile through ROAA and carries non-readers", r40, rc, {true,true,false,nonread,false,false,false});
+        rc.roaa = false;
+        test("GPU road r40p0 G57 without ROAA declares the sampler loop and keeps draw-local bits", r40, rc, {true,false,true,none,false,false,false});
+        rc.layout = false;
+        test("GPU road r40p0 G57 without ROAA or layout uses the barrier road and carries non-readers", r40, rc, {true,false,false,nonread,false,false,false});
     }
     c = caps(); c.max_push_descriptors = 6; c.mobile_profile = true;
     test("GPU road Mali push descriptor count below seven safely falls back", mali, c, {true,true,false,nonread,false,false,false});
@@ -88,6 +92,9 @@ void GSDeviceVK::TestRoadFamilies(void (*check)(bool, const char*))
     test("GPU road Qualcomm proprietary ignores a Mesa-looking ordering tag", proprietary, c, {false,false,false,none,false,false,true});
     proprietary.name = "Adreno 830";
     test("GPU road Adreno eight proprietary never trusts stale ROAA reads", proprietary, c, {false,false,false,none,false,false,true});
+    auto a750 = proprietary; a750.name = "Adreno (TM) 750";
+    missing = c; missing.roaa = false;
+    test("GPU road Adreno 750 proprietary keeps the copy road without carry", a750, missing, {false,false,false,none,false,false,true});
     Identity img{0x1010, Driver::Imagination, "PowerVR CXTP-48-1536", "Imagination", "1.0", "", false};
     missing = c; missing.roaa = false; missing.mobile_profile = true;
     test("GPU road proprietary PowerVR uses coherent input read without ROAA or sampler layout", img, missing, {true,true,false,nonread,false,false,true});

@@ -175,7 +175,13 @@ inline Facts ResolveFacts(const Identity& id, bool roaa, u32 max_push)
     const bool img = f.powervr && id.driver == Driver::Imagination;
     f.avoid_layout = (f.mali && id.info.find("r44p1") != std::string_view::npos) || img;
     f.ordered_input = img && f.avoid_layout;
-    f.broken_roaa = f.mali && ((id.mediatek && !mt6897) || f.model == 57) && !(f.malisx2 && roaa);
+    // Mali-G57 on Arm's stock r40p0 driver (Unisoc T820) passed the GS golden gate with ROAA in-tile
+    // reads on every game dump and synthetic case: bit-identical output with zero texture barriers.
+    // The r44p1 G57 keeps its own copy workaround (copy_self_read); MediaTek Mali stays denied.
+    f.broken_roaa = f.mali && (id.mediatek && !mt6897) && !(f.malisx2 && roaa);
+    // Qualcomm proprietary keeps the copy road: in-pass reads (barriers on 750, ROAA on 840) were
+    // closer to the Software reference and faster in GS dump replay, but slower in game without
+    // feedback carry (NFS Underground 2 -10% on Adreno 750), and carry is unsafe there.
     f.copy_self_read = (f.adreno && (turnip || f.driver == Driver::Qualcomm)) ||
         (f.mali && f.driver == Driver::Arm && Revision44p1(info) && !mt6897 && !f.malisx2);
     f.fix_generation = FixGeneration(id.info);
@@ -224,6 +230,10 @@ inline Selection ResolveSelection(const Facts& f, const Capabilities& c)
     // Shadow of the Colossus 2736 -> 289 render passes, 3.3x faster GPU replay.
     if (out.carry == GSFeedbackCarry::None && f.mali && out.road.texture_barrier && !out.road.in_tile_read && !sampler)
         out.carry = GSFeedbackCarry::NonReaders;
+    // Qualcomm's proprietary driver never carries: on Adreno 840 carry changed GS dump output and
+    // lost the device in NFS Underground 2. Its in-pass reads keep draw-local loop bits.
+    if (f.adreno && f.driver == Driver::Qualcomm)
+        out.carry = GSFeedbackCarry::None;
     out.dynamic_loop = GSDeclaresLoopPerDraw({.layout_road_live = sampler,
         .dynamic_state_available = c.dynamic_state && c.dynamic_command, .device_measured = f.measured_layout});
     out.raster_order_on_overlap = out.road.orders_overlapping_prims && !out.road.in_tile_read && f.order_on_request;
