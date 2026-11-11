@@ -790,14 +790,14 @@ bool VKSwapChain::CreateSwapChain()
 				size_t used = 0;
 				for (u32 i = 0; i < mode_count && used + 40 < sizeof(modes); i++)
 					used += std::snprintf(modes + used, sizeof(modes) - used, "%s%s", i ? "," : "",
-						PresentModeToString(mode_list[i]) + 19);
+						PresentModeToString(mode_list[i]) + 16); // skip "VK_PRESENT_MODE_"
 			}
 		}
 		__android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
 			"GS_PRESENT_TIME swapchain create: supportedModes=[%s] surfaceMinImages=%u surfaceMaxImages=%u "
 			"chosenMode=%s requestedImages=%u actualImages=%u",
 			modes, surface_capabilities.minImageCount, surface_capabilities.maxImageCount,
-			PresentModeToString(m_present_mode) + 19, requested_image_count, image_count);
+			PresentModeToString(m_present_mode) + 16, requested_image_count, image_count);
 	}
 	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX",
 		"Vulkan swapchain presentMode=%s requestedImages=%u actualImages=%u surfaceMin=%u surfaceMax=%u",
