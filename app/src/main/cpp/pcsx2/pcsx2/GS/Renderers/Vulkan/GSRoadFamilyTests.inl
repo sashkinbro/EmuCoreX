@@ -50,7 +50,12 @@ void GSDeviceVK::TestRoadFamilies(void (*check)(bool, const char*))
     c.texture_barriers = 0;
     test("GPU road explicit barriers off wins over custom fetch and declared facts", mali, c, {false,false,false,none,false,false,true});
     c = caps(); c.mobile_profile = true; c.disable_fetch = true;
-    test("GPU road disabled Mali fetch retains the r44p1 input/barrier spelling", mali, c, {true,false,false,none,false,false,true});
+    test("GPU road disabled Mali fetch retains the r44p1 input/barrier spelling and carries non-readers", mali, c, {true,false,false,nonread,false,false,true});
+    {
+        auto r40 = mali; r40.info = "v1.r40p0-01eac0";
+        auto rc = caps(); rc.mobile_profile = true;
+        test("GPU road stock r40p0 G57 barrier road carries the pass loop bit onto non-readers", r40, rc, {true,false,false,nonread,false,false,false});
+    }
     c = caps(); c.max_push_descriptors = 6; c.mobile_profile = true;
     test("GPU road Mali push descriptor count below seven safely falls back", mali, c, {true,true,false,nonread,false,false,false});
     Identity turnip{0x5143, Driver::Turnip, "Adreno (TM) 650", "turnip", "Mesa 26.2.0", "", false};

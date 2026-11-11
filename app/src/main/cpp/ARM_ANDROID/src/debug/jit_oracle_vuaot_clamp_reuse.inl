@@ -259,7 +259,7 @@ void CheckClampNativeFpAndPressure()
         for (bool dn : {false, true}) for (u64 seed : {0ull, 0x0800009full})
         for (u32 pattern = 0; pattern < edges.size(); ++pattern)
         {
-            VURegs initial{}; initial.VF[0].UL[3] = 0x3f800000;
+            VURegs initial; std::memset(static_cast<void*>(&initial), 0, sizeof(initial)); initial.VF[0].UL[3] = 0x3f800000;
             initial.Mem = VU1.Mem;
             for (u32 reg = 1; reg < 32; ++reg) for (u32 lane = 0; lane < 4; ++lane)
                 initial.VF[reg].UL[lane] = edges[(pattern + reg * 3 + lane) % edges.size()];

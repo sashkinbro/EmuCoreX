@@ -218,6 +218,12 @@ inline Selection ResolveSelection(const Facts& f, const Capabilities& c)
         .barriers_order_reads = out.road.texture_barrier,
         .device_is_barrier_road_vendor = f.measured_barrier,
         .framebuffer_fetch = out.road.in_tile_read, .feedback_loop_layout = sampler});
+    // Mali on the plain barrier road (no in-tile fetch, no feedback-loop layout): a draw that does
+    // not read the target keeps the open pass's loop bit instead of ending the pass. Readers still
+    // set their own bit and barrier. Measured on Mali-G57 r40p0 GS dumps with bit-identical output:
+    // Shadow of the Colossus 2736 -> 289 render passes, 3.3x faster GPU replay.
+    if (out.carry == GSFeedbackCarry::None && f.mali && out.road.texture_barrier && !out.road.in_tile_read && !sampler)
+        out.carry = GSFeedbackCarry::NonReaders;
     out.dynamic_loop = GSDeclaresLoopPerDraw({.layout_road_live = sampler,
         .dynamic_state_available = c.dynamic_state && c.dynamic_command, .device_measured = f.measured_layout});
     out.raster_order_on_overlap = out.road.orders_overlapping_prims && !out.road.in_tile_read && f.order_on_request;

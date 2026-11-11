@@ -66,6 +66,7 @@ inline Usage ReadUsage(pid_t child, uint64_t elapsed)
     std::snprintf(path, sizeof(path), "/proc/%d/status", child);
     FILE* status = std::fopen(path, "r");
     bool resident = false, threads = false;
+    char state = 0;
     if (!status) return usage;
     while (std::fgets(line, sizeof(line), status))
     {
@@ -73,8 +74,17 @@ inline Usage ReadUsage(pid_t child, uint64_t elapsed)
         if (std::sscanf(line, "VmRSS: %llu kB", &rss) == 1)
         { usage.rss_kib = rss; resident = true; }
         if (std::sscanf(line, "Threads: %u", &usage.threads) == 1) threads = true;
+        std::sscanf(line, "State: %c", &state);
     }
     std::fclose(status);
+    // An exiting thread-group leader (zombie/dead) has no VmRSS and may hide
+    // its fd table while other threads finish teardown (e.g. EGL unload).
+    // That is a process finishing, not an unavailable monitor.
+    if (state == 'Z' || state == 'X')
+    {
+        usage.valid = threads;
+        return usage;
+    }
     std::snprintf(path, sizeof(path), "/proc/%d/fd", child);
     DIR* fds = opendir(path);
     if (!fds) return usage;

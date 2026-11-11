@@ -46,5 +46,7 @@ int main(int argc, char** argv)
         auto& args = *static_cast<Arguments*>(value);
         return RunGSOraclePayload(args.argc, args.argv);
     };
-    return OracleGuard::Run(run, &arguments, {20000, 384 * 1024, 1024, 128, 12}).code;
+    // GPU drivers (notably Mali) map several hundred MiB of resident memory at
+    // context creation; Debug benchmark replays on slower SoCs need minutes.
+    return OracleGuard::Run(run, &arguments, {300000, 1024 * 1024, 1024, 128, 240}).code;
 }

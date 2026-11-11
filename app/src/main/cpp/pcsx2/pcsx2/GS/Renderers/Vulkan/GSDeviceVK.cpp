@@ -1172,6 +1172,15 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 #endif
 	m_road_facts = GSVulkanRoad::ResolveFacts(GetRoadIdentity(),
 		m_optional_extensions.vk_ext_rasterization_order_attachment_access, push_descriptor_properties.maxPushDescriptors);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+	// Debug experiment knob: re-test ROAA framebuffer fetch on drivers listed as broken.
+	if (std::getenv("EMUCOREX_GS_FORCE_ROAA"))
+	{
+		m_road_facts.broken_roaa = false;
+		m_road_facts.adreno8xx_proprietary = false;
+		m_road_facts.copy_self_read = false;
+	}
+#endif
 	const auto device_road = GSVulkanRoad::ResolveSelection(m_road_facts,
 		GetRoadCapabilities(push_descriptor_properties.maxPushDescriptors));
 	if (device_road.avoid_layout)
@@ -2909,9 +2918,26 @@ bool GSDeviceVK::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 	return true;
 }
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+namespace
+{
+static void DumpPassEndSites();
+// Why same-device framebuffer switches end a pass: [rt, ds, feedback, ds dropped, ds added] -> count.
+static std::unordered_map<u32, u64> s_framebuffer_breaks;
+static void RecordFramebufferBreak(bool rt, bool ds, bool feedback, bool ds_dropped, bool ds_added)
+{
+	if (std::getenv("EMUCOREX_GS_PASS_TRACE"))
+		s_framebuffer_breaks[(rt ? 1u : 0u) | (ds ? 2u : 0u) | (feedback ? 4u : 0u) | (ds_dropped ? 8u : 0u) | (ds_added ? 16u : 0u)]++;
+}
+}
+#endif
+
 void GSDeviceVK::Destroy()
 {
 	std::unique_lock lock(s_instance_mutex);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+	DumpPassEndSites();
+#endif
 
 	// Workers touch m_device and the shader cache, so they must be gone before teardown.
 	StopAsyncTFXCompilation();
@@ -3671,6 +3697,11 @@ bool GSDeviceVK::CheckFeatures()
 	m_features.alpha_bit_logic_op = GSAlphaBitLogicOp::DeviceQualifies(m_device_features.logicOp != 0,
 		m_features.ordered_read_costs_per_draw, m_broken_colormask_with_depth);
 	m_features.feedback_carry = road.carry;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+	// Debug experiment knob: 0 None, 1 NonReaders, 2 All.
+	if (const char* carry = std::getenv("EMUCOREX_GS_FEEDBACK_CARRY"); carry && carry[0] >= '0' && carry[0] <= '2')
+		m_features.feedback_carry = static_cast<GSFeedbackCarry>(carry[0] - '0');
+#endif
 	// In-tile reads cannot serve a sampler read of another pixel.
 	m_features.texture_feedback_requires_copy = !texture_barrier ||
 		GSOffsetSelfReadNeedsCopy(GSGetDrawRoadDevice(m_features));
@@ -4910,6 +4941,12 @@ void GSDeviceVK::OMSetRenderTargets(
 		m_current_framebuffer == VK_NULL_HANDLE)
 	{
 		// framebuffer change or feedback loop enabled/disabled
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+		if (InRenderPass())
+			RecordFramebufferBreak(m_current_render_target != vkRt, m_current_depth_target != vkDs,
+				m_current_framebuffer_feedback_loop != feedback_loop, m_current_render_target == vkRt && vkDs == nullptr,
+				m_current_render_target == vkRt && m_current_depth_target == nullptr);
+#endif
 		EndRenderPass();
 
 		if (vkRt)
@@ -9427,11 +9464,62 @@ void GSDeviceVK::BeginClearRenderPass(VkRenderPass rp, const GSVector4i& rect, f
 	BeginClearRenderPass(rp, rect, &cv, 1);
 }
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+#include <dlfcn.h>
+// Debug-only diagnostics: which call sites end render passes. On tile-based
+// GPUs every pass end stores (and the next pass reloads) all tiles, so these
+// sites are the main GS-side bandwidth lever. Enabled with
+// EMUCOREX_GS_PASS_TRACE=1; printed when the device is destroyed.
+namespace
+{
+struct PassEndSite
+{
+	uintptr_t caller, parent;
+	bool operator==(const PassEndSite& o) const { return caller == o.caller && parent == o.parent; }
+};
+struct PassEndSiteHash
+{
+	size_t operator()(const PassEndSite& s) const { return std::hash<uintptr_t>()(s.caller * 31 + s.parent); }
+};
+static const bool s_pass_end_trace = std::getenv("EMUCOREX_GS_PASS_TRACE") != nullptr;
+static std::unordered_map<PassEndSite, u64, PassEndSiteHash> s_pass_end_sites;
+
+static void DumpPassEndSites()
+{
+	if (!s_pass_end_trace || s_pass_end_sites.empty())
+		return;
+	std::vector<std::pair<PassEndSite, u64>> sites(s_pass_end_sites.begin(), s_pass_end_sites.end());
+	std::sort(sites.begin(), sites.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
+	const auto offset = [](uintptr_t address) -> uintptr_t {
+		Dl_info info{};
+		return (address && dladdr(reinterpret_cast<void*>(address), &info) && info.dli_fbase) ?
+				   address - reinterpret_cast<uintptr_t>(info.dli_fbase) : 0;
+	};
+	for (const auto& [mask, count] : s_framebuffer_breaks)
+		std::fprintf(stderr, "GS_FB_BREAK count=%llu rt=%u ds=%u feedback=%u ds_dropped=%u ds_added=%u\n",
+			static_cast<unsigned long long>(count), mask & 1, (mask >> 1) & 1, (mask >> 2) & 1, (mask >> 3) & 1, (mask >> 4) & 1);
+	s_framebuffer_breaks.clear();
+	for (size_t i = 0; i < sites.size() && i < 40; i++)
+		std::fprintf(stderr, "GS_PASS_END count=%llu caller=0x%zx parent=0x%zx\n",
+			static_cast<unsigned long long>(sites[i].second), static_cast<size_t>(offset(sites[i].first.caller)),
+			static_cast<size_t>(offset(sites[i].first.parent)));
+	s_pass_end_sites.clear();
+}
+} // namespace
+#endif
+
 void GSDeviceVK::EndRenderPass()
 {
 
 	if (m_current_render_pass == VK_NULL_HANDLE)
 		return;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+	if (s_pass_end_trace)
+	{
+		s_pass_end_sites[PassEndSite{reinterpret_cast<uintptr_t>(__builtin_return_address(0)),
+			reinterpret_cast<uintptr_t>(__builtin_extract_return_addr(__builtin_return_address(1)))}]++;
+	}
+#endif
 
 	m_current_render_pass = VK_NULL_HANDLE;
 	m_readback_kick.RenderPassEnded();

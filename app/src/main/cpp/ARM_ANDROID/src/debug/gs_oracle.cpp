@@ -313,6 +313,9 @@ struct Replay
     s32 export_case = -1;
     bool profile = false;
     std::vector<Profile> profiles;
+    // Sequence mode keeps GS, texture-cache and target state across scenes so
+    // cross-draw reuse/invalidation paths are compared, then reads all VRAM.
+    bool sequence = false;
 
     void RecordProfile(u32 packet, const std::string& name, std::chrono::steady_clock::time_point start)
     {
@@ -348,17 +351,31 @@ struct Replay
             glFinish();
     }
 
-    void ReadBuffer(u32 packet, const std::string& name, bool depth)
+    void ReadRegion(u32 packet, const std::string& name, const char* kind, u64 bitbltbuf, u32 width, u32 height)
     {
         Writes w;
-        Write(w, 0x50, (depth ? 512ull | 0x30ull << 24 : 0) | 1ull << 16); // SBP ZBUF base / 256
-        Write(w, 0x51, 0); Write(w, 0x52, Width | static_cast<u64>(Height) << 32); Write(w, 0x53, 1);
+        Write(w, 0x50, bitbltbuf);
+        Write(w, 0x51, 0); Write(w, 0x52, width | static_cast<u64>(height) << 32); Write(w, 0x53, 1);
         Send(w);
-        if (s_repro) s_repro->ReadFIFO(Width * Height / 4);
-        std::vector<u8> bytes(Width * Height * 4 + 16, 0xcd);
-        GSInitAndReadFIFO(bytes.data(), Width * Height / 4);
-        bytes.resize(Width * Height * 4);
-        Save(bytes, Width, Height, packet, name, depth ? "depth" : "rgba");
+        const u32 qwc = width * height / 4;
+        if (s_repro) s_repro->ReadFIFO(qwc);
+        std::vector<u8> bytes(static_cast<size_t>(width) * height * 4 + 16, 0xcd);
+        GSInitAndReadFIFO(bytes.data(), qwc);
+        bytes.resize(static_cast<size_t>(width) * height * 4);
+        Save(bytes, width, height, packet, name, kind);
+    }
+
+    void ReadBuffer(u32 packet, const std::string& name, bool depth)
+    {
+        // SBP ZBUF base / 256, SBW 1
+        ReadRegion(packet, name, depth ? "depth" : "rgba", (depth ? 512ull | 0x30ull << 24 : 0) | 1ull << 16, Width, Height);
+    }
+
+    void ReadAllMemory(u32 packet)
+    {
+        // Whole 4 MiB local memory as CT32, 1024x1024 with SBW 16. Catches
+        // corruption outside the 64x64 frame/depth windows (textures, CLUTs).
+        ReadRegion(packet, "vram", "rgba", 16ull << 16, 1024, 1024);
     }
 
     void Synthetic()
@@ -367,13 +384,16 @@ struct Replay
         for (u32 i = 0; i < Names.size() + cases; ++i)
         {
             const auto start = std::chrono::steady_clock::now();
-            GSreset(true);
+            const bool reset = !sequence || i == 0;
+            if (reset)
+                GSreset(true);
             std::unique_ptr<GSDumpBase> repro;
             const std::string name = i < Names.size() ? Names[i] : fmt::format("matrix-{:04d}", i - Names.size());
             if (capture)
             {
                 // Zero-length record denotes a hardware reset / new fixture.
-                corpus.insert(corpus.end(), sizeof(u64), 0);
+                if (reset)
+                    corpus.insert(corpus.end(), sizeof(u64), 0);
                 s_corpus = &corpus;
                 // Record a replayable initial state and command stream for every
                 // fixture. Only Software needs to export these identical inputs.
@@ -401,6 +421,8 @@ struct Replay
             }
             ++frames;
         }
+        if (capture && sequence)
+            ReadAllMemory(static_cast<u32>(Names.size() + cases));
         if (capture)
         {
             std::ofstream stream(output + "/corpus.bin", std::ios::binary);
@@ -552,6 +574,20 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunGSOracle(int ar
             regs.DISP[0].DISPFB.FBW = 1;
             regs.DISP[0].DISPLAY.DW = 63; regs.DISP[0].DISPLAY.DH = 63;
         }
+        std::string settings(Settings);
+        const auto note_setting = [&settings](const char* env, const char* key) {
+            if (const char* value = std::getenv(env))
+                settings += fmt::format(";{}={}", key, value);
+        };
+        note_setting("EMUCOREX_GS_ORACLE_SCALE", "scale");
+        note_setting("EMUCOREX_GS_ORACLE_BLEND", "blend");
+        note_setting("EMUCOREX_GS_ORACLE_HW_DOWNLOAD", "hwdownload");
+        note_setting("EMUCOREX_GS_ORACLE_COALESCE", "coalesce");
+        note_setting("EMUCOREX_GS_ORACLE_GAMEDB", "gamedb");
+        const char* sequence_env = std::getenv("EMUCOREX_GS_ORACLE_SEQUENCE");
+        const bool sequence = !dump && sequence_env && std::strcmp(sequence_env, "1") == 0;
+        if (sequence)
+            settings += ";sequence=1";
         Pcsx2Config::GSOptions config;
         config.Renderer = backend == "sw" ? GSRendererType::SW : backend == "vk" ? GSRendererType::VK : GSRendererType::OGL;
         config.UpscaleMultiplier = 1;
@@ -636,6 +672,7 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunGSOracle(int ar
             Require(driver.good(), "Cannot write GPU driver identity");
         }
         Replay replay{backend, output, mode == "capture", {}, 0, cases, seed, export_case, mode == "profile", {}};
+        replay.sequence = sequence;
         if (replay.profile) GSSetPerformanceCountersEnabled(true);
         auto run = [&]() {
             replay.frames = 0;
@@ -668,8 +705,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunGSOracle(int ar
         GSclose(); opened = false;
         if (allocated) { SysMemory::Release(); allocated = false; }
         std::ofstream manifest(output + "/native-" + mode + ".json");
-        manifest << fmt::format("{{\"schema\":1,\"complete\":true,\"mode\":\"{}\",\"backend\":\"{}\",\"settings\":\"{}\",\"frames\":{},\"frames_per_replay\":{},\"batch\":{},\"base_cases\":{},\"cases\":{},\"seed\":{},\"warmup\":{},\"checkpoints\":[", mode, backend, Settings,
-            replay.frames * (mode == "benchmark" ? 10 : 1), replay.frames, mode == "benchmark" ? 10 : 1, Names.size(), cases, seed, warmup);
+        manifest << fmt::format("{{\"schema\":1,\"complete\":true,\"mode\":\"{}\",\"backend\":\"{}\",\"settings\":\"{}\",\"frames\":{},\"frames_per_replay\":{},\"batch\":{},\"base_cases\":{},\"cases\":{},\"seed\":{},\"warmup\":{},\"sequence\":{},\"checkpoints\":[", mode, backend, settings,
+            replay.frames * (mode == "benchmark" ? 10 : 1), replay.frames, mode == "benchmark" ? 10 : 1, Names.size(), cases, seed, warmup, sequence ? "true" : "false");
         for (size_t i = 0; i < replay.checkpoints.size(); ++i)
         {
             const auto& p = replay.checkpoints[i];

@@ -56,7 +56,10 @@ void VifMpgTests()
         program(middle_pc, 2, 5);
         program(size - 16, 3, 9);
         std::memset(vu.Mem, 0, size);
-        VURegs initial{};
+        // VURegs has a user-provided constructor, so `VURegs initial{}` leaves
+        // VI/VF/ACC indeterminate (stack garbage, including VI[0]). Zero it.
+        VURegs initial;
+        std::memset(static_cast<void*>(&initial), 0, sizeof(initial));
         initial.Micro = vu.Micro;
         initial.Mem = vu.Mem;
         initial.idx = index;

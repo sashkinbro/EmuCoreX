@@ -69,11 +69,16 @@ namespace MTGS
 	static u32 s_packet_startpos; // size of the packet (data only, ie. not including the 16 byte command!)
 	static u32 s_packet_size; // size of the packet (data only, ie. not including the 16 byte command!)
 	static u32 s_packet_writepos; // index of the data location in the ringbuffer.
+	// EE-only copy of the last observed s_ReadPos. The GS only advances the read
+	// position toward s_WritePos, so free room computed from a stale copy is a
+	// lower bound; the GS-owned cache line is reloaded only when that is too small.
+	static u32 s_CachedReadPos;
 
-	static std::atomic<bool> s_SignalRingEnable;
+	// GS-polled flags live apart from the EE-written packet state above.
+	alignas(__cachelinesize) static std::atomic<bool> s_SignalRingEnable;
 	static std::atomic<int> s_SignalRingPosition;
 
-	static std::atomic<int> s_QueuedFrameCount;
+	alignas(__cachelinesize) static std::atomic<int> s_QueuedFrameCount;
 	static std::atomic<bool> s_VsyncSignalListener;
 
 	static std::mutex s_mtx_RingBufferBusy2; // Gets released on semaXGkick waiting...
@@ -816,13 +821,23 @@ void MTGS::GenericStall(uint size)
 	// But if not then we need to make sure the readpos is outside the scope of
 	// the block about to be written (writepos + size)
 
-	uint readpos = s_ReadPos.load(std::memory_order_acquire);
+	uint readpos = s_CachedReadPos;
 	uint freeroom;
 
 	if (writepos < readpos)
 		freeroom = readpos - writepos;
 	else
 		freeroom = RingBufferSize - (writepos - readpos);
+
+	if (freeroom <= size)
+	{
+		readpos = s_ReadPos.load(std::memory_order_acquire);
+		s_CachedReadPos = readpos;
+		if (writepos < readpos)
+			freeroom = readpos - writepos;
+		else
+			freeroom = RingBufferSize - (writepos - readpos);
+	}
 
 	if (freeroom <= size)
 	{
@@ -865,6 +880,7 @@ void MTGS::GenericStall(uint size)
 				if (freeroom > size)
 					break;
 			}
+			s_CachedReadPos = readpos;
 
 			pxAssertMsg(s_SignalRingPosition <= 0, "MTGS Thread Synchronization Error");
 		}
@@ -884,7 +900,10 @@ void MTGS::GenericStall(uint size)
 					freeroom = RingBufferSize - (writepos - readpos);
 
 				if (freeroom > size)
+				{
+					s_CachedReadPos = readpos;
 					break;
+				}
 				// Yield after 64 spin iterations to reduce CPU waste
 				// This is the FMV optimization path for small transfers
 				if ((++spin_count & 63) == 0)
