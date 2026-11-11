@@ -112,21 +112,40 @@ android {
         debug {
             externalNativeBuild {
                 cmake {
-                    // Keep gameplay profiling useful while retaining Debug-only diagnostics.
-                    arguments(
-                        "-DCMAKE_BUILD_TYPE=Debug",
-                        "-DCMAKE_C_FLAGS_DEBUG=-O2 -g1",
-                        "-DCMAKE_CXX_FLAGS_DEBUG=-O2 -g1",
-                        "-DEMUCOREX_ENABLE_NATIVE_SELF_TESTS=ON",
-                        "-DEMUCOREX_ENABLE_EXPERIMENTAL_IR=OFF",
-                        "-DEMUCOREX_ENABLE_GS_ORACLE=ON"
-                    )
+                    if (providers.gradleProperty("emucorex.releaseNative").orNull == "true") {
+                        // Debug-signed/debuggable APK with a release-identical native core
+                        // (-Pemucorex.releaseNative=true); -g1 only adds symbols for simpleperf.
+                        if (providers.gradleProperty("emucorex.nativeTune").orNull == "true") {
+                            arguments("-DEMUCOREX_NATIVE_TUNE=ON")
+                        }
+                        arguments(
+                            "-DCMAKE_BUILD_TYPE=Release",
+                            "-DCMAKE_C_FLAGS=-g1",
+                            "-DCMAKE_CXX_FLAGS=-g1",
+                            "-DEMUCOREX_ENABLE_NATIVE_SELF_TESTS=OFF",
+                            "-DEMUCOREX_ENABLE_EXPERIMENTAL_IR=OFF",
+                            "-DEMUCOREX_ENABLE_GS_ORACLE=OFF"
+                        )
+                    } else {
+                        // Keep gameplay profiling useful while retaining Debug-only diagnostics.
+                        arguments(
+                            "-DCMAKE_BUILD_TYPE=Debug",
+                            "-DCMAKE_C_FLAGS_DEBUG=-O2 -g1",
+                            "-DCMAKE_CXX_FLAGS_DEBUG=-O2 -g1",
+                            "-DEMUCOREX_ENABLE_NATIVE_SELF_TESTS=ON",
+                            "-DEMUCOREX_ENABLE_EXPERIMENTAL_IR=OFF",
+                            "-DEMUCOREX_ENABLE_GS_ORACLE=ON"
+                        )
+                    }
                 }
             }
         }
         release {
             externalNativeBuild {
                 cmake {
+                    if (providers.gradleProperty("emucorex.nativeTune").orNull == "true") {
+                        arguments("-DEMUCOREX_NATIVE_TUNE=ON")
+                    }
                     arguments("-DCMAKE_BUILD_TYPE=Release", "-DEMUCOREX_ENABLE_NATIVE_SELF_TESTS=OFF",
                         "-DEMUCOREX_ENABLE_GS_ORACLE=OFF", "-DEMUCOREX_ENABLE_EXPERIMENTAL_IR=OFF")
                 }

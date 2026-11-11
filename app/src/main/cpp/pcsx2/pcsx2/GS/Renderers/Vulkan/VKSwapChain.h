@@ -79,6 +79,10 @@ public:
 	/// Number of images that can be acquired in addition to the real frame.
 	__fi u32 GetExtraAcquirableImages() const { return m_extra_acquirable_images; }
 	VkResult AcquireNextImage();
+	// Present/acquire wall-time stats on the GS thread; see EMUCOREX_GS_PRESENT_TIMING in VKSwapChain.cpp.
+	static bool PresentTimingEnabled();
+	static u64 PresentTimingNowNs();
+	void RecordPresentTime(u64 present_ns);
 	void ReleaseCurrentImage();
 	void ResetImageAcquireResult();
 
@@ -125,5 +129,9 @@ private:
 	VkPresentModeKHR m_present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
 
 	std::optional<VkResult> m_image_acquire_result;
+
+	u32 m_requested_image_count = 0;
+	u64 m_pt_frames = 0, m_pt_present_sum_ns = 0, m_pt_present_max_ns = 0;
+	u64 m_pt_acquires = 0, m_pt_acquire_sum_ns = 0, m_pt_acquire_max_ns = 0;
 	std::optional<bool> m_exclusive_fullscreen_control;
 };

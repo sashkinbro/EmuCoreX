@@ -45,6 +45,13 @@ class GameplayProfilingDeviceTest {
         val oldBios = preferences.biosPath.first()
         val oldGames = preferences.gamePaths.first()
         val oldOnboarding = preferences.onboardingCompleted.first()
+        // Optional: run on the first usable installed custom Vulkan driver (e.g. MaliSX2).
+        val customDriver = args.getString("customDriver")?.toBooleanStrict() ?: false
+        val oldDriverType = preferences.gpuDriverType.first()
+        val oldDriverPath = preferences.customDriverPath.first()
+        val driverPath = if (customDriver) {
+            requireNotNull(GpuDriverManager(context).resolveUsableDriverPath(null)) { "No usable custom driver installed" }
+        } else null
         val held = mutableMapOf<Int, Long>()
         val allowedButtons = setOf(19, 20, 21, 22, 96, 97, 99, 100, 102, 103, 104, 105, 106, 107, 108, 109,
             110, 111, 112, 113, 120, 121, 122, 123)
@@ -73,6 +80,10 @@ class GameplayProfilingDeviceTest {
             preferences.setBiosPath(bios)
             preferences.setGamePaths(listOf(File(game).parent!!))
             preferences.setOnboardingCompleted(true)
+            if (customDriver) {
+                preferences.setCustomDriverPath(driverPath)
+                preferences.setGpuDriverType(1)
+            } else preferences.setGpuDriverType(0)
             val intent = Intent("${context.packageName}.action.LAUNCH_GAME").apply {
                 setClassName(context.packageName, "${context.packageName}.MainActivity")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -80,6 +91,10 @@ class GameplayProfilingDeviceTest {
                 putExtra("${context.packageName}.extra.RENDERER", renderer)
                 for (key in listOf("EE", "IOP", "VU0", "VU1"))
                     putExtra("${context.packageName}.extra.ENABLE_${key}_RECOMPILER", true)
+                // Optional A/B knob: run the IOP on its own thread or on the EE thread.
+                args.getString("iopThread")?.toBooleanStrict()?.let {
+                    putExtra("${context.packageName}.extra.ENABLE_IOP_THREAD", it)
+                }
             }
             status("starting")
             activity = instrumentation.startActivitySync(intent)
@@ -194,6 +209,8 @@ class GameplayProfilingDeviceTest {
             preferences.setBiosPath(oldBios.orEmpty())
             preferences.setGamePaths(oldGames)
             preferences.setOnboardingCompleted(oldOnboarding)
+            preferences.setCustomDriverPath(oldDriverPath)
+            preferences.setGpuDriverType(oldDriverType)
         }
     }
 }

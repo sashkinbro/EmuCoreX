@@ -13,10 +13,15 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 #if defined(__ANDROID__)
 #include "common/AndroidLogging.h"
+#include <sys/system_properties.h>
 #endif
 
 #if defined(VK_USE_PLATFORM_XLIB_KHR)
@@ -275,6 +280,72 @@ static const char* PresentModeToString(VkPresentModeKHR mode)
 	}
 }
 
+// Experiment knobs. Environment variable first, then (Android) the system property, which is the
+// practical route for an app process:  adb shell setprop debug.emucorex.<name> <value>
+static bool ReadPresentTuning(const char* env_name, [[maybe_unused]] const char* prop_name, char* out, size_t out_size)
+{
+	out[0] = '\0';
+	if (const char* env = std::getenv(env_name); env && env[0] != '\0')
+	{
+		std::strncpy(out, env, out_size - 1);
+		out[out_size - 1] = '\0';
+		return true;
+	}
+#if defined(__ANDROID__)
+	char value[PROP_VALUE_MAX] = {};
+	if (__system_property_get(prop_name, value) > 0 && value[0] != '\0')
+	{
+		std::strncpy(out, value, out_size - 1);
+		out[out_size - 1] = '\0';
+		return true;
+	}
+#endif
+	return false;
+}
+
+bool VKSwapChain::PresentTimingEnabled()
+{
+	static const bool enabled = [] {
+		char v[8];
+		return ReadPresentTuning("EMUCOREX_GS_PRESENT_TIMING", "debug.emucorex.present_timing", v, sizeof(v)) &&
+		       v[0] != '0';
+	}();
+	return enabled;
+}
+
+u64 VKSwapChain::PresentTimingNowNs()
+{
+	return static_cast<u64>(
+		std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
+}
+
+void VKSwapChain::RecordPresentTime(u64 present_ns)
+{
+	m_pt_frames++;
+	m_pt_present_sum_ns += present_ns;
+	m_pt_present_max_ns = std::max(m_pt_present_max_ns, present_ns);
+	if (m_pt_frames < 120)
+		return;
+
+	const double frames = static_cast<double>(m_pt_frames);
+	const double acquires = static_cast<double>(std::max<u64>(m_pt_acquires, 1));
+	char line[320];
+	std::snprintf(line, sizeof(line),
+		"GS_PRESENT_TIME mode=%s images_requested=%u images_actual=%u present_avg_ms=%.3f present_max_ms=%.3f "
+		"acquire_avg_ms=%.3f acquire_max_ms=%.3f acquires=%llu frames=%llu",
+		PresentModeToString(m_present_mode), m_requested_image_count, static_cast<u32>(m_images.size()),
+		m_pt_present_sum_ns / frames / 1e6, m_pt_present_max_ns / 1e6, m_pt_acquire_sum_ns / acquires / 1e6,
+		m_pt_acquire_max_ns / 1e6, static_cast<unsigned long long>(m_pt_acquires),
+		static_cast<unsigned long long>(m_pt_frames));
+#if defined(__ANDROID__)
+	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX", "%s", line);
+#else
+	std::fprintf(stderr, "%s\n", line);
+#endif
+	m_pt_frames = m_pt_present_sum_ns = m_pt_present_max_ns = 0;
+	m_pt_acquires = m_pt_acquire_sum_ns = m_pt_acquire_max_ns = 0;
+}
+
 bool VKSwapChain::SelectPresentMode(VkSurfaceKHR surface, GSVSyncMode* vsync_mode, VkPresentModeKHR* present_mode)
 {
 	VkResult res;
@@ -378,6 +449,42 @@ bool VKSwapChain::SelectPresentMode(VkSurfaceKHR surface, GSVSyncMode* vsync_mod
 			jNO_DEFAULT
 	}
 
+	// Experiment override: EMUCOREX_VK_PRESENT_MODE / debug.emucorex.present_mode = fifo|mailbox|immediate|relaxed.
+	{
+		char ov[16];
+		if (ReadPresentTuning("EMUCOREX_VK_PRESENT_MODE", "debug.emucorex.present_mode", ov, sizeof(ov)))
+		{
+			VkPresentModeKHR wanted = VK_PRESENT_MODE_MAX_ENUM_KHR;
+			GSVSyncMode wanted_vsync = *vsync_mode;
+			if (!std::strcmp(ov, "fifo"))
+			{
+				wanted = VK_PRESENT_MODE_FIFO_KHR;
+				wanted_vsync = GSVSyncMode::FIFO;
+			}
+			else if (!std::strcmp(ov, "mailbox"))
+			{
+				wanted = VK_PRESENT_MODE_MAILBOX_KHR;
+				wanted_vsync = GSVSyncMode::Mailbox;
+			}
+			else if (!std::strcmp(ov, "immediate"))
+				wanted = VK_PRESENT_MODE_IMMEDIATE_KHR;
+			else if (!std::strcmp(ov, "relaxed"))
+				wanted = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+
+			if (wanted != VK_PRESENT_MODE_MAX_ENUM_KHR && CheckForMode(wanted))
+			{
+				*present_mode = wanted;
+				*vsync_mode = wanted_vsync;
+				WARNING_LOG("Present mode override '{}' applied: {}", ov, PresentModeToString(wanted));
+			}
+			else
+			{
+				WARNING_LOG("Present mode override '{}' unknown or unsupported, keeping {}", ov,
+					PresentModeToString(*present_mode));
+			}
+		}
+	}
+
 	return true;
 }
 
@@ -470,10 +577,21 @@ bool VKSwapChain::CreateSwapChain()
 		preferred_image_count =
 			std::max(preferred_image_count, surface_capabilities.minImageCount + extra);
 	}
+	{
+		// Experiment override: EMUCOREX_VK_SWAPCHAIN_IMAGES / debug.emucorex.swapchain_images (clamped just below).
+		char ov[16];
+		if (ReadPresentTuning("EMUCOREX_VK_SWAPCHAIN_IMAGES", "debug.emucorex.swapchain_images", ov, sizeof(ov)))
+		{
+			const long n = std::strtol(ov, nullptr, 10);
+			if (n > 0 && n < 32)
+				preferred_image_count = static_cast<u32>(n);
+		}
+	}
 	u32 image_count = std::clamp<u32>(
 		preferred_image_count, surface_capabilities.minImageCount,
 		(surface_capabilities.maxImageCount == 0) ? std::numeric_limits<u32>::max() : surface_capabilities.maxImageCount);
 	const u32 requested_image_count = image_count;
+	m_requested_image_count = requested_image_count;
 	m_extra_acquirable_images = (image_count > surface_capabilities.minImageCount) ?
 		(image_count - surface_capabilities.minImageCount) : 0u;
 	DEV_LOG("Creating a swap chain with {} images in present mode {}", image_count, PresentModeToString(m_present_mode));
@@ -657,6 +775,30 @@ bool VKSwapChain::CreateSwapChain()
 	}
 
 #if defined(__ANDROID__)
+	{
+		// One line per swapchain creation: what the surface supports, and what was chosen.
+		u32 mode_count = 0;
+		char modes[160] = {};
+		VkPresentModeKHR mode_list[16];
+		const VkPhysicalDevice pd = GSDeviceVK::GetInstance()->GetPhysicalDevice();
+		if (vkGetPhysicalDeviceSurfacePresentModesKHR(pd, m_surface, &mode_count, nullptr) == VK_SUCCESS)
+		{
+			mode_count = std::min<u32>(mode_count, 16u);
+			const VkResult mres = vkGetPhysicalDeviceSurfacePresentModesKHR(pd, m_surface, &mode_count, mode_list);
+			if (mres == VK_SUCCESS || mres == VK_INCOMPLETE)
+			{
+				size_t used = 0;
+				for (u32 i = 0; i < mode_count && used + 40 < sizeof(modes); i++)
+					used += std::snprintf(modes + used, sizeof(modes) - used, "%s%s", i ? "," : "",
+						PresentModeToString(mode_list[i]) + 19);
+			}
+		}
+		__android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
+			"GS_PRESENT_TIME swapchain create: supportedModes=[%s] surfaceMinImages=%u surfaceMaxImages=%u "
+			"chosenMode=%s requestedImages=%u actualImages=%u",
+			modes, surface_capabilities.minImageCount, surface_capabilities.maxImageCount,
+			PresentModeToString(m_present_mode) + 19, requested_image_count, image_count);
+	}
 	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX",
 		"Vulkan swapchain presentMode=%s requestedImages=%u actualImages=%u surfaceMin=%u surfaceMax=%u",
 		PresentModeToString(m_present_mode), requested_image_count, image_count,
@@ -788,8 +930,17 @@ VkResult VKSwapChain::AcquireNextImage()
 	constexpr u64 acquire_timeout = UINT64_MAX;
 #endif
 
+	const bool timing = PresentTimingEnabled();
+	const u64 acquire_t0 = timing ? PresentTimingNowNs() : 0;
 	const VkResult res = vkAcquireNextImageKHR(GSDeviceVK::GetInstance()->GetDevice(), m_swap_chain, acquire_timeout,
 		m_semaphores[m_current_semaphore].available_semaphore, VK_NULL_HANDLE, &m_current_image);
+	if (timing)
+	{
+		const u64 dt = PresentTimingNowNs() - acquire_t0;
+		m_pt_acquires++;
+		m_pt_acquire_sum_ns += dt;
+		m_pt_acquire_max_ns = std::max(m_pt_acquire_max_ns, dt);
+	}
 	if (res == VK_TIMEOUT)
 	{
 		// No image was acquired and the semaphore was not signaled, so nothing to release;

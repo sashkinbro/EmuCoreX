@@ -304,6 +304,19 @@ if(EMUCOREX_LINK_UPSTREAM_PCSX2)
 	endif()
 endif()
 
+# A/B switch (-Pemucorex.nativeTune=true): tune scheduling for big Cortex-A cores and
+# drop the stack protector on the emulation core only. Baseline stays ARMv8.0 (no -march/-mcpu).
+# Outline atomics are already on by default in the NDK clang for aarch64-linux-android.
+# Third-party libs that parse untrusted input and the JNI glue are intentionally excluded.
+option(EMUCOREX_NATIVE_TUNE "Tune the emulation core with -mtune=cortex-a76 -fno-stack-protector" OFF)
+if(EMUCOREX_NATIVE_TUNE)
+	foreach(_emucorex_tune_target PCSX2 PCSX2_LTO common)
+		if(TARGET ${_emucorex_tune_target})
+			target_compile_options(${_emucorex_tune_target} PRIVATE -mtune=cortex-a76 -fno-stack-protector)
+		endif()
+	endforeach()
+endif()
+
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/third_party/capstone/CMakeLists.txt")
 	set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 	set(BUILD_STATIC_LIBS ON CACHE BOOL "" FORCE)
@@ -343,6 +356,9 @@ target_link_options(emucore PRIVATE
 	"LINKER:-Bsymbolic-functions"
 )
 
+if(EMUCOREX_NATIVE_TUNE)
+	target_link_options(emucore PRIVATE -mtune=cortex-a76)
+endif()
 target_compile_features(emucore PRIVATE cxx_std_20)
 target_compile_options(emucore PRIVATE -Wall -Wextra -Wpedantic)
 target_include_directories(emucore

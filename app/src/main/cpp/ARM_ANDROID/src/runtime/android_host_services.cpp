@@ -74,9 +74,7 @@ std::thread::id s_cpu_thread_id;
 std::chrono::steady_clock::time_point s_last_metrics_dispatch;
 std::mutex s_metrics_mutex;
 std::string s_metrics_snapshot;
-#if defined(EMUCOREX_GS_ORACLE_DEBUG)
 uint64_t s_metrics_sequence = 0;
-#endif
 std::atomic_bool s_performance_metrics_enabled{false};
 std::atomic_bool s_performance_metrics_detailed{false};
 std::atomic_bool s_performance_gpu_timing_requested{false};
@@ -230,13 +228,11 @@ std::string GetPerformanceMetricsSnapshot()
 	return s_metrics_snapshot;
 }
 
-#if defined(EMUCOREX_GS_ORACLE_DEBUG)
 std::string GetGameplayProfilingSample()
 {
 	std::lock_guard lock(s_metrics_mutex);
 	return std::to_string(s_metrics_sequence) + "\n" + s_metrics_snapshot;
 }
-#endif
 
 void SetPerformanceMetricsCallbackEnabled(bool enabled, bool detailed, bool gpu_timing)
 {
@@ -648,9 +644,7 @@ void Host::OnPerformanceMetricsUpdated()
 	{
 		std::lock_guard lock(s_metrics_mutex);
 		s_metrics_snapshot = std::move(snapshot);
-#if defined(EMUCOREX_GS_ORACLE_DEBUG)
 		++s_metrics_sequence;
-#endif
 	}
 }
 

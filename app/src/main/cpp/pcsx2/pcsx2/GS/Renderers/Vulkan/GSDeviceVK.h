@@ -333,6 +333,15 @@ private:
 	void ActivateCommandBuffer(u32 index);
 	void WaitForCommandBufferCompletion(u32 index);
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+	// Debug-only per-render-pass GPU timing, enabled with EMUCOREX_GS_PASS_TIMING=1.
+	void PassTimingActivate(u32 index);
+	void PassTimingBegin(VkCommandBuffer cmdbuf, VkRenderPass rp, const GSVector4i& rect, u32 present_w = 0, u32 present_h = 0);
+	void PassTimingEnd(VkCommandBuffer cmdbuf, uintptr_t caller, bool present = false);
+	void PassTimingCollect(u32 index);
+	void PassTimingDump();
+#endif
+
 	bool InitSpinResources();
 	void DestroySpinResources();
 	void WaitForSpinCompletion(u32 index);

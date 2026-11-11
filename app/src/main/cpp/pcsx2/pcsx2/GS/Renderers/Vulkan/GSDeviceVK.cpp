@@ -218,6 +218,23 @@ static constexpr VkClearValue s_present_clear_color = {{{0.0f, 0.0f, 0.0f, 1.0f}
 // We need to synchronize instance creation because of adapter enumeration from the UI thread.
 static std::mutex s_instance_mutex;
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+// Debug-only per-render-pass GPU timing (EMUCOREX_GS_PASS_TIMING=1), see GSDeviceVK::PassTiming*.
+static const bool s_pass_timing = std::getenv("EMUCOREX_GS_PASS_TIMING") != nullptr;
+static bool s_pass_timing_active = false;
+static u32 s_pass_timing_draws = 0;
+static u32 s_pass_timing_barriers = 0;
+#define EMUCOREX_PASS_TIMING_DRAW() do { if (s_pass_timing_active) s_pass_timing_draws++; } while (0)
+#define EMUCOREX_PASS_TIMING_BARRIER() do { if (s_pass_timing_active) s_pass_timing_barriers++; } while (0)
+#define EMUCOREX_PASS_TIMING_BEGIN(...) do { if (s_pass_timing) PassTimingBegin(__VA_ARGS__); } while (0)
+#define EMUCOREX_PASS_TIMING_END(...) do { if (s_pass_timing) PassTimingEnd(__VA_ARGS__); } while (0)
+#else
+#define EMUCOREX_PASS_TIMING_DRAW() do { } while (0)
+#define EMUCOREX_PASS_TIMING_BARRIER() do { } while (0)
+#define EMUCOREX_PASS_TIMING_BEGIN(...) do { } while (0)
+#define EMUCOREX_PASS_TIMING_END(...) do { } while (0)
+#endif
+
 // Surface support requires swapchain separately. The shaders use gl_VertexIndex
 // and an explicit BaseVertex constant, so shader draw parameters are unnecessary.
 static constexpr std::array<const char*, 0> s_required_device_extensions = {};
@@ -1886,7 +1903,11 @@ void GSDeviceVK::SubmitCommandBuffer(VKSwapChain* present_swap_chain)
 
 		present_swap_chain->ResetImageAcquireResult();
 
+		const bool present_timing = VKSwapChain::PresentTimingEnabled();
+		const u64 present_t0 = present_timing ? VKSwapChain::PresentTimingNowNs() : 0;
 		res = vkQueuePresentKHR(m_present_queue, &present_info);
+		if (present_timing)
+			present_swap_chain->RecordPresentTime(VKSwapChain::PresentTimingNowNs() - present_t0);
 		if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
 		{
 			// VK_ERROR_OUT_OF_DATE_KHR is not fatal, just means we need to recreate our swap chain.
@@ -1920,6 +1941,10 @@ void GSDeviceVK::CommandBufferCompleted(u32 index)
 	for (auto& it : resources.cleanup_resources)
 		it();
 	resources.cleanup_resources.clear();
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+	if (s_pass_timing)
+		PassTimingCollect(index);
+#endif
 
 	bool wants_timestamps = m_gpu_timing_enabled || resources.spin_id >= 0;
 
@@ -2048,6 +2073,10 @@ void GSDeviceVK::ActivateCommandBuffer(u32 index)
 
 	m_current_frame = index;
 	m_current_command_buffer = resources.command_buffers[1];
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+	if (s_pass_timing)
+		PassTimingActivate(index);
+#endif
 
 	// using the lower 32 bits of the fence index should be sufficient here, I hope...
 	vmaSetCurrentFrameIndex(m_allocator, static_cast<u32>(m_next_fence_counter));
@@ -2937,6 +2966,8 @@ void GSDeviceVK::Destroy()
 	std::unique_lock lock(s_instance_mutex);
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
 	DumpPassEndSites();
+	if (s_pass_timing)
+		PassTimingDump();
 #endif
 
 	// Workers touch m_device and the shader cache, so they must be gone before teardown.
@@ -3279,6 +3310,9 @@ GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
 		fb,
 		{{0, 0}, {static_cast<u32>(swap_chain_texture->GetWidth()), static_cast<u32>(swap_chain_texture->GetHeight())}},
 		1u, &s_present_clear_color};
+	EMUCOREX_PASS_TIMING_BEGIN(GetCurrentCommandBuffer(), rp.renderPass,
+		GSVector4i(0, 0, swap_chain_texture->GetWidth(), swap_chain_texture->GetHeight()),
+		static_cast<u32>(swap_chain_texture->GetWidth()), static_cast<u32>(swap_chain_texture->GetHeight()));
 	vkCmdBeginRenderPass(GetCurrentCommandBuffer(), &rp, VK_SUBPASS_CONTENTS_INLINE);
 
 	const VkViewport vp{0.0f, 0.0f, static_cast<float>(swap_chain_texture->GetWidth()),
@@ -3300,6 +3334,7 @@ void GSDeviceVK::EndPresent()
 
 	VkCommandBuffer cmdbuffer = GetCurrentCommandBuffer();
 	vkCmdEndRenderPass(cmdbuffer);
+	EMUCOREX_PASS_TIMING_END(cmdbuffer, 0, true);
 	m_is_presenting = false;
 	m_swap_chain->GetCurrentTexture()->TransitionToLayout(cmdbuffer, GSTextureVK::Layout::PresentSrc);
 	g_perfmon.Put(GSPerfMon::RenderPasses, 1);
@@ -3904,6 +3939,7 @@ void GSDeviceVK::DrawIndexedPrimitiveVSExpand(int offset, int count, bool vs_ind
 	pxAssert(offset + count <= (int)m_index.count);
 
 	g_perfmon.Put(GSPerfMon::DrawCalls, 1);
+	EMUCOREX_PASS_TIMING_DRAW();
 	if (vs_indexing)
 	{
 		SetVSPushConstants(m_vertex.start, m_index.start + offset);
@@ -3957,12 +3993,14 @@ void GSDeviceVK::Draw(const GSHWDrawConfig& config)
 void GSDeviceVK::DrawPrimitive()
 {
 	g_perfmon.Put(GSPerfMon::DrawCalls, 1);
+	EMUCOREX_PASS_TIMING_DRAW();
 	vkCmdDraw(GetCurrentCommandBuffer(), m_vertex.count, 1, m_vertex.start, 0);
 }
 
 void GSDeviceVK::DrawIndexedPrimitive()
 {
 	g_perfmon.Put(GSPerfMon::DrawCalls, 1);
+	EMUCOREX_PASS_TIMING_DRAW();
 	vkCmdDrawIndexed(GetCurrentCommandBuffer(), m_index.count, 1, m_index.start, m_vertex.start, 0);
 }
 
@@ -3970,6 +4008,7 @@ void GSDeviceVK::DrawIndexedPrimitive(int offset, int count)
 {
 	pxAssert(offset + count <= (int)m_index.count);
 	g_perfmon.Put(GSPerfMon::DrawCalls, 1);
+	EMUCOREX_PASS_TIMING_DRAW();
 	vkCmdDrawIndexed(GetCurrentCommandBuffer(), count, 1, m_index.start + offset, m_vertex.start, 0);
 }
 
@@ -9106,6 +9145,7 @@ void GSDeviceVK::ExecuteCommandBufferAndRestartPresent(bool wait_for_completion,
 
 	pxAssert(m_is_presenting);
 	vkCmdEndRenderPass(GetCurrentCommandBuffer());
+	EMUCOREX_PASS_TIMING_END(GetCurrentCommandBuffer(), 0);
 	ExecuteCommandBuffer(wait_for_completion);
 
 	GSTextureVK* swap_chain_texture = m_swap_chain->GetCurrentTexture();
@@ -9119,6 +9159,9 @@ void GSDeviceVK::ExecuteCommandBufferAndRestartPresent(bool wait_for_completion,
 		fb,
 		{{0, 0}, {static_cast<u32>(swap_chain_texture->GetWidth()), static_cast<u32>(swap_chain_texture->GetHeight())}},
 		0u, nullptr};
+	EMUCOREX_PASS_TIMING_BEGIN(GetCurrentCommandBuffer(), rp.renderPass,
+		GSVector4i(0, 0, swap_chain_texture->GetWidth(), swap_chain_texture->GetHeight()),
+		static_cast<u32>(swap_chain_texture->GetWidth()), static_cast<u32>(swap_chain_texture->GetHeight()));
 	vkCmdBeginRenderPass(GetCurrentCommandBuffer(), &rp, VK_SUBPASS_CONTENTS_INLINE);
 
 	// Dynamic viewport/scissor state does not survive a command-buffer submission.
@@ -9428,6 +9471,7 @@ void GSDeviceVK::BeginRenderPass(VkRenderPass rp, const GSVector4i& rect)
 		nullptr};
 
 	m_command_buffer_render_passes++;
+	EMUCOREX_PASS_TIMING_BEGIN(GetCurrentCommandBuffer(), rp, rect);
 	vkCmdBeginRenderPass(GetCurrentCommandBuffer(), &begin_info, VK_SUBPASS_CONTENTS_INLINE);
 }
 
@@ -9444,6 +9488,7 @@ void GSDeviceVK::BeginClearRenderPass(VkRenderPass rp, const GSVector4i& rect, c
 		m_current_framebuffer, {{rect.x, rect.y}, {static_cast<u32>(rect.width()), static_cast<u32>(rect.height())}},
 		cv_count, cv};
 
+	EMUCOREX_PASS_TIMING_BEGIN(GetCurrentCommandBuffer(), rp, rect);
 	vkCmdBeginRenderPass(GetCurrentCommandBuffer(), &begin_info, VK_SUBPASS_CONTENTS_INLINE);
 }
 
@@ -9508,6 +9553,277 @@ static void DumpPassEndSites()
 } // namespace
 #endif
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+namespace
+{
+// Per-render-pass GPU timing. Timestamps are written outside render passes only:
+// TOP_OF_PIPE right before vkCmdBeginRenderPass, BOTTOM_OF_PIPE right after
+// vkCmdEndRenderPass. On tilers the begin stamp can retire before earlier work has
+// drained, so per-pass numbers include some overlap; compare keys, not single passes.
+constexpr u32 PT_QUERIES_PER_CB = 2 * 4096;
+struct PtPass
+{
+	u32 q = 0;
+	u32 rp_key = 0;
+	bool has_key = false;
+	u32 rt_w = 0, rt_h = 0, ds_w = 0, ds_h = 0, area_w = 0, area_h = 0;
+	u32 draws = 0, barriers = 0;
+	uintptr_t caller = 0;
+};
+struct PtCB
+{
+	std::vector<PtPass> passes;
+	u32 next_q = 0;
+	bool pending = false;
+};
+struct PtAgg
+{
+	u64 count = 0, draws = 0, barriers = 0;
+	double total_us = 0.0, max_us = 0.0, area_px = 0.0;
+	std::map<uintptr_t, u64> callers;
+};
+struct PtState
+{
+	VkQueryPool pool = VK_NULL_HANDLE;
+	bool init_tried = false;
+	u32 valid_bits = 0;
+	std::array<PtCB, GSDeviceVK::NUM_COMMAND_BUFFERS> cbs;
+	PtPass cur;
+	u32 cur_cb = 0;
+	std::map<std::string, PtAgg> agg;
+	u64 frames = 0, passes = 0, overflow = 0;
+	double total_us = 0.0;
+};
+static PtState s_pt;
+} // namespace
+
+void GSDeviceVK::PassTimingActivate(u32 index)
+{
+	s_pass_timing_active = false;
+	if (!s_pt.init_tried)
+	{
+		s_pt.init_tried = true;
+		u32 count = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(m_physical_device, &count, nullptr);
+		std::vector<VkQueueFamilyProperties> props(count);
+		vkGetPhysicalDeviceQueueFamilyProperties(m_physical_device, &count, props.data());
+		s_pt.valid_bits = m_graphics_queue_family_index < count ? props[m_graphics_queue_family_index].timestampValidBits : 0;
+		if (s_pt.valid_bits == 0 || m_device_properties.limits.timestampPeriod <= 0.0f)
+		{
+			std::fprintf(stderr, "GS_PASS_TIME unsupported: timestampValidBits=%u timestampPeriod=%f (pass timing disabled)\n",
+				s_pt.valid_bits, static_cast<double>(m_device_properties.limits.timestampPeriod));
+		}
+		else
+		{
+			const VkQueryPoolCreateInfo info = {VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO, nullptr, 0, VK_QUERY_TYPE_TIMESTAMP,
+				NUM_COMMAND_BUFFERS * PT_QUERIES_PER_CB, 0};
+			if (vkCreateQueryPool(m_device, &info, nullptr, &s_pt.pool) != VK_SUCCESS)
+			{
+				s_pt.pool = VK_NULL_HANDLE;
+				std::fprintf(stderr, "GS_PASS_TIME unsupported: vkCreateQueryPool failed (pass timing disabled)\n");
+			}
+			else
+			{
+				std::fprintf(stderr, "GS_PASS_TIME enabled: validBits=%u period_ns=%f queries_per_cb=%u\n", s_pt.valid_bits,
+					static_cast<double>(m_device_properties.limits.timestampPeriod), PT_QUERIES_PER_CB);
+			}
+		}
+	}
+	if (s_pt.pool == VK_NULL_HANDLE)
+		return;
+
+	PassTimingCollect(index); // Safety net: the fence for this buffer was waited on above.
+	PtCB& cb = s_pt.cbs[index];
+	cb.passes.clear();
+	cb.next_q = 0;
+	cb.pending = false;
+	vkCmdResetQueryPool(m_frame_resources[index].command_buffers[1], s_pt.pool, index * PT_QUERIES_PER_CB, PT_QUERIES_PER_CB);
+}
+
+void GSDeviceVK::PassTimingBegin(VkCommandBuffer cmdbuf, VkRenderPass rp, const GSVector4i& rect, u32 present_w, u32 present_h)
+{
+	s_pass_timing_active = false;
+	if (s_pt.pool == VK_NULL_HANDLE)
+		return;
+	PtCB& cb = s_pt.cbs[m_current_frame];
+	if (cb.next_q + 2 > PT_QUERIES_PER_CB)
+	{
+		s_pt.overflow++;
+		return;
+	}
+
+	PtPass p;
+	p.q = cb.next_q;
+	p.area_w = static_cast<u32>(rect.width());
+	p.area_h = static_cast<u32>(rect.height());
+	for (const auto& it : m_render_pass_cache)
+	{
+		if (it.second == rp)
+		{
+			p.rp_key = it.first;
+			p.has_key = true;
+			break;
+		}
+	}
+	RenderPassCacheKey key;
+	key.key = p.rp_key;
+	if (present_w)
+	{
+		p.rt_w = present_w;
+		p.rt_h = present_h;
+	}
+	else
+	{
+		if (m_current_render_target && (!p.has_key || key.color_format != VK_FORMAT_UNDEFINED))
+		{
+			p.rt_w = static_cast<u32>(m_current_render_target->GetWidth());
+			p.rt_h = static_cast<u32>(m_current_render_target->GetHeight());
+		}
+		if (m_current_depth_target && (!p.has_key || key.depth_format != VK_FORMAT_UNDEFINED))
+		{
+			p.ds_w = static_cast<u32>(m_current_depth_target->GetWidth());
+			p.ds_h = static_cast<u32>(m_current_depth_target->GetHeight());
+		}
+	}
+
+	vkCmdWriteTimestamp(cmdbuf, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, s_pt.pool, m_current_frame * PT_QUERIES_PER_CB + p.q);
+	cb.next_q += 2;
+	s_pt.cur = p;
+	s_pt.cur_cb = m_current_frame;
+	s_pass_timing_draws = 0;
+	s_pass_timing_barriers = 0;
+	s_pass_timing_active = true;
+}
+
+void GSDeviceVK::PassTimingEnd(VkCommandBuffer cmdbuf, uintptr_t caller, bool present)
+{
+	if (present)
+		s_pt.frames++;
+	if (!s_pass_timing_active)
+		return;
+	s_pass_timing_active = false;
+	PtPass p = s_pt.cur;
+	p.draws = s_pass_timing_draws;
+	p.barriers = s_pass_timing_barriers;
+	p.caller = caller;
+	vkCmdWriteTimestamp(cmdbuf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, s_pt.pool, s_pt.cur_cb * PT_QUERIES_PER_CB + p.q + 1);
+	PtCB& cb = s_pt.cbs[s_pt.cur_cb];
+	cb.passes.push_back(p);
+	cb.pending = true;
+}
+
+void GSDeviceVK::PassTimingCollect(u32 index)
+{
+	if (s_pt.pool == VK_NULL_HANDLE)
+		return;
+	PtCB& cb = s_pt.cbs[index];
+	if (!cb.pending || cb.next_q == 0)
+		return;
+
+	// Two u64 per query: value, availability.
+	std::vector<u64> r(static_cast<size_t>(cb.next_q) * 2);
+	const VkResult res = vkGetQueryPoolResults(m_device, s_pt.pool, index * PT_QUERIES_PER_CB, cb.next_q,
+		r.size() * sizeof(u64), r.data(), 2 * sizeof(u64), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+	if (res == VK_SUCCESS || res == VK_NOT_READY)
+	{
+		const u64 mask = s_pt.valid_bits >= 64 ? ~0ull : ((1ull << s_pt.valid_bits) - 1);
+		const double period_us = static_cast<double>(m_device_properties.limits.timestampPeriod) / 1000.0;
+		for (const PtPass& p : cb.passes)
+		{
+			const size_t b = static_cast<size_t>(p.q) * 2, e = static_cast<size_t>(p.q + 1) * 2;
+			if (!r[b + 1] || !r[e + 1])
+				continue;
+			const double us = static_cast<double>((r[e] - r[b]) & mask) * period_us;
+
+			RenderPassCacheKey key;
+			key.key = p.rp_key;
+			static const char* const load_names[] = {"load", "clear", "dontcare", "?"};
+			static const char* const store_names[] = {"store", "dontcare"};
+			char buf[256];
+			if (p.has_key)
+			{
+				const bool fb = key.color_feedback_loop || key.depth_sampling;
+				const char* mode = !fb ? "none" : m_features.framebuffer_fetch ? "roaa" : UseFeedbackLoopLayout() ? "fbl" : "input";
+				std::snprintf(buf, sizeof(buf),
+					"rt=%ux%u/fmt%u ds=%ux%u/fmt%u color=%s/%s depth=%s/%s stencil=%s/%s fbloop=%u dsamp=%u fetch=%s", p.rt_w, p.rt_h,
+					static_cast<u32>(key.color_format), p.ds_w, p.ds_h, static_cast<u32>(key.depth_format),
+					load_names[key.color_load_op], store_names[key.color_store_op], load_names[key.depth_load_op],
+					store_names[key.depth_store_op], load_names[key.stencil_load_op], store_names[key.stencil_store_op],
+					static_cast<u32>(key.color_feedback_loop), static_cast<u32>(key.depth_sampling), mode);
+			}
+			else
+			{
+				std::snprintf(buf, sizeof(buf), "rt=%ux%u ds=%ux%u rp=unknown", p.rt_w, p.rt_h, p.ds_w, p.ds_h);
+			}
+			PtAgg& a = s_pt.agg[buf];
+			a.count++;
+			a.total_us += us;
+			a.max_us = std::max(a.max_us, us);
+			a.draws += p.draws;
+			a.barriers += p.barriers;
+			a.area_px += static_cast<double>(p.area_w) * p.area_h;
+			a.callers[p.caller]++;
+			s_pt.passes++;
+			s_pt.total_us += us;
+		}
+	}
+	cb.passes.clear();
+	cb.next_q = 0;
+	cb.pending = false;
+}
+
+void GSDeviceVK::PassTimingDump()
+{
+	if (s_pt.pool != VK_NULL_HANDLE)
+	{
+		vkDeviceWaitIdle(m_device);
+		for (u32 i = 0; i < NUM_COMMAND_BUFFERS; i++)
+			PassTimingCollect(i);
+		vkDestroyQueryPool(m_device, s_pt.pool, nullptr);
+		s_pt.pool = VK_NULL_HANDLE;
+	}
+	s_pt.init_tried = false;
+	s_pass_timing_active = false;
+
+	std::vector<std::pair<const std::string*, const PtAgg*>> rows;
+	for (const auto& it : s_pt.agg)
+		rows.emplace_back(&it.first, &it.second);
+	std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) { return a.second->total_us > b.second->total_us; });
+	const auto offset = [](uintptr_t address) -> uintptr_t {
+		Dl_info info{};
+		return (address && dladdr(reinterpret_cast<void*>(address), &info) && info.dli_fbase) ?
+				   address - reinterpret_cast<uintptr_t>(info.dli_fbase) : 0;
+	};
+	for (size_t i = 0; i < rows.size() && i < 40; i++)
+	{
+		const PtAgg& a = *rows[i].second;
+		uintptr_t top_caller = 0;
+		u64 top_count = 0;
+		for (const auto& [caller, n] : a.callers)
+		{
+			if (n > top_count)
+			{
+				top_count = n;
+				top_caller = caller;
+			}
+		}
+		std::fprintf(stderr,
+			"GS_PASS_TIME rank=%zu total_us=%.0f count=%llu avg_us=%.1f max_us=%.1f draws=%llu barriers=%llu avg_area_px=%.0f caller=0x%zx %s\n",
+			i + 1, a.total_us, static_cast<unsigned long long>(a.count), a.total_us / static_cast<double>(a.count), a.max_us,
+			static_cast<unsigned long long>(a.draws), static_cast<unsigned long long>(a.barriers),
+			a.area_px / static_cast<double>(a.count), static_cast<size_t>(offset(top_caller)), rows[i].first->c_str());
+	}
+	if (s_pt.overflow)
+		std::fprintf(stderr, "GS_PASS_TIME_SKIPPED overflow_passes=%llu\n", static_cast<unsigned long long>(s_pt.overflow));
+	if (s_pt.passes || s_pt.frames)
+		std::fprintf(stderr, "GS_PASS_TIME_TOTAL frames=%llu passes=%llu gpu_us=%llu\n", static_cast<unsigned long long>(s_pt.frames),
+			static_cast<unsigned long long>(s_pt.passes), static_cast<unsigned long long>(s_pt.total_us));
+	s_pt.agg.clear();
+	s_pt.frames = s_pt.passes = s_pt.overflow = 0;
+	s_pt.total_us = 0.0;
+}
+#endif
+
 void GSDeviceVK::EndRenderPass()
 {
 
@@ -9529,6 +9845,7 @@ void GSDeviceVK::EndRenderPass()
 	g_perfmon.Put(GSPerfMon::RenderPasses, 1);
 
 	vkCmdEndRenderPass(GetCurrentCommandBuffer());
+	EMUCOREX_PASS_TIMING_END(GetCurrentCommandBuffer(), reinterpret_cast<uintptr_t>(__builtin_return_address(0)));
 
 	// Same-attachment pass consumers are ordered by the incoming dependency.
 	// Sampling, transfer and compute consumers retain their explicit transitions.
@@ -10046,6 +10363,7 @@ bool GSDeviceVK::DrawStencilCounter(GSHWDrawConfig& config)
 	vkCmdSetScissor(cmdbuf, 0, 1, &scissor);
 	vkCmdPushConstants(cmdbuf, m_stencil_counter_pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(step), step);
 	g_perfmon.Put(GSPerfMon::DrawCalls, 1);
+	EMUCOREX_PASS_TIMING_DRAW();
 	vkCmdDraw(cmdbuf, 3, 1, 0, 0);
 
 	// Everything bound above went around the state cache, so the next draw binds its own again.
@@ -11067,6 +11385,7 @@ void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, 
 
 		vkCmdPipelineBarrier(GetCurrentCommandBuffer(), barrier_src_stages, barrier_dst_stages, barrier_flags, 0,
 			nullptr, 0, nullptr, n_barriers, barriers.data());
+		EMUCOREX_PASS_TIMING_BARRIER();
 	};
 
 	if (full_barrier)
