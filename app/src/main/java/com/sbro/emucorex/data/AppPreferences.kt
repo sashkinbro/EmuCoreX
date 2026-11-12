@@ -264,7 +264,6 @@ data class SettingsSnapshot(
     val gamepadDeviceAssignments: Map<Int, String> = emptyMap(),
     val ignoredGamepadDevices: Set<String> = emptySet(),
     val gpuDriverType: Int = 0,
-    val mediatekAngleOpenGl: Boolean = false,
     val customDriverPath: String? = null,
     val dev9: Dev9Settings = Dev9Settings(),
     val frameLimitEnabled: Boolean = true,
@@ -362,7 +361,7 @@ class AppPreferences(private val context: Context) {
          * custom GPU-driver paths, networking identities/room codes, locale and manager UI.
          */
         internal val EMULATOR_CLOUD_KEYS = setOf(
-            "performanceProfile", "renderer", "mediatekAngleOpenGl", "upscaleMultiplier",
+            "performanceProfile", "renderer", "upscaleMultiplier",
             "shaderChainEnabled", "shaderChainPreset", "aspectRatio", "displayCropLeft",
             "displayCropTop", "displayCropRight", "displayCropBottom", "audioVolume",
             "audioFastForwardVolume", "audioMuted", "audioInterpolation", "audioSyncMode",
@@ -886,7 +885,6 @@ class AppPreferences(private val context: Context) {
         private val GAMEPAD_DEVICE_ASSIGNMENTS = stringPreferencesKey("gamepad_device_assignments")
         private val GAMEPAD_IGNORED_DEVICES = stringPreferencesKey("gamepad_ignored_devices")
         private val GPU_DRIVER_TYPE = intPreferencesKey("gpu_driver_type")
-        private val MEDIATEK_ANGLE_OPENGL = booleanPreferencesKey("mediatek_angle_opengl")
         private val CUSTOM_DRIVER_PATH = stringPreferencesKey("custom_driver_path")
         private val DEV9_ETHERNET_ENABLED = booleanPreferencesKey("dev9_ethernet_enabled")
         private val DEV9_ETHERNET_DEVICE = stringPreferencesKey("dev9_ethernet_device")
@@ -2273,7 +2271,6 @@ class AppPreferences(private val context: Context) {
                 gamepadDeviceAssignments = decodeGamepadDeviceAssignments(prefs[GAMEPAD_DEVICE_ASSIGNMENTS]),
                 ignoredGamepadDevices = decodeIgnoredGamepadDevices(prefs[GAMEPAD_IGNORED_DEVICES]),
                 gpuDriverType = prefs[GPU_DRIVER_TYPE] ?: 0,
-                mediatekAngleOpenGl = prefs[MEDIATEK_ANGLE_OPENGL] ?: false,
                 customDriverPath = prefs[CUSTOM_DRIVER_PATH],
                 dev9 = Dev9Settings(
                     ethernetEnabled = prefs[DEV9_ETHERNET_ENABLED] ?: false,
@@ -3501,14 +3498,6 @@ class AppPreferences(private val context: Context) {
 
     val blendingAccuracyUserOverride: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[BLENDING_ACCURACY_USER_OVERRIDE] ?: (prefs[BLENDING_ACCURACY] != null)
-    }
-
-    val mediatekAngleOpenGl: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[MEDIATEK_ANGLE_OPENGL] ?: false
-    }
-
-    suspend fun setMediatekAngleOpenGl(enabled: Boolean) {
-        context.dataStore.edit { it[MEDIATEK_ANGLE_OPENGL] = enabled }
     }
 
     val texturePreloading: Flow<Int> = context.dataStore.data.map { prefs ->
@@ -4780,7 +4769,6 @@ class AppPreferences(private val context: Context) {
             put("performanceProfile", resolvePerformanceProfile(prefs))
             put("gpuHardwareProfile", gpuHardwareProfile)
             put("renderer", normalizeRendererPreference(prefs[RENDERER]))
-            put("mediatekAngleOpenGl", prefs[MEDIATEK_ANGLE_OPENGL] ?: false)
             put("upscaleMultiplier", readUpscale(prefs).toDouble())
             put("shaderChainEnabled", prefs[SHADER_CHAIN_ENABLED] ?: false)
             put("shaderChainPreset", prefs[SHADER_CHAIN_PRESET].orEmpty())
@@ -5222,15 +5210,10 @@ class AppPreferences(private val context: Context) {
             prefs[PERFORMANCE_PROFILE] = PerformanceProfiles.normalize(
                 json.optInt("performanceProfile", PerformanceProfiles.SAFE)
             )
-            val gpuHardwareProfile = GpuHardwareProfiles.normalize(
-                json.optInt("gpuHardwareProfile", GpuHardwareProfiles.ADRENO)
-            )
             val importedRenderer = normalizeRendererPreference(
                 if (json.has("renderer")) json.optInt("renderer") else null
             )
             prefs[RENDERER] = importedRenderer
-            prefs[MEDIATEK_ANGLE_OPENGL] = json.optBoolean("mediatekAngleOpenGl", false) &&
-                GpuHardwareProfiles.isMediatekProfile(gpuHardwareProfile)
             prefs[UPSCALE] = json.readUpscaleMultiplier()
             prefs[SHADER_CHAIN_ENABLED] = json.optBoolean("shaderChainEnabled", false)
             json.optString("shaderChainPreset").trim().takeIf(String::isNotEmpty)?.let {
