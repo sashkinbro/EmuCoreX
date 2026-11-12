@@ -308,6 +308,8 @@ fun SettingsScreen(
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     var selectedTab by rememberSaveable(initialTab) { mutableStateOf(initialTab.toSettingsTab()) }
+    var showAdvancedEmulationSettings by rememberSaveable { mutableStateOf(false) }
+    var showAdvancedFixSettings by rememberSaveable { mutableStateOf(false) }
     val pendingGamepadActionId = remember { mutableStateOf<String?>(null) }
     var pendingGamepadPadIndex by rememberSaveable { mutableIntStateOf(0) }
     var showTopBarMenu by remember { mutableStateOf(false) }
@@ -2828,6 +2830,13 @@ private fun SettingsContent(
                 }
 
                 SettingsTab.Emulation -> {
+                    ToggleItem(
+                        icon = Icons.Rounded.Tune,
+                        title = stringResource(R.string.emulation_advanced_settings),
+                        subtitle = stringResource(R.string.settings_expert_controls_desc),
+                        checked = showAdvancedEmulationSettings,
+                        onCheckedChange = { showAdvancedEmulationSettings = it }
+                    )
                     SettingsSection(title = stringResource(R.string.emulation_performance_stats)) {
                         ToggleItem(
                             icon = Icons.Rounded.Speed,
@@ -2882,6 +2891,7 @@ private fun SettingsContent(
                             )
                         }
                     }
+                    if (showAdvancedEmulationSettings) {
                     SettingsSection(title = stringResource(R.string.settings_jit_section)) {
                         ToggleItem(
                             icon = Icons.Rounded.Speed,
@@ -3321,6 +3331,7 @@ private fun SettingsContent(
                             onResetToDefault = { viewModel.setEnableFastCdvd(defaults.enableFastCdvd) }
                         )
                     }
+                    }
                 }
 
                 SettingsTab.Fixes -> {
@@ -3371,6 +3382,14 @@ private fun SettingsContent(
                             onResetToDefault = { viewModel.setAntiBlur(defaults.antiBlur) }
                         )
                     }
+                    ToggleItem(
+                        icon = Icons.Rounded.Tune,
+                        title = stringResource(R.string.emulation_advanced_settings),
+                        subtitle = stringResource(R.string.settings_expert_rendering_fixes_desc),
+                        checked = showAdvancedFixSettings,
+                        onCheckedChange = { showAdvancedFixSettings = it }
+                    )
+                    if (showAdvancedFixSettings) {
                     SettingsSection(title = stringResource(R.string.settings_hardware_fixes)) {
                         ChoiceSection(
                             title = stringResource(R.string.settings_cpu_sprite_render_size),
@@ -3615,6 +3634,7 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_native_palette_draw),
                             onResetToDefault = { viewModel.setNativePaletteDraw(defaults.nativePaletteDraw) }
                         )
+                    }
                     }
                 }
 
