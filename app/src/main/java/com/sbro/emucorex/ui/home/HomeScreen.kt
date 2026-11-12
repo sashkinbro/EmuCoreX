@@ -122,6 +122,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -233,7 +235,16 @@ fun HomeScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val customCoverRepository = remember(context) { CustomGameCoverRepository(context) }
     val homeBackgroundRepository = remember(context) { HomeBackgroundRepository(context) }
-    val isLandscape = windowMetrics.widthDp > windowMetrics.heightDp
+    // Real size of the library area; window/configuration values can be transiently stale during rotation.
+    var libraryAreaSizePx by remember { mutableStateOf(IntSize.Zero) }
+    val libraryAreaWidthDp = with(density) { libraryAreaSizePx.width.toDp().value.roundToInt() }
+    val libraryAreaHeightDp = with(density) { libraryAreaSizePx.height.toDp().value.roundToInt() }
+    val hasMeasuredLibraryArea = libraryAreaWidthDp > 0 && libraryAreaHeightDp > 0
+    val isLandscape = if (hasMeasuredLibraryArea) {
+        libraryAreaWidthDp > libraryAreaHeightDp
+    } else {
+        windowMetrics.widthDp > windowMetrics.heightDp
+    }
     val isTabletClass = configuration.smallestScreenWidthDp >= 600
     val isWide = isTabletClass && windowMetrics.widthDp >= 900
     val isShelfView = uiState.libraryViewMode == HomeLibraryViewMode.SHELF
@@ -245,17 +256,30 @@ fun HomeScreen(
     val sectionInnerSpacing = 4.dp
     val baseCellSize = if (isLandscape) 94.dp else 102.dp
     val minCellSize = baseCellSize * uiState.homeGridScale
-    val columnsCount = calculateHomeGridColumnCount(
-        screenWidthDp = windowMetrics.widthDp,
-        screenHeightDp = windowMetrics.heightDp,
-        smallestScreenWidthDp = configuration.smallestScreenWidthDp,
-        gridScale = uiState.homeGridScale,
-        contentReservedWidthDp = if (tvUiEnabled) {
-            TvUiMetrics.contentReservedWidthDp(windowMetrics.widthDp)
-        } else {
-            null
-        }
-    )
+    val tvReservedContentWidthDp = if (tvUiEnabled) {
+        TvUiMetrics.contentReservedWidthDp(windowMetrics.widthDp)
+    } else {
+        null
+    }
+    val columnsCount = if (hasMeasuredLibraryArea) {
+        // The measured area already excludes any reserved side panel, so add it back for the shared formula.
+        val reservedWidthDp = tvReservedContentWidthDp ?: if (isWide) 332 else 0
+        calculateHomeGridColumnCount(
+            screenWidthDp = libraryAreaWidthDp + reservedWidthDp,
+            screenHeightDp = libraryAreaHeightDp,
+            smallestScreenWidthDp = configuration.smallestScreenWidthDp,
+            gridScale = uiState.homeGridScale,
+            contentReservedWidthDp = reservedWidthDp
+        )
+    } else {
+        calculateHomeGridColumnCount(
+            screenWidthDp = windowMetrics.widthDp,
+            screenHeightDp = windowMetrics.heightDp,
+            smallestScreenWidthDp = configuration.smallestScreenWidthDp,
+            gridScale = uiState.homeGridScale,
+            contentReservedWidthDp = tvReservedContentWidthDp
+        )
+    }
     val isListView = uiState.libraryViewMode == HomeLibraryViewMode.LIST
     val standardViewMode = if (isShelfView) uiState.lastStandardLibraryViewMode else uiState.libraryViewMode
     val gridState = rememberLazyGridState()
@@ -564,7 +588,11 @@ fun HomeScreen(
                 } else {
                     val columns = if (isListView) GridCells.Fixed(1) else GridCells.Adaptive(minSize = minCellSize)
 
-                    Box(modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .onSizeChanged { libraryAreaSizePx = it }
+                    ) {
                         LazyVerticalGrid(
                             columns = columns,
                             state = gridState,

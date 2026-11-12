@@ -378,6 +378,9 @@ private fun CompactAdaptiveShell(
         withFrameNanos { }
         withFrameNanos { }
         delay(DRAWER_DESTINATION_SETTLE_MS.milliseconds)
+        if (drawerState.currentValue != DrawerValue.Closed || drawerState.targetValue != DrawerValue.Closed) {
+            drawerState.snapTo(DrawerValue.Closed)
+        }
         destinationSettled = true
     }
     LaunchedEffect(drawerState.isOpen, mobileLeadingAction, selected) {
