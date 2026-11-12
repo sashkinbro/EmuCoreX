@@ -2098,8 +2098,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         currentCustomTouchControlsProfile = launchProfile?.customTouchControls
         currentGameCoverArtPath = null
         lastAutoSavePlayTimeMs = 0L
-        pendingPlayTimeSyncMs = 0L
-        shouldCountCurrentProfileSession = false
         _uiState.value = applyInterfaceSettings(
             _uiState.value
                 .copy(
@@ -2306,8 +2304,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     currentGameCoverArtPath = null
                     currentGameCrc = ""
                     currentGameSource = "autotest_elf"
-                    shouldCountCurrentProfileSession = false
-                    shouldTrackCurrentProfilePlayTime = false
                     _uiState.value = _uiState.value.copy(
                         currentGameTitle = currentGameTitle,
                         currentGameSubtitle = currentGameSubtitle(),
@@ -2342,8 +2338,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                         serial = currentGameSerial.takeIf { it.isNotBlank() },
                         title = currentGameTitle
                     )
-                    shouldTrackCurrentProfilePlayTime = !bootSmokeProbe
-                    shouldCountCurrentProfileSession = shouldTrackCurrentProfilePlayTime
                     currentGameCrc = metadata.serialWithCrc.extractCrc().orEmpty()
                     currentGameSource = when {
                         safePath.startsWith("content://") -> "content_uri"
@@ -5877,7 +5871,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     showActionProgress = true
                 )
             }
-            cachePendingPlayTime()
             performShutdown()
             if (onExit != null) {
                 withContext(Dispatchers.Main) {
