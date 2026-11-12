@@ -1433,7 +1433,12 @@ object EmulatorBridge {
         Log.i(TAG, "onSurfaceCreated: called")
         NativeApp.setCrashContextString("emu_surface_state", "created")
         NativeApp.logCrashBreadcrumb("surfaceCreated")
+        val eventVersion = surfaceEventVersion
         launchSerial {
+            if (surfaceEventVersion != eventVersion) {
+                Log.w(TAG, "onSurfaceCreated: eventVersion mismatch ($eventVersion != $surfaceEventVersion), skipping")
+                return@launchSerial
+            }
             try {
                 NativeApp.onNativeSurfaceCreated()
                 Log.i(TAG, "onSurfaceCreated: native callback done")
@@ -1457,6 +1462,10 @@ object EmulatorBridge {
         launchSerial {
             if (surfaceEventVersion != eventVersion) {
                 Log.w(TAG, "onSurfaceChanged: eventVersion mismatch ($eventVersion != $surfaceEventVersion), skipping")
+                return@launchSerial
+            }
+            if (!surface.isValid) {
+                Log.w(TAG, "onSurfaceChanged: surface no longer valid, skipping")
                 return@launchSerial
             }
             try {
@@ -1498,7 +1507,10 @@ object EmulatorBridge {
         }
         Log.i(TAG, "rebindSurface: width=$width height=$height")
         NativeApp.logCrashBreadcrumb("rebindSurface width=$width height=$height")
+        val eventVersion = surfaceEventVersion
         try {
+            // Re-check right before the native call: destroy bumps the version synchronously.
+            if (surfaceEventVersion != eventVersion || lastSurface !== binding || !surface.isValid) return
             NativeApp.onNativeSurfaceChanged(surface, width, height, refreshRate, binding.generation)
         } catch (_: Exception) { }
     }

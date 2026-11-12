@@ -585,6 +585,25 @@ internal data class LiveRuntimeSnapshot(
     val nativePaletteDraw: Boolean
 )
 
+/**
+ * Process-lifetime scope for exit work (autosave, play-time sync, VM shutdown). It must outlive the
+ * ViewModel, which is cleared as soon as the emulation route is popped.
+ */
+private object EmulationExitCoordinator {
+    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
+
+    @Volatile
+    var inFlight: Job? = null
+
+    fun launchTracked(block: suspend () -> Unit): Job {
+        val job = scope.launch(start = kotlinx.coroutines.CoroutineStart.LAZY) { block() }
+        inFlight = job
+        job.invokeOnCompletion { if (inFlight === job) inFlight = null }
+        job.start()
+        return job
+    }
+}
+
 class EmulationViewModel(application: Application) : AndroidViewModel(application) {
     private companion object {
         const val TAG = "EmulationViewModel"
@@ -676,6 +695,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     private var hostInBackground = false
     @Volatile
     private var fastForwardRequested = false
+    @Volatile
+    private var viewModelCleared = false
     @Volatile
     private var isShuttingDown = false
     @Volatile
@@ -2211,8 +2232,20 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 statusMessage = "status_preparing"
             )
 
-            if (_uiState.value.isRunning || EmulatorBridge.hasValidVm()) {
+            // A previous ViewModel may still be autosaving/shutting down; never start before it is done.
+            EmulationExitCoordinator.inFlight?.join()
+            if (_uiState.value.isRunning) {
                 performShutdown()
+                delay(300.milliseconds)
+            } else if (EmulatorBridge.hasValidVm()) {
+                // Leftover VM from a previous ViewModel: stop it through the bridge's serial queue.
+                EmulatorBridge.setTurboModeEnabled(false)
+                EmulatorBridge.shutdown()
+                var waitTime = 0
+                while (EmulatorBridge.isVmActive() && waitTime < 2000) {
+                    delay(50.milliseconds)
+                    waitTime += 50
+                }
                 delay(300.milliseconds)
             }
 
@@ -5946,7 +5979,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         cancelPendingStart = true
         abortPendingShaderPreparation()
         pausedForBackground = false
-        viewModelScope.launch(Dispatchers.IO) {
+        // Process scope: clearing the ViewModel must not cancel the exit autosave/shutdown.
+        EmulationExitCoordinator.launchTracked {
             cleanupPendingShaderPreparation()
             if (_uiState.value.autoSaveOnExit && currentGamePath != null) {
                 saveAutoSaveSlot(
@@ -5960,7 +5994,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             syncCachedPlayTimeInBackground()
             if (onExit != null) {
                 withContext(Dispatchers.Main) {
-                    onExit.invoke()
+                    // The route may already be gone (system back during exit); never navigate twice.
+                    if (!viewModelCleared) onExit.invoke()
                 }
             }
         }
@@ -6144,6 +6179,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     override fun onCleared() {
+        viewModelCleared = true
         abortPendingShaderPreparation()
         DiscordIntegration.clearGame()
         androidGamePerformance.update(AndroidGamePhase.Idle)
@@ -6151,15 +6187,14 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             NativeApp.setPerformanceMetricsEnabled(visible = false, detailed = false, gpuTiming = false)
         }
         fastForwardRequested = false
-        runCatching {
-            kotlinx.coroutines.runBlocking(Dispatchers.IO) {
-                cachePendingPlayTime()
-            }
-        }
-        if (_uiState.value.isRunning) {
-            EmulatorBridge.resetKeyStatus()
-            runCatching {
-                kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+        // stopEmulation already runs autosave, play-time sync and shutdown in the process scope.
+        if (EmulationExitCoordinator.inFlight?.isActive == true) return
+        val wasRunning = _uiState.value.isRunning
+        EmulationExitCoordinator.launchTracked {
+            runCatching { cachePendingPlayTime() }
+            if (wasRunning) {
+                runCatching {
+                    EmulatorBridge.resetKeyStatus()
                     EmulatorBridge.setTurboModeEnabled(false)
                     EmulatorBridge.shutdown()
                 }
