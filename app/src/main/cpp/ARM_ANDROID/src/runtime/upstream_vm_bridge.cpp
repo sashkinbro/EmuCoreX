@@ -35,7 +35,6 @@
 #include "common/StringUtil.h"
 #include "common/Threading.h"
 
-#include <SDL3/SDL_hints.h>
 #include <android/log.h>
 #if defined(__ANDROID__)
 #include <sys/system_properties.h>
@@ -122,11 +121,6 @@ bool GetBoolSetting(const RuntimeSettings& settings, const char* section, const 
 	if (value == "false" || value == "0")
 		return false;
 	return fallback;
-}
-
-bool FileExists(const std::string& path)
-{
-	return !path.empty() && FileSystem::FileExists(path.c_str());
 }
 
 // ---------------------------------------------------------------------------
@@ -242,32 +236,6 @@ void ApplyOpcodeFamilyBlocklists(const RuntimeSettings& settings)
 		{
 			psxCpu->Reset();
 		}
-	}
-}
-
-void ApplyAngleOpenGLLibraryHints(const VmLaunchConfig& config)
-{
-	const bool requested = GetBoolSetting(config.settings, "EmuCore/GS", "AndroidUseAngleOpenGL", false);
-	const int renderer = GetIntSetting(config.settings, "EmuCore/GS", "Renderer", static_cast<s32>(GSRendererType::OGL));
-	const bool eligible = requested && renderer == static_cast<s32>(GSRendererType::OGL);
-
-	const std::string egl_path = Path::Combine(config.paths.native_library_dir, "libEGL_angle.so");
-	const std::string gles_path = Path::Combine(config.paths.native_library_dir, "libGLESv2_angle.so");
-	if (eligible && FileExists(egl_path) && FileExists(gles_path))
-	{
-		setenv("EMUCOREX_ANGLE_EGL_LIBRARY", egl_path.c_str(), 1);
-		setenv("EMUCOREX_ANGLE_GLES_LIBRARY", gles_path.c_str(), 1);
-		SDL_SetHintWithPriority(SDL_HINT_EGL_LIBRARY, egl_path.c_str(), SDL_HINT_OVERRIDE);
-		SDL_SetHintWithPriority(SDL_HINT_OPENGL_LIBRARY, gles_path.c_str(), SDL_HINT_OVERRIDE);
-		SDL_SetHintWithPriority(SDL_HINT_OPENGL_ES_DRIVER, "1", SDL_HINT_OVERRIDE);
-	}
-	else
-	{
-		unsetenv("EMUCOREX_ANGLE_EGL_LIBRARY");
-		unsetenv("EMUCOREX_ANGLE_GLES_LIBRARY");
-		SDL_SetHintWithPriority(SDL_HINT_EGL_LIBRARY, nullptr, SDL_HINT_OVERRIDE);
-		SDL_SetHintWithPriority(SDL_HINT_OPENGL_LIBRARY, nullptr, SDL_HINT_OVERRIDE);
-		SDL_SetHintWithPriority(SDL_HINT_OPENGL_ES_DRIVER, nullptr, SDL_HINT_OVERRIDE);
 	}
 }
 
@@ -458,9 +426,6 @@ void ConfigureImGuiFonts()
 
 bool InstallHostSettings(const VmLaunchConfig& config, bool initialize_frontend = true)
 {
-	if (initialize_frontend)
-		ApplyAngleOpenGLLibraryHints(config);
-
 	if (!config.paths.native_library_dir.empty())
 		setenv("ANDROID_NATIVE_LIB_DIR", config.paths.native_library_dir.c_str(), 1);
 	else
