@@ -166,7 +166,8 @@
     <string name="settings_expert_controls_desc">Show specialist CPU, timing, JIT and speed-hack options.</string>
     <string name="settings_expert_rendering_fixes_desc">Show specialist hardware and upscaling compatibility fixes.</string>
     <string name="settings_advanced_graphics_title">Advanced graphics options</string>
-    <string name="settings_advanced_graphics_desc">Show specialist rendering, filtering and shader controls.</string>\r\n    <string name="settings_advanced_fixes_title">Advanced rendering fixes</string>
+    <string name="settings_advanced_graphics_desc">Show specialist rendering, filtering and shader controls.</string>
+    <string name="settings_advanced_fixes_title">Advanced rendering fixes</string>
     <string name="emulation_achievements_tab">Achievements</string>
     <string name="emulation_session_tab">Session</string>
     <string name="emulation_overlay_tab">Overlay</string>
