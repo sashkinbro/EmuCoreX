@@ -1704,215 +1704,215 @@ private fun SettingsContent(
                             onCheckedChange = { showAdvancedGraphicsSettings = it }
                         )
                         if (showAdvancedGraphicsSettings) {
-                        ToggleItem(
-                            icon = Icons.Rounded.AutoFixHigh,
-                            title = stringResource(R.string.settings_retroarch_shaders),
-                            subtitle = stringResource(R.string.settings_retroarch_shaders_desc),
-                            checked = uiState.shaderChainEnabled,
-                            onCheckedChange = viewModel::setShaderChainEnabled,
-                            helpText = stringResource(R.string.settings_help_retroarch_shaders),
-                            onResetToDefault = { viewModel.setShaderChainEnabled(false) }
-                        )
-                        ShaderPresetSelector(
-                            title = stringResource(R.string.settings_shader_preset),
-                            presets = uiState.shaderPresets,
-                            selectedPath = uiState.shaderChainPreset,
-                            onSelect = viewModel::setShaderChainPreset,
-                            onRemove = viewModel::removeShaderPresets,
-                            helpText = stringResource(R.string.settings_help_shader_preset),
-                        )
-                        ShaderPackDownloadItem(
-                            installed = uiState.isShaderPackInstalled,
-                            busy = uiState.isShaderPackBusy,
-                            progress = uiState.shaderPackProgress,
-                            onClick = viewModel::downloadOfficialShaderPack
-                        )
-                        SettingsItem(
-                            icon = Icons.Rounded.FolderOpen,
-                            label = stringResource(R.string.settings_shader_pack_import),
-                            value = stringResource(R.string.settings_shader_pack_import_desc),
-                            onClick = launchShaderPackPicker
-                        )
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_anisotropic_filtering),
-                            options = listOf(
-                                0 to stringResource(R.string.settings_aniso_off),
-                                2 to "2x",
-                                4 to "4x",
-                                8 to "8x",
-                                16 to "16x"
-                            ),
-                            selectedValue = uiState.anisotropicFiltering,
-                            onSelect = viewModel::setAnisotropicFiltering,
-                            helpText = stringResource(R.string.settings_help_anisotropic_filtering),
-                            onResetToDefault = { viewModel.setAnisotropicFiltering(defaults.anisotropicFiltering) }
-                        )
-                        ToggleItem(
-                            icon = Icons.Rounded.GraphicEq,
-                            title = stringResource(R.string.settings_fxaa),
-                            subtitle = stringResource(R.string.settings_fxaa_desc),
-                            checked = uiState.enableFxaa,
-                            onCheckedChange = viewModel::setEnableFxaa,
-                            helpText = stringResource(R.string.settings_help_fxaa),
-                            onResetToDefault = { viewModel.setEnableFxaa(defaults.enableFxaa) }
-                        )
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_sgsr),
-                            options = sgsrModeOptions(),
-                            selectedValue = uiState.sgsrMode,
-                            onSelect = viewModel::setSgsrMode,
-                            helpText = stringResource(R.string.settings_help_sgsr),
-                            onResetToDefault = { viewModel.setSgsrMode(defaults.sgsrMode) }
-                        )
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_cas),
-                            options = casModeOptions(),
-                            selectedValue = uiState.casMode,
-                            onSelect = viewModel::setCasMode,
-                            helpText = stringResource(R.string.settings_help_cas),
-                            onResetToDefault = { viewModel.setCasMode(defaults.casMode) }
-                        )
-                        if (uiState.casMode != 0) {
-                            SliderItem(
-                                icon = Icons.Rounded.GraphicEq,
-                                title = stringResource(R.string.settings_cas_sharpness),
-                                subtitle = stringResource(
-                                    R.string.settings_cas_sharpness_value,
-                                    uiState.casSharpness
+                            ToggleItem(
+                                icon = Icons.Rounded.AutoFixHigh,
+                                title = stringResource(R.string.settings_retroarch_shaders),
+                                subtitle = stringResource(R.string.settings_retroarch_shaders_desc),
+                                checked = uiState.shaderChainEnabled,
+                                onCheckedChange = viewModel::setShaderChainEnabled,
+                                helpText = stringResource(R.string.settings_help_retroarch_shaders),
+                                onResetToDefault = { viewModel.setShaderChainEnabled(false) }
+                            )
+                            ShaderPresetSelector(
+                                title = stringResource(R.string.settings_shader_preset),
+                                presets = uiState.shaderPresets,
+                                selectedPath = uiState.shaderChainPreset,
+                                onSelect = viewModel::setShaderChainPreset,
+                                onRemove = viewModel::removeShaderPresets,
+                                helpText = stringResource(R.string.settings_help_shader_preset),
+                            )
+                            ShaderPackDownloadItem(
+                                installed = uiState.isShaderPackInstalled,
+                                busy = uiState.isShaderPackBusy,
+                                progress = uiState.shaderPackProgress,
+                                onClick = viewModel::downloadOfficialShaderPack
+                            )
+                            SettingsItem(
+                                icon = Icons.Rounded.FolderOpen,
+                                label = stringResource(R.string.settings_shader_pack_import),
+                                value = stringResource(R.string.settings_shader_pack_import_desc),
+                                onClick = launchShaderPackPicker
+                            )
+                            ChoiceSection(
+                                title = stringResource(R.string.settings_anisotropic_filtering),
+                                options = listOf(
+                                    0 to stringResource(R.string.settings_aniso_off),
+                                    2 to "2x",
+                                    4 to "4x",
+                                    8 to "8x",
+                                    16 to "16x"
                                 ),
-                                value = uiState.casSharpness.toFloat(),
-                                range = 0f..100f,
-                                steps = 99,
-                                onValueChange = { viewModel.setCasSharpness(it.toInt()) },
-                                helpText = stringResource(R.string.settings_help_cas_sharpness),
-                                onResetToDefault = { viewModel.setCasSharpness(defaults.casSharpness) }
+                                selectedValue = uiState.anisotropicFiltering,
+                                onSelect = viewModel::setAnisotropicFiltering,
+                                helpText = stringResource(R.string.settings_help_anisotropic_filtering),
+                                onResetToDefault = { viewModel.setAnisotropicFiltering(defaults.anisotropicFiltering) }
+                            )
+                            ToggleItem(
+                                icon = Icons.Rounded.GraphicEq,
+                                title = stringResource(R.string.settings_fxaa),
+                                subtitle = stringResource(R.string.settings_fxaa_desc),
+                                checked = uiState.enableFxaa,
+                                onCheckedChange = viewModel::setEnableFxaa,
+                                helpText = stringResource(R.string.settings_help_fxaa),
+                                onResetToDefault = { viewModel.setEnableFxaa(defaults.enableFxaa) }
+                            )
+                            ChoiceSection(
+                                title = stringResource(R.string.settings_sgsr),
+                                options = sgsrModeOptions(),
+                                selectedValue = uiState.sgsrMode,
+                                onSelect = viewModel::setSgsrMode,
+                                helpText = stringResource(R.string.settings_help_sgsr),
+                                onResetToDefault = { viewModel.setSgsrMode(defaults.sgsrMode) }
+                            )
+                            ChoiceSection(
+                                title = stringResource(R.string.settings_cas),
+                                options = casModeOptions(),
+                                selectedValue = uiState.casMode,
+                                onSelect = viewModel::setCasMode,
+                                helpText = stringResource(R.string.settings_help_cas),
+                                onResetToDefault = { viewModel.setCasMode(defaults.casMode) }
+                            )
+                            if (uiState.casMode != 0) {
+                                SliderItem(
+                                    icon = Icons.Rounded.GraphicEq,
+                                    title = stringResource(R.string.settings_cas_sharpness),
+                                    subtitle = stringResource(
+                                        R.string.settings_cas_sharpness_value,
+                                        uiState.casSharpness
+                                    ),
+                                    value = uiState.casSharpness.toFloat(),
+                                    range = 0f..100f,
+                                    steps = 99,
+                                    onValueChange = { viewModel.setCasSharpness(it.toInt()) },
+                                    helpText = stringResource(R.string.settings_help_cas_sharpness),
+                                    onResetToDefault = { viewModel.setCasSharpness(defaults.casSharpness) }
+                                )
+                            }
+                            ChoiceSection(
+                                title = stringResource(R.string.settings_tv_shader),
+                                options = tvShaderOptions(),
+                                selectedValue = uiState.tvShader,
+                                onSelect = viewModel::setTvShader,
+                                helpText = stringResource(R.string.settings_help_tv_shader),
+                                onResetToDefault = { viewModel.setTvShader(defaults.tvShader) }
                             )
                         }
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_tv_shader),
-                            options = tvShaderOptions(),
-                            selectedValue = uiState.tvShader,
-                            onSelect = viewModel::setTvShader,
-                            helpText = stringResource(R.string.settings_help_tv_shader),
-                            onResetToDefault = { viewModel.setTvShader(defaults.tvShader) }
-                        )
-                    }
-                    SettingsSection(title = stringResource(R.string.settings_rendering_section)) {
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_hw_download_mode),
-                            options = hwDownloadModeOptions(),
-                            selectedValue = uiState.hwDownloadMode,
-                            onSelect = viewModel::setHwDownloadMode,
-                            helpText = stringResource(R.string.settings_help_hw_download_mode),
-                            onResetToDefault = { viewModel.setHwDownloadMode(defaults.hwDownloadMode) }
-                        )
-                        SettingsInlineNote(
-                            text = stringResource(R.string.settings_hw_download_mode_desc)
-                        )
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_blending_accuracy),
-                            options = blendingAccuracyOptions(),
-                            selectedValue = uiState.blendingAccuracy,
-                            onSelect = viewModel::setBlendingAccuracy,
-                            helpText = stringResource(R.string.settings_help_blending_accuracy),
-                            onResetToDefault = {
-                                viewModel.setBlendingAccuracy(defaults.blendingAccuracy)
-                            }
-                        )
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_texture_preloading),
-                            options = texturePreloadingOptions(),
-                            selectedValue = uiState.texturePreloading,
-                            onSelect = viewModel::setTexturePreloading,
-                            helpText = stringResource(R.string.settings_help_texture_preloading),
-                            onResetToDefault = { viewModel.setTexturePreloading(defaults.texturePreloading) }
-                        )
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_bilinear_filtering),
-                            options = bilinearFilteringOptions(),
-                            selectedValue = uiState.textureFiltering,
-                            onSelect = viewModel::setTextureFiltering,
-                            helpText = stringResource(R.string.settings_help_bilinear_filtering),
-                            onResetToDefault = { viewModel.setTextureFiltering(defaults.textureFiltering) }
-                        )
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_trilinear_filtering),
-                            options = trilinearFilteringOptions(),
-                            selectedValue = uiState.trilinearFiltering,
-                            onSelect = viewModel::setTrilinearFiltering,
-                            helpText = stringResource(R.string.settings_help_trilinear_filtering),
-                            onResetToDefault = { viewModel.setTrilinearFiltering(defaults.trilinearFiltering) }
-                        )
-                        ToggleItem(
-                            icon = Icons.Rounded.GraphicEq,
-                            title = stringResource(R.string.settings_hw_mipmapping),
-                            subtitle = stringResource(R.string.settings_hw_mipmapping_desc),
-                            checked = uiState.enableHwMipmapping,
-                            onCheckedChange = viewModel::setEnableHwMipmapping,
-                            helpText = stringResource(R.string.settings_help_hw_mipmapping),
-                            onResetToDefault = { viewModel.setEnableHwMipmapping(defaults.enableHwMipmapping) }
-                        )
-                        ToggleItem(
-                            icon = Icons.Rounded.GraphicEq,
-                            title = stringResource(R.string.settings_hw_rov),
-                            subtitle = stringResource(R.string.settings_hw_rov_desc),
-                            checked = uiState.hwRov,
-                            onCheckedChange = viewModel::setHwRov,
-                            helpText = stringResource(R.string.settings_help_hw_rov),
-                            onResetToDefault = { viewModel.setHwRov(defaults.hwRov) }
-                        )
-                    }
-                    SettingsSection(title = stringResource(R.string.emulation_screen_tab)) {
-                        SliderItem(
-                            icon = Icons.Rounded.GraphicEq,
-                            title = stringResource(R.string.settings_shadeboost_brightness),
-                            subtitle = uiState.shadeBoostBrightness.toString(),
-                            valueLabel = { it.roundToInt().toString() },
-                            value = uiState.shadeBoostBrightness.toFloat(),
-                            range = 1f..100f,
-                            steps = 98,
-                            onValueChange = { viewModel.setShadeBoostBrightness(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_shadeboost_brightness),
-                            onResetToDefault = { viewModel.setShadeBoostBrightness(defaults.shadeBoostBrightness) }
-                        )
-                        SliderItem(
-                            icon = Icons.Rounded.GraphicEq,
-                            title = stringResource(R.string.settings_shadeboost_contrast),
-                            subtitle = uiState.shadeBoostContrast.toString(),
-                            valueLabel = { it.roundToInt().toString() },
-                            value = uiState.shadeBoostContrast.toFloat(),
-                            range = 1f..100f,
-                            steps = 98,
-                            onValueChange = { viewModel.setShadeBoostContrast(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_shadeboost_contrast),
-                            onResetToDefault = { viewModel.setShadeBoostContrast(defaults.shadeBoostContrast) }
-                        )
-                        SliderItem(
-                            icon = Icons.Rounded.GraphicEq,
-                            title = stringResource(R.string.settings_shadeboost_saturation),
-                            subtitle = uiState.shadeBoostSaturation.toString(),
-                            valueLabel = { it.roundToInt().toString() },
-                            value = uiState.shadeBoostSaturation.toFloat(),
-                            range = 1f..100f,
-                            steps = 98,
-                            onValueChange = { viewModel.setShadeBoostSaturation(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_shadeboost_saturation),
-                            onResetToDefault = { viewModel.setShadeBoostSaturation(defaults.shadeBoostSaturation) }
-                        )
-                        SliderItem(
-                            icon = Icons.Rounded.GraphicEq,
-                            title = stringResource(R.string.settings_shadeboost_gamma),
-                            subtitle = uiState.shadeBoostGamma.toString(),
-                            valueLabel = { it.roundToInt().toString() },
-                            value = uiState.shadeBoostGamma.toFloat(),
-                            range = 1f..100f,
-                            steps = 98,
-                            onValueChange = { viewModel.setShadeBoostGamma(it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_shadeboost_gamma),
-                            onResetToDefault = { viewModel.setShadeBoostGamma(defaults.shadeBoostGamma) }
-                        )
-                    }
-                    }
+                        SettingsSection(title = stringResource(R.string.settings_rendering_section)) {
+                            ChoiceSection(
+                                title = stringResource(R.string.settings_hw_download_mode),
+                                options = hwDownloadModeOptions(),
+                                selectedValue = uiState.hwDownloadMode,
+                                onSelect = viewModel::setHwDownloadMode,
+                                helpText = stringResource(R.string.settings_help_hw_download_mode),
+                                onResetToDefault = { viewModel.setHwDownloadMode(defaults.hwDownloadMode) }
+                            )
+                            SettingsInlineNote(
+                                text = stringResource(R.string.settings_hw_download_mode_desc)
+                            )
+                            ChoiceSection(
+                                title = stringResource(R.string.settings_blending_accuracy),
+                                options = blendingAccuracyOptions(),
+                                selectedValue = uiState.blendingAccuracy,
+                                onSelect = viewModel::setBlendingAccuracy,
+                                helpText = stringResource(R.string.settings_help_blending_accuracy),
+                                onResetToDefault = {
+                                    viewModel.setBlendingAccuracy(defaults.blendingAccuracy)
+                                }
+                            )
+                            ChoiceSection(
+                                title = stringResource(R.string.settings_texture_preloading),
+                                options = texturePreloadingOptions(),
+                                selectedValue = uiState.texturePreloading,
+                                onSelect = viewModel::setTexturePreloading,
+                                helpText = stringResource(R.string.settings_help_texture_preloading),
+                                onResetToDefault = { viewModel.setTexturePreloading(defaults.texturePreloading) }
+                            )
+                            ChoiceSection(
+                                title = stringResource(R.string.settings_bilinear_filtering),
+                                options = bilinearFilteringOptions(),
+                                selectedValue = uiState.textureFiltering,
+                                onSelect = viewModel::setTextureFiltering,
+                                helpText = stringResource(R.string.settings_help_bilinear_filtering),
+                                onResetToDefault = { viewModel.setTextureFiltering(defaults.textureFiltering) }
+                            )
+                            ChoiceSection(
+                                title = stringResource(R.string.settings_trilinear_filtering),
+                                options = trilinearFilteringOptions(),
+                                selectedValue = uiState.trilinearFiltering,
+                                onSelect = viewModel::setTrilinearFiltering,
+                                helpText = stringResource(R.string.settings_help_trilinear_filtering),
+                                onResetToDefault = { viewModel.setTrilinearFiltering(defaults.trilinearFiltering) }
+                            )
+                            ToggleItem(
+                                icon = Icons.Rounded.GraphicEq,
+                                title = stringResource(R.string.settings_hw_mipmapping),
+                                subtitle = stringResource(R.string.settings_hw_mipmapping_desc),
+                                checked = uiState.enableHwMipmapping,
+                                onCheckedChange = viewModel::setEnableHwMipmapping,
+                                helpText = stringResource(R.string.settings_help_hw_mipmapping),
+                                onResetToDefault = { viewModel.setEnableHwMipmapping(defaults.enableHwMipmapping) }
+                            )
+                            ToggleItem(
+                                icon = Icons.Rounded.GraphicEq,
+                                title = stringResource(R.string.settings_hw_rov),
+                                subtitle = stringResource(R.string.settings_hw_rov_desc),
+                                checked = uiState.hwRov,
+                                onCheckedChange = viewModel::setHwRov,
+                                helpText = stringResource(R.string.settings_help_hw_rov),
+                                onResetToDefault = { viewModel.setHwRov(defaults.hwRov) }
+                            )
+                        }
+                        SettingsSection(title = stringResource(R.string.emulation_screen_tab)) {
+                            SliderItem(
+                                icon = Icons.Rounded.GraphicEq,
+                                title = stringResource(R.string.settings_shadeboost_brightness),
+                                subtitle = uiState.shadeBoostBrightness.toString(),
+                                valueLabel = { it.roundToInt().toString() },
+                                value = uiState.shadeBoostBrightness.toFloat(),
+                                range = 1f..100f,
+                                steps = 98,
+                                onValueChange = { viewModel.setShadeBoostBrightness(it.toInt()) },
+                                helpText = stringResource(R.string.settings_help_shadeboost_brightness),
+                                onResetToDefault = { viewModel.setShadeBoostBrightness(defaults.shadeBoostBrightness) }
+                            )
+                            SliderItem(
+                                icon = Icons.Rounded.GraphicEq,
+                                title = stringResource(R.string.settings_shadeboost_contrast),
+                                subtitle = uiState.shadeBoostContrast.toString(),
+                                valueLabel = { it.roundToInt().toString() },
+                                value = uiState.shadeBoostContrast.toFloat(),
+                                range = 1f..100f,
+                                steps = 98,
+                                onValueChange = { viewModel.setShadeBoostContrast(it.toInt()) },
+                                helpText = stringResource(R.string.settings_help_shadeboost_contrast),
+                                onResetToDefault = { viewModel.setShadeBoostContrast(defaults.shadeBoostContrast) }
+                            )
+                            SliderItem(
+                                icon = Icons.Rounded.GraphicEq,
+                                title = stringResource(R.string.settings_shadeboost_saturation),
+                                subtitle = uiState.shadeBoostSaturation.toString(),
+                                valueLabel = { it.roundToInt().toString() },
+                                value = uiState.shadeBoostSaturation.toFloat(),
+                                range = 1f..100f,
+                                steps = 98,
+                                onValueChange = { viewModel.setShadeBoostSaturation(it.toInt()) },
+                                helpText = stringResource(R.string.settings_help_shadeboost_saturation),
+                                onResetToDefault = { viewModel.setShadeBoostSaturation(defaults.shadeBoostSaturation) }
+                            )
+                            SliderItem(
+                                icon = Icons.Rounded.GraphicEq,
+                                title = stringResource(R.string.settings_shadeboost_gamma),
+                                subtitle = uiState.shadeBoostGamma.toString(),
+                                valueLabel = { it.roundToInt().toString() },
+                                value = uiState.shadeBoostGamma.toFloat(),
+                                range = 1f..100f,
+                                steps = 98,
+                                onValueChange = { viewModel.setShadeBoostGamma(it.toInt()) },
+                                helpText = stringResource(R.string.settings_help_shadeboost_gamma),
+                                onResetToDefault = { viewModel.setShadeBoostGamma(defaults.shadeBoostGamma) }
+                            )
+                        }
+                        }
                 }
 
                 SettingsTab.Audio -> {
