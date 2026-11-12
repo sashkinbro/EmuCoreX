@@ -13,6 +13,7 @@
 #include "common/Assertions.h"
 #include "common/Console.h"
 #include "common/Error.h"
+#include "common/FileSystem.h"
 #include "common/Path.h"
 #include "common/StringUtil.h"
 
@@ -54,6 +55,88 @@ static std::unique_ptr<ThreadedFileReader> GetFileReader(const std::string& path
 		return std::make_unique<BlockdumpFileReader>();
 
 	return std::make_unique<FlatFileReader>();
+}
+
+// Resolves a .cue sheet to the single binary image it references (first FILE entry).
+// Falls back to a case-insensitive match, then to "<cue base name>.bin" next to the sheet.
+static std::string ResolveCueSheet(const std::string& cue_path)
+{
+	const std::optional<std::string> text = FileSystem::ReadFileToString(cue_path.c_str());
+	if (!text.has_value())
+		return {};
+
+	const std::string dir(Path::GetDirectory(cue_path));
+	std::string referenced;
+	u32 file_entries = 0;
+
+	for (const std::string_view raw_line : StringUtil::SplitString(*text, '\n', true))
+	{
+		std::string_view line = StringUtil::StripWhitespace(raw_line);
+		if (line.size() >= 3 && static_cast<unsigned char>(line[0]) == 0xEF && static_cast<unsigned char>(line[1]) == 0xBB &&
+			static_cast<unsigned char>(line[2]) == 0xBF)
+			line = StringUtil::StripWhitespace(line.substr(3));
+		if (line.size() < 5 || !StringUtil::compareNoCase(line.substr(0, 4), "FILE") || (line[4] != ' ' && line[4] != '\t'))
+			continue;
+
+		line = StringUtil::StripWhitespace(line.substr(5));
+		std::string name;
+		if (!line.empty() && line.front() == '"')
+		{
+			const size_t end = line.find('"', 1);
+			if (end == std::string_view::npos)
+				continue;
+			name = std::string(line.substr(1, end - 1));
+		}
+		else
+		{
+			// Unquoted: the last token is the file type (BINARY/MOTOROLA/...).
+			const size_t end = line.find_last_of(" \t");
+			name = std::string(StringUtil::StripWhitespace(end == std::string_view::npos ? line : line.substr(0, end)));
+		}
+
+		if (name.empty())
+			continue;
+		if (file_entries++ == 0)
+			referenced = std::move(name);
+	}
+
+	if (file_entries > 1)
+		Console.Warning("CUE: '%s' references %u files; only the first is used.", cue_path.c_str(), file_entries);
+
+	const auto find_in_dir = [&](const std::string& wanted) -> std::string {
+		if (wanted.empty())
+			return {};
+		std::string rel = wanted;
+		std::replace(rel.begin(), rel.end(), '\\', '/');
+		const std::string full = Path::IsAbsolute(rel) ? rel : Path::Combine(dir, rel);
+		if (FileSystem::FileExists(full.c_str()))
+			return full;
+
+		// Case-insensitive lookup in the target's directory.
+		const std::string_view want_name = Path::GetFileName(full);
+		const std::string target_dir(Path::GetDirectory(full));
+		FileSystem::FindResultsArray results;
+		if (FileSystem::FindFiles(target_dir.c_str(), "*", FILESYSTEM_FIND_FILES | FILESYSTEM_FIND_HIDDEN_FILES, &results))
+		{
+			for (const FILESYSTEM_FIND_DATA& fd : results)
+			{
+				if (StringUtil::compareNoCase(Path::GetFileName(fd.FileName), want_name))
+					return Path::Combine(target_dir, Path::GetFileName(fd.FileName));
+			}
+		}
+		return {};
+	};
+
+	std::string resolved = find_in_dir(referenced);
+	if (resolved.empty())
+	{
+		// The sheet points at a missing file: use "<cue title>.bin" beside it if present.
+		const std::string sibling = std::string(Path::GetFileTitle(cue_path)) + ".bin";
+		resolved = find_in_dir(Path::Combine(dir, sibling));
+		if (!resolved.empty())
+			Console.Warning("CUE: '%s' references missing '%s', using '%s'.", cue_path.c_str(), referenced.c_str(), resolved.c_str());
+	}
+	return resolved;
 }
 
 int InputIsoFile::ReadSync(u8* dst, uint lsn)
@@ -192,6 +275,17 @@ void InputIsoFile::_init()
 bool InputIsoFile::Open(std::string srcfile, Error* error)
 {
 	Close();
+	if (StringUtil::compareNoCase(Path::GetExtension(srcfile), "cue"))
+	{
+		std::string bin_path = ResolveCueSheet(srcfile);
+		if (bin_path.empty())
+		{
+			Error::SetStringFmt(error, "Unable to find the image referenced by cue sheet '{}'", Path::GetFileName(srcfile));
+			return false;
+		}
+		srcfile = std::move(bin_path);
+	}
+
 	m_filename = std::move(srcfile);
 	m_reader = GetFileReader(m_filename);
 	if (!m_reader->Open(m_filename, error))
