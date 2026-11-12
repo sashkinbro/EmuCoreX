@@ -309,6 +309,7 @@ fun SettingsScreen(
     val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     var selectedTab by rememberSaveable(initialTab) { mutableStateOf(initialTab.toSettingsTab()) }
     var showAdvancedEmulationSettings by rememberSaveable { mutableStateOf(false) }
+    var showAdvancedGraphicsSettings by rememberSaveable { mutableStateOf(false) }
     var showAdvancedFixSettings by rememberSaveable { mutableStateOf(false) }
     val pendingGamepadActionId = remember { mutableStateOf<String?>(null) }
     var pendingGamepadPadIndex by rememberSaveable { mutableIntStateOf(0) }
@@ -649,6 +650,7 @@ fun SettingsScreen(
                 searchQuery = searchQuery,
                 onSearchResultSelected = { tab ->
                     selectedTab = tab
+                    if (tab == SettingsTab.Graphics) showAdvancedGraphicsSettings = true
                     searchEnabled = false
                     searchQuery = ""
                 },
@@ -1695,6 +1697,14 @@ private fun SettingsContent(
                             )
                         }
                         ToggleItem(
+                            icon = Icons.Rounded.Tune,
+                            title = stringResource(R.string.settings_advanced_graphics_title),
+                            subtitle = stringResource(R.string.settings_advanced_graphics_desc),
+                            checked = showAdvancedGraphicsSettings,
+                            onCheckedChange = { showAdvancedGraphicsSettings = it }
+                        )
+                        if (showAdvancedGraphicsSettings) {
+                        ToggleItem(
                             icon = Icons.Rounded.AutoFixHigh,
                             title = stringResource(R.string.settings_retroarch_shaders),
                             subtitle = stringResource(R.string.settings_retroarch_shaders_desc),
@@ -1901,6 +1911,7 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_shadeboost_gamma),
                             onResetToDefault = { viewModel.setShadeBoostGamma(defaults.shadeBoostGamma) }
                         )
+                    }
                     }
                 }
 
