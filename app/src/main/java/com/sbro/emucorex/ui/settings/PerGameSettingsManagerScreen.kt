@@ -962,7 +962,10 @@ private fun GameSettingsTabContent(
     onOpenGpuDriverManager: () -> Unit,
     onDraftChange: (PerGameSettings) -> Unit
 ) {
-    var showAdvancedGraphicsSettings by rememberSaveable { mutableStateOf(false) }\n    var showAdvancedFixSettings by rememberSaveable { mutableStateOf(false) }\n    val nativeUpscaleLabel = stringResource(R.string.settings_upscale_native)\r\n    val context = LocalContext.current
+    var showAdvancedGraphicsSettings by rememberSaveable { mutableStateOf(false) }
+    var showAdvancedFixSettings by rememberSaveable { mutableStateOf(false) }
+    val nativeUpscaleLabel = stringResource(R.string.settings_upscale_native)
+    val context = LocalContext.current
     val preferences = remember(context) { AppPreferences(context) }
     val settingsSnapshot by preferences.settingsSnapshot.collectAsState(initial = SettingsSnapshot())
     val globalKeyboardMouseSettings by preferences.keyboardMouseSettings.collectAsState(
@@ -1058,7 +1061,16 @@ private fun GameSettingsTabContent(
                             onDraftChange(draft.copy(localMultiplayerMode = defaultProfile.localMultiplayerMode))
                         }
                     )
-                }\n                ToggleRow(\n                    title = stringResource(R.string.settings_advanced_graphics_title),\n                    checked = showAdvancedGraphicsSettings,\n                    onCheckedChange = { showAdvancedGraphicsSettings = it },\n                    helpText = stringResource(R.string.settings_advanced_graphics_desc),\n                    onResetToDefault = { showAdvancedGraphicsSettings = false }\n                )\n                if (showAdvancedGraphicsSettings) {\n                EditorSection(title = stringResource(R.string.game_settings_manager_section_graphics)) {
+                }
+                ToggleRow(
+                    title = stringResource(R.string.settings_advanced_graphics_title),
+                    checked = showAdvancedGraphicsSettings,
+                    onCheckedChange = { showAdvancedGraphicsSettings = it },
+                    helpText = stringResource(R.string.settings_advanced_graphics_desc),
+                    onResetToDefault = { showAdvancedGraphicsSettings = false }
+                )
+                if (showAdvancedGraphicsSettings) {
+                EditorSection(title = stringResource(R.string.game_settings_manager_section_graphics)) {
                     SelectionRow(
                         title = stringResource(R.string.settings_bilinear_filtering),
                         options = bilinearFilteringOptions(),
