@@ -1214,7 +1214,16 @@ private fun GameSettingsTabContent(
                         onResetToDefault = { onDraftChange(draft.copy(enableHwMipmapping = defaultProfile.enableHwMipmapping)) }
                     )
                 }
-                EditorSection(title = stringResource(R.string.game_settings_manager_section_screen)) {\n                    ShadeBoostRows(\n                        draft = draft,\n                        defaultProfile = defaultProfile,\n                        onDraftChange = onDraftChange\n                    )\n                }\n                }\n            }\n            GameSettingsManagerTab.MemoryCards -> {
+                EditorSection(title = stringResource(R.string.game_settings_manager_section_screen)) {
+                    ShadeBoostRows(
+                        draft = draft,
+                        defaultProfile = defaultProfile,
+                        onDraftChange = onDraftChange
+                    )
+                }
+                }
+            }
+            GameSettingsManagerTab.MemoryCards -> {
                 EditorSection(title = stringResource(R.string.per_game_memory_cards_title)) {
                     Text(
                         text = stringResource(R.string.per_game_memory_cards_desc),
@@ -1914,7 +1923,26 @@ private fun GameSettingsTabContent(
                         helpText = stringResource(R.string.settings_help_anti_blur),
                         onResetToDefault = { onDraftChange(draft.copy(antiBlur = defaultProfile.antiBlur)) }
                     )
-                }\n                ToggleRow(\n                    title = stringResource(R.string.settings_advanced_fixes_title),\n                    checked = showAdvancedFixSettings,\n                    onCheckedChange = { showAdvancedFixSettings = it },\n                    helpText = stringResource(R.string.settings_expert_rendering_fixes_desc),\n                    onResetToDefault = { showAdvancedFixSettings = false }\n                )\n                if (showAdvancedFixSettings) {\n                    HardwareFixesRows(\n                        draft = draft,\n                        defaultProfile = defaultProfile,\n                        onDraftChange = onDraftChange\n                    )\n                    UpscalingFixesRows(\n                        draft = draft,\n                        defaultProfile = defaultProfile,\n                        onDraftChange = onDraftChange\n                    )\n                }\n            }
+                }\n                ToggleRow(
+                    title = stringResource(R.string.settings_advanced_fixes_title),
+                    checked = showAdvancedFixSettings,
+                    onCheckedChange = { showAdvancedFixSettings = it },
+                    helpText = stringResource(R.string.settings_expert_rendering_fixes_desc),
+                    onResetToDefault = { showAdvancedFixSettings = false }
+                )
+                if (showAdvancedFixSettings) {
+                    HardwareFixesRows(
+                        draft = draft,
+                        defaultProfile = defaultProfile,
+                        onDraftChange = onDraftChange
+                    )
+                    UpscalingFixesRows(
+                        draft = draft,
+                        defaultProfile = defaultProfile,
+                        onDraftChange = onDraftChange
+                    )
+                }
+            }
         }
     }
 }
