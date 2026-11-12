@@ -131,8 +131,9 @@ internal fun HomeShelfMode(
         pageCount = { games.size }
     )
     val scope = rememberCoroutineScope()
-    val shouldRequestGamepadFocus =
-        LocalTvUiEnvironment.current.enabled || remember { GamepadManager.isGamepadConnected() }
+    // Always own focus on the shelf: key events (D-pad, keyboard, gamepad connected later) only
+    // reach the card handler while a card is focused. The focus border stays gamepad-only.
+    val shouldRequestGamepadFocus = true
     val cardFocusRequesters = remember(games) { List(games.size) { FocusRequester() } }
     val currentPage = pagerState.currentPage.coerceIn(0, games.lastIndex)
     val activeGame = games[currentPage]
