@@ -783,9 +783,7 @@
     <string name="settings_help_fps_overlay_mode">بین یک بازخوانی ساده FPS و یک پانل آماری دقیق‌تر انتخاب می‌کند.</string>
     <string name="settings_help_fps_overlay_position">روکش FPS یا آمار را در یکی از چهار گوشه قرار می‌دهد.</string>
     <string name="settings_help_gpu_driver">به شما امکان می‌دهد یک بسته درایور سفارشی GPU را جایگزین کنید.</string>
-    <string name="settings_help_gpu_hardware_profile">شاخه GPU موبایل مورد استفاده برای رندرینگ سخت‌افزاری را انتخاب می‌کند.</string>
-    <string name="settings_help_mediatek_angle_opengl">رندرکننده OpenGL مدیاتک را از طریق کتابخانه‌های همراه ANGLE مسیردهی می‌کند.</string>
-    <string name="settings_help_bilinear_filtering">حالت اصلی فیلتر بافت مورد استفاده توسط رندرکننده را کنترل می‌کند.</string>
+    <string name="settings_help_gpu_hardware_profile">شاخه GPU موبایل مورد استفاده برای رندرینگ سخت‌افزاری را انتخاب می‌کند.</string>    <string name="settings_help_bilinear_filtering">حالت اصلی فیلتر بافت مورد استفاده توسط رندرکننده را کنترل می‌کند.</string>
     <string name="settings_help_texture_filtering">نحوه فیلتر شدن بافت‌ها قبل از رسیدن به صفحه نمایش را کنترل می‌کند.</string>
     <string name="settings_help_trilinear_filtering">انتقال‌ها را بین سطوح mip روی بافت‌ها صاف می‌کند.</string>
     <string name="settings_help_cpu_sprite_render_size">آستانه اندازه اسپریت را تعیین می‌کند که ترسیم به سمت مسیر CPU حرکت کند.</string>
@@ -1250,12 +1248,7 @@
     <string name="gpu_mali_title">Mali</string>
     <string name="gpu_mali_desc">استفاده از شاخه Mali با کنترل واکشی فریم‌بافر ARM.</string>
     <string name="gpu_powervr_title">PowerVR</string>
-    <string name="gpu_powervr_desc">استفاده از شاخه PowerVR برای دستگاه‌های دارای GPUی Imagination.</string>
-    <string name="settings_mediatek_angle_opengl">ANGLE برای OpenGL</string>
-    <string name="settings_mediatek_angle_opengl_desc">از کتابخانه‌های ANGLE همراه برای رندرگر OpenGL استفاده کنید (در دسترس روی Mali و PowerVR).</string>
-    <string name="settings_mediatek_notice_title">سازگاری MediaTek</string>
-    <string name="settings_mediatek_notice_message">پشتیبانی از MediaTek هنوز آزمایشی است. تا زمانی که به بهبود سازگاری و عملکرد ادامه می‌دهیم، ممکن است خرابی، اشکالات گرافیکی و عملکرد ناپایدار رخ دهد.\n\nاگر با مشکل گرافیکی روبه‌رو شدید، OpenGL را با ANGLE فعال امتحان کنید. اگر مشکل ادامه داشت، از رندرکننده نرم‌افزاری استفاده کنید.</string>
-    <string name="onboarding_title">برای بازی آماده شوید</string>
+    <string name="gpu_powervr_desc">استفاده از شاخه PowerVR برای دستگاه‌های دارای GPUی Imagination.</string>    <string name="settings_mediatek_notice_title">سازگاری MediaTek</string>    <string name="onboarding_title">برای بازی آماده شوید</string>
     <string name="onboarding_subtitle">یک فایل BIOS اضافه کنید، پوشه بازی‌های خود را انتخاب کنید و دسترسی کامل به فایل را بدهید.</string>
     <string name="onboarding_bios_title">انتخاب فایل BIOS</string>
     <string name="onboarding_bios_desc">یک پوشه BIOS شامل BIOS عادی PS2 و ROMهای Namco System 246/256 انتخاب کنید.</string>
