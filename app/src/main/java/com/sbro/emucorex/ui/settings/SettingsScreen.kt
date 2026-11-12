@@ -1696,14 +1696,16 @@ private fun SettingsContent(
                                 onResetToDefault = { viewModel.setDisplayCrop(update(0)) }
                             )
                         }
-                        ToggleItem(
-                            icon = Icons.Rounded.Tune,
-                            title = stringResource(R.string.settings_advanced_graphics_title),
-                            subtitle = stringResource(R.string.settings_advanced_graphics_desc),
-                            checked = showAdvancedGraphicsSettings,
-                            onCheckedChange = { showAdvancedGraphicsSettings = it }
-                        )
-                        if (showAdvancedGraphicsSettings) {
+                    }
+                    ToggleItem(
+                        icon = Icons.Rounded.Tune,
+                        title = stringResource(R.string.settings_advanced_graphics_title),
+                        subtitle = stringResource(R.string.settings_advanced_graphics_desc),
+                        checked = showAdvancedGraphicsSettings,
+                        onCheckedChange = { showAdvancedGraphicsSettings = it }
+                    )
+                    if (showAdvancedGraphicsSettings) {
+                        SettingsSection(title = stringResource(R.string.emulation_section_video)) {
                             ToggleItem(
                                 icon = Icons.Rounded.AutoFixHigh,
                                 title = stringResource(R.string.settings_retroarch_shaders),
@@ -1912,7 +1914,7 @@ private fun SettingsContent(
                                 onResetToDefault = { viewModel.setShadeBoostGamma(defaults.shadeBoostGamma) }
                             )
                         }
-                        }
+                    }
                 }
 
                 SettingsTab.Audio -> {
