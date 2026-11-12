@@ -7,13 +7,14 @@ This roadmap tracks the remaining work for the Android PS2 emulator fork. Items 
 - [x] Remove the ANGLE renderer option and its Android/native runtime configuration.
 - [x] Remove obsolete ANGLE preference and UI string resources.
 - [x] Use GPU-family-aware renderer defaults: Vulkan for Adreno, OpenGL for other detected GPU families; keep OpenGL, Vulkan, and Software selectable.
-- [x] Add deterministic unit coverage for Adreno, Mali, PowerVR, and unknown-profile renderer defaults.
+- [x] Add deterministic unit coverage for Adreno, Mali, PowerVR, and unknown-profile renderer defaults; correct stale assertions that expected Vulkan on every device.
+- [x] Record the old EmuCoreX Sly 2 baseline: approximately 40% speed / 20–24 FPS (user-reported; test scene and settings still need to be captured).
 - [x] Confirm opt-in device tests exist for renderer lifecycle, surface recovery, and Vulkan startup recovery; these still require execution on real hardware with game/BIOS inputs.
 - [x] Keep English as the app's built-in language; user-provided dictionaries are the planned localisation model, not bundled translations.
 
 ## Priority 1 — Stability and renderer validation
 
-- [ ] Build debug and release variants after the ANGLE removal; fix any Kotlin, JNI, native-linking, or packaging regressions.
+- [ ] Build debug and release variants after the ANGLE removal; fix any Kotlin, JNI, native-linking, or packaging regressions. No GitHub Actions runs are currently present, so local build verification is still required.
 - [ ] Scan the full source tree and packaged outputs for leftover ANGLE libraries, hints, settings, and user-facing references.
 - [ ] Verify OpenGL and Vulkan startup, gameplay, suspend/resume, surface recreation, and recovery on Mali devices.
 - [ ] Benchmark both renderers on the same games and scenes; confirm the GPU-family defaults are sensible and retain a safe manual override.
