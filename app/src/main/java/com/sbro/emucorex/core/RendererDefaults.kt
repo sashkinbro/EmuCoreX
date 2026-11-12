@@ -5,14 +5,17 @@ object RendererDefaults {
     const val OPENGL = 12
     const val SOFTWARE = 13
     const val VULKAN = 14
-    // Prefer OpenGL on Mali/PowerVR, where Vulkan is not consistently faster.
-    // Adreno devices retain Vulkan as the default; both backends remain selectable.
+
+    // Generic fallback when hardware detection is unavailable. Runtime selection
+    // should use defaultForHardware() so known GPU families get the safer default.
     const val DEFAULT = OPENGL
 
-    fun defaultForHardware(): Int = when (GpuHardwareProfiles.detectHardwareProfile()) {
+    internal fun defaultForProfile(profile: Int): Int = when (GpuHardwareProfiles.normalize(profile)) {
         GpuHardwareProfiles.ADRENO -> VULKAN
         else -> OPENGL
     }
+
+    fun defaultForHardware(): Int = defaultForProfile(GpuHardwareProfiles.detectHardwareProfile())
 
     fun normalizeAndroidRenderer(value: Int): Int {
         return when (value) {
