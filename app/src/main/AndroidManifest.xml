@@ -9,7 +9,6 @@
         tools:ignore="ForegroundServicesPolicy" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="com.android.vending.BILLING" />
     <!-- The Social SDK AAR also contains voice features. EmuCoreX only uses account linking and
          Rich Presence, so explicitly remove permissions that would otherwise be merged in. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove" />
@@ -80,13 +79,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.EmuCoreX"
         tools:ignore="UnusedAttribute">
-        <meta-data
-            android:name="google_analytics_adid_collection_enabled"
-            android:value="false" />
-        <meta-data
-            android:name="google_analytics_default_allow_ad_personalization_signals"
-            android:value="false" />
-
         <activity
             android:name=".MainActivity"
             android:exported="true"
