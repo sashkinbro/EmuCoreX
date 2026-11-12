@@ -893,7 +893,7 @@ bool GameDatabaseSchema::GameEntry::TestBundledMobileDatabase()
 	s_game_db.clear();
 	GameDatabase::loadFile("resources/GameIndex.yaml", "GameIndex.yaml", false);
 	GameDatabase::loadFile("resources/emucorex_overrides.yaml", "emucorex_overrides.yaml", true);
-	bool ok = tree->rootref().num_children() == 147;
+	bool ok = tree->rootref().num_children() == 159;
 	for (const auto& n : tree->rootref().children())
 	{
 		const auto serial = StringUtil::toLower(std::string(n.key().str, n.key().len));

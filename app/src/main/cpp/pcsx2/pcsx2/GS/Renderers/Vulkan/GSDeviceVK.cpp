@@ -7604,7 +7604,7 @@ bool GSDeviceVK::TestTFXShaderSourceBuilders()
 		if (source.starts_with(prefix))
 			source.insert(prefix.size(), removed_requirement);
 		// The new selector has its own checks below; preserve all pre-port fixtures.
-		for (const std::string_view macro : {"#define VS_SPRITE_EDGE_CLAMP ", "#define PS_SPRITE_EDGE_CLAMP ", "#define PS_AF_IN_SRC1 ", "#define PS_NATIVE_TEXEL_GRID ", "#define GPU_PROFILE_MALI ", "#define PS_QUANTIZE_COLOR ", "#define PS_SUBSTITUTE_ALPHA ", "#define PS_STENCIL_COUNTER ", "#define PS_BLEND_FACTOR_IN_ALPHA "})
+		for (const std::string_view macro : {"#define VS_SPRITE_EDGE_CLAMP ", "#define PS_SPRITE_EDGE_CLAMP ", "#define PS_AF_IN_SRC1 ", "#define PS_NATIVE_TEXEL_GRID ", "#define GPU_PROFILE_MALI ", "#define PS_QUANTIZE_COLOR ", "#define PS_SUBSTITUTE_ALPHA ", "#define PS_STENCIL_COUNTER ", "#define PS_BLEND_FACTOR_IN_ALPHA ", "#define PS_REPLACEMENT_ALPHA_SNAP "})
 		{
 			const size_t at = source.find(macro);
 			if (at != std::string::npos)
