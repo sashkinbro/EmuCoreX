@@ -313,7 +313,6 @@ data class SettingsUiState(
     val gamepadBindings: Map<String, Int> = emptyMap(),
     val gamepadBindingsByPad: Map<Int, Map<String, Int>> = emptyMap(),
     val gpuDriverType: Int = 0,
-    val mediatekAngleOpenGl: Boolean = false,
     val customDriverPath: String? = null,
     val dev9: Dev9Settings = Dev9Settings(),
     val installedGpuDrivers: List<InstalledGpuDriver> = emptyList(),
@@ -661,7 +660,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             gamepadBindings = snapshot.gamepadBindings,
             gamepadBindingsByPad = snapshot.gamepadBindingsByPad,
             gpuDriverType = snapshot.gpuDriverType,
-            mediatekAngleOpenGl = snapshot.mediatekAngleOpenGl,
             customDriverPath = snapshot.customDriverPath,
             dev9 = snapshot.dev9,
             frameLimitEnabled = snapshot.frameLimitEnabled,
@@ -1914,16 +1912,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun setMediatekAngleOpenGl(enabled: Boolean) {
-        viewModelScope.launch {
-            val effectiveEnabled = enabled &&
-                GpuHardwareProfiles.isMediatekProfile(GpuHardwareProfiles.detectHardwareProfile()) &&
-                EmulatorBridge.isBundledAngleAvailable()
-            preferences.setMediatekAngleOpenGl(effectiveEnabled)
-            EmulatorBridge.setSetting("EmuCore/GS", "AndroidUseAngleOpenGL", "bool", effectiveEnabled.toString())
-        }
-    }
-
     fun setTexturePreloading(value: Int) {
         viewModelScope.launch {
             markPerformancePresetCustom()
@@ -2480,7 +2468,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 gpuDriverType = _uiState.value.gpuDriverType,
                 customDriverPath = _uiState.value.customDriverPath,
                 gpuHardwareProfile = GpuHardwareProfiles.detectHardwareProfile(),
-                mediatekAngleOpenGl = _uiState.value.mediatekAngleOpenGl,
                 aspectRatio = _uiState.value.aspectRatio,
                 localMultiplayerMode = _uiState.value.localMultiplayerMode,
                 audioVolume = _uiState.value.audioVolume,
