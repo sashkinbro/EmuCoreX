@@ -47,8 +47,11 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
@@ -84,6 +87,7 @@ import kotlin.math.absoluteValue
 import com.sbro.emucorex.ui.theme.neon.neonShape
 import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun HomeShelfMode(
     games: List<GameItem>,
@@ -167,8 +171,12 @@ internal fun HomeShelfMode(
     }
     // Focus follows the settled page; the target card may not be composed yet (e.g. after a
     // wrap-around jump), so retry for a few frames instead of failing silently.
+    val inputModeManager = LocalInputModeManager.current
+    val keyDriven = LocalTvUiEnvironment.current.enabled || remember { GamepadManager.isGamepadConnected() }
     LaunchedEffect(pagerState.settledPage, shouldRequestGamepadFocus, cardFocusRequesters) {
         if (!shouldRequestGamepadFocus) return@LaunchedEffect
+        // Clickable cards are not focusable in touch input mode (cold start before any key press).
+        if (keyDriven) inputModeManager.requestInputMode(InputMode.Keyboard)
         val requester = cardFocusRequesters[pagerState.settledPage.coerceIn(0, cardFocusRequesters.lastIndex)]
         repeat(8) {
             if (runCatching { requester.requestFocus() }.getOrDefault(false)) return@LaunchedEffect

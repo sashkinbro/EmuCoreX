@@ -288,7 +288,8 @@ fun HomeScreen(
         derivedStateOf { gridState.firstVisibleItemIndex > 2 || gridState.firstVisibleItemScrollOffset > 900 }
     }
     val libraryFocusRegistry = remember { HomeLibraryFocusRegistry() }
-    val shouldRequestGamepadFocus = tvUiEnabled || remember { GamepadManager.isGamepadConnected() }
+    // Always own focus on entry: key events only reach the cards while one is focused.
+    val shouldRequestGamepadFocus = true
 
     fun applyShelfSystemBarsHidden() {
         val activity = context as? Activity ?: return
