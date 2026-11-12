@@ -101,6 +101,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -1377,6 +1378,28 @@ fun AppNavigation(
                 "Handling launch request destination=$startupDestination path=${launchRequest.gamePath} bios=${launchRequest.bootBios} autotest=${launchRequest.autotestMode}"
             )
             if (startupDestination != StartupDestination.HOME) return@LaunchedEffect
+            val runningEntry = navController.currentBackStackEntry
+            val runningRoute = if (runningEntry?.destination?.hasRoute<EmulationRoute>() == true) {
+                runningEntry.toRoute<EmulationRoute>()
+            } else null
+            if (runningRoute != null &&
+                !launchRequest.bootBios && !runningRoute.bootBios &&
+                runningRoute.gamePath == launchRequest.gamePath
+            ) {
+                // Same game is already running: just return to it.
+                GameLaunchShortcut.clearLaunchRequest(activity?.intent)
+                return@LaunchedEffect
+            }
+            if (runningRoute != null) {
+                // A different game is running: leave it first (exit work runs in the VM exit scope) and wait until
+                // its screen is fully gone, so the old surface is not destroyed after the new one was created.
+                navController.popBackStack(HomeRoute, inclusive = false)
+                withTimeoutOrNull(3000) {
+                    navController.visibleEntries.first { entries ->
+                        entries.none { it.destination.hasRoute<EmulationRoute>() }
+                    }
+                }
+            }
             navController.navigate(
                 EmulationRoute(
                     gamePath = launchRequest.gamePath,
