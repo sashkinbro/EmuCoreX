@@ -1,6 +1,5 @@
 package com.sbro.emucorex.ui.settings
 
-import android.app.Activity
 import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
@@ -20,9 +19,6 @@ import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.GsHackDefaults
 import com.sbro.emucorex.core.PerformanceProfiles
 import com.sbro.emucorex.core.PerformancePresets
-import com.sbro.emucorex.core.ProProductOffer
-import com.sbro.emucorex.core.ProPurchaseManager
-import com.sbro.emucorex.core.ProPurchaseTier
 import com.sbro.emucorex.core.NativeApp
 import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.core.StorageAccess
@@ -139,14 +135,6 @@ data class SettingsUiState(
     val isBackgroundImporting: Boolean = false,
     val customizationMessageResId: Int? = null,
     val isProUnlocked: Boolean = false,
-    val proPrice: String? = null,
-    val proProducts: List<ProProductOffer> = emptyList(),
-    val ownedProProductIds: Set<String> = emptySet(),
-    val isProPurchaseStatusVerified: Boolean = false,
-    val isProProductLoading: Boolean = false,
-    val isProProductAvailable: Boolean = false,
-    val isProPurchaseInProgress: Boolean = false,
-    val proPurchaseMessageResId: Int? = null,
     val languageTag: String? = null,
     val tvInterfaceMode: TvInterfaceMode = TvInterfaceMode.AUTO,
     val renderer: Int = RendererDefaults.defaultForHardware(),
@@ -388,7 +376,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val appUpdateRepository = AppUpdateRepository(application)
     private val gpuDriverManager = GpuDriverManager(application)
     private val gpuDriverCatalogRepository = GpuDriverCatalogRepository(application)
-    private val proPurchaseManager = ProPurchaseManager.getInstance(application)
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
     // Kept outside SettingsUiState: that data class is at the JVM 255-argument limit.
@@ -430,18 +417,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         refreshEmulatorDataLocations()
 
                 viewModelScope.launch {
-            proPurchaseManager.state.collect { proState ->
-                _uiState.update { it.copy(
-                    isProUnlocked = proState.isProUnlocked,
-                    proPrice = proState.productPrice,
-                    proProducts = proState.products,
-                    ownedProProductIds = proState.ownedProductIds,
-                    isProPurchaseStatusVerified = proState.isPurchaseStatusVerified,
-                    isProProductLoading = proState.isProductLoading,
-                    isProProductAvailable = proState.isProductAvailable,
-                    isProPurchaseInProgress = proState.isPurchaseInProgress,
-                    proPurchaseMessageResId = proState.messageResId
-                ) }
+            preferences.proUnlocked.collect { unlocked ->
+                _uiState.update { it.copy(isProUnlocked = unlocked) }
             }
         }
 
@@ -1158,17 +1135,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val value = code.filter(Char::isLetterOrDigit).take(12).uppercase()
         if (value.length in 4..12) preferences.setDev9LocalLinkRoomCode(value)
     }
-
-    fun purchasePro(
-        activity: Activity,
-        tier: ProPurchaseTier = ProPurchaseTier.BASE
-    ) {
-        proPurchaseManager.purchase(activity, tier)
-    }
-
-    fun restoreProPurchases() { proPurchaseManager.restorePurchases(showMessage = true) }
-
-    fun clearProPurchaseMessage() { proPurchaseManager.clearMessage() }
 
 
     fun setRenderer(value: Int) {
