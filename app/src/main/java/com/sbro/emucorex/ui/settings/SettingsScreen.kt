@@ -651,6 +651,8 @@ fun SettingsScreen(
                 onSearchResultSelected = { tab ->
                     selectedTab = tab
                     if (tab == SettingsTab.Graphics) showAdvancedGraphicsSettings = true
+                    if (tab == SettingsTab.Emulation) showAdvancedEmulationSettings = true
+                    if (tab == SettingsTab.Fixes) showAdvancedFixSettings = true
                     searchEnabled = false
                     searchQuery = ""
                 },
