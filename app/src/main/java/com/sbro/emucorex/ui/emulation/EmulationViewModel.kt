@@ -74,10 +74,7 @@ import com.sbro.emucorex.data.GameMenuTabId
 import com.sbro.emucorex.data.GameMenuSectionId
 import com.sbro.emucorex.data.DefaultGameMenuTabOrder
 import com.sbro.emucorex.data.DefaultGameMenuSectionOrder
-import com.sbro.emucorex.data.PlayTimeSyncCacheRepository
 import com.sbro.emucorex.data.PerformanceOverlayMetrics
-import com.sbro.emucorex.data.PlayerProfileRepository
-import com.sbro.emucorex.data.PlayerPlayTimeDelta
 import com.sbro.emucorex.data.RetroArchShaderRepository
 import com.sbro.emucorex.data.SaveStateRepository
 import com.sbro.emucorex.data.ShaderPackInstallProgress
@@ -608,8 +605,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     private companion object {
         const val TAG = "EmulationViewModel"
         private const val AUTO_SAVE_SLOT = 0
-        private const val PLAY_TIME_LOCAL_CACHE_INTERVAL_MS = 60_000L
-        private const val PLAY_TIME_CLOUD_SYNC_INTERVAL_MS = 10L * 60_000L
         private const val ACTIVE_PATCH_NOTICE_DURATION_MS = 7_000L
         private val SAVE_STATE_FILE_REGEX = Regex("""^(.+?) \(([0-9A-Fa-f]{8})\)\.(\d{2})\.p2s$""")
     }
@@ -625,8 +620,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     private val compatibilityRepository = Pcsx2CompatibilityRepository(application)
     private val gameRepository = GameRepository()
     private val saveStateRepository = SaveStateRepository(application)
-    private val playerProfileRepository = PlayerProfileRepository(application)
-    private val playTimeSyncCacheRepository = PlayTimeSyncCacheRepository(application)
     private val performanceCpuName = MobileSocNameMapper.currentDeviceName()
     private val androidGamePerformance = AndroidGamePerformance(application)
     private val initialFrameGeneration = frameGenerationManager.snapshot()
@@ -722,14 +715,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     private var currentTouchControlsLayoutProfile: TouchControlsLayoutProfile? = null
     private var currentCustomTouchControlsProfile: CustomTouchControlLibrary? = null
     private var lastAutoSavePlayTimeMs: Long = 0L
-    private var pendingPlayTimeSyncMs: Long = 0L
-    private var playTimeSyncJob: Job? = null
     private var savePreviewJob: Job? = null
-    private var lastCloudPlayTimeSyncAtMs: Long = 0L
-    private var shouldCountCurrentProfileSession = false
-    // Autotest and boot-smoke VMs may run for minutes, but must never enter persistent player stats.
-    private var shouldTrackCurrentProfilePlayTime = false
-    private val playTimeSyncMutex = Mutex()
     init {
         viewModelScope.launch {
             preferences.cleanupLegacyClampingPreferencesIfNeeded()
@@ -1593,12 +1579,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
         val nextPlayTimeMs = state.activePlayTimeMs + 1_000L
         _uiState.value = state.copy(activePlayTimeMs = nextPlayTimeMs)
-        if (shouldTrackCurrentProfilePlayTime) {
-            pendingPlayTimeSyncMs += 1_000L
-            if (pendingPlayTimeSyncMs >= PLAY_TIME_LOCAL_CACHE_INTERVAL_MS) {
-                schedulePlayTimeSync()
-            }
-        }
 
         val intervalMs = state.autoSaveIntervalMinutes.coerceIn(1, 999) * 60_000L
         if (!state.autoSaveEnabled ||
@@ -1611,88 +1591,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
         lastAutoSavePlayTimeMs = nextPlayTimeMs
         performAutoSave()
-    }
-
-    private fun schedulePlayTimeSync() {
-        if (playTimeSyncJob?.isActive == true) return
-        playTimeSyncJob = viewModelScope.launch {
-            try {
-                withContext(Dispatchers.IO) {
-                    cachePendingPlayTime()
-                    flushCachedPlayTimeIfDue(force = false)
-                }
-            } finally {
-                playTimeSyncJob = null
-            }
-        }
-    }
-
-    private suspend fun cachePendingPlayTime() {
-        playTimeSyncMutex.withLock {
-            if (!shouldTrackCurrentProfilePlayTime) {
-                pendingPlayTimeSyncMs = 0L
-                shouldCountCurrentProfileSession = false
-                return@withLock
-            }
-            val durationMs = pendingPlayTimeSyncMs
-            if (durationMs <= 0L) return@withLock
-            val path = currentGamePath
-            val title = currentGameTitle
-            val serial = currentGameSerial.takeIf { it.isNotBlank() }
-            val coverArtPath = currentGameCoverArtPath
-            pendingPlayTimeSyncMs = 0L
-            val cached = runCatching {
-                playTimeSyncCacheRepository.add(
-                    PlayerPlayTimeDelta(
-                        gamePath = path,
-                        title = title,
-                        serial = serial,
-                        coverArtPath = coverArtPath,
-                        durationMs = durationMs,
-                        sessionCount = if (shouldCountCurrentProfileSession) 1L else 0L
-                    )
-                )
-            }.isSuccess
-            if (cached) {
-                shouldCountCurrentProfileSession = false
-            } else {
-                pendingPlayTimeSyncMs += durationMs
-            }
-        }
-    }
-
-    private suspend fun flushCachedPlayTimeIfDue(force: Boolean) {
-        val nowMs = System.currentTimeMillis()
-        val lastSyncAtMs = maxOf(lastCloudPlayTimeSyncAtMs, playTimeSyncCacheRepository.getLastCloudSyncAtMs())
-        if (!force && nowMs - lastSyncAtMs < PLAY_TIME_CLOUD_SYNC_INTERVAL_MS) {
-            return
-        }
-        if (!playerProfileRepository.hasSignedInUser()) {
-            return
-        }
-        val entries = playTimeSyncCacheRepository.drain()
-        if (entries.isEmpty()) return
-        val synced = runCatching {
-            playerProfileRepository.recordPlayTimeBatch(entries)
-        }.isSuccess
-        if (synced) {
-            lastCloudPlayTimeSyncAtMs = nowMs
-            playTimeSyncCacheRepository.setLastCloudSyncAtMs(nowMs)
-        } else {
-            playTimeSyncCacheRepository.restore(entries)
-        }
-    }
-
-    private suspend fun syncPendingPlayTime(forceCloud: Boolean = true) {
-        cachePendingPlayTime()
-        flushCachedPlayTimeIfDue(force = forceCloud)
-    }
-
-    private fun syncCachedPlayTimeInBackground(forceCloud: Boolean = true) {
-        val app = getApplication<Application>() as EmuCoreXApp
-        app.applicationScope.launch {
-            flushCachedPlayTimeIfDue(force = forceCloud)
-        }
     }
 
     private fun performAutoSave() {
@@ -2186,13 +2084,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         cancelPendingStart = false
         currentLaunchRequest = launchRequest
         pausedForBackground = false
-        if (pendingPlayTimeSyncMs > 0L) {
-            runCatching {
-                kotlinx.coroutines.runBlocking(Dispatchers.IO) {
-                    cachePendingPlayTime()
-                }
-            }
-        }
         currentGamePath = if (bootToBios) null else path?.takeIf { it.isNotBlank() }
         RetroAchievementsStateManager.setActiveGame(currentGamePath)
         // Read the per-game touch profile synchronously so the very first rendered frame
@@ -2209,7 +2100,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         lastAutoSavePlayTimeMs = 0L
         pendingPlayTimeSyncMs = 0L
         shouldCountCurrentProfileSession = false
-        shouldTrackCurrentProfilePlayTime = false
         _uiState.value = applyInterfaceSettings(
             _uiState.value
                 .copy(
@@ -2401,8 +2291,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     currentGameCoverArtPath = null
                     currentGameCrc = ""
                     currentGameSource = "bios_only"
-                    shouldCountCurrentProfileSession = false
-                    shouldTrackCurrentProfilePlayTime = false
                     _uiState.value = _uiState.value.copy(
                         currentGameTitle = currentGameTitle,
                         currentGameSubtitle = currentGameSubtitle(),
@@ -5991,7 +5879,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             }
             cachePendingPlayTime()
             performShutdown()
-            syncCachedPlayTimeInBackground()
             if (onExit != null) {
                 withContext(Dispatchers.Main) {
                     // The route may already be gone (system back during exit); never navigate twice.
@@ -6017,7 +5904,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             DiscordIntegration.setPaused(true)
             updateCrashContext(launchState = "paused")
             synchronizePauseState()
-            viewModelScope.launch(Dispatchers.IO) { syncPendingPlayTime(forceCloud = false) }
         }
     }
 
@@ -6191,7 +6077,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         if (EmulationExitCoordinator.inFlight?.isActive == true) return
         val wasRunning = _uiState.value.isRunning
         EmulationExitCoordinator.launchTracked {
-            runCatching { cachePendingPlayTime() }
             if (wasRunning) {
                 runCatching {
                     EmulatorBridge.resetKeyStatus()
