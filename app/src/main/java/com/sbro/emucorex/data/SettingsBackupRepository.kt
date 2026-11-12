@@ -5,7 +5,6 @@ import android.net.Uri
 import android.util.Log
 import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.BackupSessionGate
-import com.sbro.emucorex.data.drive.DriveBackupArchive
 import com.sbro.emucorex.data.gamedb.GameDbUserOverrides
 import org.json.JSONObject
 import java.io.File
@@ -31,7 +30,6 @@ class SettingsBackupRepository(
             val output = context.contentResolver.openOutputStream(destination) ?: return@runCatching false
             output.use {
                 BackupSessionGate.whileStopped {
-                    DriveBackupArchive(context).recoverPending()
                     writeBackup(it, includeSaveStates)
                 }
             }
@@ -46,7 +44,6 @@ class SettingsBackupRepository(
             val input = context.contentResolver.openInputStream(source) ?: return@runCatching false
             input.use {
                 BackupSessionGate.whileStopped {
-                    DriveBackupArchive(context).recoverPending()
                     restoreBackup(it)
                 }
             }
