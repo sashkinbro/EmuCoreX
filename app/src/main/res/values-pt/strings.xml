@@ -1440,13 +1440,7 @@
     <string name="pro_message_restore_failed">Não é possível restaurar o Pro neste momento.</string>
     <string name="pro_message_purchase_failed">Não foi possível concluir a compra do Pro.</string>
     <string name="pro_message_pending_confirmation">A compra do Pro aguarda confirmação.</string>
-    <string name="pro_price_unavailable">O Pro ainda não está disponível</string>
-    <string name="settings_help_mediatek_angle_opengl">Roteia o renderizador OpenGL da MediaTek através de bibliotecas ANGLE integradas. Devido à sobrecarga de tradução, isso pode aumentar ou diminuir o desempenho dependendo do jogo. Disponível para perfis Mali e PowerVR e permanece desativado por padrão.</string>
-    <string name="settings_mediatek_angle_opengl">ANGLE para OpenGL</string>
-    <string name="settings_mediatek_angle_opengl_desc">Usa as bibliotecas ANGLE incluídas para o renderizador OpenGL (disponível em Mali e PowerVR).</string>
-    <string name="settings_mediatek_notice_title">Compatibilidade com MediaTek</string>
-    <string name="settings_mediatek_notice_message">O suporte à MediaTek ainda é experimental. Podem ocorrer falhas, artefatos gráficos e comportamento instável enquanto continuamos melhorando a compatibilidade e o desempenho.\n\nSe houver problemas gráficos, experimente o OpenGL com o ANGLE ativado. Se persistirem, use o renderizador Software.</string>
-    <string name="settings_pro_tab">Pro</string>
+    <string name="pro_price_unavailable">O Pro ainda não está disponível</string>    <string name="settings_mediatek_notice_title">Compatibilidade com MediaTek</string>    <string name="settings_pro_tab">Pro</string>
     <string name="settings_pro_desc">Desbloqueie temas personalizados, o Crimson, o ícone dourado do aplicativo, perfis Pro, estatísticas avançadas e cartões de jogador.</string>
     <string name="settings_pro_not_active">Não ativo</string>
     <string name="settings_pro_purchased">Comprado</string>
