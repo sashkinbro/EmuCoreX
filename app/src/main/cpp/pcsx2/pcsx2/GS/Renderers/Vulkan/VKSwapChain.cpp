@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -319,6 +320,38 @@ u64 VKSwapChain::PresentTimingNowNs()
 		std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
 }
 
+bool VKSwapChain::AsyncPresentEnabled()
+{
+	static const bool enabled = [] {
+		char v[8];
+		return !(ReadPresentTuning("EMUCOREX_GS_ASYNC_PRESENT", "debug.emucorex.async_present", v, sizeof(v)) &&
+		         v[0] == '0');
+	}();
+	return enabled;
+}
+
+static std::atomic<u64> s_gs_enqueue_sum_ns{0}, s_gs_enqueue_max_ns{0}, s_gs_wait_sum_ns{0}, s_gs_wait_max_ns{0};
+
+void VKSwapChain::RecordGsPresentCost(u64 enqueue_ns, u64 wait_ns)
+{
+	if (enqueue_ns)
+	{
+		s_gs_enqueue_sum_ns.fetch_add(enqueue_ns, std::memory_order_relaxed);
+		u64 prev = s_gs_enqueue_max_ns.load(std::memory_order_relaxed);
+		while (prev < enqueue_ns && !s_gs_enqueue_max_ns.compare_exchange_weak(prev, enqueue_ns, std::memory_order_relaxed))
+		{
+		}
+	}
+	if (wait_ns)
+	{
+		s_gs_wait_sum_ns.fetch_add(wait_ns, std::memory_order_relaxed);
+		u64 prev = s_gs_wait_max_ns.load(std::memory_order_relaxed);
+		while (prev < wait_ns && !s_gs_wait_max_ns.compare_exchange_weak(prev, wait_ns, std::memory_order_relaxed))
+		{
+		}
+	}
+}
+
 void VKSwapChain::RecordPresentTime(u64 present_ns)
 {
 	m_pt_frames++;
@@ -329,14 +362,20 @@ void VKSwapChain::RecordPresentTime(u64 present_ns)
 
 	const double frames = static_cast<double>(m_pt_frames);
 	const double acquires = static_cast<double>(std::max<u64>(m_pt_acquires, 1));
-	char line[320];
+	char line[640];
 	std::snprintf(line, sizeof(line),
 		"GS_PRESENT_TIME mode=%s images_requested=%u images_actual=%u present_avg_ms=%.3f present_max_ms=%.3f "
-		"acquire_avg_ms=%.3f acquire_max_ms=%.3f acquires=%llu frames=%llu",
+		"acquire_avg_ms=%.3f acquire_max_ms=%.3f acquires=%llu frames=%llu "
+		"async_present=%s gs_enqueue_avg_ms=%.3f gs_enqueue_max_ms=%.3f gs_wait_avg_ms=%.3f gs_wait_max_ms=%.3f",
 		PresentModeToString(m_present_mode), m_requested_image_count, static_cast<u32>(m_images.size()),
 		m_pt_present_sum_ns / frames / 1e6, m_pt_present_max_ns / 1e6, m_pt_acquire_sum_ns / acquires / 1e6,
 		m_pt_acquire_max_ns / 1e6, static_cast<unsigned long long>(m_pt_acquires),
-		static_cast<unsigned long long>(m_pt_frames));
+		static_cast<unsigned long long>(m_pt_frames),
+		GSDeviceVK::GetInstance() ? GSDeviceVK::GetInstance()->GetAsyncPresentModeString() : "off",
+		s_gs_enqueue_sum_ns.exchange(0, std::memory_order_relaxed) / frames / 1e6,
+		s_gs_enqueue_max_ns.exchange(0, std::memory_order_relaxed) / 1e6,
+		s_gs_wait_sum_ns.exchange(0, std::memory_order_relaxed) / frames / 1e6,
+		s_gs_wait_max_ns.exchange(0, std::memory_order_relaxed) / 1e6);
 #if defined(__ANDROID__)
 	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX", "%s", line);
 #else

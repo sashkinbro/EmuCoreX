@@ -50,6 +50,10 @@
 #include <algorithm>
 #include <bit>
 #include <chrono>
+#include <condition_variable>
+#if defined(__ANDROID__)
+#include <pthread.h>
+#endif
 #include <cstring>
 #include <deque>
 #include <limits>
@@ -941,6 +945,32 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 		spin_queue_info.pQueuePriorities = queue_priorities + 1;
 	}
 
+	// Async present: give the present thread its own VkQueue in the graphics family when the family
+	// exposes a spare one, so vkQueuePresentKHR never serialises with the GS thread's vkQueueSubmit.
+	// Otherwise the present thread shares the graphics queue behind m_queue_mutex.
+	float graphics_queue_priorities[3] = {1.0f, 1.0f, 1.0f};
+	u32 async_present_queue_index = UINT32_MAX;
+	m_async_present_enabled = VKSwapChain::AsyncPresentEnabled();
+	if (m_async_present_enabled)
+	{
+		const bool spin_on_graphics_extra =
+			m_spin_queue_family_index == m_graphics_queue_family_index && spin_queue_index != 0;
+		if (spin_on_graphics_extra)
+			graphics_queue_priorities[1] = 0.0f; // spin queue keeps its low priority
+		if (m_present_queue_family_index == m_graphics_queue_family_index &&
+			graphics_queue_info.queueCount < 3 &&
+			queue_family_properties[m_graphics_queue_family_index].queueCount > graphics_queue_info.queueCount)
+		{
+			async_present_queue_index = graphics_queue_info.queueCount;
+			graphics_queue_info.queueCount++;
+			graphics_queue_info.pQueuePriorities = graphics_queue_priorities;
+		}
+		Console.WriteLn("VK: async present on (graphics family %u queueCount=%u requested=%u, %s)",
+			m_graphics_queue_family_index, queue_family_properties[m_graphics_queue_family_index].queueCount,
+			graphics_queue_info.queueCount,
+			async_present_queue_index != UINT32_MAX ? "dedicated present queue" : "shared queue + mutex");
+	}
+
 	device_info.pQueueCreateInfos = queue_infos.data();
 
 	ExtensionList enabled_extensions;
@@ -1115,6 +1145,8 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 		// queue-family search above), so a late-arriving surface can present.
 		vkGetDeviceQueue(m_device, m_present_queue_family_index, 0, &m_present_queue);
 	}
+	if (async_present_queue_index != UINT32_MAX)
+		vkGetDeviceQueue(m_device, m_graphics_queue_family_index, async_present_queue_index, &m_async_present_queue);
 	m_spinning_supported = m_spin_queue_family_index != queue_family_count &&
 	                       queue_family_properties[m_graphics_queue_family_index].timestampValidBits > 0 &&
 	                       m_device_properties.limits.timestampPeriod > 0;
@@ -1685,7 +1717,86 @@ void GSDeviceVK::WaitForFenceCounter(u64 fence_counter)
 
 void GSDeviceVK::WaitForGPUIdle()
 {
+	// vkDeviceWaitIdle needs every queue externally synchronised: the present thread must be idle.
+	DrainPresent();
 	vkDeviceWaitIdle(m_device);
+}
+
+const char* GSDeviceVK::GetAsyncPresentModeString() const
+{
+	if (!m_async_present_enabled)
+		return "off";
+	return m_async_present_queue != VK_NULL_HANDLE ? "sep_queue" : "shared_mutex";
+}
+
+void GSDeviceVK::DrainPresent()
+{
+	if (!m_present_thread.joinable())
+		return;
+
+	std::unique_lock lock(m_present_mutex);
+	if (!m_present_pending)
+		return;
+	const bool timing = VKSwapChain::PresentTimingEnabled();
+	const u64 t0 = timing ? VKSwapChain::PresentTimingNowNs() : 0;
+	m_present_done_cv.wait(lock, [this] { return !m_present_pending; });
+	if (timing)
+		VKSwapChain::RecordGsPresentCost(0, VKSwapChain::PresentTimingNowNs() - t0);
+}
+
+void GSDeviceVK::EnqueueAsyncPresent(VKSwapChain* swap_chain)
+{
+	const bool timing = VKSwapChain::PresentTimingEnabled();
+	const u64 t0 = timing ? VKSwapChain::PresentTimingNowNs() : 0;
+	{
+		std::unique_lock lock(m_present_mutex);
+		if (!m_present_thread.joinable())
+		{
+			m_present_thread_exit = false;
+			m_present_thread = std::thread([this] { PresentThreadMain(); });
+		}
+		// Back-pressure: BeginPresent already drained the previous frame, so this does not wait.
+		m_present_done_cv.wait(lock, [this] { return !m_present_pending; });
+		m_present_job = swap_chain;
+		m_present_pending = true;
+	}
+	m_present_cv.notify_one();
+	if (timing)
+		VKSwapChain::RecordGsPresentCost(VKSwapChain::PresentTimingNowNs() - t0, 0);
+}
+
+void GSDeviceVK::PresentThreadMain()
+{
+#if defined(__ANDROID__)
+	pthread_setname_np(pthread_self(), "GSPresent");
+#endif
+	std::unique_lock lock(m_present_mutex);
+	for (;;)
+	{
+		m_present_cv.wait(lock, [this] { return m_present_job != nullptr || m_present_thread_exit; });
+		if (!m_present_job)
+			break; // exit requested with nothing queued
+		VKSwapChain* const swap_chain = m_present_job;
+		lock.unlock();
+		PresentSwapChain(swap_chain, GetPresentThreadQueue());
+		lock.lock();
+		m_present_job = nullptr;
+		m_present_pending = false;
+		m_present_done_cv.notify_all();
+	}
+}
+
+void GSDeviceVK::StopPresentThread()
+{
+	if (!m_present_thread.joinable())
+		return;
+	DrainPresent();
+	{
+		std::lock_guard lock(m_present_mutex);
+		m_present_thread_exit = true;
+	}
+	m_present_cv.notify_all();
+	m_present_thread.join();
 }
 
 float GSDeviceVK::GetAndResetAccumulatedGPUTime()
@@ -1908,7 +2019,13 @@ void GSDeviceVK::SubmitCommandBuffer(VKSwapChain* present_swap_chain)
 	// here first. On a coherent ring each of these six calls returns on a compare.
 	FlushStreamRingWrites();
 
-	res = vkQueueSubmit(m_graphics_queue, 1, &submit_info, resources.fence);
+	{
+		// Only needed when the present thread may be inside vkQueuePresentKHR on this very queue.
+		std::unique_lock<std::mutex> queue_lock(m_queue_mutex, std::defer_lock);
+		if (m_async_present_enabled && GetPresentThreadQueue() == m_graphics_queue)
+			queue_lock.lock();
+		res = vkQueueSubmit(m_graphics_queue, 1, &submit_info, resources.fence);
+	}
 	if (res != VK_SUCCESS)
 	{
 		LOG_VULKAN_ERROR(res, "vkQueueSubmit failed: ");
@@ -1933,7 +2050,11 @@ void GSDeviceVK::SubmitCommandBuffer(VKSwapChain* present_swap_chain)
 	if (present_swap_chain)
 	{
 		const bool has_new_frame = std::exchange(m_present_has_new_frame, false);
-		if (GSLsfg::IsActive() &&
+		// LSFG presents (and submits) from the GS thread, so it always takes the synchronous path.
+		const bool lsfg_active = GSLsfg::IsActive();
+		if (lsfg_active)
+			DrainPresent();
+		if (lsfg_active &&
 			GSLsfg::PresentWithGeneration(m_present_queue, present_swap_chain,
 				present_swap_chain->GetRenderingFinishedSemaphore(), has_new_frame))
 		{
@@ -1941,41 +2062,61 @@ void GSDeviceVK::SubmitCommandBuffer(VKSwapChain* present_swap_chain)
 			return;
 		}
 
-		const VkPresentInfoKHR present_info = {VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, nullptr, 1,
-			present_swap_chain->GetRenderingFinishedSemaphorePtr(), 1, present_swap_chain->GetSwapChainPtr(),
-			present_swap_chain->GetCurrentImageIndexPtr(), nullptr};
-
-		present_swap_chain->ResetImageAcquireResult();
-
-		const bool present_timing = VKSwapChain::PresentTimingEnabled();
-		const u64 present_t0 = present_timing ? VKSwapChain::PresentTimingNowNs() : 0;
-		res = vkQueuePresentKHR(m_present_queue, &present_info);
-		if (present_timing)
-			present_swap_chain->RecordPresentTime(VKSwapChain::PresentTimingNowNs() - present_t0);
-		if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
+		if (m_async_present_enabled && !lsfg_active)
 		{
-			// VK_ERROR_OUT_OF_DATE_KHR is not fatal, just means we need to recreate our swap chain.
-			if (res == VK_ERROR_OUT_OF_DATE_KHR)
-			{
-				// Defer until next frame, otherwise resizing would invalidate swapchain before next present.
-				m_resize_requested = true;
-			}
-			else
-			{
-				LOG_VULKAN_ERROR(res, "vkQueuePresentKHR failed: ");
-			}
-
+			// The present thread owns the swap chain's acquire state until DrainPresent() returns.
+			EnqueueAsyncPresent(present_swap_chain);
 			return;
 		}
 
-		if (res == VK_SUBOPTIMAL_KHR && present_swap_chain->HasSurfaceRotationChanged())
-			m_resize_requested = true;
-
-		// Grab the next image as soon as possible, that way we spend less time blocked on the next
-		// submission. Don't care if it fails, we'll deal with that at the presentation call site.
-		// Credit to dxvk for the idea.
-		present_swap_chain->AcquireNextImage();
+		PresentSwapChain(present_swap_chain, m_present_queue);
 	}
+}
+
+void GSDeviceVK::PresentSwapChain(VKSwapChain* present_swap_chain, VkQueue queue)
+{
+	const VkPresentInfoKHR present_info = {VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, nullptr, 1,
+		present_swap_chain->GetRenderingFinishedSemaphorePtr(), 1, present_swap_chain->GetSwapChainPtr(),
+		present_swap_chain->GetCurrentImageIndexPtr(), nullptr};
+
+	present_swap_chain->ResetImageAcquireResult();
+
+	const bool present_timing = VKSwapChain::PresentTimingEnabled();
+	const u64 present_t0 = present_timing ? VKSwapChain::PresentTimingNowNs() : 0;
+	VkResult res;
+	{
+		// Sync path runs on the GS thread with nobody else to race; the async thread only needs the lock
+		// when it shares a queue with GS-thread submits (no dedicated present queue).
+		std::unique_lock<std::mutex> queue_lock(m_queue_mutex, std::defer_lock);
+		if (m_async_present_enabled && (queue == m_graphics_queue || queue == m_spin_queue))
+			queue_lock.lock();
+		res = vkQueuePresentKHR(queue, &present_info);
+	}
+	if (present_timing)
+		present_swap_chain->RecordPresentTime(VKSwapChain::PresentTimingNowNs() - present_t0);
+	if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
+	{
+		// VK_ERROR_OUT_OF_DATE_KHR is not fatal, just means we need to recreate our swap chain.
+		if (res == VK_ERROR_OUT_OF_DATE_KHR)
+		{
+			// Defer until next frame, otherwise resizing would invalidate swapchain before next present.
+			m_resize_requested = true;
+		}
+		else
+		{
+			LOG_VULKAN_ERROR(res, "vkQueuePresentKHR failed: ");
+		}
+
+		return;
+	}
+
+	if (res == VK_SUBOPTIMAL_KHR && present_swap_chain->HasSurfaceRotationChanged())
+		m_resize_requested = true;
+
+	// Grab the next image as soon as possible, that way we spend less time blocked on the next
+	// submission. Don't care if it fails, we'll deal with that at the presentation call site.
+	// Credit to dxvk for the idea.
+	present_swap_chain->AcquireNextImage();
 }
 
 void GSDeviceVK::CommandBufferCompleted(u32 index)
@@ -2728,7 +2869,12 @@ void GSDeviceVK::SubmitSpinCommand(u32 index, u32 cycles)
 		submit_info.pWaitSemaphores = &resources.semaphore;
 		submit_info.pWaitDstStageMask = sema_waits;
 	}
-	vkQueueSubmit(m_spin_queue, 1, &submit_info, resources.fence);
+	{
+		std::unique_lock<std::mutex> queue_lock(m_queue_mutex, std::defer_lock);
+		if (m_async_present_enabled && GetPresentThreadQueue() == m_spin_queue)
+			queue_lock.lock();
+		vkQueueSubmit(m_spin_queue, 1, &submit_info, resources.fence);
+	}
 	resources.in_progress = true;
 	resources.cycles = cycles;
 }
@@ -3038,6 +3184,7 @@ void GSDeviceVK::Destroy()
 		WaitForGPUIdle();
 
 	m_swap_chain.reset();
+	StopPresentThread();
 
 	if (m_device != VK_NULL_HANDLE)
 	{
@@ -3125,6 +3272,7 @@ bool GSDeviceVK::UpdateWindow()
 
 void GSDeviceVK::ResizeWindow(u32 new_window_width, u32 new_window_height, float new_window_scale)
 {
+	DrainPresent();
 	m_resize_requested = false;
 
 	if (!m_swap_chain || (m_swap_chain->GetWidth() == new_window_width &&
@@ -3219,6 +3367,9 @@ void GSDeviceVK::SetVSyncMode(GSVSyncMode mode, bool allow_present_throttle)
 
 GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
 {
+	// The previous frame's present and acquire ran on the present thread; take the swap chain back
+	// before any path (including the early returns) can touch it.
+	DrainPresent();
 	FlushDeferredDraws();
 	m_present_has_new_frame = false;
 	m_present_geometry={};
@@ -6328,6 +6479,7 @@ void GSDeviceVK::RenderImGui()
 
 void GSDeviceVK::RenderBlankFrame()
 {
+	DrainPresent();
 	VkResult res = m_swap_chain->AcquireNextImage();
 	if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
 	{
@@ -9828,6 +9980,7 @@ void GSDeviceVK::PassTimingDump()
 {
 	if (s_pt.pool != VK_NULL_HANDLE)
 	{
+		DrainPresent();
 		vkDeviceWaitIdle(m_device);
 		for (u32 i = 0; i < NUM_COMMAND_BUFFERS; i++)
 			PassTimingCollect(i);

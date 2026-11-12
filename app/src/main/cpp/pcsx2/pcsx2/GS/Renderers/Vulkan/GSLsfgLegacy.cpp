@@ -1200,6 +1200,10 @@ namespace GSLsfgLegacy
 		s_backend.finalize();
 		s_context_id = -1;
 
+		// The present thread may be inside vkQueuePresentKHR; vkDeviceWaitIdle needs all queues quiescent.
+		// DrainPresent is a no-op when no present is queued, and the pointer may be null at teardown.
+		if (GSDeviceVK* const vk_device = GSDeviceVK::GetInstance())
+			vk_device->DrainPresent();
 		if (s_device != VK_NULL_HANDLE)
 			vkDeviceWaitIdle(s_device);
 		DestroyResources();

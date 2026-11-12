@@ -83,6 +83,11 @@ public:
 	static bool PresentTimingEnabled();
 	static u64 PresentTimingNowNs();
 	void RecordPresentTime(u64 present_ns);
+	/// GS-thread time spent queueing a present, and blocked waiting for the present thread (async mode).
+	static void RecordGsPresentCost(u64 enqueue_ns, u64 wait_ns);
+	/// Present on a dedicated thread (default on). Kill switch: debug.emucorex.async_present=0 or
+	/// EMUCOREX_GS_ASYNC_PRESENT=0.
+	static bool AsyncPresentEnabled();
 	void ReleaseCurrentImage();
 	void ResetImageAcquireResult();
 

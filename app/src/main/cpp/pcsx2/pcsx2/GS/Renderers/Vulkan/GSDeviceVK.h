@@ -260,6 +260,13 @@ public:
 
 	void WaitForGPUIdle();
 
+	// Async present (VKSwapChain::AsyncPresentEnabled): block until the present thread has finished
+	// the queued present and the following image acquire. Every GS-thread access to the swap chain
+	// and every vkDeviceWaitIdle must come after this. No-op when nothing is queued.
+	void DrainPresent();
+	/// "off", "sep_queue" (dedicated VkQueue) or "shared_mutex" (graphics queue, mutex-guarded).
+	const char* GetAsyncPresentModeString() const;
+
 	// A stream ring replaced its buffer (VKStreamBuffer::Grow). Rebinds whatever refers to it by
 	// handle, from the command buffer being recorded on.
 	void OnStreamRingReplaced(const VKStreamBuffer& ring);
@@ -279,6 +286,12 @@ private:
 #endif
 
 	void SubmitCommandBuffer(VKSwapChain* present_swap_chain);
+	// vkQueuePresentKHR + the follow-up acquire. Runs on the GS thread (sync) or the present thread.
+	void PresentSwapChain(VKSwapChain* swap_chain, VkQueue queue);
+	void EnqueueAsyncPresent(VKSwapChain* swap_chain);
+	void PresentThreadMain();
+	VkQueue GetPresentThreadQueue() const { return m_async_present_queue != VK_NULL_HANDLE ? m_async_present_queue : m_present_queue; }
+	void StopPresentThread();
 	void MoveToNextCommandBuffer();
 
 	enum class WaitType
@@ -441,6 +454,18 @@ private:
 
 	VkQueue m_graphics_queue = VK_NULL_HANDLE;
 	VkQueue m_present_queue = VK_NULL_HANDLE;
+	// Dedicated queue for the present thread (same family as graphics); null = share m_graphics_queue.
+	VkQueue m_async_present_queue = VK_NULL_HANDLE;
+	bool m_async_present_enabled = false;
+	// Serialises vkQueueSubmit/vkQueuePresentKHR on queues that more than one thread may touch.
+	std::mutex m_queue_mutex;
+	std::thread m_present_thread;
+	std::mutex m_present_mutex;
+	std::condition_variable m_present_cv;
+	std::condition_variable m_present_done_cv;
+	VKSwapChain* m_present_job = nullptr;
+	bool m_present_pending = false;
+	bool m_present_thread_exit = false;
 	u32 m_graphics_queue_family_index = 0;
 	u32 m_present_queue_family_index = 0;
 
@@ -656,7 +681,7 @@ public:
 
 private:
 	std::unique_ptr<VKSwapChain> m_swap_chain;
-	bool m_resize_requested = false;
+	std::atomic<bool> m_resize_requested{false};
 	bool m_is_presenting = false;
 
 	VkDescriptorSetLayout m_utility_ds_layout = VK_NULL_HANDLE;
