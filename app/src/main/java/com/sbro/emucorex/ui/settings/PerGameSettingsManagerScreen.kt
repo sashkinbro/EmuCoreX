@@ -1070,7 +1070,7 @@ private fun GameSettingsTabContent(
                     onResetToDefault = { showAdvancedGraphicsSettings = false }
                 )
                 if (showAdvancedGraphicsSettings) {
-                        EditorSection(title = stringResource(R.string.game_settings_manager_section_graphics)) {
+                    EditorSection(title = stringResource(R.string.game_settings_manager_section_graphics)) {
                         SelectionRow(
                             title = stringResource(R.string.settings_bilinear_filtering),
                             options = bilinearFilteringOptions(),
