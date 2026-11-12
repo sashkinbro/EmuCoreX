@@ -1,0 +1,147 @@
+name: Android APK CI and Releases
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test and build Android APKs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install pinned Android build tools
+        run: |
+          sdkmanager --install \
+            "platforms;android-37" \
+            "ndk;29.0.14206865" \
+            "cmake;3.22.1"
+          yes | sdkmanager --licenses >/dev/null
+
+      - name: Prepare local build configuration
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
+
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          else
+            cat > app/google-services.json <<'JSON'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "emucorex-ci-placeholder",
+              "storage_bucket": "emucorex-ci-placeholder.invalid"
+            },
+            "client": [{
+              "client_info": {
+                "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+                "android_client_info": { "package_name": "com.sbro.emucorex" }
+              },
+              "api_key": [{ "current_key": "CI_PLACEHOLDER_NOT_A_REAL_API_KEY" }]
+            }],
+            "configuration_version": "1"
+          }
+          JSON
+            echo "Using placeholder Firebase configuration; CI APKs are not production-backend configured."
+          fi
+
+          if [ -n "$RELEASE_KEYSTORE_BASE64" ] && [ -n "$RELEASE_STORE_PASSWORD" ] && [ -n "$RELEASE_KEY_ALIAS" ] && [ -n "$RELEASE_KEY_PASSWORD" ]; then
+            echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > release-signing.jks
+            {
+              echo "emucorex.release.storeFile=$GITHUB_WORKSPACE/release-signing.jks"
+              echo "emucorex.release.storePassword=$RELEASE_STORE_PASSWORD"
+              echo "emucorex.release.keyAlias=$RELEASE_KEY_ALIAS"
+              echo "emucorex.release.keyPassword=$RELEASE_KEY_PASSWORD"
+            } >> local.properties
+            echo "Release signing key configured."
+          else
+            echo "Release signing secrets are incomplete or absent; the release APK will be unsigned."
+          fi
+
+      - name: Run unit tests and build debug/release APKs
+        run: |
+          ./gradlew --no-daemon --stacktrace --max-workers=2 \
+            :app:testDebugUnitTest \
+            :app:assembleDebug \
+            :app:assembleRelease
+
+      - name: Stage APKs and build metadata
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/*.apk dist/EmuCoreX-debug.apk
+          RELEASE_APK="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -n 1)"
+          test -n "$RELEASE_APK"
+          if [[ "$RELEASE_APK" == *"unsigned"* ]]; then
+            cp "$RELEASE_APK" dist/EmuCoreX-release-unsigned.apk
+            echo "Release APK is unsigned. Configure the four RELEASE_* secrets for a stable signed release." > dist/RELEASE-SIGNING.txt
+          else
+            cp "$RELEASE_APK" dist/EmuCoreX-release.apk
+            echo "Release APK signed with the configured repository signing key." > dist/RELEASE-SIGNING.txt
+          fi
+          {
+            echo "Commit: $GITHUB_SHA"
+            echo "Ref: $GITHUB_REF"
+            echo "Version: $(grep -E 'versionName = ' app/build.gradle.kts | head -n 1 | cut -d '"' -f 2)"
+            echo "Debug APK: EmuCoreX-debug.apk"
+            echo "Release APK: $(basename "$RELEASE_APK")"
+          } > dist/BUILD-INFO.txt
+
+      - name: Upload debug and release APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: EmuCoreX-Android-APKs
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Generate release changelog
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          chmod +x scripts/generate-changelog.sh
+          scripts/generate-changelog.sh > dist/RELEASE-NOTES.md
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: EmuCoreX ${{ github.ref_name }}
+          body_path: dist/RELEASE-NOTES.md
+          files: |
+            dist/EmuCoreX-debug.apk
+            dist/EmuCoreX-release.apk
+            dist/EmuCoreX-release-unsigned.apk
+            dist/RELEASE-SIGNING.txt
+            dist/BUILD-INFO.txt
+          fail_on_unmatched_files: false
+          generate_release_notes: false
