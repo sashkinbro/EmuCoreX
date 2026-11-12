@@ -1,61 +1,12 @@
 package com.sbro.emucorex.core
 
-import android.content.Context
-import android.os.Bundle
-import android.util.Log
-import com.google.firebase.analytics.FirebaseAnalytics
-import com.sbro.emucorex.BuildConfig
-import java.util.concurrent.atomic.AtomicBoolean
-
 /**
- * Centralized, best-effort product analytics.
- *
- * Event methods intentionally accept only bounded technical values. Never add game titles,
- * serials, file paths, account identifiers, or other user-provided strings here.
+ * Analytics is intentionally disabled in the offline-first build.
+ * Keep the call surface so gameplay code does not depend on a telemetry SDK.
  */
 object AppAnalytics {
-    private const val TAG = "AppAnalytics"
-
-    private val ready = AtomicBoolean(false)
-
-    @Volatile
-    private var firebaseAnalytics: FirebaseAnalytics? = null
-
-    fun initialize(context: Context) {
-        if (ready.get()) return
-
-        runCatching {
-            val analytics = FirebaseAnalytics.getInstance(context.applicationContext)
-            analytics.setConsent(
-                mapOf(
-                    FirebaseAnalytics.ConsentType.ANALYTICS_STORAGE to
-                        FirebaseAnalytics.ConsentStatus.GRANTED,
-                    FirebaseAnalytics.ConsentType.AD_STORAGE to
-                        FirebaseAnalytics.ConsentStatus.DENIED,
-                    FirebaseAnalytics.ConsentType.AD_USER_DATA to
-                        FirebaseAnalytics.ConsentStatus.DENIED,
-                    FirebaseAnalytics.ConsentType.AD_PERSONALIZATION to
-                        FirebaseAnalytics.ConsentStatus.DENIED
-                )
-            )
-            analytics.setAnalyticsCollectionEnabled(true)
-            analytics.setUserProperty(
-                "build_type",
-                if (BuildConfig.DEBUG) "debug" else "release"
-            )
-            firebaseAnalytics = analytics
-            ready.set(true)
-        }.onFailure { error ->
-            Log.w(TAG, "Firebase Analytics initialization failed", error)
-        }
-    }
-
-    fun logOnboardingCompleted(performanceProfile: Int) {
-        logEvent("onboarding_complete") {
-            putString("performance_profile", AnalyticsDimensions.performanceProfile(performanceProfile))
-        }
-    }
-
+    fun initialize(context: android.content.Context) = Unit
+    fun logOnboardingCompleted(performanceProfile: Int) = Unit
     fun logEmulationStarted(
         launchType: String,
         renderer: Int,
@@ -63,53 +14,10 @@ object AppAnalytics {
         upscaleMultiplier: Float,
         performanceProfile: Int,
         saveStateLoad: Boolean
-    ) {
-        logEvent("emulation_start") {
-            putString("launch_type", AnalyticsDimensions.sanitizeLaunchType(launchType))
-            putString("renderer", AnalyticsDimensions.renderer(renderer))
-            putString("audio_backend", AnalyticsDimensions.audioBackend(audioBackend))
-            putString("upscale", AnalyticsDimensions.upscale(upscaleMultiplier))
-            putString("performance_profile", AnalyticsDimensions.performanceProfile(performanceProfile))
-            putLong("save_state_load", saveStateLoad.toAnalyticsLong())
-        }
-    }
-
-    fun logEmulationStartFailed(launchType: String, reason: String) {
-        logEvent("emulation_start_failed") {
-            putString("launch_type", AnalyticsDimensions.sanitizeLaunchType(launchType))
-            putString("reason", AnalyticsDimensions.sanitizeFailureReason(reason))
-        }
-    }
-
-    fun logEmulationEnded(activePlayTimeMs: Long, renderer: Int, audioBackend: Int) {
-        val safeDurationMs = activePlayTimeMs.coerceAtLeast(0L)
-        logEvent("emulation_end") {
-            putLong("duration_seconds", safeDurationMs / 1_000L)
-            putString("duration_bucket", AnalyticsDimensions.durationBucket(safeDurationMs))
-            putString("renderer", AnalyticsDimensions.renderer(renderer))
-            putString("audio_backend", AnalyticsDimensions.audioBackend(audioBackend))
-        }
-    }
-
-    fun logSaveStateAction(action: String, automatic: Boolean, success: Boolean) {
-        logEvent("save_state_action") {
-            putString("action", AnalyticsDimensions.sanitizeSaveStateAction(action))
-            putLong("automatic", automatic.toAnalyticsLong())
-            putLong("success", success.toAnalyticsLong())
-        }
-    }
-
-    private inline fun logEvent(name: String, buildParams: Bundle.() -> Unit) {
-        if (!ready.get()) return
-        val analytics = firebaseAnalytics ?: return
-        runCatching {
-            analytics.logEvent(name, Bundle().apply(buildParams))
-        }.onFailure { error ->
-            Log.w(TAG, "Failed to log analytics event: $name", error)
-        }
-    }
-
-    private fun Boolean.toAnalyticsLong(): Long = if (this) 1L else 0L
+    ) = Unit
+    fun logEmulationStartFailed(launchType: String, reason: String) = Unit
+    fun logEmulationEnded(activePlayTimeMs: Long, renderer: Int, audioBackend: Int) = Unit
+    fun logSaveStateAction(action: String, automatic: Boolean, success: Boolean) = Unit
 }
 
 internal object AnalyticsDimensions {
