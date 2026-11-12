@@ -13,6 +13,7 @@
 #include "GS/Renderers/Common/GSAlphaBitLogicOp.h"
 #include "GS/Renderers/Common/GSFastStencilShadow.h"
 #include "GS/Renderers/Common/GSDrawRoadConfig.h"
+#include "GS/Renderers/Common/GSPassTag.h"
 #include "GS/Renderers/Common/GSBlendConstantPolicy.h"
 #include "GS/Renderers/Vulkan/GSLsfg.h"
 #include "GS/Renderers/Vulkan/VKBuilders.h"
@@ -243,9 +244,50 @@ static constexpr const char* const s_pass_reason_names[] = {"copy", "main", "mai
 static PassReason s_pass_reason = PassReason::Copy;
 static u64 s_pass_frame_counts[static_cast<u32>(PassReason::Count)] = {};
 static u64 s_pass_total_counts[static_cast<u32>(PassReason::Count)] = {};
-static void PassReasonCount(PassReason r)
+// GS_PASS_SIZES: passes bucketed by (reason, rt, ds, draw kind, fbp, psm), dumped every
+// EMUCOREX_GS_PASS_SIZES_FRAMES frames (default 120) and at shutdown. Targets <=128x128 also
+// get a GS_PASS_SIZES_SMALL top-10 with the full FRAME/TEX0 of the opening draw.
+bool g_emucorex_pass_tag_on = s_pass_timing;
+GSPassTag g_emucorex_pass_tag;
+static std::unordered_map<std::string, u64> s_pass_size_counts;
+static std::unordered_map<std::string, u64> s_pass_small_counts;
+static void PassSizeRecord(PassReason r, GSTextureVK* rt, GSTextureVK* ds)
+{
+	const GSPassTag& t = g_emucorex_pass_tag;
+	char rts[24] = "none", dss[24] = "none";
+	if (rt)
+		std::snprintf(rts, sizeof(rts), "%dx%d", rt->GetWidth(), rt->GetHeight());
+	if (ds)
+		std::snprintf(dss, sizeof(dss), "%dx%d", ds->GetWidth(), ds->GetHeight());
+	char buf[320];
+	std::snprintf(buf, sizeof(buf), "reason=%s rt=%s ds=%s kind=%s fbp=0x%x psm=%s", s_pass_reason_names[static_cast<u32>(r)], rts,
+		dss, t.active ? t.kind : "none", t.fbp, t.active ? GSUtil::GetPSMName(static_cast<int>(t.fpsm)) : "none");
+	s_pass_size_counts[buf]++;
+	if (rt && rt->GetWidth() <= 128 && rt->GetHeight() <= 128)
+	{
+		char sb[400];
+		std::snprintf(sb, sizeof(sb), "%s fbw=%u tme=%u tbp=0x%x tbw=%u tpsm=%s", buf, t.fbw, t.tme ? 1u : 0u, t.tbp, t.tbw,
+			t.active ? GSUtil::GetPSMName(static_cast<int>(t.tpsm)) : "none");
+		s_pass_small_counts[sb]++;
+	}
+}
+static void PassSizesDump(u64 frame)
+{
+	auto dump = [&](const char* tag, std::unordered_map<std::string, u64>& m, size_t limit) {
+		std::vector<std::pair<std::string, u64>> rows(m.begin(), m.end());
+		std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) { return a.second != b.second ? a.second > b.second : a.first < b.first; });
+		for (size_t i = 0; i < rows.size() && i < limit; i++)
+			std::fprintf(stderr, "%s frame=%llu %s count=%llu\n", tag, static_cast<unsigned long long>(frame), rows[i].first.c_str(),
+				static_cast<unsigned long long>(rows[i].second));
+		m.clear();
+	};
+	dump("GS_PASS_SIZES", s_pass_size_counts, 64);
+	dump("GS_PASS_SIZES_SMALL", s_pass_small_counts, 10);
+}
+static void PassReasonCount(PassReason r, GSTextureVK* rt, GSTextureVK* ds)
 {
 	s_pass_frame_counts[static_cast<u32>(r)]++;
+	PassSizeRecord(r, rt, ds);
 	s_pass_reason = PassReason::Copy;
 }
 static void PassReasonLine(const char* tag, u64 frame, const u64* counts, u64 div)
@@ -264,6 +306,13 @@ static void PassReasonFrameEnd(u64 frame)
 {
 	if (frame % 60 == 0)
 		PassReasonLine("frame", frame, s_pass_frame_counts, 1);
+	static const u64 sizes_every = [] {
+		const char* e = std::getenv("EMUCOREX_GS_PASS_SIZES_FRAMES");
+		const long v = e ? std::atol(e) : 0;
+		return static_cast<u64>(v > 0 ? v : 120);
+	}();
+	if (frame % sizes_every == 0)
+		PassSizesDump(frame);
 	for (u32 i = 0; i < static_cast<u32>(PassReason::Count); i++)
 	{
 		s_pass_total_counts[i] += s_pass_frame_counts[i];
@@ -271,8 +320,8 @@ static void PassReasonFrameEnd(u64 frame)
 	}
 }
 #define EMUCOREX_PASS_REASON(r) do { if (s_pass_timing) s_pass_reason = (r); } while (0)
-#define EMUCOREX_PASS_COUNT() do { if (s_pass_timing) PassReasonCount(s_pass_reason); } while (0)
-#define EMUCOREX_PASS_COUNT_AS(r) do { if (s_pass_timing) PassReasonCount(r); } while (0)
+#define EMUCOREX_PASS_COUNT() do { if (s_pass_timing) PassReasonCount(s_pass_reason, m_current_render_target, m_current_depth_target); } while (0)
+#define EMUCOREX_PASS_COUNT_AS(r) do { if (s_pass_timing) PassReasonCount(r, m_current_render_target, m_current_depth_target); } while (0)
 #else
 #define EMUCOREX_PASS_TIMING_DRAW() do { } while (0)
 #define EMUCOREX_PASS_TIMING_BARRIER() do { } while (0)
@@ -10022,6 +10071,7 @@ void GSDeviceVK::PassTimingDump()
 		std::fprintf(stderr, "GS_PASS_TIME_SKIPPED overflow_passes=%llu\n", static_cast<unsigned long long>(s_pt.overflow));
 	if (s_pt.frames)
 		PassReasonLine("avg_per_frame", s_pt.frames, s_pass_total_counts, s_pt.frames);
+	PassSizesDump(s_pt.frames);
 	if (s_pt.passes || s_pt.frames)
 		std::fprintf(stderr, "GS_PASS_TIME_TOTAL frames=%llu passes=%llu gpu_us=%llu\n", static_cast<unsigned long long>(s_pt.frames),
 			static_cast<unsigned long long>(s_pt.passes), static_cast<unsigned long long>(s_pt.total_us));

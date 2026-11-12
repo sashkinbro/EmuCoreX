@@ -12,6 +12,7 @@
 #include "GS/Renderers/Common/GSNativeTexelGridPolicy.h"
 #include "GS/Renderers/HW/GSFeedbackDrawlistTarget.h"
 #include "GS/Renderers/Common/GSDrawRoadConfig.h"
+#include "GS/Renderers/Common/GSPassTag.h"
 #include "GS/Renderers/Common/GSFeedbackBarrierPlan.h"
 #include "GS/Renderers/Common/GSBlendConstantPolicy.h"
 #include "GS/Renderers/Common/GSPassScheduler.h"
@@ -234,6 +235,16 @@ __fi void GSRendererHW::CarryBlendBeforeSubmit(GSTextureCache::Target* rt, GSTex
 
 __fi void GSRendererHW::SubmitHardwareDraw()
 {
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+	if (g_emucorex_pass_tag_on && g_emucorex_pass_tag.active)
+	{
+		GSPassTag& t = g_emucorex_pass_tag;
+		const char* base = m_texture_shuffle ? "texture_shuffle" : m_channel_shuffle ? "channel_shuffle" :
+			m_conf.ps.pal_fmt ? "clut" : m_conf.ps.tex_is_fb ? "tex_is_fb" : "normal";
+		std::snprintf(t.kind, sizeof(t.kind), "%s%s%s%s%s", base, t.src_from_target ? "+src_target" : "", t.src_is_rt ? "+src_is_rt" : "",
+			t.src_downscaled ? "+downscaled" : "", t.src_direct ? "+direct" : "");
+	}
+#endif
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	if (m_blend_carry_capture)
 	{
@@ -3374,6 +3385,38 @@ void GSRendererHW::Draw()
 	m_cached_ctx.TEST = context->TEST;
 	m_cached_ctx.FRAME = context->FRAME;
 	m_cached_ctx.ZBUF = context->ZBUF;
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+	// Debug-only: tag the draw in flight so GS_PASS_SIZES can attribute passes opened by it (or by the
+	// target/texture-cache work it triggers). Restored on every exit path.
+	struct PassTagScope
+	{
+		GSPassTag saved;
+		bool on;
+		PassTagScope(const GSDrawingContext* c, bool tme) : on(g_emucorex_pass_tag_on)
+		{
+			if (!on)
+				return;
+			saved = g_emucorex_pass_tag;
+			GSPassTag& t = g_emucorex_pass_tag;
+			t = GSPassTag();
+			t.active = true;
+			std::snprintf(t.kind, sizeof(t.kind), "pre_submit");
+			t.fbp = c->FRAME.Block();
+			t.fbw = c->FRAME.FBW;
+			t.fpsm = c->FRAME.PSM;
+			t.tme = tme;
+			t.tbp = c->TEX0.TBP0;
+			t.tbw = c->TEX0.TBW;
+			t.tpsm = c->TEX0.PSM;
+		}
+		~PassTagScope()
+		{
+			if (on)
+				g_emucorex_pass_tag = saved;
+		}
+	} pass_tag_scope(context, m_draw_env->PRIM.TME != 0);
+#endif
 
 	if (IsBadFrame())
 	{
@@ -10794,6 +10837,17 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 	bool& DATE_PRIMID = date_options.primid;
 	bool& DATE_BARRIER = date_options.barrier;
 	bool& DATE_one = date_options.stencil_one;
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+	if (g_emucorex_pass_tag_on && g_emucorex_pass_tag.active)
+	{
+		GSPassTag& t = g_emucorex_pass_tag;
+		t.src_from_target = tex && tex->m_from_target;
+		t.src_is_rt = tex && rt && tex->m_from_target == rt;
+		t.src_downscaled = tex && tex->m_from_target && tex->m_from_target->m_downscaled;
+		t.src_direct = tex && tex->m_target_direct;
+	}
+#endif
 
 	ResetStates();
 
