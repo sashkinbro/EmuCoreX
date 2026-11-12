@@ -338,7 +338,7 @@ object MobileSocNameMapper {
         put("A333", "Allwinner A333")
         put("A537", "Allwinner A537")
         put("MR527", "Allwinner MR527")
-        // Other common handheld parts: detection does not imply MaliSX2 support.
+        // Other common handheld parts: A133/A133P are PowerVR (no MaliSX2); H616/H618/H700 are Mali-G31 (MaliSX2 0.5.0+).
         put("A133P", "Allwinner A133P")
         put("A133", "Allwinner A133")
         put("H700", "Allwinner H700")

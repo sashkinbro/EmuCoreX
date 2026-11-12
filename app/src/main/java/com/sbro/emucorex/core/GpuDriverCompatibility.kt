@@ -202,20 +202,25 @@ object GpuDriverCompatibility {
     private const val DRIVER_VENDOR_METADATA = "driver_vendor.txt"
     private const val MALI_SX2_CATALOG_ID_PREFIX = "mali-sx2-"
     private const val MALI_SX2_LIBRARY_NAME = "libvulkan_malisx2.so"
+    /** Optional trailing core-count/revision suffixes: "MC4", "MP2", "2EE", "r1", "r1p0". */
+    private const val MALI_SX2_SUFFIX =
+        """(?:[\s\-]*(?:(?:mc|mp)\s*\d{1,2}|\d{1,2}ee|r\d+(?:p\d+)?))*$"""
     /**
      * Fallback model list for catalog entries that predate `supportedGpuModels` and
-     * for already-installed libraries, which carry no version context. It matches
-     * the models the current package supports, so an installed 0.4.0 is not refused
-     * at launch on a Mali-G52 or Mali-G76.
+     * for already-installed libraries, which carry no version context. It must match
+     * the models the newest package supports (0.5.0: G31, G51, G52, G57, G68, G76,
+     * G77, G78(AE), G310, G510, G610, G615, G710, G715), so an installed library is
+     * not refused at launch. Trailing core-count/revision suffixes are ignored.
      */
     private val MALI_SX2_SUPPORTED_MODEL = Regex(
-        """^(?:mali|immortalis)-g(?:52|57|68|76|77|78(?:ae)?|615|715)(?:\s+(?:mc|mp)\s*\d{1,2})?$""",
+        """^(?:mali|immortalis)-g(?:31|51|52|57|68|76|77|78(?:ae)?|310|510|610|615|710|715)""" +
+            MALI_SX2_SUFFIX,
         RegexOption.IGNORE_CASE
     )
 
-    /** "Mali-G57 MC4" / "Immortalis-G715" / "Mali-G78AE MC4" -> the catalog token ("G57", "G715", "G78AE"). */
+    /** "Mali-G57 MC4" / "Immortalis-G715" / "Mali-G31 2EE" -> the catalog token ("G57", "G715", "G31"). */
     private val MALI_SX2_MODEL_TOKEN = Regex(
-        """^(?:mali|immortalis)-g(\d{2,3}[a-z]*)(?:\s+(?:mc|mp)\s*\d{1,2})?$""",
+        """^(?:mali|immortalis)-g(\d{2,3}(?:ae)?)""" + MALI_SX2_SUFFIX,
         RegexOption.IGNORE_CASE
     )
 

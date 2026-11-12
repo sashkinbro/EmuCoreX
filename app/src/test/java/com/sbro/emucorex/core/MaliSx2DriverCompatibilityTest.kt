@@ -27,7 +27,7 @@ class MaliSx2DriverCompatibilityTest {
     @Test
     fun sx2FailsClosedForUnknownOrUnsupportedMaliModelsWhileOtherMaliDriversKeepExistingBehavior() {
         val unknown = DeviceGpuInfoResolver.resolve(null, null)
-        val unsupported = DeviceGpuInfoResolver.resolve("Mali-G610 MC4", null)
+        val unsupported = DeviceGpuInfoResolver.resolve("Mali-G72 MP3", null)
         for (model in listOf(unknown, unsupported)) {
             assertFalse(GpuDriverCompatibility.isCatalogDriverCompatible(sx2Driver, maliDevice, model))
             assertTrue(GpuDriverCompatibility.isCatalogDriverCompatible(ordinaryMaliDriver, maliDevice, model))
@@ -37,7 +37,7 @@ class MaliSx2DriverCompatibilityTest {
     @Test
     fun onlyTheSx2InstalledLibraryGetsRendererSpecificValidation() {
         val supported = DeviceGpuInfoResolver.resolve("ARM Mali-G78AE", null)
-        val unsupported = DeviceGpuInfoResolver.resolve("ARM Mali-G610", null)
+        val unsupported = DeviceGpuInfoResolver.resolve("ARM Mali-G72", null)
         assertTrue(GpuDriverCompatibility.isInstalledDriverCompatible(
             "libvulkan_malisx2.so", maliDevice, maliDevice, supported
         ))
@@ -50,6 +50,14 @@ class MaliSx2DriverCompatibilityTest {
             "libvulkan_malisx2.so", maliDevice, maliDevice,
             DeviceGpuInfoResolver.resolve("Mali-G76 MC4", null)
         ))
+        // 0.5.0 added the Bifrost G31/G51 and Valhall G310/G510/G610/G710 models.
+        listOf("Mali-G31 2EE", "Mali-G51 MP4", "Mali-G310 MC2", "Mali-G510 MC4", "Mali-G610 MC4", "Mali-G710 MP7")
+            .forEach { renderer ->
+                assertTrue(renderer, GpuDriverCompatibility.isInstalledDriverCompatible(
+                    "libvulkan_malisx2.so", maliDevice, maliDevice,
+                    DeviceGpuInfoResolver.resolve(renderer, null)
+                ))
+            }
         assertTrue(GpuDriverCompatibility.isInstalledDriverCompatible(
             "drivers/vendor/libvulkan_malisx2.so", maliDevice, maliDevice, supported
         ))
@@ -124,7 +132,49 @@ class MaliSx2DriverCompatibilityTest {
         assertTrue(GpuDriverCompatibility.isCatalogDriverCompatible(sx2Driver, maliDevice, model52))
         assertTrue(GpuDriverCompatibility.isCatalogDriverCompatible(sx2Driver, maliDevice, model76))
         assertTrue(GpuDriverCompatibility.isCatalogDriverCompatible(sx2Driver, maliDevice, model57))
-        assertFalse(GpuDriverCompatibility.isCatalogDriverCompatible(sx2Driver, maliDevice, model610))
+        assertTrue(GpuDriverCompatibility.isCatalogDriverCompatible(sx2Driver, maliDevice, model610))
+        assertFalse(GpuDriverCompatibility.isCatalogDriverCompatible(
+            sx2Driver, maliDevice, DeviceGpuInfoResolver.resolve("Mali-G72 MP3", null)
+        ))
+    }
+
+    @Test
+    fun catalogEntryListingTheNewModelsAllowsThemAndOlderEntriesStillRefuseThem() {
+        val v050 = driver(
+            id = "mali-sx2-0.5.0",
+            gpu = "Mali Bifrost/Valhall",
+            models = listOf(
+                "G31", "G51", "G52", "G76", "G57", "G68", "G77", "G78", "G78AE",
+                "G310", "G510", "G610", "G710", "G615", "G715"
+            )
+        )
+        val v040 = driver(
+            id = "mali-sx2-0.4.0",
+            gpu = "Mali Bifrost/Valhall",
+            models = listOf("G52", "G76", "G57", "G68", "G77", "G78", "G78AE", "G615", "G715")
+        )
+        listOf(
+            "Mali-G31 2EE" to "Rockchip RK3326", "Mali-G31 MP2" to null, "Mali-G51 MP4" to null,
+            "Mali-G310 MC2" to null, "Mali-G510 MC4" to null, "Mali-G610 MC4" to null,
+            "Mali-G710 MP7" to null
+        ).forEach { (renderer, soc) ->
+            val model = DeviceGpuInfoResolver.resolve(renderer, soc)
+            assertTrue(renderer, GpuDriverCompatibility.isCatalogDriverCompatible(v050, maliDevice, model))
+            assertFalse(renderer, GpuDriverCompatibility.isCatalogDriverCompatible(v040, maliDevice, model))
+            assertTrue(renderer, GpuDriverCompatibility.isCatalogDriverCompatible(sx2Driver, maliDevice, model))
+        }
+    }
+
+    @Test
+    fun modelTokensIgnoreCoreCountAndRevisionSuffixes() {
+        fun token(name: String) = GpuDriverCompatibility.maliSx2ModelToken(GpuModelInfo(GpuVendor.MALI, name))
+        assertEquals("G31", token("Mali-G31 2EE"))
+        assertEquals("G31", token("Mali-G31"))
+        assertEquals("G710", token("Mali-G710 MP7"))
+        assertEquals("G78AE", token("Mali-G78AE MC4"))
+        assertEquals("G52", token("Mali-G52 r1"))
+        assertEquals("G52", token("Mali-G52 MC2 r1p0"))
+        assertEquals("G715", token("Immortalis-G715 MC11"))
     }
 
     @Test
@@ -180,8 +230,19 @@ class MaliSx2DriverCompatibilityTest {
     }
 
     @Test
+    fun allwinnerG31PartsAllowSx2FromTheFallbackListButNotOldCatalogEntries() {
+        val legacy = driver("mali-sx2-0.4.0", "Mali", listOf("G52", "G57", "G76"))
+        listOf("H616", "H618", "H700").forEach { part ->
+            val soc = MobileSocNameMapper.resolve(part)
+            val gpu = DeviceGpuInfoResolver.resolve(SocGpuCatalog.forSoc(soc)?.displayName, soc)
+            val vendor = GpuDriverCompatibility.resolveDeviceVendor(part, soc, gpu)
+            assertFalse(GpuDriverCompatibility.isCatalogDriverCompatible(legacy, vendor, gpu))
+        }
+    }
+
+    @Test
     fun unsupportedAllwinnerGpusCannotUseSx2() {
-        listOf("A133", "A133P", "H616", "H618", "H700").forEach { part ->
+        listOf("A133", "A133P").forEach { part ->
             val soc = MobileSocNameMapper.resolve(part)
             val gpu = DeviceGpuInfoResolver.resolve(SocGpuCatalog.forSoc(soc)?.displayName, soc)
             val vendor = GpuDriverCompatibility.resolveDeviceVendor(part, soc, gpu)
@@ -224,7 +285,8 @@ class MaliSx2DriverCompatibilityTest {
         }
         val g31 = DeviceGpuInfoResolver.resolve("Mali-G31", "Rockchip RK3326")
         assertFalse(GpuDriverCompatibility.isCatalogDriverCompatible(current, maliDevice, g31))
-        assertFalse(GpuDriverCompatibility.isInstalledDriverCompatible("libvulkan_malisx2.so", maliDevice, maliDevice, g31))
+        assertTrue(GpuDriverCompatibility.isInstalledDriverCompatible("libvulkan_malisx2.so", maliDevice, maliDevice, g31))
+        assertEquals("G31", GpuDriverCompatibility.maliSx2ModelToken(g31.model))
     }
 
     private fun driver(id: String, gpu: String, models: List<String> = emptyList()) = RemoteGpuDriver(

@@ -58,7 +58,7 @@ class SocGpuCatalogTest {
         assertEquals("Mali-G610 MC4", SocGpuCatalog.forSoc("Dimensity 7200 series")?.displayName)
         assertEquals("Mali-G57 MC3", SocGpuCatalog.forSoc("Dimensity 720 series")?.displayName)
         assertEquals("Immortalis-G720 MC12", SocGpuCatalog.forSoc("Dimensity 9300 series")?.displayName)
-        assertEquals("Mali-G57 MC2", SocGpuCatalog.forSoc("Dimensity 930")?.displayName)
+        assertEquals("PowerVR BXM-8-256", SocGpuCatalog.forSoc("Dimensity 930")?.displayName)
         assertEquals("Mali-G68 MC4", SocGpuCatalog.forSoc("Dimensity 900/920/1080")?.displayName)
         assertEquals("Mali-G57 MC2", SocGpuCatalog.forSoc("Helio G99/G100")?.displayName)
         assertEquals("Mali-G52 MC2", SocGpuCatalog.forSoc("Helio G70/G80/G85/G88")?.displayName)
@@ -72,7 +72,7 @@ class SocGpuCatalogTest {
         assertEquals("Xclipse 920", SocGpuCatalog.forSoc("Exynos 2200")?.displayName)
         assertEquals("Xclipse 530", SocGpuCatalog.forSoc("Exynos 1480")?.displayName)
         assertEquals("Mali-G52 MP1", SocGpuCatalog.forSoc("Exynos 850")?.displayName)
-        assertEquals("Mali-G715 MP7", SocGpuCatalog.forSoc("Google Tensor G3")?.displayName)
+        assertEquals("Immortalis-G715 MP10", SocGpuCatalog.forSoc("Google Tensor G3")?.displayName)
         assertEquals("PowerVR DXT-48-1536", SocGpuCatalog.forSoc("Google Tensor G5")?.displayName)
         assertEquals("PowerVR CXTP-48-1536", SocGpuCatalog.forSoc("Google Tensor G6")?.displayName)
         assertEquals("Xclipse 550", SocGpuCatalog.forSoc("Exynos 1680")?.displayName)
@@ -124,7 +124,21 @@ class SocGpuCatalogTest {
             "Unisoc T700" to "Mali-G52",
             "Amlogic A311D2" to "Mali-G52 MP8", "Amlogic A311D" to "Mali-G52 MP4",
             "Rockchip RK3566" to "Mali-G52 2EE", "Rockchip RK3568" to "Mali-G52 2EE",
-            "Rockchip RK3326" to "Mali-G31 2EE"
+            "Rockchip RK3326" to "Mali-G31 MP2"
+        ).forEach { (soc, gpu) -> assertEquals(soc, gpu, SocGpuCatalog.forSoc(soc)?.displayName) }
+    }
+
+    @Test
+    fun `maps additional MaliSX2-relevant SoCs`() {
+        mapOf(
+            "Amlogic S922X" to "Mali-G52 MP6", "Amlogic S905X5" to "Mali-G310",
+            "Dimensity 9200+" to "Immortalis-G715 MC11", "Dimensity 9000+" to "Mali-G710 MC10",
+            "Dimensity 8050" to "Mali-G77 MC9", "Dimensity 8020" to "Mali-G77 MC9",
+            "Dimensity 1050" to "Mali-G610 MC3", "Dimensity 7050" to "Mali-G68 MC4",
+            "Dimensity 6020" to "Mali-G57 MC2",
+            "MediaTek MT8195" to "Mali-G57 MC5", "MediaTek MT8188" to "Mali-G57 MC2",
+            "Exynos 880" to "Mali-G76 MP5", "Kirin 985" to "Mali-G77 MP8",
+            "Kirin 9000" to "Mali-G78 MP24", "Kirin 9000E" to "Mali-G78 MP22"
         ).forEach { (soc, gpu) -> assertEquals(soc, gpu, SocGpuCatalog.forSoc(soc)?.displayName) }
     }
 }
