@@ -294,9 +294,9 @@ void EEVuFmacAccTests()
 			char name[128];
 			std::snprintf(name, sizeof(name), "FMAC %s clamp=%u %s %s exact (failing masks 0x%04x, %u cases)",
 				cls, clamp, mode_names[mode], ops[oi].name.c_str(), fail_masks >> 1, failures);
-			// Exponent-255 operands are only informational: the JIT is not
-			// contractually bit-exact for them at every clamp level.
-			if (wild)
+			// Exponent-255 operands are only informational below clamp 3; the JIT is not
+			// contractually bit-exact for them there. Clamp 3 (full) must match exactly.
+			if (wild && clamp != 3)
 			{
 				wild_failures += failures;
 				if (failures)
@@ -335,7 +335,7 @@ void EEVuFmacAccTests()
 		char name[128];
 		std::snprintf(name, sizeof(name), "FMAC %s clamp=%u %s random sequences exact (%u/%u failing)",
 			cls, clamp, mode_names[mode], seq_failures, kSequences);
-		if (wild)
+		if (wild && clamp != 3)
 		{
 			wild_failures += seq_failures;
 			if (seq_failures)
@@ -345,7 +345,7 @@ void EEVuFmacAccTests()
 			Check(seq_failures == 0, name);
 	}
 	s_wild = false;
-	std::printf("fmac-acc oracle: %u informational mismatches with exponent-255 operands (not gated)\n", wild_failures);
+	std::printf("fmac-acc oracle: %u informational mismatches with exponent-255 operands below clamp 3 (not gated)\n", wild_failures);
 	EmuCoreXOracleSetEeIrMode(-1);
 	EmuCoreXOracleSetVUIR(0, -1);
 	EmuCoreXOracleSetVUIR(1, -1);

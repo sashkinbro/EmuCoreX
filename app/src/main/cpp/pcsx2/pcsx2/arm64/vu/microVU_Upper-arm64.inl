@@ -179,6 +179,20 @@ static __fi bool mVUUpperWillClampFt_oaknut(mV, int clampType)
 	return clampE || ((clampType & cFt) && !clampE && (CHECK_VU_OVERFLOW(mVU.index) || CHECK_VU_SIGN_OVERFLOW(mVU.index)));
 }
 
+// Clamp mode 3 only: broadcast and Q/I forms must clamp operands for every mask,
+// and an accumulator copied over a VF00-loaded Fs register must not inherit its
+// "never needs clamping" hint.
+static __fi bool mVUUpperSignClampE_oaknut(mV)
+{
+	return clampE && CHECK_VU_SIGN_OVERFLOW(mVU.index);
+}
+
+static __fi void mVUUpperAccumulatorIsClampable_oaknut(mV, int reg)
+{
+	if (mVUUpperSignClampE_oaknut(mVU))
+		mVU.regAlloc->clearVFZeroHint(reg);
+}
+
 static __fi void mVUUpperMovmskps_oaknut(const oak::WReg& dst, const oak::QReg& src, bool mask_ready = false)
 {
 	// The only caller passes a 0/all-ones lane mask (a CMEQ/CMHS result), so the
@@ -1530,6 +1544,7 @@ static void mVU_MADD_direct_emit_oaknut(mP)
 
 	const int ACC = mVU.regAlloc->allocRegId(32);
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
+	mVUUpperAccumulatorIsClampable_oaknut(mVU, Fs);
 	const int tempFs = mVU.regAlloc->allocRegId();
 
 	recBeginOaknutEmit();
@@ -1566,6 +1581,7 @@ static void mVU_MADD_cop2_emit_oaknut(mP)
 	const int Ft = mVU.regAlloc->allocRegId();
 	const int ACC = mVU.regAlloc->allocRegId(32);
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
+	mVUUpperAccumulatorIsClampable_oaknut(mVU, Fs);
 	const int tempFs = mVU.regAlloc->allocRegId();
 	const int t1 = mVU.regAlloc->allocRegId();
 
@@ -1627,6 +1643,7 @@ static void mVU_MADDi_direct_emit_oaknut(mP)
 	const int Fi = mVU.regAlloc->allocRegId(33, 0, _X_Y_Z_W);
 	const int ACC = mVU.regAlloc->allocRegId(32);
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
+	mVUUpperAccumulatorIsClampable_oaknut(mVU, Fs);
 	const int tempFs = mVU.regAlloc->allocRegId();
 	const int t1 = needsVu0Exact ? mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
 
@@ -1702,6 +1719,7 @@ static void mVU_MADDq_direct_emit_oaknut(mP)
 
 	const int ACC = mVU.regAlloc->allocRegId(32);
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
+	mVUUpperAccumulatorIsClampable_oaknut(mVU, Fs);
 	const int tempFs = mVU.regAlloc->allocRegId();
 
 	recBeginOaknutEmit();
@@ -1763,6 +1781,7 @@ static void mVU_MADD_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 
 	const int ACC = mVU.regAlloc->allocRegId(32);
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
+	mVUUpperAccumulatorIsClampable_oaknut(mVU, Fs);
 	const int tempFs = mVU.regAlloc->allocRegId();
 	const int t1 = (needsVu1MaddLaneVuDouble && !mVUUpperUseHardwareInputFlush_oaknut(mVU.index)) ?
 		mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
@@ -3868,7 +3887,7 @@ static void mVU_MULAq_emit(mP)
 static void mVU_MULA_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane)
 {
 	mVUUpperNaturalScope natural_scope(mVU, true);
-	const bool shouldClampFt = (lane == 3) && _XYZW_PS && mVUUpperWillClampFt_oaknut(mVU, cFt);
+	const bool shouldClampFt = ((lane == 3 && _XYZW_PS) || mVUUpperSignClampE_oaknut(mVU)) && mVUUpperWillClampFt_oaknut(mVU, cFt);
 	const bool useFtLane = !shouldClampFt;
 	const int FtRaw = mVU.regAlloc->allocRegId(_Ft_);
 	int FtL = VU_HOST_NO_XMM;
@@ -4113,7 +4132,7 @@ static void mVU_MUL_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane)
 	if (mVUtryEmitNoLaneFmacFlags_oaknut(mVU))
 		return;
 
-	const bool shouldClampFt = _XYZW_PS && mVUUpperWillClampFt_oaknut(mVU, cFt);
+	const bool shouldClampFt = (_XYZW_PS || mVUUpperSignClampE_oaknut(mVU)) && mVUUpperWillClampFt_oaknut(mVU, cFt);
 	const bool useFtLane = !shouldClampFt;
 	const int FtRaw = mVU.regAlloc->allocRegId(_Ft_);
 	int FtL = VU_HOST_NO_XMM;

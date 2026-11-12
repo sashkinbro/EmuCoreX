@@ -924,6 +924,11 @@ public:
         }
 	}
 
+	void clearVFZeroHint(int regId)
+	{
+		xmmMap[regId].isZero = false;
+	}
+
 	bool checkVFClamp(int regId)
 	{
 		if (regId != VU_HOST_XMMPQ && ((xmmMap[regId].VFreg == 33 && !EmuConfig.Gamefixes.IbitHack) || xmmMap[regId].isZero))
