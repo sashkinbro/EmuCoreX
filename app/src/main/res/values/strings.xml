@@ -875,7 +875,6 @@
     <string name="settings_help_fps_overlay_position">Places the FPS or stats overlay in one of the four corners. Move it away from touch controls, HUD elements, subtitles, or minimaps so it stays readable without covering important game info.</string>
     <string name="settings_help_gpu_driver">Allows you to select a custom GPU driver package (like Turnip) to replace the default system driver. Custom drivers can significantly improve performance or fix visual glitches in certain games on Snapdragon/Adreno devices. If you experience crashes, revert to the System driver.</string>
     <string name="settings_help_gpu_hardware_profile">Selects the mobile GPU branch used by hardware rendering. Snapdragon keeps the current Adreno path; MediaTek exposes Mali and PowerVR fixes for devices that need those GPU paths.</string>
-    <string name="settings_help_mediatek_angle_opengl">Routes the MediaTek OpenGL renderer through bundled ANGLE libraries. Because of translation overhead, this might increase or decrease performance depending on the game. Available for Mali and PowerVR profiles and stays off by default.</string>
     <string name="settings_help_bilinear_filtering">Controls the main texture filtering mode used by the renderer. Nearest keeps the sharpest raw look, PS2 stays closest to original console behavior, and Forced modes smooth more aggressively. If a game looks too blocky or too blurry, this is the first filtering option to adjust.</string>
     <string name="settings_help_texture_filtering">Controls how textures are filtered before they reach the screen. PS2/Automatic modes stay closer to original behavior, Forced modes smooth everything, and Nearest keeps the sharpest but roughest image. If a game looks too blurry or too noisy, this is one of the first options to try.</string>
     <string name="settings_help_trilinear_filtering">Smooths transitions between mip levels on textures that use them. It can reduce shimmer on roads, walls, and distant surfaces, but stronger modes may blur the image more than the original game intended.</string>
@@ -1375,10 +1374,8 @@
     <string name="gpu_mali_desc">Uses the Mali branch with ARM framebuffer-fetch handling.</string>
     <string name="gpu_powervr_title">PowerVR</string>
     <string name="gpu_powervr_desc">Uses the PowerVR branch for Imagination GPU devices.</string>
-    <string name="settings_mediatek_angle_opengl">ANGLE for OpenGL</string>
-    <string name="settings_mediatek_angle_opengl_desc">Use bundled ANGLE libraries for the OpenGL renderer (available on Mali and PowerVR).</string>
     <string name="settings_mediatek_notice_title">MediaTek compatibility</string>
-    <string name="settings_mediatek_notice_message">MediaTek support is still experimental. Crashes, visual artifacts, and unstable behavior may occur while we continue improving compatibility and performance.\n\nIf you experience graphics issues, try OpenGL with ANGLE enabled. If the issues persist, use the Software renderer.</string>
+    <string name="settings_mediatek_notice_message">MediaTek support is still experimental. Crashes, visual artifacts, and unstable behavior may occur while we continue improving compatibility and performance.\n\nIf you experience graphics issues, try switching between Vulkan and OpenGL. If the issues persist, use the Software renderer.</string>
     <string name="onboarding_title">Get ready to play</string>
     <string name="onboarding_subtitle">Add a BIOS file, choose your game folders, and grant file access.</string>
     <string name="onboarding_bios_title">Choose BIOS File</string>
