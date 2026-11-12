@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Build
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.google.firebase.auth.FirebaseAuth
 import com.sbro.emucorex.BuildConfig
 import com.sbro.emucorex.core.MobileSocNameMapper
 import com.sbro.emucorex.core.NativeApp
@@ -121,7 +120,6 @@ class FeedbackUploadWorker(
         val coreVersion = runCatching { NativeApp.getCoreVersion().orEmpty() }
             .getOrDefault("")
             .ifBlank { "unknown" }
-        val account = runCatching { FirebaseAuth.getInstance().currentUser }.getOrNull()
         return linkedMapOf(
             "appVersion" to BuildConfig.VERSION_NAME,
             "appBuild" to BuildConfig.VERSION_CODE.toString(),
@@ -132,7 +130,6 @@ class FeedbackUploadWorker(
             "hardware" to Build.HARDWARE,
             "abis" to Build.SUPPORTED_ABIS.joinToString(", "),
             "locale" to Locale.getDefault().toLanguageTag(),
-            "accountId" to account?.uid.orEmpty()
         ).filterValues(String::isNotBlank)
     }
 
