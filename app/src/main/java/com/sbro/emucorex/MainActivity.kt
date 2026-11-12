@@ -31,7 +31,6 @@ import com.sbro.emucorex.core.AppLocaleManager
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.KeyboardMouseManager
 import com.sbro.emucorex.core.NativeApp
-import com.sbro.emucorex.core.PlayInAppReviewManager
 import com.sbro.emucorex.core.LocalTvUiEnvironment
 import com.sbro.emucorex.core.TvInterfaceMode
 import com.sbro.emucorex.core.TvUiPolicy
@@ -55,7 +54,6 @@ import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 
 private const val TAG = "MainActivity"
-private const val IN_APP_REVIEW_HOME_SETTLE_DELAY_MS = 750L
 
 open class MainActivity : ComponentActivity() {
     protected open val launchedFromTv: Boolean = false
@@ -64,8 +62,6 @@ open class MainActivity : ComponentActivity() {
     private var keepSplashVisible = true
     private var launchIntentVersion by mutableIntStateOf(0)
     private var restoredFromSavedState = false
-    private var reviewRequestInFlight = false
-    private var reviewRetryAfterResumeScheduled = false
     private var appliedDarkTheme = true
 
     override fun attachBaseContext(newBase: Context) {
@@ -190,103 +186,9 @@ open class MainActivity : ComponentActivity() {
                             isEmulationActive = it
                             UiSoundManager.setEmulationActive(it)
                         },
-                        onEmulationSessionCompleted = { activePlayTimeMs ->
-                            recordCompletedEmulationSession(preferences, activePlayTimeMs)
-                        }
+                        onEmulationSessionCompleted = { }
                     )
                 }
-            }
-        }
-    }
-
-    private fun recordCompletedEmulationSession(
-        preferences: AppPreferences,
-        activePlayTimeMs: Long
-    ) {
-        val app = application as EmuCoreXApp
-        app.applicationScope.launch {
-            preferences.recordInAppReviewSession(activePlayTimeMs)
-            withContext(Dispatchers.Main.immediate) {
-                if (lifecycle.currentState == Lifecycle.State.DESTROYED) return@withContext
-                lifecycleScope.launch {
-                    delay(IN_APP_REVIEW_HOME_SETTLE_DELAY_MS.milliseconds)
-                    awaitResumedAndAttemptInAppReview(preferences)
-                }
-            }
-        }
-    }
-
-    private suspend fun awaitResumedAndAttemptInAppReview(preferences: AppPreferences) {
-        val state = lifecycle.currentStateFlow.first { currentState ->
-            currentState == Lifecycle.State.DESTROYED ||
-                currentState.isAtLeast(Lifecycle.State.RESUMED)
-        }
-        if (state == Lifecycle.State.DESTROYED) return
-        attemptInAppReview(preferences)
-    }
-
-    private suspend fun attemptInAppReview(preferences: AppPreferences) {
-        if (reviewRequestInFlight) return
-        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
-        if (!PlayInAppReviewManager.canRequest(this)) return
-
-        reviewRequestInFlight = true
-        val claimedAtMs = preferences.claimInAppReviewAttempt()
-        if (claimedAtMs == null) {
-            reviewRequestInFlight = false
-            return
-        }
-        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-            reviewRequestInFlight = false
-            releaseReviewAttemptAndRetryWhenResumed(preferences, claimedAtMs)
-            return
-        }
-
-        PlayInAppReviewManager.request(this) { result ->
-            reviewRequestInFlight = false
-            when (result) {
-                PlayInAppReviewManager.Result.COMPLETED -> {
-                    (application as EmuCoreXApp).applicationScope.launch {
-                        preferences.markInAppReviewRequested(claimedAtMs)
-                    }
-                }
-                PlayInAppReviewManager.Result.ACTIVITY_NOT_READY -> {
-                    releaseReviewAttemptAndRetryWhenResumed(preferences, claimedAtMs)
-                }
-                PlayInAppReviewManager.Result.RETRYABLE_FAILURE -> {
-                    Log.w(TAG, "In-app review failed; retry remains available after cooldown")
-                }
-            }
-        }
-    }
-
-    private fun releaseReviewAttemptAndRetryWhenResumed(
-        preferences: AppPreferences,
-        claimedAtMs: Long
-    ) {
-        val app = application as EmuCoreXApp
-        app.applicationScope.launch {
-            preferences.releaseInAppReviewAttempt(claimedAtMs)
-            withContext(Dispatchers.Main.immediate) {
-                scheduleReviewRetryAfterResume(preferences)
-            }
-        }
-    }
-
-    private fun scheduleReviewRetryAfterResume(preferences: AppPreferences) {
-        if (reviewRetryAfterResumeScheduled || lifecycle.currentState == Lifecycle.State.DESTROYED) return
-        reviewRetryAfterResumeScheduled = true
-        lifecycleScope.launch {
-            try {
-                val state = lifecycle.currentStateFlow.first { currentState ->
-                    currentState == Lifecycle.State.DESTROYED ||
-                        currentState.isAtLeast(Lifecycle.State.RESUMED)
-                }
-                if (state == Lifecycle.State.DESTROYED) return@launch
-                delay(IN_APP_REVIEW_HOME_SETTLE_DELAY_MS.milliseconds)
-                attemptInAppReview(preferences)
-            } finally {
-                reviewRetryAfterResumeScheduled = false
             }
         }
     }
