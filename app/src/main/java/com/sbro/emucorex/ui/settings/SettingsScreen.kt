@@ -1,6 +1,5 @@
 package com.sbro.emucorex.ui.settings
 
-import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Intent
@@ -177,10 +176,8 @@ import com.sbro.emucorex.core.GpuDriverCompatibility
 import com.sbro.emucorex.core.FrameGenerationManager
 import com.sbro.emucorex.core.LocalTvUiEnvironment
 import com.sbro.emucorex.core.PerformanceProfiles
-import com.sbro.emucorex.core.ProPurchaseTier
 import com.sbro.emucorex.core.TvInterfaceMode
 import com.sbro.emucorex.core.TvUiPolicy
-import com.sbro.emucorex.core.availableProSupportOffers
 import com.sbro.emucorex.core.buildUpscaleOptions
 import com.sbro.emucorex.core.upscaleKeyToMultiplier
 import com.sbro.emucorex.core.upscaleMultiplierValue
@@ -226,7 +223,6 @@ import com.sbro.emucorex.ui.common.EmulationSideArtworkThumbnail
 import com.sbro.emucorex.ui.common.EmulatorDataLocationDialog
 import com.sbro.emucorex.ui.common.NavigationBackButton
 import com.sbro.emucorex.ui.common.NamcoArcadeGuideContent
-import com.sbro.emucorex.ui.common.ProSupportOptionsDialog
 import com.sbro.emucorex.ui.common.ProvideGamepadShoulderActions
 import com.sbro.emucorex.ui.common.RequestFocusOnResume
 import com.sbro.emucorex.ui.common.ScreenTopBar
@@ -353,12 +349,6 @@ fun SettingsScreen(
     val settingsListState = rememberLazyListState()
     val stickyTabInset = stickyTabTopInset()
     val settingsTabsPinned = rememberStickyTabHeaderPinned(settingsListState, "settings-tabs")
-    val proPurchaseMessage = uiState.proPurchaseMessageResId?.let { stringResource(it) }
-    LaunchedEffect(proPurchaseMessage) {
-        val message = proPurchaseMessage ?: return@LaunchedEffect
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-        viewModel.clearProPurchaseMessage()
-    }
     val customizationMessage = uiState.customizationMessageResId?.let { stringResource(it) }
     LaunchedEffect(customizationMessage) {
         val message = customizationMessage ?: return@LaunchedEffect
@@ -1417,9 +1407,7 @@ private fun SettingsContent(
                                     activate = true
                                 )
                             },
-                            onProLockedSelected = {
-                                (context as? Activity)?.let(viewModel::purchasePro)
-                            }
+                            onProLockedSelected = { }
                         )
                         SettingsItem(
                             icon = Icons.Rounded.Palette,
@@ -3661,13 +3649,6 @@ private fun SettingsContent(
                 SettingsTab.Pro -> {
                     ProSettingsTab(
                         uiState = uiState,
-                        onPurchase = { (context as? Activity)?.let(viewModel::purchasePro) },
-                        onPurchaseTier = { tier ->
-                            (context as? Activity)?.let { activity ->
-                                viewModel.purchasePro(activity, tier)
-                            }
-                        },
-                        onRestore = viewModel::restoreProPurchases,
                         onApplyCrimson = { viewModel.setThemeMode(ThemeMode.PRO) }
                     )
                 }
@@ -5102,333 +5083,25 @@ private fun gameMenuSectionLabel(section: GameMenuSectionId): String = when (sec
 @Composable
 private fun ProSettingsTab(
     uiState: SettingsUiState,
-    onPurchase: () -> Unit,
-    onPurchaseTier: (ProPurchaseTier) -> Unit,
-    onRestore: () -> Unit,
     onApplyCrimson: () -> Unit
 ) {
-    var showSupportOptions by rememberSaveable { mutableStateOf(false) }
-    val supportOffers = if (uiState.isProUnlocked && !uiState.isProPurchaseStatusVerified) {
-        emptyList()
-    } else {
-        availableProSupportOffers(
-            offers = uiState.proProducts,
-            ownedProductIds = uiState.ownedProProductIds
-        )
-    }
-
-    if (showSupportOptions) {
-        ProSupportOptionsDialog(
-            offers = supportOffers,
-            purchaseInProgress = uiState.isProPurchaseInProgress,
-            onPurchase = { tier ->
-                showSupportOptions = false
-                onPurchaseTier(tier)
-            },
-            onDismiss = { showSupportOptions = false }
-        )
-    }
-
     SettingsSection(title = stringResource(R.string.settings_pro_title)) {
-        ProStatusCard(
-            isUnlocked = uiState.isProUnlocked,
-            price = when {
-                uiState.isProUnlocked -> stringResource(R.string.settings_pro_purchased)
-                uiState.proPrice != null -> uiState.proPrice
-                uiState.isProProductLoading -> stringResource(R.string.pro_price_loading)
-                else -> stringResource(R.string.pro_price_unavailable)
-            },
-            purchaseInProgress = uiState.isProPurchaseInProgress,
-            onPurchase = onPurchase,
-            onShowSupportOptions = if (supportOffers.isNotEmpty()) {
-                { showSupportOptions = true }
-            } else {
-                null
-            },
-            onRestore = onRestore,
-            onApplyCrimson = onApplyCrimson
-        )
         Text(
-            text = stringResource(R.string.settings_pro_included_title),
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .padding(top = 4.dp)
+            text = if (uiState.isProUnlocked) {
+                stringResource(R.string.settings_pro_purchased)
+            } else {
+                "Purchases are disabled in this build. Existing local Pro unlocks are preserved."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        ProFeatureRow(
-            title = stringResource(R.string.settings_pro_feature_crimson_title),
-            description = stringResource(R.string.settings_pro_feature_crimson_desc),
-            active = uiState.isProUnlocked
-        )
-        ProFeatureRow(
-            title = stringResource(R.string.settings_pro_feature_theme_manager_title),
-            description = stringResource(R.string.settings_pro_feature_theme_manager_desc),
-            active = uiState.isProUnlocked
-        )
-        ProFeatureRow(
-            title = stringResource(R.string.settings_pro_feature_controls_manager_title),
-            description = stringResource(R.string.settings_pro_feature_controls_manager_desc),
-            active = uiState.isProUnlocked
-        )
-        ProFeatureRow(
-            title = stringResource(R.string.settings_pro_feature_icon_title),
-            description = stringResource(R.string.settings_pro_feature_icon_desc),
-            active = uiState.isProUnlocked
-        )
-        ProFeatureRow(
-            title = stringResource(R.string.settings_pro_feature_profile_title),
-            description = stringResource(R.string.settings_pro_feature_profile_desc),
-            active = uiState.isProUnlocked
-        )
-        ProFeatureRow(
-            title = stringResource(R.string.settings_pro_feature_stats_title),
-            description = stringResource(R.string.settings_pro_feature_stats_desc),
-            active = uiState.isProUnlocked
-        )
-        ProFeatureRow(
-            title = stringResource(R.string.settings_pro_feature_card_title),
-            description = stringResource(R.string.settings_pro_feature_card_desc),
-            active = uiState.isProUnlocked
-        )
-        ProFeatureRow(
-            title = stringResource(R.string.settings_pro_feature_support_title),
-            description = stringResource(R.string.settings_pro_feature_support_desc),
-            active = uiState.isProUnlocked
-        )
-    }
-}
-
-@Composable
-private fun ProStatusCard(
-    isUnlocked: Boolean,
-    price: String,
-    purchaseInProgress: Boolean,
-    onPurchase: () -> Unit,
-    onShowSupportOptions: (() -> Unit)?,
-    onRestore: () -> Unit,
-    onApplyCrimson: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        shape = neonShape(20.dp),
-        color = if (isUnlocked) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-        } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f)
-        },
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.68f))
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
+        if (uiState.isProUnlocked) {
+            Button(
+                onClick = onApplyCrimson,
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                shape = neonShape(16.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(neonShape(14.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Star,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(
-                            if (isUnlocked) R.string.settings_pro_unlocked_title
-                            else R.string.settings_pro_locked_title
-                        ),
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(
-                            if (isUnlocked) R.string.settings_pro_unlocked_body
-                            else R.string.settings_pro_locked_body
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                ProMetaPill(
-                    label = stringResource(R.string.settings_pro_status_label),
-                    value = if (isUnlocked) stringResource(R.string.settings_pro_active) else stringResource(R.string.settings_pro_not_active),
-                    modifier = Modifier.weight(1f)
-                )
-                ProMetaPill(
-                    label = stringResource(
-                        if (isUnlocked) R.string.settings_pro_purchase_label
-                        else R.string.settings_pro_price_label
-                    ),
-                    value = price,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (isUnlocked) {
-                    Button(
-                        onClick = onApplyCrimson,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = neonShape(16.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.settings_pro_apply_theme),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                } else {
-                    OutlinedButton(
-                        onClick = onRestore,
-                        modifier = Modifier.weight(1f),
-                        shape = neonShape(16.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.settings_pro_restore),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Button(
-                        onClick = onPurchase,
-                        enabled = !purchaseInProgress,
-                        modifier = Modifier.weight(1f),
-                        shape = neonShape(16.dp)
-                    ) {
-                        Text(
-                            text = stringResource(
-                                if (purchaseInProgress) R.string.pro_purchase_busy
-                                else R.string.settings_pro_buy
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
-            if (onShowSupportOptions != null) {
-                TextButton(
-                    onClick = onShowSupportOptions,
-                    enabled = !purchaseInProgress,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Star,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(R.string.settings_pro_support_more),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProMetaPill(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape = neonShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
-private fun ProFeatureRow(
-    title: String,
-    description: String,
-    active: Boolean
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        shape = neonShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f))
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(neonShape(12.dp))
-                    .background(
-                        if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-                        else MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Star,
-                    contentDescription = null,
-                    tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(19.dp)
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Text(stringResource(R.string.settings_pro_apply_theme))
             }
         }
     }
