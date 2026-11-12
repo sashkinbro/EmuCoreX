@@ -174,9 +174,61 @@ void ApplyOpcodeFamilyBlocklists(const RuntimeSettings& settings)
 				mask = 0;
 			}
 		}
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		// Debug-only bisect aid: debug.emucorex.ee_family_mask=<decimal mask> overrides the EE family mask.
+		if (ck.core == OpcodeFamilies::CORE_EE)
+		{
+			char ee_mask_override[PROP_VALUE_MAX] = {};
+			if (__system_property_get("debug.emucorex.ee_family_mask", ee_mask_override) > 0)
+			{
+				try
+				{
+					mask = std::stoull(ee_mask_override, nullptr, 10);
+				}
+				catch (...)
+				{
+				}
+			}
+		}
+#endif
 
 		std::unordered_set<u32> ids;
-		u64 ids_hash = 0;
+		u64 prop_ids_hash = 0;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		// Debug-only bisect aid: debug.emucorex.ee_opcode_ids="id,lo-hi,..." (decimal) adds EE opcode ids.
+		if (ck.core == OpcodeFamilies::CORE_EE)
+		{
+			char ids_override[PROP_VALUE_MAX] = {};
+			if (__system_property_get("debug.emucorex.ee_opcode_ids", ids_override) > 0)
+			{
+				std::string_view view(ids_override);
+				size_t start = 0;
+				while (start < view.size())
+				{
+					const size_t comma = view.find(',', start);
+					const std::string token(view.substr(start, (comma == std::string_view::npos) ? std::string_view::npos : comma - start));
+					try
+					{
+						const size_t dash = token.find('-');
+						const u32 lo = static_cast<u32>(std::stoul(token.substr(0, dash)));
+						const u32 hi = (dash == std::string::npos) ? lo : static_cast<u32>(std::stoul(token.substr(dash + 1)));
+						for (u32 id = lo; id <= hi && id - lo < 4096; id++)
+						{
+							ids.insert(id);
+							prop_ids_hash = prop_ids_hash * 1000003ull + id + 1;
+						}
+					}
+					catch (...)
+					{
+					}
+					if (comma == std::string_view::npos)
+						break;
+					start = comma + 1;
+				}
+			}
+		}
+#endif
+		u64 ids_hash = prop_ids_hash;
 		if (ck.has_ids)
 		{
 			if (const std::string* ids_str = find_setting(ck.ids_key); ids_str && !ids_str->empty())

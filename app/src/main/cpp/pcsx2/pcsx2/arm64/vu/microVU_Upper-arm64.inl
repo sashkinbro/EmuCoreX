@@ -2355,9 +2355,7 @@ static void mVU_MSUBA_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lan
 
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
 	const int ACC = mVU.regAlloc->allocRegId(32, 32, 0xf, false);
-	const bool useMaskedVectorPath = isVU0 && isCOP2 && lane == 1 && _XYZW_SS && !_W;
-
-	if ((_XYZW_SS && !useMaskedVectorPath) || _X_Y_Z_W == 0xf)
+	if (_XYZW_SS || _X_Y_Z_W == 0xf)
 	{
 		if (_XYZW_SS)
 		{

@@ -562,6 +562,16 @@ void ClassifierTests()
     SetFamilyMask(CORE_VU0, 0);
 }
 
+// FMAC ACC oracle: optional extra VU0/VU1 state (ACC, I, Q) injected by RunVU
+// and RunEEProgram, which otherwise zero or default it.
+struct FmacInit
+{
+    u32 vf[128];
+    u32 acc[4];
+    u32 i, q;
+};
+const FmacInit* s_fmac_init = nullptr;
+
 struct Snapshot
 {
     VURegs regs;
@@ -601,6 +611,13 @@ Snapshot RunVU(u32 index, bool jit, const std::vector<u32>& program, u32 pc, u64
         std::memcpy(vu.VF, initialVF, sizeof(vu.VF));
     if (initialACC)
         std::memcpy(&vu.ACC, initialACC, sizeof(vu.ACC));
+    if (s_fmac_init)
+    {
+        std::memcpy(&vu.ACC, s_fmac_init->acc, sizeof(vu.ACC));
+        vu.VI[REG_I].UL = s_fmac_init->i;
+        vu.VI[REG_Q].UL = s_fmac_init->q;
+        vu.q.UL = s_fmac_init->q;
+    }
     const u32 size = index ? 0x4000 : 0x1000;
     for (u32 i = 0; i < size; i += 8)
     {
@@ -3183,6 +3200,13 @@ EESnapshot RunEEProgram(bool jit, const std::vector<u32>& program, bool multiBlo
     std::memset(&VU0.ACC, 0, sizeof(VU0.ACC));
     VU0.q.UL = VU0.p.UL = 0;
     VU0.macflag = VU0.statusflag = VU0.clipflag = 0;
+    if (s_fmac_init)
+    {
+        std::memcpy(&VU0.ACC, s_fmac_init->acc, sizeof(VU0.ACC));
+        VU0.VI[REG_I].UL = s_fmac_init->i;
+        VU0.VI[REG_Q].UL = s_fmac_init->q;
+        VU0.q.UL = s_fmac_init->q;
+    }
     // A self-branch terminates the recompiled block so the forced exit fires
     // at a branch boundary; the interpreter stops after the same steps.
     std::vector<u32> code = program;
@@ -4253,6 +4277,7 @@ void EECoverageCop2Spec2()
 #include "jit_oracle_ee_vu_maxmin_broadcast.inl"
 #include "jit_oracle_ee_vu_maxmin_i.inl"
 #include "jit_oracle_ee_vu_maxmin_i_flags.inl"
+#include "jit_oracle_ee_vu_fmac_acc.inl"
 #include "jit_oracle_ee_bc1.inl"
 #include "jit_oracle_ee_hot_loads.inl"
 #include "jit_oracle_ee_branch_immediates.inl"
@@ -10167,6 +10192,11 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
         EEUnalignedWordStoreTests();
         return;
     }
+    if (direct_suite && std::strcmp(direct_suite, "ee-vu-fmac-acc") == 0)
+    {
+        EEVuFmacAccTests();
+        return;
+    }
     if (direct_suite && std::strcmp(direct_suite, "ee-vu-lower-zero-tail") == 0)
     {
         EEVuLowerZeroTailClampTests();
@@ -12678,7 +12708,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
     else if (std::strcmp(suite, "ee-madd") == 0 || std::strcmp(suite, "ee-direct") == 0 || std::strcmp(suite, "ee-direct-stores") == 0 ||
         std::strcmp(suite, "ee-unaligned-stores") == 0 || std::strcmp(suite, "ee-unaligned-word-stores") == 0 ||
         std::strcmp(suite, "ee-vu-local") == 0 || std::strcmp(suite, "ee-vu-status") == 0 ||
-        std::strcmp(suite, "ee-vu-local-clip") == 0 || std::strcmp(suite, "ee-vu-local-identity") == 0 || std::strcmp(suite, "ee-vu-zero-tail") == 0 || std::strcmp(suite, "ee-vu-lower-zero-tail") == 0)
+        std::strcmp(suite, "ee-vu-local-clip") == 0 || std::strcmp(suite, "ee-vu-local-identity") == 0 || std::strcmp(suite, "ee-vu-zero-tail") == 0 || std::strcmp(suite, "ee-vu-lower-zero-tail") == 0 ||
+        std::strcmp(suite, "ee-vu-fmac-acc") == 0)
         EETests(false, false, false, false, false, false, false, false, false,
             false, false, false, false, false, false, 0, false, false, false, false, suite);
     else if (std::strcmp(suite, "ee") == 0)

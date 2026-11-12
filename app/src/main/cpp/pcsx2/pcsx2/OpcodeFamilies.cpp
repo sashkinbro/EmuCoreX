@@ -122,8 +122,26 @@ namespace OpcodeFamilies
 			}
 
 			case 18: // COP2 (VU0 macro)
+			{
+				if (key)
+				{
+					// Per-opcode keys: transfers/branches by rs, SPECIAL1 by funct (0x100|funct),
+					// SPECIAL2 by its 7-bit index (0x200|idx).
+					const u32 rs = (code >> 21) & 0x1F;
+					const u32 funct = code & 0x3F;
+					if (rs < 16)
+						*key = (primary << 11) | rs;
+					else if (funct < 0x3C)
+						*key = (primary << 11) | 0x100 | funct;
+					else
+						*key = (primary << 11) | 0x200 | (((code >> 4) & 0x7C) | (code & 0x3));
+				}
+				return EE::FAM_COP2;
+			}
 			case 54: // LQC2
 			case 62: // SQC2
+				if (key)
+					*key = primary << 11; // matches OpcodeFamiliesModel key(54)/key(62)
 				return EE::FAM_COP2;
 
 			case 28: // MMI

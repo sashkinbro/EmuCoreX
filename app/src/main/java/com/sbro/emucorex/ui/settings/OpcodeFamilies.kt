@@ -13,6 +13,8 @@ import com.sbro.emucorex.R
  *     REGIMM   -> rt    (5 bits)
  *     COP0/COP1-> rs    (5 bits)
  *     COP1 S/W -> 0x40 | funct
+ *     COP2     -> rs (<16) | 0x100 | funct (SPECIAL1) | 0x200 | 7-bit SPECIAL2 index
+ *                 (the UI only lists LQC2/SQC2 = key(54)/key(62); others are bisect-only)
  *     MMI/MMI0..3 -> ((code >> 6) & 0x1F) << 6 | funct
  *     standard -> 0
  */
