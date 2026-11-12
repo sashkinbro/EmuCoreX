@@ -43,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,6 +78,7 @@ import com.sbro.emucorex.ui.common.RequestFocusOnResume
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.isGenerated3dCover
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 import com.sbro.emucorex.ui.theme.neon.neonShape
@@ -145,9 +147,31 @@ internal fun HomeShelfMode(
             pagerState.scrollToPage(lastIndex)
         }
     }
-    LaunchedEffect(pagerState.currentPage, shouldRequestGamepadFocus) {
-        if (shouldRequestGamepadFocus) {
-            cardFocusRequesters[pagerState.currentPage.coerceIn(0, cardFocusRequesters.lastIndex)].requestFocus()
+    // Button navigation keeps an explicit target index (wraps around) instead of deriving it
+    // from the page the pager happens to be on mid-animation.
+    val navTarget = remember(games) { intArrayOf(-1) }
+    val navJob = remember(games) { arrayOfNulls<Job>(1) }
+    fun navigateBy(delta: Int) {
+        val count = games.size
+        if (count <= 1) return
+        val active = navJob[0]?.isActive == true && navTarget[0] in 0 until count
+        val base = if (active) navTarget[0] else pagerState.currentPage.coerceIn(0, count - 1)
+        val target = ((base + delta) % count + count) % count
+        navTarget[0] = target
+        navJob[0]?.cancel()
+        navJob[0] = scope.launch {
+            val wrapped = (delta > 0 && target < base) || (delta < 0 && target > base)
+            if (wrapped) pagerState.scrollToPage(target) else pagerState.animateScrollToPage(target)
+        }
+    }
+    // Focus follows the settled page; the target card may not be composed yet (e.g. after a
+    // wrap-around jump), so retry for a few frames instead of failing silently.
+    LaunchedEffect(pagerState.settledPage, shouldRequestGamepadFocus, cardFocusRequesters) {
+        if (!shouldRequestGamepadFocus) return@LaunchedEffect
+        val requester = cardFocusRequesters[pagerState.settledPage.coerceIn(0, cardFocusRequesters.lastIndex)]
+        repeat(8) {
+            if (runCatching { requester.requestFocus() }.getOrDefault(false)) return@LaunchedEffect
+            withFrameNanos { }
         }
     }
     RequestFocusOnResume(
@@ -280,16 +304,8 @@ internal fun HomeShelfMode(
                                 onLongClickChangeSerial = onLongClickChangeSerial?.let { action ->
                                     { action(game) }
                                 },
-                                onNavigateLeft = {
-                                    if (page > 0 && !pagerState.isScrollInProgress) {
-                                        scope.launch { pagerState.animateScrollToPage(page - 1) }
-                                    }
-                                },
-                                onNavigateRight = {
-                                    if (page < games.lastIndex && !pagerState.isScrollInProgress) {
-                                        scope.launch { pagerState.animateScrollToPage(page + 1) }
-                                    }
-                                }
+                                onNavigateLeft = { navigateBy(-1) },
+                                onNavigateRight = { navigateBy(1) }
                             )
                         }
                     }
@@ -534,7 +550,9 @@ private fun ShelfCoverCard(
                     Key.NumPadEnter -> true
                     else -> false
                 }
-                if (keyEvent.nativeKeyEvent.repeatCount != 0 && isShelfNavigationKey) {
+                val isSelectKey = isShelfNavigationKey &&
+                    keyEvent.key != Key.DirectionLeft && keyEvent.key != Key.DirectionRight
+                if (keyEvent.nativeKeyEvent.repeatCount != 0 && isSelectKey) {
                     return@onPreviewKeyEvent true
                 }
                 when (keyEvent.key) {
