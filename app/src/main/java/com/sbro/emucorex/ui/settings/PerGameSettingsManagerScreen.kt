@@ -1070,158 +1070,158 @@ private fun GameSettingsTabContent(
                     onResetToDefault = { showAdvancedGraphicsSettings = false }
                 )
                 if (showAdvancedGraphicsSettings) {
-                EditorSection(title = stringResource(R.string.game_settings_manager_section_graphics)) {
-                    SelectionRow(
-                        title = stringResource(R.string.settings_bilinear_filtering),
-                        options = bilinearFilteringOptions(),
-                        selectedValue = draft.textureFiltering,
-                        onSelected = { onDraftChange(draft.copy(textureFiltering = it)) },
-                        helpText = stringResource(R.string.settings_help_bilinear_filtering),
-                        onResetToDefault = { onDraftChange(draft.copy(textureFiltering = defaultProfile.textureFiltering)) }
-                    )
-                    SelectionRow(
-                        title = stringResource(R.string.settings_trilinear_filtering),
-                        options = trilinearFilteringOptions(),
-                        selectedValue = draft.trilinearFiltering,
-                        onSelected = { onDraftChange(draft.copy(trilinearFiltering = it)) },
-                        helpText = stringResource(R.string.settings_help_trilinear_filtering),
-                        onResetToDefault = { onDraftChange(draft.copy(trilinearFiltering = defaultProfile.trilinearFiltering)) }
-                    )
-                    SelectionRow(
-                        title = stringResource(R.string.settings_hw_download_mode),
-                        options = hwDownloadModeOptions(),
-                        selectedValue = draft.hwDownloadMode,
-                        onSelected = { onDraftChange(draft.copy(hwDownloadMode = it)) },
-                        helpText = stringResource(R.string.settings_help_hw_download_mode),
-                        onResetToDefault = { onDraftChange(draft.copy(hwDownloadMode = defaultProfile.hwDownloadMode)) }
-                    )
-                    SelectionRow(
-                        title = stringResource(R.string.settings_blending_accuracy),
-                        options = blendingAccuracyOptions(),
-                        selectedValue = draft.blendingAccuracy,
-                        onSelected = { onDraftChange(draft.copy(blendingAccuracy = it)) },
-                        helpText = stringResource(R.string.settings_help_blending_accuracy),
-                        onResetToDefault = { onDraftChange(draft.copy(blendingAccuracy = defaultProfile.blendingAccuracy)) }
-                    )
-                    SelectionRow(
-                        title = stringResource(R.string.settings_texture_preloading),
-                        options = texturePreloadingOptions(),
-                        selectedValue = draft.texturePreloading,
-                        onSelected = { onDraftChange(draft.copy(texturePreloading = it)) },
-                        helpText = stringResource(R.string.settings_help_texture_preloading),
-                        onResetToDefault = { onDraftChange(draft.copy(texturePreloading = defaultProfile.texturePreloading)) }
-                    )
-                    SelectionRow(
-                        title = stringResource(R.string.settings_anisotropic_filtering),
-                        options = anisotropicFilteringOptions(),
-                        selectedValue = draft.anisotropicFiltering,
-                        onSelected = { onDraftChange(draft.copy(anisotropicFiltering = it)) },
-                        helpText = stringResource(R.string.settings_help_anisotropic_filtering),
-                        onResetToDefault = { onDraftChange(draft.copy(anisotropicFiltering = defaultProfile.anisotropicFiltering)) }
-                    )
-                    val globalShaderPresetName = shaderPresets
-                        .firstOrNull { it.absolutePath == settingsSnapshot.shaderChainPreset }
-                        ?.label
-                        ?.substringAfterLast('/')
-                        ?: stringResource(R.string.settings_shader_preset_none)
-                    val globalScopeLabel = stringResource(R.string.controls_editor_global_scope)
-                    val globalValueLabel = stringResource(
-                        R.string.emulation_shaders_global_value,
-                        globalShaderPresetName
-                    )
-                    val useGlobalShaderLabel = "$globalScopeLabel · $globalValueLabel"
-                    ShaderPresetSelector(
-                        title = stringResource(R.string.settings_shader_preset),
-                        presets = shaderPresets,
-                        onRemove = onRemoveShaderPresets,
-                        selectedPath = when (draft.shaderChainOverrideEnabled) {
-                            null -> SHADER_PRESET_USE_GLOBAL
-                            false -> ""
-                            true -> draft.shaderChainPreset
-                        },
-                        onSelect = { selectedPath ->
-                            onDraftChange(
-                                when (selectedPath) {
-                                    SHADER_PRESET_USE_GLOBAL -> draft.copy(
-                                        shaderChainOverrideEnabled = null,
-                                        shaderChainPreset = ""
-                                    )
-                                    "" -> draft.copy(
-                                        shaderChainOverrideEnabled = false,
-                                        shaderChainPreset = ""
-                                    )
-                                    else -> draft.copy(
-                                        shaderChainOverrideEnabled = true,
-                                        shaderChainPreset = selectedPath
-                                    )
-                                }
+                    EditorSection(title = stringResource(R.string.game_settings_manager_section_graphics)) {
+                        SelectionRow(
+                            title = stringResource(R.string.settings_bilinear_filtering),
+                            options = bilinearFilteringOptions(),
+                            selectedValue = draft.textureFiltering,
+                            onSelected = { onDraftChange(draft.copy(textureFiltering = it)) },
+                            helpText = stringResource(R.string.settings_help_bilinear_filtering),
+                            onResetToDefault = { onDraftChange(draft.copy(textureFiltering = defaultProfile.textureFiltering)) }
+                        )
+                        SelectionRow(
+                            title = stringResource(R.string.settings_trilinear_filtering),
+                            options = trilinearFilteringOptions(),
+                            selectedValue = draft.trilinearFiltering,
+                            onSelected = { onDraftChange(draft.copy(trilinearFiltering = it)) },
+                            helpText = stringResource(R.string.settings_help_trilinear_filtering),
+                            onResetToDefault = { onDraftChange(draft.copy(trilinearFiltering = defaultProfile.trilinearFiltering)) }
+                        )
+                        SelectionRow(
+                            title = stringResource(R.string.settings_hw_download_mode),
+                            options = hwDownloadModeOptions(),
+                            selectedValue = draft.hwDownloadMode,
+                            onSelected = { onDraftChange(draft.copy(hwDownloadMode = it)) },
+                            helpText = stringResource(R.string.settings_help_hw_download_mode),
+                            onResetToDefault = { onDraftChange(draft.copy(hwDownloadMode = defaultProfile.hwDownloadMode)) }
+                        )
+                        SelectionRow(
+                            title = stringResource(R.string.settings_blending_accuracy),
+                            options = blendingAccuracyOptions(),
+                            selectedValue = draft.blendingAccuracy,
+                            onSelected = { onDraftChange(draft.copy(blendingAccuracy = it)) },
+                            helpText = stringResource(R.string.settings_help_blending_accuracy),
+                            onResetToDefault = { onDraftChange(draft.copy(blendingAccuracy = defaultProfile.blendingAccuracy)) }
+                        )
+                        SelectionRow(
+                            title = stringResource(R.string.settings_texture_preloading),
+                            options = texturePreloadingOptions(),
+                            selectedValue = draft.texturePreloading,
+                            onSelected = { onDraftChange(draft.copy(texturePreloading = it)) },
+                            helpText = stringResource(R.string.settings_help_texture_preloading),
+                            onResetToDefault = { onDraftChange(draft.copy(texturePreloading = defaultProfile.texturePreloading)) }
+                        )
+                        SelectionRow(
+                            title = stringResource(R.string.settings_anisotropic_filtering),
+                            options = anisotropicFilteringOptions(),
+                            selectedValue = draft.anisotropicFiltering,
+                            onSelected = { onDraftChange(draft.copy(anisotropicFiltering = it)) },
+                            helpText = stringResource(R.string.settings_help_anisotropic_filtering),
+                            onResetToDefault = { onDraftChange(draft.copy(anisotropicFiltering = defaultProfile.anisotropicFiltering)) }
+                        )
+                        val globalShaderPresetName = shaderPresets
+                            .firstOrNull { it.absolutePath == settingsSnapshot.shaderChainPreset }
+                            ?.label
+                            ?.substringAfterLast('/')
+                            ?: stringResource(R.string.settings_shader_preset_none)
+                        val globalScopeLabel = stringResource(R.string.controls_editor_global_scope)
+                        val globalValueLabel = stringResource(
+                            R.string.emulation_shaders_global_value,
+                            globalShaderPresetName
+                        )
+                        val useGlobalShaderLabel = "$globalScopeLabel · $globalValueLabel"
+                        ShaderPresetSelector(
+                            title = stringResource(R.string.settings_shader_preset),
+                            presets = shaderPresets,
+                            onRemove = onRemoveShaderPresets,
+                            selectedPath = when (draft.shaderChainOverrideEnabled) {
+                                null -> SHADER_PRESET_USE_GLOBAL
+                                false -> ""
+                                true -> draft.shaderChainPreset
+                            },
+                            onSelect = { selectedPath ->
+                                onDraftChange(
+                                    when (selectedPath) {
+                                        SHADER_PRESET_USE_GLOBAL -> draft.copy(
+                                            shaderChainOverrideEnabled = null,
+                                            shaderChainPreset = ""
+                                        )
+                                        "" -> draft.copy(
+                                            shaderChainOverrideEnabled = false,
+                                            shaderChainPreset = ""
+                                        )
+                                        else -> draft.copy(
+                                            shaderChainOverrideEnabled = true,
+                                            shaderChainPreset = selectedPath
+                                        )
+                                    }
+                                )
+                            },
+                            helpText = stringResource(R.string.settings_help_shader_preset),
+                            leadingOptions = listOf(
+                                SHADER_PRESET_USE_GLOBAL to useGlobalShaderLabel
+                            ),
+                            cardHorizontalPadding = 0.dp
+                        )
+                        ToggleRow(
+                            title = stringResource(R.string.settings_fxaa),
+                            checked = draft.enableFxaa,
+                            onCheckedChange = { onDraftChange(draft.copy(enableFxaa = it)) },
+                            helpText = stringResource(R.string.settings_help_fxaa),
+                            onResetToDefault = { onDraftChange(draft.copy(enableFxaa = defaultProfile.enableFxaa)) }
+                        )
+                        SelectionRow(
+                            title = stringResource(R.string.settings_sgsr),
+                            options = sgsrModeOptions(),
+                            selectedValue = draft.sgsrMode,
+                            onSelected = { onDraftChange(draft.copy(sgsrMode = it)) },
+                            helpText = stringResource(R.string.settings_help_sgsr),
+                            onResetToDefault = { onDraftChange(draft.copy(sgsrMode = defaultProfile.sgsrMode)) }
+                        )
+                        SelectionRow(
+                            title = stringResource(R.string.settings_cas),
+                            options = casModeOptions(),
+                            selectedValue = draft.casMode,
+                            onSelected = { onDraftChange(draft.copy(casMode = it)) },
+                            helpText = stringResource(R.string.settings_help_cas),
+                            onResetToDefault = { onDraftChange(draft.copy(casMode = defaultProfile.casMode)) }
+                        )
+                        if (draft.casMode != 0) {
+                            SliderRow(
+                                title = stringResource(R.string.settings_cas_sharpness),
+                                value = draft.casSharpness.toFloat(),
+                                valueLabel = stringResource(R.string.settings_cas_sharpness_value, draft.casSharpness),
+                                range = 0f..100f,
+                                steps = 99,
+                                onValueChange = { onDraftChange(draft.copy(casSharpness = it.toInt())) },
+                                helpText = stringResource(R.string.settings_help_cas_sharpness),
+                                onResetToDefault = { onDraftChange(draft.copy(casSharpness = defaultProfile.casSharpness)) }
                             )
-                        },
-                        helpText = stringResource(R.string.settings_help_shader_preset),
-                        leadingOptions = listOf(
-                            SHADER_PRESET_USE_GLOBAL to useGlobalShaderLabel
-                        ),
-                        cardHorizontalPadding = 0.dp
-                    )
-                    ToggleRow(
-                        title = stringResource(R.string.settings_fxaa),
-                        checked = draft.enableFxaa,
-                        onCheckedChange = { onDraftChange(draft.copy(enableFxaa = it)) },
-                        helpText = stringResource(R.string.settings_help_fxaa),
-                        onResetToDefault = { onDraftChange(draft.copy(enableFxaa = defaultProfile.enableFxaa)) }
-                    )
-                    SelectionRow(
-                        title = stringResource(R.string.settings_sgsr),
-                        options = sgsrModeOptions(),
-                        selectedValue = draft.sgsrMode,
-                        onSelected = { onDraftChange(draft.copy(sgsrMode = it)) },
-                        helpText = stringResource(R.string.settings_help_sgsr),
-                        onResetToDefault = { onDraftChange(draft.copy(sgsrMode = defaultProfile.sgsrMode)) }
-                    )
-                    SelectionRow(
-                        title = stringResource(R.string.settings_cas),
-                        options = casModeOptions(),
-                        selectedValue = draft.casMode,
-                        onSelected = { onDraftChange(draft.copy(casMode = it)) },
-                        helpText = stringResource(R.string.settings_help_cas),
-                        onResetToDefault = { onDraftChange(draft.copy(casMode = defaultProfile.casMode)) }
-                    )
-                    if (draft.casMode != 0) {
-                        SliderRow(
-                            title = stringResource(R.string.settings_cas_sharpness),
-                            value = draft.casSharpness.toFloat(),
-                            valueLabel = stringResource(R.string.settings_cas_sharpness_value, draft.casSharpness),
-                            range = 0f..100f,
-                            steps = 99,
-                            onValueChange = { onDraftChange(draft.copy(casSharpness = it.toInt())) },
-                            helpText = stringResource(R.string.settings_help_cas_sharpness),
-                            onResetToDefault = { onDraftChange(draft.copy(casSharpness = defaultProfile.casSharpness)) }
+                        }
+                        SelectionRow(
+                            title = stringResource(R.string.settings_tv_shader),
+                            options = tvShaderOptions(),
+                            selectedValue = draft.tvShader,
+                            onSelected = { onDraftChange(draft.copy(tvShader = it)) },
+                            helpText = stringResource(R.string.settings_help_tv_shader),
+                            onResetToDefault = { onDraftChange(draft.copy(tvShader = defaultProfile.tvShader)) }
+                        )
+                        ToggleRow(
+                            title = stringResource(R.string.settings_hw_mipmapping),
+                            checked = draft.enableHwMipmapping,
+                            onCheckedChange = { onDraftChange(draft.copy(enableHwMipmapping = it)) },
+                            helpText = stringResource(R.string.settings_help_hw_mipmapping),
+                            onResetToDefault = { onDraftChange(draft.copy(enableHwMipmapping = defaultProfile.enableHwMipmapping)) }
                         )
                     }
-                    SelectionRow(
-                        title = stringResource(R.string.settings_tv_shader),
-                        options = tvShaderOptions(),
-                        selectedValue = draft.tvShader,
-                        onSelected = { onDraftChange(draft.copy(tvShader = it)) },
-                        helpText = stringResource(R.string.settings_help_tv_shader),
-                        onResetToDefault = { onDraftChange(draft.copy(tvShader = defaultProfile.tvShader)) }
-                    )
-                    ToggleRow(
-                        title = stringResource(R.string.settings_hw_mipmapping),
-                        checked = draft.enableHwMipmapping,
-                        onCheckedChange = { onDraftChange(draft.copy(enableHwMipmapping = it)) },
-                        helpText = stringResource(R.string.settings_help_hw_mipmapping),
-                        onResetToDefault = { onDraftChange(draft.copy(enableHwMipmapping = defaultProfile.enableHwMipmapping)) }
-                    )
-                }
-                EditorSection(title = stringResource(R.string.game_settings_manager_section_screen)) {
-                    ShadeBoostRows(
-                        draft = draft,
-                        defaultProfile = defaultProfile,
-                        onDraftChange = onDraftChange
-                    )
-                }
-                }
+                    EditorSection(title = stringResource(R.string.game_settings_manager_section_screen)) {
+                        ShadeBoostRows(
+                            draft = draft,
+                            defaultProfile = defaultProfile,
+                            onDraftChange = onDraftChange
+                        )
+                    }
+                    }
             }
             GameSettingsManagerTab.MemoryCards -> {
                 EditorSection(title = stringResource(R.string.per_game_memory_cards_title)) {
@@ -1923,7 +1923,8 @@ private fun GameSettingsTabContent(
                         helpText = stringResource(R.string.settings_help_anti_blur),
                         onResetToDefault = { onDraftChange(draft.copy(antiBlur = defaultProfile.antiBlur)) }
                     )
-                }\n                ToggleRow(
+                }
+                ToggleRow(
                     title = stringResource(R.string.settings_advanced_fixes_title),
                     checked = showAdvancedFixSettings,
                     onCheckedChange = { showAdvancedFixSettings = it },
