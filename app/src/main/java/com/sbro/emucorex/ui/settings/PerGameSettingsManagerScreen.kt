@@ -962,8 +962,7 @@ private fun GameSettingsTabContent(
     onOpenGpuDriverManager: () -> Unit,
     onDraftChange: (PerGameSettings) -> Unit
 ) {
-    val nativeUpscaleLabel = stringResource(R.string.settings_upscale_native)
-    val context = LocalContext.current
+    var showAdvancedGraphicsSettings by rememberSaveable { mutableStateOf(false) }\n    var showAdvancedFixSettings by rememberSaveable { mutableStateOf(false) }\n    val nativeUpscaleLabel = stringResource(R.string.settings_upscale_native)\r\n    val context = LocalContext.current
     val preferences = remember(context) { AppPreferences(context) }
     val settingsSnapshot by preferences.settingsSnapshot.collectAsState(initial = SettingsSnapshot())
     val globalKeyboardMouseSettings by preferences.keyboardMouseSettings.collectAsState(
@@ -1059,8 +1058,7 @@ private fun GameSettingsTabContent(
                             onDraftChange(draft.copy(localMultiplayerMode = defaultProfile.localMultiplayerMode))
                         }
                     )
-                }
-                EditorSection(title = stringResource(R.string.game_settings_manager_section_graphics)) {
+                }\n                ToggleRow(\n                    title = stringResource(R.string.settings_advanced_graphics_title),\n                    checked = showAdvancedGraphicsSettings,\n                    onCheckedChange = { showAdvancedGraphicsSettings = it },\n                    helpText = stringResource(R.string.settings_advanced_graphics_desc),\n                    onResetToDefault = { showAdvancedGraphicsSettings = false }\n                )\n                if (showAdvancedGraphicsSettings) {\n                EditorSection(title = stringResource(R.string.game_settings_manager_section_graphics)) {
                     SelectionRow(
                         title = stringResource(R.string.settings_bilinear_filtering),
                         options = bilinearFilteringOptions(),
@@ -1204,15 +1202,7 @@ private fun GameSettingsTabContent(
                         onResetToDefault = { onDraftChange(draft.copy(enableHwMipmapping = defaultProfile.enableHwMipmapping)) }
                     )
                 }
-                EditorSection(title = stringResource(R.string.game_settings_manager_section_screen)) {
-                    ShadeBoostRows(
-                        draft = draft,
-                        defaultProfile = defaultProfile,
-                        onDraftChange = onDraftChange
-                    )
-                }
-            }
-            GameSettingsManagerTab.MemoryCards -> {
+                EditorSection(title = stringResource(R.string.game_settings_manager_section_screen)) {\n                    ShadeBoostRows(\n                        draft = draft,\n                        defaultProfile = defaultProfile,\n                        onDraftChange = onDraftChange\n                    )\n                }\n                }\n            }\n            GameSettingsManagerTab.MemoryCards -> {
                 EditorSection(title = stringResource(R.string.per_game_memory_cards_title)) {
                     Text(
                         text = stringResource(R.string.per_game_memory_cards_desc),
@@ -1912,18 +1902,7 @@ private fun GameSettingsTabContent(
                         helpText = stringResource(R.string.settings_help_anti_blur),
                         onResetToDefault = { onDraftChange(draft.copy(antiBlur = defaultProfile.antiBlur)) }
                     )
-                }
-                HardwareFixesRows(
-                    draft = draft,
-                    defaultProfile = defaultProfile,
-                    onDraftChange = onDraftChange
-                )
-                UpscalingFixesRows(
-                    draft = draft,
-                    defaultProfile = defaultProfile,
-                    onDraftChange = onDraftChange
-                )
-            }
+                }\n                ToggleRow(\n                    title = stringResource(R.string.settings_advanced_fixes_title),\n                    checked = showAdvancedFixSettings,\n                    onCheckedChange = { showAdvancedFixSettings = it },\n                    helpText = stringResource(R.string.settings_expert_rendering_fixes_desc),\n                    onResetToDefault = { showAdvancedFixSettings = false }\n                )\n                if (showAdvancedFixSettings) {\n                    HardwareFixesRows(\n                        draft = draft,\n                        defaultProfile = defaultProfile,\n                        onDraftChange = onDraftChange\n                    )\n                    UpscalingFixesRows(\n                        draft = draft,\n                        defaultProfile = defaultProfile,\n                        onDraftChange = onDraftChange\n                    )\n                }\n            }
         }
     }
 }
