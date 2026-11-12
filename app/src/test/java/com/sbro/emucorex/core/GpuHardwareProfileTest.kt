@@ -39,19 +39,7 @@ class GpuHardwareProfileTest {
         assertEquals("adreno", GpuHardwareProfiles.familyName(GpuHardwareProfiles.ADRENO))
         assertEquals("powervr", GpuHardwareProfiles.familyName(GpuHardwareProfiles.POWERVR))
         assertEquals("mali", GpuHardwareProfiles.familyName(GpuHardwareProfiles.MALI))
-        // Unsupported persisted values normalize to the Mali family.
         assertEquals("mali", GpuHardwareProfiles.familyName(999))
-    }
-
-    @Test
-    fun rendererNormalizationRejectsUnsupportedPersistedValues() {
-        assertEquals(RendererDefaults.OPENGL, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.OPENGL))
-        assertEquals(RendererDefaults.SOFTWARE, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.SOFTWARE))
-        assertEquals(RendererDefaults.VULKAN, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.VULKAN))
-        assertEquals(RendererDefaults.defaultForHardware(), RendererDefaults.normalizeAndroidRenderer(999))
-        assertEquals(RendererDefaults.defaultForHardware(), RendererDefaults.normalizeAndroidRenderer(RendererDefaults.AUTO))
-        // An explicit user selection must survive regardless of the hardware default.
-        assertEquals(RendererDefaults.VULKAN, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.VULKAN))
     }
 
     @Test
@@ -59,7 +47,14 @@ class GpuHardwareProfileTest {
         assertEquals(RendererDefaults.VULKAN, RendererDefaults.defaultForProfile(GpuHardwareProfiles.ADRENO))
         assertEquals(RendererDefaults.OPENGL, RendererDefaults.defaultForProfile(GpuHardwareProfiles.MALI))
         assertEquals(RendererDefaults.OPENGL, RendererDefaults.defaultForProfile(GpuHardwareProfiles.POWERVR))
-        // Unknown profiles normalize conservatively to the OpenGL path.
-        assertEquals(RendererDefaults.OPENGL, RendererDefaults.defaultForProfile(999))
+    }
+
+    @Test
+    fun rendererNormalizationPreservesSupportedSelectionsAndUsesHardwareFallback() {
+        assertEquals(RendererDefaults.OPENGL, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.OPENGL))
+        assertEquals(RendererDefaults.SOFTWARE, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.SOFTWARE))
+        assertEquals(RendererDefaults.VULKAN, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.VULKAN))
+        assertEquals(RendererDefaults.defaultForHardware(), RendererDefaults.normalizeAndroidRenderer(999))
+        assertEquals(RendererDefaults.defaultForHardware(), RendererDefaults.normalizeAndroidRenderer(RendererDefaults.AUTO))
     }
 }
