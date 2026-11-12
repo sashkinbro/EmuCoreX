@@ -1438,13 +1438,7 @@
     <string name="pro_message_restore_failed">تعذر استعادة Pro في الوقت الحالي.</string>
     <string name="pro_message_purchase_failed">تعذر إكمال عملية شراء Pro.</string>
     <string name="pro_message_pending_confirmation">شراء Pro في انتظار التأكيد.</string>
-    <string name="pro_price_unavailable">Pro غير متوفر بعد</string>
-    <string name="settings_help_mediatek_angle_opengl">يوجه عارض MediaTek OpenGL من خلال مكتبات ANGLE المجمعة. نظرًا للعبء الإضافي للترجمة، قد يؤدي ذلك إلى زيادة أو تقليل الأداء اعتمادًا على اللعبة. متاح لملفات تعريف Mali و PowerVR ويبقى متوقفًا بشكل افتراضي.</string>
-    <string name="settings_mediatek_angle_opengl">ANGLE لـ OpenGL</string>
-    <string name="settings_mediatek_angle_opengl_desc">استخدم مكتبات ANGLE المضمنة لمحرك OpenGL (متاحة على Mali وPowerVR).</string>
-    <string name="settings_mediatek_notice_title">توافق MediaTek</string>
-    <string name="settings_mediatek_notice_message">لا يزال دعم MediaTek تجريبيًا. قد تحدث أعطال ومشكلات رسومية وسلوك غير مستقر بينما نواصل تحسين التوافق والأداء.\n\nإذا واجهت مشكلات رسومية، فجرّب OpenGL مع تفعيل ANGLE. وإذا استمرت المشكلات، فاستخدم العارض البرمجي.</string>
-    <string name="settings_pro_tab">Pro</string>
+    <string name="pro_price_unavailable">Pro غير متوفر بعد</string>    <string name="settings_mediatek_notice_title">توافق MediaTek</string>    <string name="settings_pro_tab">Pro</string>
     <string name="settings_pro_desc">افتح السمات المخصصة ومظهر Crimson وأيقونة التطبيق الذهبية وملفات Pro والإحصاءات المتقدمة وبطاقات اللاعبين.</string>
     <string name="settings_pro_not_active">غير نشط</string>
     <string name="settings_pro_purchased">تم الشراء</string>
