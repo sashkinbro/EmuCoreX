@@ -24,6 +24,8 @@ This roadmap tracks the remaining work for the Android PS2 emulator fork. Items 
 ## Priority 2 — Performance and low-memory target
 
 - [ ] Add reliable performance instrumentation for frame pacing, CPU/GPU time or wait indicators where available, queue backlog, thermal state, and memory use.
+- [ ] Add a frame limiter with an independent **Perfect Frame Pacing** toggle. Keep the FPS cap user-adjustable, offer sensible 50/59.94/60 Hz-aware targets and half-rate options such as 25/30 FPS, and use deadline-based presentation scheduling with display-sync support where available. Do not alter the emulated PS2 clock or skip required GS work.
+- [ ] Extend the statistics overlay with frame-time variance/jitter and pacing-deadline misses so capped and uncapped modes can be compared objectively.
 - [ ] Implement a conservative rendering watchdog with hysteresis. It may adjust safe host-side quality controls (internal resolution, filtering, post-processing, cache budgets); it must not skip emulated GS commands or alter game simulation.
 - [ ] Prototype Phantom LOD only where draw/resource semantics can be proven safe; use per-game profiles or verified bounds rather than generic scene assumptions.
 - [ ] Profile asset/texture cache budgets and safe eviction before attempting broader asset hollowing or memory reclamation.
