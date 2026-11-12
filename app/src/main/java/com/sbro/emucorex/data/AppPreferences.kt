@@ -354,67 +354,6 @@ class AppPreferences(private val context: Context) {
     private val localePrefs = context.getSharedPreferences("ui_locale", Context.MODE_PRIVATE)
 
     companion object {
-        /**
-         * Portable emulator/core settings that are safe to keep in a Firestore profile.
-         *
-         * Deliberately excludes library paths, BIOS/game locations, memory-card paths,
-         * custom GPU-driver paths, networking identities/room codes, locale and manager UI.
-         */
-        internal val EMULATOR_CLOUD_KEYS = setOf(
-            "performanceProfile", "renderer", "upscaleMultiplier",
-            "shaderChainEnabled", "shaderChainPreset", "aspectRatio", "displayCropLeft",
-            "displayCropTop", "displayCropRight", "displayCropBottom", "audioVolume",
-            "audioFastForwardVolume", "audioMuted", "audioInterpolation", "audioSyncMode",
-            "audioLightweightSpu2", "audioBackend", "audioBufferMs", "audioOutputLatencyMs",
-            "audioMinimalOutputLatency", "autoProgressiveScan", "padVibration",
-            "padVibrationStrength", "padVibrationFallback", "showFps", "showPatchMessages",
-            "fpsOverlayMode",
-            "fpsOverlayCorner", "fpsOverlayScale", "fpsOverlayMetrics", "confirmSaveLoadActions",
-            "backButtonExitsGame", "compactControls", "keepScreenOn", "overlayScale",
-            "overlayOpacity", "overlayShow", "racingMode", "stickyButtons", "touchscreenRightStick",
-            "touchscreenRightStickSensitivity", "touchscreenLeftStick",
-            "touchscreenLeftStickSensitivity", "touchHaptics", "touchHapticsPreset", "stickToggleTarget",
-            "touchHapticsStrength", "gyroMode", "gyroSensitivity", "gyroSmoothing",
-            "gyroInvertX", "gyroInvertY", "gyroStickTarget", "lightGunAim",
-            "lightGunCursorEnabled", "usbPort1Device", "usbPort2Device",
-            "gamepadStickDeadzone", "gamepadLeftStickSensitivity",
-            "gamepadRightStickSensitivity", "gamepadLeftStickNegativeDeadzone",
-            "gamepadRightStickNegativeDeadzone", "gamepadLeftStickAntiDeadzone",
-            "gamepadRightStickAntiDeadzone", "gamepadLeftStickCurve", "gamepadRightStickCurve",
-            "gamepadRightStickUpToR2",
-            "gamepadRightStickDownToL2", "gamepadButtonHaptics", "pressureModifierAmount",
-            "enableFastBoot", "eeCycleRate", "eeCycleSkip", "enableEeRecompiler",
-            "enableIopRecompiler", "enableVu0Recompiler", "enableVu1Recompiler", "enableFastmem",
-            "eeFpuRoundMode", "vu0RoundMode", "vu1RoundMode", "eeFpuClampingMode",
-            "vu0ClampingMode", "vu1ClampingMode", "enableGameFixes", "autoGsHardwareFixes", "enableEeTimingHack",
-            "enableWaitLoopSpeedhack", "enableIntcStatSpeedhack", "enableVuFlagHack",
-            "enableInstantVu1", "enableMtvu", "enableIopThread", "enableVUAot", "enableThreadPinning", "enableFastCdvd",
-            "hwDownloadMode", "frameSkip", "skipDuplicateFrames", "lowLatencyMode", "textureFiltering",
-            "trilinearFiltering", "blendingAccuracy", "texturePreloading",
-            "textureReplacementsEnabled", "textureReplacementsAsync", "textureReplacementsPrecache", "textureUpscaleMode",
-            "textureDumpingEnabled", "enableFxaa", "sgsrMode", "casMode", "casSharpness",
-            "tvShader", "enableWidescreenPatches", "enableNoInterlacingPatches",
-            "deinterlaceMode", "dithering", "antiBlur", "anisotropicFiltering",
-            "enableHwMipmapping", "hwRov", "cpuSpriteRenderSize", "cpuSpriteRenderLevel",
-            "softwareClutRender", "gpuTargetClutMode", "skipDrawStart", "skipDrawEnd",
-            "autoFlushHardware", "cpuFramebufferConversion", "disableDepthConversion",
-            "disableSafeFeatures", "disableRenderFixes", "preloadFrameData",
-            "disablePartialInvalidation", "textureInsideRt", "readTargetsOnClose",
-            "estimateTextureRegion", "gpuPaletteConversion", "halfPixelOffset", "nativeScaling",
-            "roundSprite", "bilinearUpscale", "textureOffsetX", "textureOffsetY", "alignSprite",
-            "mergeSprite", "forceEvenSpritePosition", "nativePaletteDraw", "enableAutoGamepad",
-            "preferExternalGamepadPlayerOne",
-            "hideOverlayOnGamepad", "gamepadBindings", "dev9EthernetEnabled", "dev9InterceptDhcp",
-            "dev9Dns1Mode", "dev9Dns1", "dev9Dns2Mode", "dev9Dns2", "dev9LocalLinkMode",
-            "frameLimitEnabled", "vSyncEnabled", "fastForwardSpeed", "targetFps", "ntscFramerate",
-            "palFramerate", "autoSaveEnabled", "autoSaveIntervalMinutes", "overlayLayoutVersion",
-            "dpadOffset", "lstickOffset", "rstickOffset", "actionOffset", "lbtnOffset",
-            "rbtnOffset", "centerOffset", "stickScale", "leftStickSensitivity",
-            "rightStickSensitivity", "invertLeftStick", "invertRightStick",
-            "invertLeftStickHorizontal", "invertRightStickHorizontal", "stickSurfaceMode",
-            "controlLayouts", "customTouchControls", "touchControlVisualStyle",
-            "touchControlPressEffect", "localMultiplayerMode"
-        )
 
         const val DEV9_DNS_MODE_MANUAL = "Manual"
         const val DEV9_DNS_MODE_AUTO = "Auto"
@@ -660,13 +599,6 @@ class AppPreferences(private val context: Context) {
             stringPreferencesKey("last_core_binary_fingerprint")
         private val MEDIATEK_SETTINGS_NOTICE_SHOWN =
             booleanPreferencesKey("mediatek_settings_notice_shown")
-        private val IN_APP_REVIEW_QUALIFYING_SESSION_COUNT =
-            intPreferencesKey("in_app_review_qualifying_session_count")
-        private val IN_APP_REVIEW_TOTAL_ACTIVE_PLAY_TIME_MS =
-            longPreferencesKey("in_app_review_total_active_play_time_ms")
-        private val IN_APP_REVIEW_LAST_ATTEMPT_AT_MS =
-            longPreferencesKey("in_app_review_last_attempt_at_ms")
-        private val IN_APP_REVIEW_REQUESTED = booleanPreferencesKey("in_app_review_requested")
         private val RENDERER = intPreferencesKey("renderer")
         private val UPSCALE = floatPreferencesKey("upscale_multiplier_v2")
         private val UPSCALE_LEGACY = intPreferencesKey("upscale_multiplier")
@@ -1450,53 +1382,6 @@ class AppPreferences(private val context: Context) {
     suspend fun markMediatekSettingsNoticeShown() {
         context.dataStore.edit { prefs -> prefs[MEDIATEK_SETTINGS_NOTICE_SHOWN] = true }
     }
-
-    suspend fun recordInAppReviewSession(activePlayTimeMs: Long) {
-        context.dataStore.edit { prefs ->
-            val updated = InAppReviewPolicy.recordSession(
-                progress = prefs.inAppReviewProgress(),
-                activePlayTimeMs = activePlayTimeMs
-            )
-            prefs[IN_APP_REVIEW_QUALIFYING_SESSION_COUNT] = updated.qualifyingSessionCount
-            prefs[IN_APP_REVIEW_TOTAL_ACTIVE_PLAY_TIME_MS] = updated.totalActivePlayTimeMs
-        }
-    }
-
-    suspend fun claimInAppReviewAttempt(nowMs: Long = System.currentTimeMillis()): Long? {
-        val claimedAtMs = nowMs.coerceAtLeast(1L)
-        var claimed = false
-        context.dataStore.edit { prefs ->
-            if (!InAppReviewPolicy.canAttempt(prefs.inAppReviewProgress(), claimedAtMs)) return@edit
-            prefs[IN_APP_REVIEW_LAST_ATTEMPT_AT_MS] = claimedAtMs
-            claimed = true
-        }
-        return claimedAtMs.takeIf { claimed }
-    }
-
-    suspend fun releaseInAppReviewAttempt(claimedAtMs: Long) {
-        context.dataStore.edit { prefs ->
-            if (prefs[IN_APP_REVIEW_LAST_ATTEMPT_AT_MS] == claimedAtMs &&
-                prefs[IN_APP_REVIEW_REQUESTED] != true
-            ) {
-                prefs.remove(IN_APP_REVIEW_LAST_ATTEMPT_AT_MS)
-            }
-        }
-    }
-
-    suspend fun markInAppReviewRequested(claimedAtMs: Long) {
-        context.dataStore.edit { prefs ->
-            if (prefs[IN_APP_REVIEW_LAST_ATTEMPT_AT_MS] == claimedAtMs) {
-                prefs[IN_APP_REVIEW_REQUESTED] = true
-            }
-        }
-    }
-
-    private fun Preferences.inAppReviewProgress(): InAppReviewProgress = InAppReviewProgress(
-        qualifyingSessionCount = this[IN_APP_REVIEW_QUALIFYING_SESSION_COUNT] ?: 0,
-        totalActivePlayTimeMs = this[IN_APP_REVIEW_TOTAL_ACTIVE_PLAY_TIME_MS] ?: 0L,
-        reviewRequested = this[IN_APP_REVIEW_REQUESTED] ?: false,
-        lastAttemptAtMs = this[IN_APP_REVIEW_LAST_ATTEMPT_AT_MS] ?: 0L
-    )
 
     val renderer: Flow<Int> = context.dataStore.data.map { prefs ->
         normalizeRendererPreference(prefs[RENDERER])
@@ -5122,23 +5007,6 @@ class AppPreferences(private val context: Context) {
             put("memoryCardSlot1", prefs[MEMORY_CARD_SLOT1])
             put("memoryCardSlot2", prefs[MEMORY_CARD_SLOT2])
         }
-    }
-
-    suspend fun exportEmulatorCloudJson(): JSONObject {
-        val complete = exportJson()
-        return JSONObject().apply {
-            EMULATOR_CLOUD_KEYS.forEach { key ->
-                if (complete.has(key) && !complete.isNull(key)) put(key, complete.get(key))
-            }
-        }
-    }
-
-    suspend fun importEmulatorCloudJson(cloud: JSONObject) {
-        val merged = exportJson()
-        EMULATOR_CLOUD_KEYS.forEach { key ->
-            if (cloud.has(key) && !cloud.isNull(key)) merged.put(key, cloud.get(key))
-        }
-        importJson(merged)
     }
 
     suspend fun importJson(json: JSONObject) {
