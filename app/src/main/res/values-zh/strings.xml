@@ -1440,13 +1440,7 @@
     <string name="pro_message_restore_failed">目前无法恢复 Pro。</string>
     <string name="pro_message_purchase_failed">无法完成 Pro 购买。</string>
     <string name="pro_message_pending_confirmation">Pro 购买等待确认中。</string>
-    <string name="pro_price_unavailable">Pro 尚未可用</string>
-    <string name="settings_help_mediatek_angle_opengl">通过捆绑的 ANGLE 库路由 MediaTek OpenGL 渲染器。由于转换开销，根据游戏的不同，这可能会提高或降低性能。适用于 Mali 和 PowerVR 配置文件，默认关闭。</string>
-    <string name="settings_mediatek_angle_opengl">适用于 OpenGL 的 ANGLE</string>
-    <string name="settings_mediatek_angle_opengl_desc">为 OpenGL 渲染器使用内置 ANGLE 库（适用于 Mali 和 PowerVR）。</string>
-    <string name="settings_mediatek_notice_title">MediaTek 兼容性</string>
-    <string name="settings_mediatek_notice_message">MediaTek 支持目前仍处于实验阶段。在我们继续改进兼容性和性能期间，可能会出现崩溃、图形异常和运行不稳定。\n\n如果遇到图形问题，请尝试启用 ANGLE 的 OpenGL。若问题仍然存在，请使用软件渲染器。</string>
-    <string name="settings_pro_tab">Pro</string>
+    <string name="pro_price_unavailable">Pro 尚未可用</string>    <string name="settings_mediatek_notice_title">MediaTek 兼容性</string>    <string name="settings_pro_tab">Pro</string>
     <string name="settings_pro_desc">解锁自定义主题、Crimson 主题、金色应用图标、Pro 个人资料、高级统计和玩家卡片。</string>
     <string name="settings_pro_not_active">未激活</string>
     <string name="settings_pro_purchased">已购买</string>
