@@ -210,7 +210,6 @@ import com.sbro.emucorex.data.PerGameSettingsRepository
 import com.sbro.emucorex.data.PerformanceOverlayMetrics
 import com.sbro.emucorex.data.RetroArchShaderPreset
 import com.sbro.emucorex.data.SettingsBackupRepository
-import com.sbro.emucorex.ui.profile.CloudProfilesDialog
 import androidx.compose.material.icons.rounded.CloudSync
 import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.data.ShaderPackInstallProgress
@@ -311,7 +310,6 @@ fun SettingsScreen(
     var showTopBarMenu by remember { mutableStateOf(false) }
     val showResetAllSettingsDialog = remember { mutableStateOf(false) }
     var showBackupExportDialog by rememberSaveable { mutableStateOf(false) }
-    var showDriveBackupDialog by rememberSaveable { mutableStateOf(false) }
     var includeSaveStatesInBackup by rememberSaveable { mutableStateOf(false) }
     val showCoverUrlDialog = remember { mutableStateOf(false) }
     var editingArcadeCoverUrl by remember { mutableStateOf(false) }
@@ -629,7 +627,7 @@ fun SettingsScreen(
                     showBackupExportDialog = true
                 },
                 launchSettingsBackupImport = { settingsBackupImporter.launch(arrayOf("application/zip", "*/*")) },
-                launchCloudBackup = { showDriveBackupDialog = true },
+                launchCloudBackup = { showBackupExportDialog = true },
                 openLanguageSheet = openLanguageSheet,
                 onRequestGamepadBinding = { padIndex, actionId ->
                     pendingGamepadPadIndex = padIndex
@@ -872,10 +870,6 @@ fun SettingsScreen(
                 }
             }
         )
-    }
-
-    if (showDriveBackupDialog) {
-        CloudProfilesDialog(onDismiss = { showDriveBackupDialog = false }, firebaseAvailable = false, initialDrive = true)
     }
 
     if (showBackupExportDialog) {
