@@ -16,9 +16,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
-import com.sbro.emucorex.core.BackupSessionGate
-import com.sbro.emucorex.data.drive.DriveBackupArchive
-import com.sbro.emucorex.data.drive.DriveBackupException
 
 class EmuCoreXApp : Application() {
     internal val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -33,16 +30,6 @@ class EmuCoreXApp : Application() {
         // If the previous process died with a native Vulkan crash, arm a one-shot OpenGL
         // launch. The saved renderer setting is not modified.
         runCatching { VulkanStartupGuard.consumeStartupCrash(this) }
-        if (DriveBackupArchive.hasPendingRecovery(this)) applicationScope.launch {
-            try { BackupSessionGate.whileStopped { DriveBackupArchive(this@EmuCoreXApp).recoverPending() } }
-            catch (cancelled: CancellationException) { throw cancelled }
-            catch (error: Exception) {
-                // VM startup performs the same recovery under the gate before it can open cards.
-                if ((error as? DriveBackupException)?.reason != "busy") {
-                    android.util.Log.w("DriveBackup", "Pending restore recovery will be retried before VM startup")
-                }
-            }
-        }
         AppAnalytics.initialize(this)
         applicationScope.launch {
             try {
