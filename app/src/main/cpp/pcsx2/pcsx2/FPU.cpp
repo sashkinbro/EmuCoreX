@@ -5,6 +5,7 @@
 #include "Config.h"
 
 #include <cmath>
+#include <cstring>
 
 // Helper Macros
 //****************************************************************
@@ -183,19 +184,57 @@ float fpuDouble(u32 f)
 	}
 }
 
+// EE FPU add/sub guard-bit emulation (ported from ARMSX2 fpuGuardMask/eeGuardedAddSub, GPL-3).
+// With d = expA - expB (raw exponent fields), the smaller operand is shifted out
+// before the add: it loses its low (|d|-1) bits, and past 24 only its sign
+// remains. |d| <= 1 masks nothing. Gated on CHECK_FPU_GUARDED like the JIT.
+static void fpuGuardMask(u32& a, u32& b)
+{
+	const s32 diff = (s32)((a >> 23) & 0xFF) - (s32)((b >> 23) & 0xFF);
+
+	if (diff >= 25)
+		b &= 0x80000000;
+	else if (diff >= 2)
+		b &= 0xffffffffu << (diff - 1);
+	else if (diff <= -25)
+		a &= 0x80000000;
+	else if (diff <= -2)
+		a &= 0xffffffffu << (-diff - 1);
+}
+
+// Operands arrive as fpuDouble()-clamped words. Returns the sum rounded by the
+// host FPU under the current FPCR, like the plain float op it replaces.
+static float eeGuardedAddSub(u32 a, u32 b, bool issub)
+{
+	if (CHECK_FPU_GUARDED)
+		fpuGuardMask(a, b);
+	FPRreg fa, fb;
+	fa.UL = a;
+	fb.UL = b;
+	return issub ? fa.f - fb.f : fa.f + fb.f;
+}
+
+static u32 fpuDouble2u(u32 f)
+{
+	const float v = fpuDouble(f);
+	u32 r;
+	std::memcpy(&r, &v, sizeof(r));
+	return r;
+}
+
 void ABS_S() {
 	_FdValUl_ = _FsValUl_ & 0x7fffffff;
 	clearFPUFlags( FPUflagO | FPUflagU );
 }
 
 void ADD_S() {
-	_FdValf_  = fpuDouble( _FsValUl_ ) + fpuDouble( _FtValUl_ );
+	_FdValf_  = eeGuardedAddSub( fpuDouble2u( _FsValUl_ ), fpuDouble2u( _FtValUl_ ), false );
 	if (checkOverflow( _FdValUl_, FPUflagO | FPUflagSO)) return;
 	checkUnderflow( _FdValUl_, FPUflagU | FPUflagSU);
 }
 
 void ADDA_S() {
-	_FAValf_  = fpuDouble( _FsValUl_ ) + fpuDouble( _FtValUl_ );
+	_FAValf_  = eeGuardedAddSub( fpuDouble2u( _FsValUl_ ), fpuDouble2u( _FtValUl_ ), false );
 	if (checkOverflow( _FAValUl_, FPUflagO | FPUflagSO)) return;
 	checkUnderflow( _FAValUl_, FPUflagU | FPUflagSU);
 }
@@ -275,13 +314,15 @@ void DIV_S() {
 void MADD_S() {
 	FPRreg temp;
 	temp.f = fpuDouble( _FsValUl_ ) * fpuDouble( _FtValUl_ );
-	_FdValf_  = fpuDouble( _FAValUl_ ) + fpuDouble( temp.UL );
+	_FdValf_  = eeGuardedAddSub( fpuDouble2u( _FAValUl_ ), fpuDouble2u( temp.UL ), false );
 	if (checkOverflow( _FdValUl_, FPUflagO | FPUflagSO)) return;
 	checkUnderflow( _FdValUl_, FPUflagU | FPUflagSU);
 }
 
 void MADDA_S() {
-	_FAValf_ += fpuDouble( _FsValUl_ ) * fpuDouble( _FtValUl_ );
+	FPRreg prod;
+	prod.f = fpuDouble( _FsValUl_ ) * fpuDouble( _FtValUl_ );
+	_FAValf_  = eeGuardedAddSub( fpuDouble2u( _FAValUl_ ), fpuDouble2u( prod.UL ), false );
 	if (checkOverflow( _FAValUl_, FPUflagO | FPUflagSO)) return;
 	checkUnderflow( _FAValUl_, FPUflagU | FPUflagSU);
 }
@@ -308,13 +349,15 @@ void MOV_S() {
 void MSUB_S() {
 	FPRreg temp;
 	temp.f = fpuDouble( _FsValUl_ ) * fpuDouble( _FtValUl_ );
-	_FdValf_  = fpuDouble( _FAValUl_ ) - fpuDouble( temp.UL );
+	_FdValf_  = eeGuardedAddSub( fpuDouble2u( _FAValUl_ ), fpuDouble2u( temp.UL ), true );
 	if (checkOverflow( _FdValUl_, FPUflagO | FPUflagSO)) return;
 	checkUnderflow( _FdValUl_, FPUflagU | FPUflagSU);
 }
 
 void MSUBA_S() {
-	_FAValf_ -= fpuDouble( _FsValUl_ ) * fpuDouble( _FtValUl_ );
+	FPRreg prod;
+	prod.f = fpuDouble( _FsValUl_ ) * fpuDouble( _FtValUl_ );
+	_FAValf_  = eeGuardedAddSub( fpuDouble2u( _FAValUl_ ), fpuDouble2u( prod.UL ), true );
 	if (checkOverflow( _FAValUl_, FPUflagO | FPUflagSO)) return;
 	checkUnderflow( _FAValUl_, FPUflagU | FPUflagSU);
 }
@@ -373,13 +416,13 @@ void SQRT_S() {
 }
 
 void SUB_S() {
-	_FdValf_  = fpuDouble( _FsValUl_ ) - fpuDouble( _FtValUl_ );
+	_FdValf_  = eeGuardedAddSub( fpuDouble2u( _FsValUl_ ), fpuDouble2u( _FtValUl_ ), true );
 	if (checkOverflow( _FdValUl_, FPUflagO | FPUflagSO)) return;
 	checkUnderflow( _FdValUl_, FPUflagU | FPUflagSU);
 }
 
 void SUBA_S() {
-	_FAValf_  = fpuDouble( _FsValUl_ ) - fpuDouble( _FtValUl_ );
+	_FAValf_  = eeGuardedAddSub( fpuDouble2u( _FsValUl_ ), fpuDouble2u( _FtValUl_ ), true );
 	if (checkOverflow( _FAValUl_, FPUflagO | FPUflagSO)) return;
 	checkUnderflow( _FAValUl_, FPUflagU | FPUflagSU);
 }

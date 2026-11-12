@@ -4288,6 +4288,7 @@ void EECoverageCop2Spec2()
 #include "jit_oracle_ee_fastmem_exit.inl"
 #include "jit_oracle_ee_fastmem_cold.inl"
 #include "jit_oracle_ee_madd.inl"
+#include "jit_oracle_ee_fpu_hw.inl"
 
 void EEVuAbsSharedTests()
 {
@@ -10187,6 +10188,11 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
         EeMaddNativeOracleTests();
         return;
     }
+    if (direct_suite && std::strcmp(direct_suite, "ee-fpu-hw") == 0)
+    {
+        EeFpuHwTests();
+        return;
+    }
     if (direct_suite && std::strcmp(direct_suite, "ee-unaligned-word-stores") == 0)
     {
         EEUnalignedWordStoreTests();
@@ -12705,7 +12711,7 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
     else if (std::strcmp(suite, "ee-branch-immediates") == 0)
         EETests(false, false, false, false, false, false, false, false, false,
             false, false, false, false, false, false, 0, false, false, false, true);
-    else if (std::strcmp(suite, "ee-madd") == 0 || std::strcmp(suite, "ee-direct") == 0 || std::strcmp(suite, "ee-direct-stores") == 0 ||
+    else if (std::strcmp(suite, "ee-madd") == 0 || std::strcmp(suite, "ee-fpu-hw") == 0 || std::strcmp(suite, "ee-direct") == 0 || std::strcmp(suite, "ee-direct-stores") == 0 ||
         std::strcmp(suite, "ee-unaligned-stores") == 0 || std::strcmp(suite, "ee-unaligned-word-stores") == 0 ||
         std::strcmp(suite, "ee-vu-local") == 0 || std::strcmp(suite, "ee-vu-status") == 0 ||
         std::strcmp(suite, "ee-vu-local-clip") == 0 || std::strcmp(suite, "ee-vu-local-identity") == 0 || std::strcmp(suite, "ee-vu-zero-tail") == 0 || std::strcmp(suite, "ee-vu-lower-zero-tail") == 0 ||

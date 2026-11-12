@@ -700,7 +700,8 @@ struct Pcsx2Config
 			fpuOverflow : 1,
 			fpuExtraOverflow : 1,
 			fpuFullMode : 1,
-			fpuCorrectAddSub : 1;
+			fpuCorrectAddSub : 1,
+			fpuGuardedAddSub : 1; // EE FPU add/sub guard-bit emulation (single-precision fast path). On by default; ported from ARMSX2.
 
 		bool
 			EnableEECache : 1;
@@ -1678,6 +1679,7 @@ namespace EmuFolders
 #define CHECK_FPU_EXTRA_FLAGS 1 // Always enabled now // Sets D/I flags on FPU instructions
 #define CHECK_FPU_FULL (EmuConfig.Cpu.Recompiler.fpuFullMode)
 #define CHECK_FPU_CORRECT_ADD_SUB (EmuConfig.Cpu.Recompiler.fpuCorrectAddSub)
+#define CHECK_FPU_GUARDED (EmuConfig.Cpu.Recompiler.fpuGuardedAddSub) // If enabled (default), add/sub emulate the PS2 FPU's missing mantissa guard bits on the single-precision fast path (EE JIT and interpreter).
 
 //------------ EE Recompiler defines - Comment to disable a recompiler ---------------
 

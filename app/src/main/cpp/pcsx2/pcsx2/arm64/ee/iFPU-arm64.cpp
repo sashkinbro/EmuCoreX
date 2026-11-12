@@ -399,6 +399,53 @@ static void recFpuClearFcr31_emit_oaknut(u32 bits)
 	oakStore32(OAK_WSCRATCH2, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, fpuRegs.fprc[31]))});
 }
 
+// EE FPU add/sub guard-bit emulation (ported from ARMSX2 fpuEmitGuardedAddSub, GPL-3).
+// The EE adder has no guard bits: with d = expA - expB (raw 8-bit fields), the smaller
+// operand loses its low (|d|-1) bits (d >= 25: everything but its sign). |d| <= 1 masks
+// nothing. This masks the two operands IN PLACE; the caller emits the plain FADD/FSUB
+// afterwards under the EE FPCR. sreg/treg must be allocator temps the caller owns.
+//
+// GPR scratch contract: touches only w0/w1/w2 (x86reg <= 2, never allocatable) and
+// w16 (OAK_WSCRATCH) / w17 (OAK_WSCRATCH2). On Android the int allocator hands out
+// x3,x5-x15 and x20-x23, so w9/w10 are NOT safe here: a resident FCR31 or any cached
+// GPR may live there (ARMSX2 hit this as the Shadow of the Colossus bug). No NEON
+// temp is needed since the operand temps are masked directly. Hot path (|d| <= 1)
+// falls through the 8-instruction check and skips the mask block.
+static void recFpuGuardMask_emit_oaknut(int sreg, int treg)
+{
+	if (!CHECK_FPU_GUARDED)
+		return;
+
+	oak::Label plain;
+
+	oakAsm->FMOV(OAK_WARG1, oakSRegister(sreg));
+	oakAsm->FMOV(OAK_WARG2, oakSRegister(treg));
+	oakAsm->UBFX(OAK_WARG3, OAK_WARG1, 23, 8);
+	oakAsm->UBFX(OAK_WSCRATCH, OAK_WARG2, 23, 8);
+	oakAsm->SUB(OAK_WARG3, OAK_WARG3, OAK_WSCRATCH);     // d = expS - expT
+	oakAsm->ADD(OAK_WSCRATCH, OAK_WARG3, 1);
+	oakAsm->CMP(OAK_WSCRATCH, 2);
+	oakAsm->B(oak::Cond::LS, plain);                     // -1 <= d <= 1: no masking
+
+	oakAsm->ASR(OAK_WSCRATCH2, OAK_WARG3, 31);           // all ones when d < 0
+	oakAsm->EOR(OAK_WARG3, OAK_WARG3, OAK_WSCRATCH2);
+	oakAsm->SUB(OAK_WARG3, OAK_WARG3, OAK_WSCRATCH2);    // |d|
+	oakAsm->CMP(OAK_WARG3, 25);
+	oakAsm->SUB(OAK_WARG3, OAK_WARG3, 1);                // shift = |d| - 1
+	oakAsm->MOV(OAK_WSCRATCH, 31);
+	oakAsm->CSEL(OAK_WARG3, OAK_WSCRATCH, OAK_WARG3, oak::Cond::GE); // |d| >= 25: keep sign only
+	oakAsm->MOV(OAK_WSCRATCH, -1);
+	oakAsm->LSL(OAK_WSCRATCH, OAK_WSCRATCH, OAK_WARG3);  // m = 0xffffffff << shift
+	oakAsm->ORR(OAK_WARG3, OAK_WSCRATCH, OAK_WSCRATCH2); // mask for T (all ones when d < 0)
+	oakAsm->ORN(OAK_WSCRATCH, OAK_WSCRATCH, OAK_WSCRATCH2); // mask for S (all ones when d > 0)
+	oakAsm->AND(OAK_WARG2, OAK_WARG2, OAK_WARG3);
+	oakAsm->AND(OAK_WARG1, OAK_WARG1, OAK_WSCRATCH);
+	oakAsm->FMOV(oakSRegister(treg), OAK_WARG2);
+	oakAsm->FMOV(oakSRegister(sreg), OAK_WARG1);
+
+	oakAsm->l(plain);
+}
+
 static void recADD_S_emit_oaknut(int info)
 {
 	EE::Profiler.EmitOp(eeOpcode::ADD_F);
@@ -415,6 +462,7 @@ static void recADD_S_emit_oaknut(int info)
 	recFpuLoadScalarMemoryOperand_emit_oaknut(treg, _Ft_);
 	recFpuDoubleClampOperand_emit_oaknut(sreg);
 	recFpuDoubleClampOperand_emit_oaknut(treg);
+	recFpuGuardMask_emit_oaknut(sreg, treg);
 	oakAsm->FADD(oakSRegister(EEREC_D), oakSRegister(sreg), oakSRegister(treg));
 	recFpuClampFloat3Operand_emit_oaknut(EEREC_D);
 	recEndOaknutEmit();
@@ -445,6 +493,7 @@ static void recADDA_S_emit_oaknut(int info)
 	recFpuLoadScalarOperand_emit_oaknut(treg, _Ft_, EEREC_T, info & PROCESS_EE_T);
 	recFpuDoubleClampOperand_emit_oaknut(sreg);
 	recFpuDoubleClampOperand_emit_oaknut(treg);
+	recFpuGuardMask_emit_oaknut(sreg, treg);
 	oakAsm->FADD(oakSRegister(EEREC_ACC), oakSRegister(sreg), oakSRegister(treg));
 	recFpuClampFloat3Operand_emit_oaknut(EEREC_ACC);
 	recEndOaknutEmit();
@@ -982,6 +1031,7 @@ static void recMADD_S_emit_oaknut(int info)
 	recFpuMaddProduct_emit_oaknut(productreg, sreg, treg, true);
 	if (CHECK_FPU_EXTRA_OVERFLOW)
 		recFpuClampFloat3Operand_emit_oaknut(accreg);
+	recFpuGuardMask_emit_oaknut(accreg, productreg);
 	oakAsm->FADD(oakSRegister(EEREC_D), oakSRegister(accreg), oakSRegister(productreg));
 	recFpuClampFloat3Operand_emit_oaknut(EEREC_D);
 	recEndOaknutEmit();
@@ -1015,6 +1065,7 @@ static void recMADDA_S_emit_oaknut(int info)
 	recFpuMaddProduct_emit_oaknut(productreg, sreg, treg, true);
 	if (CHECK_FPU_EXTRA_OVERFLOW)
 		recFpuClampFloat3Operand_emit_oaknut(accreg);
+	recFpuGuardMask_emit_oaknut(accreg, productreg);
 	oakAsm->FADD(oakSRegister(EEREC_ACC), oakSRegister(accreg), oakSRegister(productreg));
 	recFpuClampFloat3Operand_emit_oaknut(EEREC_ACC);
 	recEndOaknutEmit();
@@ -1165,6 +1216,7 @@ static void recMSUB_S_emit_oaknut(int info)
 	recFpuMaddProduct_emit_oaknut(productreg, sreg, treg, true);
 	if (CHECK_FPU_EXTRA_OVERFLOW)
 		recFpuClampFloat3Operand_emit_oaknut(accreg);
+	recFpuGuardMask_emit_oaknut(accreg, productreg);
 	oakAsm->FSUB(oakSRegister(EEREC_D), oakSRegister(accreg), oakSRegister(productreg));
 	recFpuClampFloat3Operand_emit_oaknut(EEREC_D);
 	recEndOaknutEmit();
@@ -1198,6 +1250,7 @@ static void recMSUBA_S_emit_oaknut(int info)
 	recFpuMaddProduct_emit_oaknut(productreg, sreg, treg, true);
 	if (CHECK_FPU_EXTRA_OVERFLOW)
 		recFpuClampFloat3Operand_emit_oaknut(accreg);
+	recFpuGuardMask_emit_oaknut(accreg, productreg);
 	oakAsm->FSUB(oakSRegister(EEREC_ACC), oakSRegister(accreg), oakSRegister(productreg));
 	recFpuClampFloat3Operand_emit_oaknut(EEREC_ACC);
 	recEndOaknutEmit();
@@ -1361,6 +1414,7 @@ static void recSUB_S_emit_oaknut(int info)
 		recFpuLoadScalarOperand_emit_oaknut(treg, _Ft_, EEREC_T, info & PROCESS_EE_T);
 	recFpuDoubleClampOperand_emit_oaknut(sreg);
 	recFpuDoubleClampOperand_emit_oaknut(treg);
+	recFpuGuardMask_emit_oaknut(sreg, treg);
 	oakAsm->FSUB(oakSRegister(EEREC_D), oakSRegister(sreg), oakSRegister(treg));
 	recFpuClampFloat3Operand_emit_oaknut(EEREC_D);
 	recEndOaknutEmit();
@@ -1389,6 +1443,7 @@ static void recSUBA_S_emit_oaknut(int info)
 	recFpuLoadScalarOperand_emit_oaknut(treg, _Ft_, EEREC_T, info & PROCESS_EE_T);
 	recFpuDoubleClampOperand_emit_oaknut(sreg);
 	recFpuDoubleClampOperand_emit_oaknut(treg);
+	recFpuGuardMask_emit_oaknut(sreg, treg);
 	oakAsm->FSUB(oakSRegister(EEREC_ACC), oakSRegister(sreg), oakSRegister(treg));
 	recFpuClampFloat3Operand_emit_oaknut(EEREC_ACC);
 	recEndOaknutEmit();

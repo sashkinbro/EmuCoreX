@@ -370,6 +370,15 @@ void ApplyOldCoreJitSettings(SettingsInterface& si, const VmLaunchConfig& config
 		enable_vu_program_cache = vu_program_cache_override[0] == '1';
 #endif
 	si.SetBoolValue("EmuCore/CPU/Recompiler", "EnableVUProgramCache", enable_vu_program_cache);
+	bool fpu_guarded_add_sub = GetBoolSetting(config.settings, "EmuCore/CPU/Recompiler", "fpuGuardedAddSub", true);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	// Debug-only A/B aid: debug.emucorex.fpu_guarded=0|1 overrides EE FPU guard-bit ADD/SUB emulation.
+	char fpu_guarded_override[PROP_VALUE_MAX] = {};
+	if (__system_property_get("debug.emucorex.fpu_guarded", fpu_guarded_override) == 1 &&
+		(fpu_guarded_override[0] == '0' || fpu_guarded_override[0] == '1'))
+		fpu_guarded_add_sub = fpu_guarded_override[0] == '1';
+#endif
+	si.SetBoolValue("EmuCore/CPU/Recompiler", "fpuGuardedAddSub", fpu_guarded_add_sub);
 	si.SetBoolValue("EmuCore/CPU/Recompiler", "EnableFastmem",
 		GetBoolSetting(config.settings, "EmuCore/CPU/Recompiler", "EnableFastmem", true));
 	si.SetBoolValue("EmuCore/CPU/Recompiler", "EnableEECache",
