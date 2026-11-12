@@ -48,14 +48,18 @@ class GpuHardwareProfileTest {
         assertEquals(RendererDefaults.OPENGL, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.OPENGL))
         assertEquals(RendererDefaults.SOFTWARE, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.SOFTWARE))
         assertEquals(RendererDefaults.VULKAN, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.VULKAN))
-        assertEquals(RendererDefaults.VULKAN, RendererDefaults.normalizeAndroidRenderer(999))
-        assertEquals(RendererDefaults.VULKAN, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.AUTO))
+        assertEquals(RendererDefaults.defaultForHardware(), RendererDefaults.normalizeAndroidRenderer(999))
+        assertEquals(RendererDefaults.defaultForHardware(), RendererDefaults.normalizeAndroidRenderer(RendererDefaults.AUTO))
         // An explicit user selection must survive regardless of the hardware default.
         assertEquals(RendererDefaults.VULKAN, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.VULKAN))
     }
 
     @Test
-    fun rendererDefaultsToVulkanOnAndroid() {
-        assertEquals(RendererDefaults.VULKAN, RendererDefaults.defaultForHardware())
+    fun rendererDefaultsAreSelectedByGpuFamily() {
+        assertEquals(RendererDefaults.VULKAN, RendererDefaults.defaultForProfile(GpuHardwareProfiles.ADRENO))
+        assertEquals(RendererDefaults.OPENGL, RendererDefaults.defaultForProfile(GpuHardwareProfiles.MALI))
+        assertEquals(RendererDefaults.OPENGL, RendererDefaults.defaultForProfile(GpuHardwareProfiles.POWERVR))
+        // Unknown profiles normalize conservatively to the OpenGL path.
+        assertEquals(RendererDefaults.OPENGL, RendererDefaults.defaultForProfile(999))
     }
 }
