@@ -493,10 +493,6 @@ PAPX-90517:
   name-sort: "ぷりんす おぶ ぺるしゃ じかんのすな [たいけんばん]"
   name-en: "Prince of Persia - The Sands of Time [Trial]"
   region: "NTSC-J"
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -2041,9 +2037,7 @@ SCAJ-20125:
   name: "Tekken 5"
   region: "NTSC-Unk"
   clampModes:
-    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
+    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -2055,9 +2049,7 @@ SCAJ-20126:
   name: "Tekken 5"
   region: "NTSC-Unk"
   clampModes:
-    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
+    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -2259,10 +2251,6 @@ SCAJ-20153:
 SCAJ-20154:
   name: "Prince of Persia - Warrior Within"
   region: "NTSC-Unk"
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -2587,9 +2575,7 @@ SCAJ-20199:
   name: "Tekken 5 [PlayStation2 the Best]"
   region: "NTSC-Unk"
   clampModes:
-    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
+    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -2883,10 +2869,6 @@ SCCS-60002:
 SCED-50041:
   name: "Tekken Tag Tournament [Demo]"
   region: "PAL-E"
-  clampModes:
-    eeClampMode: 3 # Fixes broken effects.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SCED-50065:
@@ -3197,10 +3179,6 @@ SCED-51111:
 SCED-51120:
   name: "Tekken 4 [Demo]"
   region: "PAL-E"
-  clampModes:
-    eeClampMode: 3 # Fixes broken effects.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SCED-51140:
@@ -4309,9 +4287,7 @@ SCED-53538:
   name: "Tekken 5 [Demo]"
   region: "PAL-M5"
   clampModes:
-    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
+    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -4739,10 +4715,6 @@ SCES-50001:
   name: "Tekken Tag Tournament"
   region: "PAL-M5"
   compat: 5
-  clampModes:
-    eeClampMode: 3 # Fixes broken effects.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SCES-50002:
@@ -5107,10 +5079,6 @@ SCES-50878:
   name: "Tekken 4"
   region: "PAL-M5"
   compat: 5
-  clampModes:
-    eeClampMode: 3 # Fixes broken effects.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SCES-50885:
@@ -5857,8 +5825,6 @@ SCES-52586:
   name: "Death by Degrees"
   region: "PAL-E-S"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1 # Fixes broken effects in this Tekken spin-off.
   gsHWFixes:
     getSkipCount: "GSC_NamcoGames"
     halfPixelOffset: 5 # Fixes alignment of shuffles and post processing.
@@ -5963,8 +5929,6 @@ SCES-53033:
 SCES-53053:
   name: "Death by Degrees"
   region: "PAL-F-I"
-  clampModes:
-    vu1ClampMode: 1 # Fixes broken effects in this Tekken spin-off.
   gsHWFixes:
     getSkipCount: "GSC_NamcoGames"
     halfPixelOffset: 5 # Fixes alignment of shuffles and post processing.
@@ -5974,8 +5938,6 @@ SCES-53054:
   name: "Death by Degrees"
   region: "PAL-E-G"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1 # Fixes broken effects in this Tekken spin-off.
   gsHWFixes:
     getSkipCount: "GSC_NamcoGames"
     halfPixelOffset: 5 # Fixes alignment of shuffles and post processing.
@@ -6022,9 +5984,7 @@ SCES-53202:
   region: "PAL-M5"
   compat: 5
   clampModes:
-    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
+    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -7085,8 +7045,6 @@ SCES-55570:
 SCES-55571:
   name: "Ghostbusters - The Video Game"
   region: "PAL-M6"
-  clampModes:
-    vu1ClampMode: 1 # Normal VU1 clamping.
 SCES-55573:
   name: "MotorStorm - Arctic Edge"
   region: "PAL-M14"
@@ -7532,10 +7490,6 @@ SCKA-20045:
   name: "철권　４ [PlayStation 2 Big Hit Series]"
   name-en: "Tekken 4 [PlayStation 2 Big Hit Series]"
   region: "NTSC-K"
-  clampModes:
-    eeClampMode: 3 # Fixes broken effects.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SCKA-20046:
@@ -7589,9 +7543,7 @@ SCKA-20049:
   name-en: "Tekken 5"
   region: "NTSC-K"
   clampModes:
-    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
+    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -7864,9 +7816,7 @@ SCKA-20081:
   name-en: "Tekken 5 [PlayStation 2 BigHit Series]"
   region: "NTSC-K"
   clampModes:
-    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
+    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -7927,8 +7877,6 @@ SCKA-20088:
 SCKA-20089:
   name: "BioHazard 4" # No listed Korean name on ReDump
   region: "NTSC-K"
-  clampModes:
-    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gameFixes:
     - BlitInternalFPSHack # Fixes internal FPS detection.
   gsHWFixes:
@@ -7938,8 +7886,6 @@ SCKA-20090:
   name-en: "God Hand"
   region: "NTSC-K"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1 # Normal VU1 clamping.
   gsHWFixes:
     halfPixelOffset: 2 # Depth of field effect aligned properly + Shifts buildings correctly.
     nativeScaling: 2 # Fixes post effects.
@@ -7984,8 +7930,6 @@ SCKA-20096:
   name: "반야드"
   name-en: "Nickelodeon Barnyard"
   region: "NTSC-K"
-  clampModes:
-    vu1ClampMode: 1 # Normal VU1 clamping.
   speedHacks:
     instantVU1: 0 # Significantly improves game speed.
   gsHWFixes:
@@ -9222,10 +9166,6 @@ SCPS-15066:
   name-sort: "ぷりんす おぶ ぺるしゃ じかんのすな"
   name-en: "Prince of Persia - The Sands of Time"
   region: "NTSC-J"
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -10599,10 +10539,6 @@ SCPS-55017:
   name-en: "Tekken 4"
   region: "NTSC-J"
   compat: 3
-  clampModes:
-    eeClampMode: 3 # Fixes broken effects.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1
 SCPS-55018:
@@ -10884,10 +10820,6 @@ SCPS-56002:
   name-en: "Tekken Tag Tournament"
   region: "NTSC-K"
   compat: 5
-  clampModes:
-    eeClampMode: 3 # Fixes broken effects.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SCPS-56003:
@@ -10912,10 +10844,6 @@ SCPS-56006:
   name-en: "Tekken 4"
   region: "NTSC-K"
   compat: 5
-  clampModes:
-    eeClampMode: 3 # Fixes broken effects.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1
 SCPS-56007:
@@ -11010,8 +10938,6 @@ SCUS-21295:
   compat: 5
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes water and grass textures.
     halfPixelOffset: 4 # Mostly aligns post-processing.
@@ -13440,8 +13366,6 @@ SLAJ-25073:
   name-sort: "ばいおはざーど4 [Asiaばん]"
   name-en: "BioHazard 4 [Asia Version]"
   region: "NTSC-J"
-  clampModes:
-    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gameFixes:
     - BlitInternalFPSHack # Fixes internal FPS detection.
   gsHWFixes:
@@ -13841,10 +13765,6 @@ SLED-51921:
 SLED-51961:
   name: "Prince of Persia - The Sands of Time [Demo]"
   region: "PAL-E"
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 4 # Fixes post positioning.
@@ -14048,10 +13968,6 @@ SLED-52899:
 SLED-52929:
   name: "Prince of Persia - Warrior Within [Demo]"
   region: "PAL-M5"
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -15446,8 +15362,6 @@ SLES-50386:
   name: "Crash Bandicoot - The Wrath of Cortex"
   region: "PAL-M6"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gsHWFixes:
     halfPixelOffset: 5 # Helps post misaligment.
     nativePaletteDraw: 1
@@ -15553,18 +15467,12 @@ SLES-50435:
   name: "Tony Hawk's Pro Skater 3"
   region: "PAL-E"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1
 SLES-50436:
   name: "Tony Hawk's Pro Skater 3"
   region: "PAL-F"
-  clampModes:
-    vu1ClampMode: 1
 SLES-50437:
   name: "Tony Hawk's Pro Skater 3"
   region: "PAL-G"
-  clampModes:
-    vu1ClampMode: 1
 SLES-50438:
   name: "Motor Mayhem"
   region: "PAL-M3"
@@ -17195,22 +17103,16 @@ SLES-51130:
   compat: 5
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1
 SLES-51131:
   name: "Tony Hawk's Pro Skater 4"
   region: "PAL-F"
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1
 SLES-51132:
   name: "Tony Hawk's Pro Skater 4"
   region: "PAL-G"
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1
 SLES-51133:
   name: "Red Faction II"
   region: "PAL-M3"
@@ -18950,8 +18852,6 @@ SLES-51848:
   compat: 5
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     minimumBlendingLevel: 3 # Fixes broken lighting on ground and buildings.
     halfPixelOffset: 4 # Mostly aligns post-processing.
@@ -18965,8 +18865,6 @@ SLES-51851:
   region: "PAL-F"
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     minimumBlendingLevel: 3 # Fixes broken lighting on ground and buildings.
     halfPixelOffset: 4 # Mostly aligns post-processing.
@@ -18978,8 +18876,6 @@ SLES-51852:
   compat: 5
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     minimumBlendingLevel: 3 # Fixes broken lighting on ground and buildings.
     halfPixelOffset: 4 # Mostly aligns post-processing.
@@ -18990,8 +18886,6 @@ SLES-51853:
   region: "PAL-F"
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     minimumBlendingLevel: 3 # Fixes broken lighting on ground and buildings.
     halfPixelOffset: 4 # Mostly aligns post-processing.
@@ -19002,8 +18896,6 @@ SLES-51854:
   region: "PAL-S"
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     minimumBlendingLevel: 3 # Fixes broken lighting on ground and buildings.
     halfPixelOffset: 4 # Mostly aligns post-processing.
@@ -19039,6 +18931,8 @@ SLES-51862:
 SLES-51863:
   name: "Maze Action"
   region: "PAL-E"
+  gameFixes:
+    - InstantDMAHack # Fixes SPS on characters.
 SLES-51864:
   name: "Police Chase Down"
   region: "PAL-E"
@@ -19202,10 +19096,6 @@ SLES-51918:
   name: "Prince of Persia - The Sands of Time"
   region: "PAL-M5"
   compat: 5
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -19310,10 +19200,6 @@ SLES-51960:
 SLES-51961:
   name: "Prince of Persia - The Sands of Time" # Pre-order Demo
   region: "PAL-E"
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -19843,10 +19729,6 @@ SLES-52187:
   name: "Baldur's Gate - Dark Alliance II"
   region: "PAL-M3"
   compat: 5
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     textureInsideRT: 1 # Fixes half right.
     estimateTextureRegion: 1 # Improves performance and reduces hash cache size.
@@ -19856,10 +19738,6 @@ SLES-52188:
   name: "Baldur's Gate - Dark Alliance II"
   region: "PAL-M3"
   compat: 5
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     textureInsideRT: 1 # Fixes half right.
     estimateTextureRegion: 1 # Improves performance and reduces hash cache size.
@@ -21045,8 +20923,6 @@ SLES-52621:
   region: "PAL-E"
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1 # Fixes VU1 clamp-sensitive geometry without enabling heavier modes.
   gsHWFixes:
     minimumBlendingLevel: 3 # Fixes broken lighting on ground and buildings.
     preloadFrameData: 1 # Fixes missing loading screens.
@@ -21058,8 +20934,6 @@ SLES-52622:
   region: "PAL-M4"
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1 # Fixes VU1 clamp-sensitive geometry without enabling heavier modes.
   gsHWFixes:
     minimumBlendingLevel: 3 # Fixes broken lighting on ground and buildings.
     preloadFrameData: 1 # Fixes missing loading screens.
@@ -21574,9 +21448,6 @@ SLES-52781:
 SLES-52782:
   name: "Call of Duty - Finest Hour"
   region: "PAL-E"
-  clampModes:
-    eeClampMode: 2
-    vu1ClampMode: 1
   gsHWFixes:
     cpuSpriteRenderBW: 1 # Fixes textures.
   patches:
@@ -21588,9 +21459,6 @@ SLES-52782:
 SLES-52783:
   name: "Call of Duty - Finest Hour"
   region: "PAL-F-S-I"
-  clampModes:
-    eeClampMode: 2
-    vu1ClampMode: 1
   gsHWFixes:
     cpuSpriteRenderBW: 1 # Fixes textures.
   patches:
@@ -21602,9 +21470,6 @@ SLES-52783:
 SLES-52784:
   name: "Call of Duty - Finest Hour"
   region: "PAL-G"
-  clampModes:
-    eeClampMode: 2
-    vu1ClampMode: 1
   gsHWFixes:
     cpuSpriteRenderBW: 1 # Fixes textures.
   patches:
@@ -21748,10 +21613,6 @@ SLES-52822:
   name: "Prince of Persia - Warrior Within"
   region: "PAL-M6"
   compat: 5
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -23835,16 +23696,12 @@ SLES-53523:
 SLES-53524:
   name: "Mortal Kombat - Shaolin Monks"
   region: "PAL-M5"
-  clampModes:
-    eeClampMode: 3
   gsHWFixes:
     halfPixelOffset: 5 # Fixes effect alignment.
     autoFlush: 2 # Fixes bloom intensity
 SLES-53525:
   name: "Mortal Kombat - Shaolin Monks"
   region: "PAL-G"
-  clampModes:
-    eeClampMode: 3
   gsHWFixes:
     halfPixelOffset: 5 # Fixes effect alignment.
     autoFlush: 2 # Fixes bloom intensity
@@ -23937,8 +23794,6 @@ SLES-53534:
   compat: 5
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes water and grass textures.
     halfPixelOffset: 4 # Mostly aligns post-processing.
@@ -23950,8 +23805,6 @@ SLES-53535:
   region: "PAL-M4"
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes water and grass textures.
     halfPixelOffset: 4 # Mostly aligns post-processing.
@@ -24262,6 +24115,10 @@ SLES-53614:
 SLES-53616:
   name: "True Crime - New York City"
   region: "PAL-E"
+  clampModes:
+    eeClampMode: 2 # Fixes SPS on highway.
+  roundModes:
+    eeRoundMode: 0 # Fixes scene switching in intro.
   gsHWFixes:
     cpuSpriteRenderBW: 1 # Fixes textures.
     cpuSpriteRenderLevel: 1 # Needed for above.
@@ -24274,6 +24131,10 @@ SLES-53616:
 SLES-53617:
   name: "True Crime - New York City"
   region: "PAL-G"
+  clampModes:
+    eeClampMode: 2 # Fixes SPS on highway.
+  roundModes:
+    eeRoundMode: 0 # Fixes scene switching in intro.
   gsHWFixes:
     cpuSpriteRenderBW: 1 # Fixes textures.
     cpuSpriteRenderLevel: 1 # Needed for above.
@@ -24286,6 +24147,10 @@ SLES-53617:
 SLES-53618:
   name: "True Crime - New York City"
   region: "PAL-S"
+  clampModes:
+    eeClampMode: 2 # Fixes SPS on highway.
+  roundModes:
+    eeRoundMode: 0 # Fixes scene switching in intro.
   gsHWFixes:
     cpuSpriteRenderBW: 1 # Fixes textures.
     cpuSpriteRenderLevel: 1 # Needed for above.
@@ -24528,8 +24393,6 @@ SLES-53702:
   name: "Resident Evil 4"
   region: "PAL-M5"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gsHWFixes:
     halfPixelOffset: 5 # Fixes blurriness.
 SLES-53703:
@@ -24774,8 +24637,6 @@ SLES-53755:
 SLES-53756:
   name: "Resident Evil 4"
   region: "PAL-M5"
-  clampModes:
-    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gsHWFixes:
     halfPixelOffset: 5 # Fixes blurriness.
 SLES-53758:
@@ -24856,10 +24717,6 @@ SLES-53777:
   name: "Prince of Persia - The Two Thrones"
   region: "PAL-M5"
   compat: 5
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 1 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -25493,16 +25350,12 @@ SLES-54002:
   name: "FlatOut 2"
   region: "PAL-M5"
   compat: 5
-  clampModes:
-    eeClampMode: 3 # Full EE/FPU clamping.
   gsHWFixes:
     halfPixelOffset: 2 # Corrects most vertical lines.
 SLES-54003:
   name: "FlatOut 2"
   region: "PAL-G"
   compat: 5
-  clampModes:
-    eeClampMode: 3 # Full EE/FPU clamping.
   gsHWFixes:
     halfPixelOffset: 2 # Corrects most vertical lines.
 SLES-54004:
@@ -26345,8 +26198,6 @@ SLES-54309:
 SLES-54310:
   name: "Open Season"
   region: "PAL-M4"
-  clampModes:
-    vu1ClampMode: 1 # Normal VU1 clamping.
   gsHWFixes:
     halfPixelOffset: 4 # Aligns post effects.
 SLES-54311:
@@ -26358,8 +26209,6 @@ SLES-54313:
 SLES-54316:
   name: "Open Season - Rebelles de la Foret"
   region: "PAL-F"
-  clampModes:
-    vu1ClampMode: 1 # Normal VU1 clamping.
   gsHWFixes:
     halfPixelOffset: 4 # Aligns post effects.
 SLES-54317:
@@ -26653,8 +26502,6 @@ SLES-54374:
 SLES-54376:
   name: "Nickelodeon Barnyard"
   region: "PAL-E"
-  clampModes:
-    vu1ClampMode: 1 # Normal VU1 clamping.
   speedHacks:
     instantVU1: 0 # Significantly improves game speed.
   gsHWFixes:
@@ -26665,8 +26512,6 @@ SLES-54376:
 SLES-54377:
   name: "Nick - Der tierisch verrückte Bauernhof"
   region: "PAL-G"
-  clampModes:
-    vu1ClampMode: 1 # Normal VU1 clamping.
   speedHacks:
     instantVU1: 0 # Significantly improves game speed.
   gsHWFixes:
@@ -26677,8 +26522,6 @@ SLES-54377:
 SLES-54378:
   name: "Nickelodeon Barnyard"
   region: "PAL-M4"
-  clampModes:
-    vu1ClampMode: 1 # Normal VU1 clamping.
   speedHacks:
     instantVU1: 0 # Significantly improves game speed.
   gsHWFixes:
@@ -26735,8 +26578,6 @@ SLES-54389:
   compat: 5
   roundModes:
     vu1RoundMode: 0 # Fixes invalid VU size spam and likely SPS.
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     minimumBlendingLevel: 3 # Fixes broken lighting on ground and buildings.
     halfPixelOffset: 4 # Mostly aligns post-processing.
@@ -26748,8 +26589,6 @@ SLES-54390:
   compat: 5
   roundModes:
     vu1RoundMode: 0 # Fixes invalid VU size spam and likely SPS.
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     minimumBlendingLevel: 3 # Fixes broken lighting on ground and buildings.
     halfPixelOffset: 4 # Mostly aligns post-processing.
@@ -27114,8 +26953,6 @@ SLES-54490:
   name: "God Hand"
   region: "PAL-M5"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1 # Normal VU1 clamping.
   gsHWFixes:
     halfPixelOffset: 2 # Depth of field effect aligned properly + Shifts buildings correctly.
     nativeScaling: 2 # Fixes post effects.
@@ -27791,8 +27628,6 @@ SLES-54713:
 SLES-54714:
   name: "Tony Hawk's Downhill Jam"
   region: "PAL-E"
-  clampModes:
-    vu1ClampMode: 1
   speedHacks:
     mtvu: 0 # Fixes tutorial crashing.
   roundModes:
@@ -27805,8 +27640,6 @@ SLES-54714:
 SLES-54715:
   name: "Tony Hawk's Downhill Jam"
   region: "PAL-M4"
-  clampModes:
-    vu1ClampMode: 1
   speedHacks:
     mtvu: 0 # Fixes tutorial crashing.
   roundModes:
@@ -28617,8 +28450,6 @@ SLES-54963:
   compat: 5
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     minimumBlendingLevel: 3 # Fixes broken lighting on ground and buildings.
     halfPixelOffset: 4 # Mostly aligns post-processing.
@@ -28629,8 +28460,6 @@ SLES-54964:
   region: "PAL-M4"
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     minimumBlendingLevel: 3 # Fixes broken lighting on ground and buildings.
     halfPixelOffset: 4 # Mostly aligns post-processing.
@@ -30038,16 +29867,12 @@ SLES-55366:
 SLES-55367:
   name: "Call of Duty - World at War - Final Fronts"
   region: "PAL-M4"
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Fixes bloom misalignment.
     halfPixelOffset: 2 # Fixes lighting misalignment and depth lines.
 SLES-55369:
   name: "Call of Duty - World at War - Final Fronts"
   region: "PAL-G"
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Fixes bloom misalignment.
     halfPixelOffset: 2 # Fixes lighting misalignment and depth lines.
@@ -32301,10 +32126,6 @@ SLKA-25120:
   name: "페르시아의 왕자"
   name-en: "Prince of Persia - The Sands of Time"
   region: "NTSC-K"
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -32990,10 +32811,6 @@ SLKA-25247:
   name: "페르시아의 왕자 - 전사의 길"
   name-en: "Prince of Persia - Warrior Within"
   region: "NTSC-K"
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -33591,10 +33408,6 @@ SLKA-25346:
   name: "페르시아의 왕자 - 두개의 왕좌" # Undumped on ReDump as of 2025-08-28
   name-en: "Prince of Persia - The Two Thrones"
   region: "NTSC-K"
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 1 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -33880,8 +33693,6 @@ SLKA-25401:
   name: "FlatOut 2" # No listed Korean name on ReDump
   region: "NTSC-K"
   compat: 5
-  clampModes:
-    eeClampMode: 3 # Full EE/FPU clamping.
   gsHWFixes:
     halfPixelOffset: 2 # Corrects most vertical lines.
 SLKA-25402:
@@ -33926,8 +33737,6 @@ SLKA-25410:
   name: "바이오하자드 4 [PlayStation 2 BigHit Series]" # Undumped on ReDump as of 2025-08-28
   name-en: "Biohazard 4 [PlayStation 2 BigHit Series]" # Resident Evil 4
   region: "NTSC-K"
-  clampModes:
-    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gameFixes:
     - BlitInternalFPSHack # Fixes internal FPS detection.
   gsHWFixes:
@@ -34123,8 +33932,6 @@ SLKA-25449:
   name: "콜 오브 듀티 - 월드 앳 워　파이널 프론트"
   name-en: "Call of Duty - World at War - Final Fronts"
   region: "NTSC-K"
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Fixes bloom misalignment.
     halfPixelOffset: 2 # Fixes lighting misalignment and depth lines.
@@ -34195,10 +34002,6 @@ SLKA-25460:
   name: "페르시아의 왕자 - 시간의 모래 [PlayStation 2 BigHit Series]" # Undumped on ReDump as of 2025-08-28
   name-en: "Prince of Persia - The Sands of Time [PlayStation 2 BigHit Series]"
   region: "NTSC-K"
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -34207,10 +34010,6 @@ SLKA-25461:
   name: "페르시아의 왕자 - 두개의 왕좌 [PlayStation 2 BigHit Series]" # Undumped on ReDump as of 2025-08-28
   name-en: "Prince of Persia - The Two Thrones [PlayStation 2 BigHit Series]"
   region: "NTSC-K"
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 1 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -34219,10 +34018,6 @@ SLKA-25462:
   name: "페르시아의 왕자 - 전사의 길 [PlayStation 2 BigHit Series]" # Undumped on ReDump as of 2025-08-28
   name-en: "Prince of Persia - Warrior Within [PlayStation 2 BigHit Series]"
   region: "NTSC-K"
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -35659,6 +35454,14 @@ SLPM-55237:
   name-sort: "めたるぎあ そりっど2 そりっどすねーく [こなみでんどうせれくしょん] [でぃすく 2]"
   name-en: "Metal Gear Solid 2 - Solid Snake [KONAMI Dendou Selection] [Disc 2]"
   region: "NTSC-J"
+SLPM-55238:
+  name: "Fate/Unlimited codes [Best Price]"
+  name-sort: "ふぇいと/あんりみてっどこーど [Best Price]"
+  name-en: "Fate - Unlimited Codes [Best Price]"
+  region: "NTSC-J"
+  compat: 5
+  roundModes:
+    eeRoundMode: 0 # Fixes bow porjectile trajectories.
 SLPM-55239:
   name: "デス・コネクション"
   name-sort: "です こねくしょん"
@@ -38295,8 +38098,6 @@ SLPM-62114:
   name-sort: "くらっしゅばんでぃくー4 さくれつ まじんぱわー"
   name-en: "Crash Bandicoot 4 - Sakuretsu! Majin Power"
   region: "NTSC-J"
-  clampModes:
-    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gsHWFixes:
     halfPixelOffset: 5 # Helps post misaligment.
     nativePaletteDraw: 1
@@ -41712,8 +41513,6 @@ SLPM-64509:
   name-sort: "Crash Bandicoot - Mawangui Buhwal"
   name-en: "Crash Bandicoot - Return of the Demon King [English Dub Edition]" # Wrath of Cortex
   region: "NTSC-K"
-  clampModes:
-    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gsHWFixes:
     halfPixelOffset: 5 # Helps post misaligment.
     nativePaletteDraw: 1
@@ -41731,8 +41530,6 @@ SLPM-64513:
   name-sort: "Crash Bandicoot - Mawangui Buhwal"
   name-en: "Crash Bandicoot - Return of the Demon King" # Wrath of Cortex
   region: "NTSC-K"
-  clampModes:
-    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gsHWFixes:
     halfPixelOffset: 5 # Helps post misaligment.
     nativePaletteDraw: 1
@@ -42930,8 +42727,6 @@ SLPM-65190:
   name-sort: "とにーほーく ぷろすけーたー 3"
   name-en: "Tony Hawk's Pro Skater 3"
   region: "NTSC-J"
-  clampModes:
-    vu1ClampMode: 1
 SLPM-65191:
   name: "V-RALLY3"
   name-sort: "V-らりー3"
@@ -44314,8 +44109,6 @@ SLPM-65419:
   region: "NTSC-J"
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1
 SLPM-65420:
   name: "ダビつく3 ダービー馬をつくろう！"
   name-sort: "だびつく3 だーびーばをつくろう！"
@@ -46802,10 +46595,6 @@ SLPM-65845:
   name-en: "Baldur's Gate - Dark Alliance II"
   region: "NTSC-J"
   compat: 5
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     textureInsideRT: 1 # Fixes half right.
     estimateTextureRegion: 1 # Improves performance and reduces hash cache size.
@@ -47717,10 +47506,6 @@ SLPM-66002:
   name-sort: "ぷりんす おぶ ぺるしゃ けんし の こころ"
   name-en: "Prince of Persia - Warrior Within"
   region: "NTSC-J"
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -48734,9 +48519,6 @@ SLPM-66159:
   name-sort: "こーる おぶ でゅーてぃー - ふぁいねすと あわー"
   name-en: "Call of Duty - Finest Hour"
   region: "NTSC-J"
-  clampModes:
-    eeClampMode: 2
-    vu1ClampMode: 1
   gsHWFixes:
     cpuSpriteRenderBW: 1 # Fixes textures.
 SLPM-66160:
@@ -49093,8 +48875,6 @@ SLPM-66213:
   name-en: "BioHazard 4"
   region: "NTSC-J"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gameFixes:
     - BlitInternalFPSHack # Fixes internal FPS detection.
   gsHWFixes:
@@ -50234,10 +50014,6 @@ SLPM-66391:
   name-sort: "ぷりんす おぶ ぺるしゃ ふたつのたましい"
   name-en: "Prince of Persia - The Two Thrones"
   region: "NTSC-J"
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 1 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -50758,6 +50534,10 @@ SLPM-66473:
   name-sort: "とぅるー くらいむ にゅーよーくしてぃ"
   name-en: "True Crime - New York City"
   region: "NTSC-J"
+  clampModes:
+    eeClampMode: 2 # Fixes SPS on highway.
+  roundModes:
+    eeRoundMode: 0 # Fixes scene switching in intro.
   gsHWFixes:
     cpuSpriteRenderBW: 1 # Fixes textures.
     cpuSpriteRenderLevel: 1 # Needed for above.
@@ -51224,8 +51004,6 @@ SLPM-66550:
   name-en: "God Hand"
   region: "NTSC-J"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1 # Normal VU1 clamping.
   gsHWFixes:
     halfPixelOffset: 2 # Depth of field effect aligned properly + Shifts buildings correctly.
     nativeScaling: 2 # Fixes post effects.
@@ -51511,8 +51289,6 @@ SLPM-66591:
   name-en: "FlatOut 2 GTR - Ganbare Tobidase Racing"
   region: "NTSC-J"
   compat: 5
-  clampModes:
-    eeClampMode: 3 # Full EE/FPU clamping.
   gsHWFixes:
     halfPixelOffset: 2 # Corrects most vertical lines.
 SLPM-66592:
@@ -52029,10 +51805,6 @@ SLPM-66673:
   name-sort: "ぷりんす おぶ ぺるしゃ けんし の こころ [UBISOFT BEST]"
   name-en: "Prince of Persia - Warrior Within [Ubisoft Best]"
   region: "NTSC-J"
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -54582,8 +54354,6 @@ SLPM-74003:
   name-sort: "くらっしゅばんでぃくー4 さくれつ！まじんぱわー [PlayStation2 the Best]"
   name-en: "Crash Bandicoot 4 - Sakuretsu! Majin Power [PlayStation2 the Best]"
   region: "NTSC-J"
-  clampModes:
-    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gsHWFixes:
     halfPixelOffset: 5 # Helps post misaligment.
     nativePaletteDraw: 1
@@ -54812,8 +54582,6 @@ SLPM-74229:
   name-sort: "ばいおはざーど4 [PlayStation2 the Best]"
   name-en: "BioHazard 4 [PlayStation2 the Best]"
   region: "NTSC-J"
-  clampModes:
-    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gameFixes:
     - BlitInternalFPSHack # Fixes internal FPS detection.
   gsHWFixes:
@@ -54908,8 +54676,6 @@ SLPM-74241:
   name-sort: "GOD HAND [PlayStation2 the Best]"
   name-en: "God Hand [PlayStation2 the Best]"
   region: "NTSC-J"
-  clampModes:
-    vu1ClampMode: 1 # Normal VU1 clamping.
   gsHWFixes:
     halfPixelOffset: 2 # Depth of field effect aligned properly + Shifts buildings correctly.
     nativeScaling: 2 # Fixes post effects.
@@ -54928,6 +54694,10 @@ SLPM-74243:
   name-sort: "とぅるー くらいむ にゅーよーくしてぃ [PlayStation2 the Best]"
   name-en: "True Crime - New York City [PlayStation2 the Best]"
   region: "NTSC-J"
+  clampModes:
+    eeClampMode: 2 # Fixes SPS on highway.
+  roundModes:
+    eeRoundMode: 0 # Fixes scene switching in intro.
   gsHWFixes:
     cpuSpriteRenderBW: 1 # Fixes textures.
     cpuSpriteRenderLevel: 1 # Needed for above.
@@ -55106,8 +54876,6 @@ SLPM-74262:
   name-sort: "ばいおはざーど4 [PlayStation2 the Best]"
   name-en: "BioHazard 4 [PlayStation2 the Best]"
   region: "NTSC-J"
-  clampModes:
-    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gameFixes:
     - BlitInternalFPSHack # Fixes internal FPS detection.
   gsHWFixes:
@@ -55233,8 +55001,6 @@ SLPM-74288:
   name-sort: "ばいおはざーど4 [PlayStation2 the Best]"
   name-en: "BioHazard 4 [PlayStation2 the Best]"
   region: "NTSC-J"
-  clampModes:
-    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gameFixes:
     - BlitInternalFPSHack # Fixes internal FPS detection.
   gsHWFixes:
@@ -55523,10 +55289,6 @@ SLPS-20015:
   name-en: "Tekken Tag Tournament"
   region: "NTSC-J"
   compat: 5
-  clampModes:
-    eeClampMode: 3 # Fixes broken effects.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLPS-20016:
@@ -58316,6 +58078,15 @@ SLPS-25045:
     - SoftwareRendererFMVHack # Fixes black FMVs.
   gsHWFixes:
     roundSprite: 1 # Fixes font artifacts.
+SLPS-25045P:
+  name: "リリーのアトリエ ～ザールブルグの錬金術士3～ [Premium Box]"
+  name-sort: "りりーのあとりえ ざーるぶるぐのれんきんじゅつし3 [Premium Box]"
+  name-en: "Lilie no Atelier - Salburg no Renkinjutsushi 3 [Premium Box]"
+  region: "NTSC-J"
+  gameFixes:
+    - SoftwareRendererFMVHack # Fixes black FMVs.
+  gsHWFixes:
+    roundSprite: 1 # Fixes font artifacts.
 SLPS-25046:
   name: "ゴルフナビゲーター Vol 1 ～カレドニアンゴルフクラブ・総武カントリークラブ 総武コース～"
   name-sort: "ごるふなびげーたー Vol. 1  ～かれどにあんごるふくらぶ・そうぶかんとりーくらぶ そうぶこーす～"
@@ -58637,10 +58408,6 @@ SLPS-25100:
   name-en: "Tekken 4"
   region: "NTSC-J"
   compat: 5
-  clampModes:
-    eeClampMode: 3 # Fixes broken effects.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLPS-25101:
@@ -59456,6 +59223,13 @@ SLPS-25238:
   name-sort: "まい めりー めいびー"
   name-en: "My Merry Maybe"
   region: "NTSC-J"
+SLPS-25239:
+  name: "NBA STREET2 ダンク天国"
+  name-sort: "NBA すとりーと2 だんくてんごく"
+  name-en: "NBA Street Vol. 2"
+  region: "NTSC-J"
+  clampModes:
+    vuClampMode: 2 # Missing environment with microVU.
 SLPS-25240:
   name: "MEGUMI / モーショングラビアシリーズ(仮)"
   name-sort: "めぐみ もーしょんぐらびあしりーず(かり)"
@@ -61139,9 +60913,7 @@ SLPS-25510:
   region: "NTSC-J"
   compat: 5
   clampModes:
-    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
+    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -64118,10 +63890,6 @@ SLPS-71501:
   name-sort: "てっけんたっぐとーなめんと [MEGA HITS!]"
   name-en: "Tekken Tag Tournament [MEGA HITS!]"
   region: "NTSC-J"
-  clampModes:
-    eeClampMode: 3 # Fixes broken effects.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLPS-71502:
@@ -64219,10 +63987,6 @@ SLPS-73104:
   name-sort: "てっけんたっぐとーなめんと [PlayStation2 the Best]"
   name-en: "Tekken Tag Tournament [PlayStation2 the Best]"
   region: "NTSC-J"
-  clampModes:
-    eeClampMode: 3 # Fixes broken effects.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLPS-73105:
@@ -64359,10 +64123,6 @@ SLPS-73209:
   name-sort: "てっけん4 [PlayStation2 the Best]"
   name-en: "Tekken 4 [PlayStation2 the Best]"
   region: "NTSC-J"
-  clampModes:
-    eeClampMode: 3 # Fixes broken effects.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLPS-73210:
@@ -64480,9 +64240,7 @@ SLPS-73223:
   name-en: "Tekken 5 [PlayStation2 the Best]"
   region: "NTSC-J"
   clampModes:
-    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
+    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -65132,10 +64890,6 @@ SLUS-20001:
   name: "Tekken Tag Tournament"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    eeClampMode: 3 # Fixes broken effects.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLUS-20002:
@@ -65189,8 +64943,6 @@ SLUS-20013:
   name: "Tony Hawk's Pro Skater 3"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1
 SLUS-20014:
   name: "Armored Core 2"
   region: "NTSC-U"
@@ -66121,8 +65873,6 @@ SLUS-20238:
   name: "Crash Bandicoot - The Wrath of Cortex"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gsHWFixes:
     halfPixelOffset: 5 # Helps post misaligment.
     nativePaletteDraw: 1
@@ -66545,10 +66295,6 @@ SLUS-20328:
   name: "Tekken 4"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    eeClampMode: 3 # Fixes broken effects.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLUS-20329:
@@ -67493,8 +67239,6 @@ SLUS-20504:
   compat: 5
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1
 SLUS-20505:
   name: "Mace Griffin - Bounty Hunter"
   region: "NTSC-U"
@@ -68430,10 +68174,6 @@ SLUS-20675:
   name: "Baldur's Gate - Dark Alliance II"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gameFixes:
     - SoftwareRendererFMVHack # Fixes FMVs.
   gsHWFixes:
@@ -68692,9 +68432,6 @@ SLUS-20725:
   name: "Call of Duty - Finest Hour"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    eeClampMode: 2
-    vu1ClampMode: 1
   gsHWFixes:
     cpuSpriteRenderBW: 1 # Fixes textures.
   patches:
@@ -68729,8 +68466,6 @@ SLUS-20731:
   compat: 5
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     minimumBlendingLevel: 3 # Fixes broken lighting on ground and buildings.
     halfPixelOffset: 4 # Mostly aligns post-processing.
@@ -68792,10 +68527,6 @@ SLUS-20743:
   name: "Prince of Persia - The Sands of Time"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -69869,8 +69600,6 @@ SLUS-20934:
   name: "Death by Degrees"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1 # Fixes broken effects in this Tekken spin-off.
   gsHWFixes:
     getSkipCount: "GSC_NamcoGames"
     halfPixelOffset: 5 # Fixes alignment of shuffles and post processing.
@@ -70071,8 +69800,6 @@ SLUS-20965:
   compat: 5
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1 # Fixes VU1 clamp-sensitive geometry without enabling heavier modes.
   gsHWFixes:
     minimumBlendingLevel: 3 # Fixes broken lighting on ground and buildings.
     preloadFrameData: 1 # Fixes missing loading screens.
@@ -70470,10 +70197,6 @@ SLUS-21022:
   name: "Prince of Persia - Warrior Within"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -70711,9 +70434,7 @@ SLUS-21059:
   region: "NTSC-U"
   compat: 5
   clampModes:
-    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
+    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -70864,8 +70585,6 @@ SLUS-21087:
   name: "Mortal Kombat - Shaolin Monks"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    eeClampMode: 3
   gsHWFixes:
     halfPixelOffset: 5 # Fixes effect alignment.
     autoFlush: 2 # Fixes bloom intensity
@@ -70970,6 +70689,10 @@ SLUS-21106:
   name: "True Crime - New York City"
   region: "NTSC-U"
   compat: 5
+  clampModes:
+    eeClampMode: 2 # Fixes SPS on highway.
+  roundModes:
+    eeRoundMode: 0 # Fixes scene switching in intro.
   gsHWFixes:
     cpuSpriteRenderBW: 1 # Fixes textures.
     cpuSpriteRenderLevel: 1 # Needed for above.
@@ -71142,8 +70865,6 @@ SLUS-21134:
   name: "Resident Evil 4"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gameFixes:
     - BlitInternalFPSHack # Fixes internal FPS detection.
   gsHWFixes:
@@ -71286,9 +71007,7 @@ SLUS-21160:
   name: "Tekken 5 [Demo]"
   region: "NTSC-U"
   clampModes:
-    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
+    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -71599,8 +71318,6 @@ SLUS-21208:
   compat: 5
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes water and grass textures.
     halfPixelOffset: 4 # Mostly aligns post-processing.
@@ -71892,8 +71609,6 @@ SLUS-21251:
   name: "FlatOut 2"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    eeClampMode: 3 # Full EE/FPU clamping.
   gsHWFixes:
     halfPixelOffset: 2 # Corrects most vertical lines.
 SLUS-21252:
@@ -72103,8 +71818,6 @@ SLUS-21277:
   name: "Nickelodeon Barnyard"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1 # Normal VU1 clamping.
   speedHacks:
     instantVU1: 0 # Significantly improves game speed.
   gsHWFixes:
@@ -72213,10 +71926,6 @@ SLUS-21287:
   name: "Prince of Persia - The Two Thrones"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 1 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -72270,8 +71979,6 @@ SLUS-21295:
   compat: 5
   roundModes:
     vu1RoundMode: 0 # Crashes without.
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes water and grass textures.
     halfPixelOffset: 4 # Mostly aligns post-processing.
@@ -73299,8 +73006,6 @@ SLUS-21444:
   compat: 5
   roundModes:
     vu1RoundMode: 0 # Fixes invalid VU size spam and likely SPS.
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     minimumBlendingLevel: 3 # Fixes broken lighting on ground and buildings.
     halfPixelOffset: 4 # Mostly aligns post-processing.
@@ -73387,8 +73092,6 @@ SLUS-21456:
   name: "Tony Hawk's Downhill Jam"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1
   speedHacks:
     mtvu: 0 # Fixes tutorial crashing.
   roundModes:
@@ -73456,8 +73159,6 @@ SLUS-21467:
   name: "Open Season"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1 # Normal VU1 clamping.
   gsHWFixes:
     halfPixelOffset: 4 # Aligns post effects.
 SLUS-21469:
@@ -73699,8 +73400,6 @@ SLUS-21503:
   name: "God Hand"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1 # Normal VU1 clamping.
   gsHWFixes:
     halfPixelOffset: 2 # Depth of field effect aligned properly + Shifts buildings correctly.
     nativeScaling: 2 # Fixes post effects.
@@ -74187,8 +73886,6 @@ SLUS-21616:
   compat: 5
   roundModes:
     vu1RoundMode: 0 # Fixes SPS and VU size spam.
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     minimumBlendingLevel: 3 # Fixes broken lighting on ground and buildings.
     halfPixelOffset: 4 # Mostly aligns post-processing.
@@ -74937,8 +74634,6 @@ SLUS-21746:
   name: "Call of Duty - World at War - Final Fronts"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Fixes bloom misalignment.
     halfPixelOffset: 2 # Fixes lighting misalignment and depth lines.
@@ -75635,8 +75330,6 @@ SLUS-21882:
   name: "Ghostbusters - The Video Game"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    vu1ClampMode: 1 # Normal VU1 clamping.
 SLUS-21883:
   name: "Disney/Pixar Cars - Race-O-Rama"
   region: "NTSC-U"
@@ -75715,6 +75408,8 @@ SLUS-21898:
   name: "Band Hero"
   region: "NTSC-U"
   compat: 5
+  roundModes:
+    vu1RoundMode: 0 # Fixes VU size spam and potential graphical issues.
   gsHWFixes:
     autoFlush: 1 # Fixes character shadow misalignment.
     preloadFrameData: 1 # Fixes icons.
@@ -76009,10 +75704,6 @@ SLUS-28010:
 SLUS-28012:
   name: "Tekken 4 [Trade Demo]"
   region: "NTSC-U"
-  clampModes:
-    eeClampMode: 3 # Fixes broken effects.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLUS-28013:
@@ -76232,8 +75923,6 @@ SLUS-29009:
 SLUS-29010:
   name: "Crash Bandicoot - The Wrath of Cortex [Demo]"
   region: "NTSC-U"
-  clampModes:
-    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gsHWFixes:
     halfPixelOffset: 5 # Helps post misaligment.
     nativePaletteDraw: 1
@@ -76310,10 +75999,6 @@ SLUS-29033:
 SLUS-29034:
   name: "Tekken 4 [Regular Demo]"
   region: "NTSC-U"
-  clampModes:
-    eeClampMode: 3 # Fixes broken effects.
-    vu0ClampMode: 3 # Fixes VU0 calculations with Extra + Preserve Sign clamping.
-    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLUS-29035:
@@ -76423,10 +76108,6 @@ SLUS-29068:
 SLUS-29069:
   name: "Prince of Persia - The Sands of Time [Demo]"
   region: "NTSC-U"
-  clampModes:
-    eeClampMode: 1
-    vu0ClampMode: 1
-    vu1ClampMode: 1
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
@@ -76865,8 +76546,6 @@ SLUS-29168:
 SLUS-29169:
   name: "Resident Evil 4 [Demo]"
   region: "NTSC-U"
-  clampModes:
-    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gameFixes:
     - BlitInternalFPSHack # Fixes internal FPS detection.
   gsHWFixes:
