@@ -5,7 +5,7 @@
 [![Support EmuCoreX on Patreon](https://img.shields.io/badge/Patreon-Support%20EmuCoreX-ff424d?logo=patreon&logoColor=white)](https://www.patreon.com/c/emucore/membership)
 [![Join the EmuCoreX Discord](https://img.shields.io/badge/Discord-Join%20our%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/c5EBeNRpz2)
 
-EmuCoreX is a PlayStation 2 library, launcher, and emulator frontend for Android. It pairs a purpose-built interface with a PCSX2-derived emulation core adapted for Android devices.
+EmuCoreX is a PlayStation 2 library, launcher, and emulator frontend for Android. It pairs a purpose-built interface with a PCSX2-derived emulation core adapted for Android devices. Account, cloud-drive, and Play Billing SDK integrations are not required; backup and restore are user-directed local file operations.
 
 Official website: https://emucorex.web.app/
 
@@ -16,6 +16,7 @@ Official website: https://emucorex.web.app/
 - BIOS and game folder setup, with recovery when folders become invalid
 - In-game overlay for renderer, aspect ratio, resolution, speedhacks, cheats, FPS, and quick actions
 - Save state manager, BIOS boot, and library navigation from the side drawer
+- Manual ZIP export/import for settings, memory cards, cheats, and optional save states
 - RetroAchievements integration and a dedicated achievements screen
 - Cheat management with `.pnach` import, editing, and per-game activation in overlay
 - Advanced graphics and GS hack controls, including device-safe defaults for MediaTek
@@ -52,16 +53,16 @@ This repository contains the Android app, including its UI, settings, bridge cod
 - Android DataStore
 - JNI bridge to native C++
 - Emulation core derived from PCSX2 and integrated into EmuCoreX's native Android stack
-- Firebase services used by the Android app
+- Local-only settings and save-data backup through Android's document picker
 
 ## Current App Scope
 
-EmuCoreX version `0.4.7` currently targets Android with:
+The current app build targets Android with:
 
 - `minSdk 29`
 - `targetSdk 37`
 - package id `com.sbro.emucorex`
-- version `0.4.7`
+- version `0.5.8`
 
 ## Building Locally
 
