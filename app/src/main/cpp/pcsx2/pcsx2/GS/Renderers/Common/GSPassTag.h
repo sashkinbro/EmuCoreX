@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0+
 #pragma once
 
+#include <cstdint>
+
 // Debug-only (EMUCOREX_GS_PASS_TIMING=1): describes the HW draw in flight so the Vulkan
 // device can attribute each render pass to the draw that opened it (GS_PASS_SIZES lines).
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
@@ -16,4 +18,6 @@ struct GSPassTag
 };
 extern bool g_emucorex_pass_tag_on;
 extern GSPassTag g_emucorex_pass_tag;
+// GS_FLUSH_CAUSES: why coalesced draws were emitted (GSDevice.cpp); logged and reset by GSDeviceVK every 60 frames.
+void GSFlushStatsLog(uint64_t frame);
 #endif

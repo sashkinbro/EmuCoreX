@@ -3,6 +3,7 @@
 
 #include "GS/Renderers/Common/GSDevice.h"
 #include "GS/Renderers/Common/GSPassScheduler.h"
+#include "GS/Renderers/Common/GSPassTag.h"
 #include "GS/GSGL.h"
 #include "GS/GS.h"
 #include "GS/GSUtil.h"
@@ -20,6 +21,9 @@
 #include "imgui.h"
 
 #include <algorithm>
+#include <cstdio>
+#include <cstring>
+#include <string>
 #include <functional>
 #include <cmath>
 #include <limits>
@@ -516,7 +520,7 @@ void GSDevice::ClearDepth(GSTexture* t, float d)
 
 bool GSDevice::ProcessClearsBeforeCopy(GSTexture* sTex, GSTexture* dTex, const bool full_copy)
 {
-	FlushDeferredDraws();
+	FlushDeferredDraws(GSFlushCause::Copy);
 	pxAssert(sTex->GetState() == GSTexture::State::Cleared && dTex->IsRenderTargetOrDepthStencil());
 
 	// Pass it forward if we're clearing the whole thing.
@@ -683,7 +687,7 @@ GSTexture* GSDevice::FetchSurface(GSTexture::Usage usage, int width, int height,
 			if (held->GetUsage() == usage && held->GetFormat() == format && held->GetSize() == size &&
 				held->GetMipmapLevels() == levels)
 			{
-				FlushDeferredDraws();
+				FlushDeferredDraws(GSFlushCause::Pool);
 				break;
 			}
 		}
@@ -802,7 +806,7 @@ bool GSDevice::UsesLowerLeftOrigin() const
 
 void GSDevice::AgePool()
 {
-	FlushDeferredDraws();
+	FlushDeferredDraws(GSFlushCause::Pool);
 	m_frame++;
 
 	// Toss out textures when they're not too-recently used.
@@ -826,7 +830,7 @@ void GSDevice::AgePool()
 
 void GSDevice::AgePoolAfterPresentCapSkip()
 {
-	FlushDeferredDraws();
+	FlushDeferredDraws(GSFlushCause::Pool);
 	m_frame++;
 
 	// Only deletion scanning is amortized, bounded to four cap-created skips.
@@ -868,7 +872,7 @@ u32 GSDevice::GetPoolMaxAge(bool texture) const
 
 void GSDevice::PurgePool()
 {
-	FlushDeferredDraws();
+	FlushDeferredDraws(GSFlushCause::Pool);
 	m_frames_since_pool_cleanup = 0;
 	for (FastList<GSTexture*>& pool : m_pool)
 	{
@@ -1053,7 +1057,7 @@ bool GSDevice::TryStretchRectAsCopy(GSTexture* sTex, const GSVector4& sRect, GST
 void GSDevice::StretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
 	ShaderConvertSelector shader, Filter filter)
 {
-	FlushDeferredDraws();
+	FlushDeferredDraws(GSFlushCause::Copy);
 	if (TryStretchRectAsCopy(sTex, sRect, dTex, dRect, shader))
 		return;
 	DoStretchRectWithAssertions(sTex, sRect, dTex, dRect, shader, filter);
@@ -1117,7 +1121,7 @@ bool GSDevice::DeferredDrawsReference(const GSTexture* tex) const
 void GSDevice::FlushDeferredDrawsFor(const GSTexture* tex)
 {
 	if (m_pass_scheduler->ShouldFlushForTextureMutation(tex, m_flushing))
-		FlushDeferredDrawsImpl();
+		FlushDeferredDrawsImpl(GSFlushCause::TextureMutation);
 }
 
 bool GSDevice::DeferredDrawsWouldObserve(const GSTexture* tex) const
@@ -1125,9 +1129,62 @@ bool GSDevice::DeferredDrawsWouldObserve(const GSTexture* tex) const
 	return m_pass_scheduler->ShouldFlushForTextureMutation(tex, m_flushing);
 }
 
-void GSDevice::FlushDeferredDrawsImpl()
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+// Debug-only (EMUCOREX_GS_PASS_TIMING=1): why coalesced draws were emitted, logged by GSDeviceVK as
+// GS_FLUSH_CAUSES every 60 frames. Counts are per flush; "runs" is the render passes the flush produces.
+static const char* const s_flush_cause_names[] = {"other", "not_deferrable", "conflict_raw", "conflict_war", "cap_draws",
+	"cap_bytes", "cap_sampled", "max_runs", "attach_alias", "texture_mutation", "copy", "readback", "present", "pool"};
+static_assert(std::size(s_flush_cause_names) == static_cast<size_t>(GSFlushCause::Count));
+static u64 s_flush_cause_counts[static_cast<size_t>(GSFlushCause::Count)] = {};
+static u64 s_flush_cause_draws[static_cast<size_t>(GSFlushCause::Count)] = {};
+static u64 s_flush_runs_hist[17] = {};
+static u64 s_flush_total = 0, s_flush_draws = 0, s_flush_runs = 0;
+void GSFlushStatsLog(u64 frame)
+{
+	if (s_flush_total == 0)
+		return;
+	std::string causes, draws, hist;
+	for (size_t i = 0; i < static_cast<size_t>(GSFlushCause::Count); i++)
+	{
+		if (s_flush_cause_counts[i] == 0)
+			continue;
+		causes += std::string(" ") + s_flush_cause_names[i] + "=" + std::to_string(s_flush_cause_counts[i]);
+		draws += std::string(" ") + s_flush_cause_names[i] + "=" + std::to_string(s_flush_cause_draws[i] / s_flush_cause_counts[i]);
+	}
+	for (size_t i = 1; i < std::size(s_flush_runs_hist); i++)
+	{
+		if (s_flush_runs_hist[i])
+			hist += " " + std::to_string(i) + ":" + std::to_string(s_flush_runs_hist[i]);
+	}
+	std::fprintf(stderr, "GS_FLUSH_CAUSES frame=%llu flushes=%llu draws=%llu runs=%llu |%s | avg_draws_per_flush%s | runs_per_flush%s\n",
+		static_cast<unsigned long long>(frame), static_cast<unsigned long long>(s_flush_total),
+		static_cast<unsigned long long>(s_flush_draws), static_cast<unsigned long long>(s_flush_runs), causes.c_str(),
+		draws.c_str(), hist.c_str());
+	std::memset(s_flush_cause_counts, 0, sizeof(s_flush_cause_counts));
+	std::memset(s_flush_cause_draws, 0, sizeof(s_flush_cause_draws));
+	std::memset(s_flush_runs_hist, 0, sizeof(s_flush_runs_hist));
+	s_flush_total = s_flush_draws = s_flush_runs = 0;
+}
+#endif
+
+void GSDevice::FlushDeferredDrawsImpl(GSFlushCause cause)
 {
 	pxAssert(!m_flushing);
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+	if (g_emucorex_pass_tag_on)
+	{
+		const u32 runs = m_pass_scheduler->GetRunCount();
+		const size_t c = static_cast<size_t>(cause);
+		s_flush_cause_counts[c]++;
+		s_flush_cause_draws[c] += m_pass_scheduler->GetCount();
+		s_flush_runs_hist[std::min<u32>(runs, static_cast<u32>(std::size(s_flush_runs_hist)) - 1)]++;
+		s_flush_total++;
+		s_flush_draws += m_pass_scheduler->GetCount();
+		s_flush_runs += runs;
+	}
+#else
+	(void)cause;
+#endif
 	m_flushing = true;
 	m_pass_scheduler->Emit(this);
 	m_flushing = false;
@@ -1146,14 +1203,14 @@ void GSDevice::RenderHW(GSHWDrawConfig& config)
 	if (!GSConfig.CoalesceRenderPasses || m_flushing || config.ds_as_rt ||
 		!GSPassScheduler::IsDeferrable(config))
 	{
-		FlushDeferredDraws();
+		FlushDeferredDraws(GSFlushCause::NotDeferrable);
 		DoRenderHW(config);
 		return;
 	}
 
 	if (m_pass_scheduler->TryEnqueue(config) != GSPassScheduler::Disposition::Queued)
 	{
-		FlushDeferredDraws();
+		FlushDeferredDraws(m_pass_scheduler->GetLastRefusal());
 		if (m_pass_scheduler->TryEnqueue(config) != GSPassScheduler::Disposition::Queued)
 		{
 			DoRenderHW(config);
@@ -1188,7 +1245,7 @@ void GSDevice::SortMultiStretchRects(MultiStretchRect* rects, u32 num_rects)
 
 void GSDevice::ClearCurrent()
 {
-	FlushDeferredDraws();
+	FlushDeferredDraws(GSFlushCause::Present);
 	m_current = nullptr;
 
 	delete m_merge;
@@ -1215,7 +1272,7 @@ void GSDevice::Merge(GSTexture* sTex[3], GSVector4* sRect, GSVector4* dRect, con
 
 void GSDevice::Merge(GSTexture* sTex[3], GSVector4* sRect, GSVector4* dRect, const MergeTopBand* top_band, const GSVector2i& fs, const GSRegPMODE& PMODE, const GSRegEXTBUF& EXTBUF, u32 c)
 {
-	FlushDeferredDraws();
+	FlushDeferredDraws(GSFlushCause::Present);
 	if (ResizeRenderTarget(&m_merge, fs.x, fs.y, false, false))
 		DoMerge(sTex, sRect, m_merge, dRect, top_band, PMODE, EXTBUF, c, BilnIf(GSConfig.PCRTCOffsets));
 
@@ -1229,7 +1286,7 @@ void GSDevice::Interlace(const GSVector2i& ds, int field, int mode, float yoffse
 
 void GSDevice::Interlace(const GSVector2i& ds, int field, int mode, float yoffset, const GSFieldPadRows& top_pad, float line_rows, float line_origin)
 {
-	FlushDeferredDraws();
+	FlushDeferredDraws(GSFlushCause::Present);
 	static int bufIdx = 0;
 	float offset = yoffset * static_cast<float>(field);
 	offset = GSConfig.DisableInterlaceOffset ? 0.0f : offset;
@@ -2138,7 +2195,7 @@ bool GSDevice::GetFSR1ShaderSource(std::string* source, bool easu_pass)
 }
 void GSDevice::FSR1Upscale(GSTexture*& tex, GSVector4i& src_rect, GSVector4& src_uv, const GSVector4& draw_rect)
 {
-	FlushDeferredDraws();
+	FlushDeferredDraws(GSFlushCause::Present);
 	const int dst_width = static_cast<int>(std::ceil(draw_rect.z - draw_rect.x));
 	const int dst_height = static_cast<int>(std::ceil(draw_rect.w - draw_rect.y));
 	if (dst_width <= 0 || dst_height <= 0)
@@ -2220,7 +2277,7 @@ void GSDevice::FSR1Upscale(GSTexture*& tex, GSVector4i& src_rect, GSVector4& src
 void GSDevice::SGSRUpscale(GSTexture*& tex, GSVector4i& src_rect, GSVector4& src_uv, const GSVector4& draw_rect,
 	bool edge_direction)
 {
-	FlushDeferredDraws();
+	FlushDeferredDraws(GSFlushCause::Present);
 	const int dst_width = static_cast<int>(std::ceil(draw_rect.z - draw_rect.x));
 	const int dst_height = static_cast<int>(std::ceil(draw_rect.w - draw_rect.y));
 	if (dst_width <= 0 || dst_height <= 0)

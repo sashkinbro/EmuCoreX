@@ -216,6 +216,122 @@ SLUS-21065:
     halfPixelOffset: 5
     hwDownloadMode: 2 # No Readbacks — NFS Underground 2 perf (community request)
     nativeScaling: 1
+# Need for Speed - Most Wanted (all retail serials incl. Black Edition, same engine) -
+# coalesce render passes. 2026-11-12, performance push session 5. The race scene
+# is ~160 render passes per frame, ~65 of them 64x64 C16 targets ping-ponging between
+# a handful of framebuffers; the scheduler (GSPassScheduler, MAX_RUNS 8) merges draws
+# per target. Lenovo GS oracle (nfsmw race dump, MAX_RUNS 8): passes 1223 -> 773, GPU
+# ~80 -> ~70 ms per replay, display hashes identical. gsHWFixes is replaced wholesale, so the upstream GameIndex values
+# (bilinearUpscale, halfPixelOffset, nativeScaling, cpuCLUTRender, gpuTargetCLUT,
+# drawBuffering) are restated unchanged. Serials: SLUS-21257, SLUS-21267, SLUS-21351, SLES-53557, SLES-53558, SLES-53559, SLES-53857, SLAJ-25075, SLKA-25334, SLPM-66232, SLPM-66562, SLPM-55003
+SLUS-21257: # NTSC-U
+  gsHWFixes:
+    bilinearUpscale: 2
+    coalesceRenderPasses: 1
+    cpuCLUTRender: 1
+    drawBuffering: 1
+    gpuTargetCLUT: 1
+    halfPixelOffset: 5
+    nativeScaling: 2
+SLUS-21267: # NTSC-U
+  gsHWFixes:
+    bilinearUpscale: 2
+    coalesceRenderPasses: 1
+    cpuCLUTRender: 1
+    drawBuffering: 1
+    gpuTargetCLUT: 1
+    halfPixelOffset: 5
+    nativeScaling: 2
+SLUS-21351: # NTSC-U Black Edition
+  gsHWFixes:
+    bilinearUpscale: 2
+    coalesceRenderPasses: 1
+    cpuCLUTRender: 1
+    drawBuffering: 1
+    gpuTargetCLUT: 1
+    halfPixelOffset: 5
+    nativeScaling: 2
+SLES-53557: # PAL-E
+  gsHWFixes:
+    bilinearUpscale: 2
+    coalesceRenderPasses: 1
+    cpuCLUTRender: 1
+    drawBuffering: 1
+    gpuTargetCLUT: 1
+    halfPixelOffset: 5
+    nativeScaling: 2
+SLES-53558: # PAL-M8
+  gsHWFixes:
+    bilinearUpscale: 2
+    coalesceRenderPasses: 1
+    cpuCLUTRender: 1
+    drawBuffering: 1
+    gpuTargetCLUT: 1
+    halfPixelOffset: 5
+    nativeScaling: 2
+SLES-53559: # PAL-M7
+  gsHWFixes:
+    bilinearUpscale: 2
+    coalesceRenderPasses: 1
+    cpuCLUTRender: 1
+    drawBuffering: 1
+    gpuTargetCLUT: 1
+    halfPixelOffset: 5
+    nativeScaling: 2
+SLES-53857: # PAL-M3 Black Edition
+  gsHWFixes:
+    bilinearUpscale: 2
+    coalesceRenderPasses: 1
+    cpuCLUTRender: 1
+    drawBuffering: 1
+    gpuTargetCLUT: 1
+    halfPixelOffset: 5
+    nativeScaling: 2
+SLAJ-25075: # NTSC-Unk Black Edition
+  gsHWFixes:
+    bilinearUpscale: 2
+    coalesceRenderPasses: 1
+    cpuCLUTRender: 1
+    drawBuffering: 1
+    gpuTargetCLUT: 1
+    halfPixelOffset: 5
+    nativeScaling: 2
+SLKA-25334: # NTSC-K
+  gsHWFixes:
+    bilinearUpscale: 2
+    coalesceRenderPasses: 1
+    cpuCLUTRender: 1
+    drawBuffering: 1
+    gpuTargetCLUT: 1
+    halfPixelOffset: 5
+    nativeScaling: 2
+SLPM-66232: # NTSC-J
+  gsHWFixes:
+    bilinearUpscale: 2
+    coalesceRenderPasses: 1
+    cpuCLUTRender: 1
+    drawBuffering: 1
+    gpuTargetCLUT: 1
+    halfPixelOffset: 5
+    nativeScaling: 2
+SLPM-66562: # NTSC-J EA Best Hits
+  gsHWFixes:
+    bilinearUpscale: 2
+    coalesceRenderPasses: 1
+    cpuCLUTRender: 1
+    drawBuffering: 1
+    gpuTargetCLUT: 1
+    halfPixelOffset: 5
+    nativeScaling: 2
+SLPM-55003: # NTSC-J EA:SY! 1980
+  gsHWFixes:
+    bilinearUpscale: 2
+    coalesceRenderPasses: 1
+    cpuCLUTRender: 1
+    drawBuffering: 1
+    gpuTargetCLUT: 1
+    halfPixelOffset: 5
+    nativeScaling: 2
 SLUS-21419:
   gsHWFixes:
     autoFlush: 1

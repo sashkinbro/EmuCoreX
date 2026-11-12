@@ -1455,7 +1455,29 @@ static inline u32 GetVertexAlignment(GSHWDrawConfig::VSExpand expand)
 
 class GSPassScheduler;
 
-class GSDevice : public GSAlignedClass<32>
+/// Why queued (coalesced) draws were emitted. Only used for the debug GS_FLUSH_CAUSES counters
+/// (EMUCOREX_GS_PASS_TIMING=1); production code just passes the value along.
+enum class GSFlushCause : u8
+{
+	Other = 0,
+	NotDeferrable, ///< Next draw cannot be queued (barrier, feedback, DATE, colclip, ...).
+	ConflictRaw,   ///< Next draw samples a target a queued draw writes.
+	ConflictWar,   ///< Next draw writes a texture a queued draw samples.
+	CapDraws,      ///< Queue holds MAX_DRAWS records.
+	CapBytes,      ///< Vertex or index byte cap.
+	CapSampled,    ///< Sampled-texture set is full.
+	MaxRuns,       ///< All run slots are used and the next draw needs a new one.
+	AttachAlias,   ///< Next draw shares only one attachment with an open run.
+	TextureMutation, ///< Upload, clear, invalidate or recycle of a referenced texture.
+	Copy,          ///< Copy, stretch, convert or other utility pass.
+	Readback,      ///< Download of GS memory to the CPU.
+	Present,       ///< Merge, interlace, present, end of frame.
+	Pool,          ///< Texture pool aging, purge, or reuse of a held texture.
+	Count
+};
+
+class GSDevice
+ : public GSAlignedClass<32>
 {
 	friend class GSPassScheduler;
 public:
@@ -1644,7 +1666,7 @@ protected:
 	bool m_flushing = false;
 	std::vector<GSTexture*> m_deferred_recycle;
 
-	void FlushDeferredDrawsImpl();
+	void FlushDeferredDrawsImpl(GSFlushCause cause);
 	bool DeferredDrawsReference(const GSTexture* tex) const;
 
 	bool AcquireWindow(bool recreate_window);
@@ -1809,10 +1831,10 @@ public:
 	/// displayed, but the GPU command queue will still be flushed.
 	virtual PresentResult BeginPresent(bool frame_skip) = 0;
 
-	void FlushDeferredDraws()
+	void FlushDeferredDraws(GSFlushCause cause = GSFlushCause::Other)
 	{
 		if (m_deferred_draw_count != 0 && !m_flushing)
-			FlushDeferredDrawsImpl();
+			FlushDeferredDrawsImpl(cause);
 	}
 	void FlushDeferredDrawsFor(const GSTexture* tex);
 	bool DeferredDrawsWouldObserve(const GSTexture* tex) const;
@@ -1880,7 +1902,7 @@ public:
 	GSTexture* CreateCompatible(GSTexture* tex, int w, int h, bool clear = true, bool prefer_reuse = true);
 
 	virtual std::unique_ptr<GSDownloadTexture> CreateDownloadTexture(u32 width, u32 height, GSTexture::Format format) = 0;
-	void FlushBeforeReadback() { FlushDeferredDraws(); }
+	void FlushBeforeReadback() { FlushDeferredDraws(GSFlushCause::Readback); }
 
 	virtual void CopyRect(GSTexture* sTex, GSTexture* dTex, const GSVector4i& r, u32 destX, u32 destY) = 0;
 

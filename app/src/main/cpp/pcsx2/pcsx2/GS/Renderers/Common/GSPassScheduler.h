@@ -44,6 +44,9 @@ public:
 	};
 
 	__fi u32 GetCount() const { return m_queued; }
+	__fi u32 GetRunCount() const { return m_run_count; }
+	/// Why the last TryEnqueue() returned NeedsFlush. Only meaningful right after such a return.
+	__fi GSFlushCause GetLastRefusal() const { return m_last_refusal; }
 	__fi bool IsEmpty() const { return m_queued == 0; }
 
 	/// True when a draw uses only ordinary attachment/sampler accesses: no barrier,
@@ -78,11 +81,13 @@ public:
 	void Clear();
 
 private:
-	// Two runs covers the plain ping-pong; the rest is headroom for the third and fourth
-	// target that show up once the queue lives long enough to see them. Every extra run does
-	// widen the window in which an aliasing draw forces everything to flush, and past four
-	// the measured return is nil.
-	static constexpr u32 MAX_RUNS = 4;
+	// Two runs covers the plain ping-pong; the rest is headroom for the third and later
+	// targets that show up once the queue lives long enough to see them. Every extra run does
+	// widen the window in which an aliasing draw forces everything to flush. Dirge needed
+	// no more than four; Need for Speed Most Wanted cycles through five or more small
+	// targets per frame, hence eight. Runs are searched linearly and nothing else is sized
+	// or masked by this value.
+	static constexpr u32 MAX_RUNS = 8;
 
 	// Caps exist so a pathological frame cannot grow the queue without bound. Hitting one is
 	// not an error: it forces an earlier flush, which costs a render pass, not correctness.
@@ -121,6 +126,7 @@ private:
 	std::array<Run, MAX_RUNS> m_runs;
 	u32 m_run_count = 0;
 	u32 m_queued = 0;
+	GSFlushCause m_last_refusal = GSFlushCause::Other;
 
 	/// Every texture sampled by a queued draw, deduped. Bounded: overflow just forces a
 	/// flush, which is always safe.

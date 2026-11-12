@@ -419,18 +419,27 @@ GSPassScheduler::Disposition GSPassScheduler::TryEnqueue(const GSHWDrawConfig& c
 	pxAssert(IsDeferrable(config));
 
 	if (ConflictsWithQueued(config))
+	{
+		m_last_refusal = (IsAttachmentOfAnyRun(config.tex) || IsAttachmentOfAnyRun(config.pal)) ?
+		                     GSFlushCause::ConflictRaw : GSFlushCause::ConflictWar;
 		return Disposition::NeedsFlush;
+	}
 
 	// Refuse capacity overflow before opening a run or changing attachment load state.
 	const size_t vertex_bytes = sizeof(GSVertex) * config.nverts;
 	const size_t index_bytes = sizeof(u16) * config.nindices;
 
 	if (m_queued >= MAX_DRAWS)
+	{
+		m_last_refusal = GSFlushCause::CapDraws;
 		return Disposition::NeedsFlush;
-	if ((m_vertices.size() * sizeof(GSVertex)) + vertex_bytes > MAX_VERTEX_BYTES)
+	}
+	if ((m_vertices.size() * sizeof(GSVertex)) + vertex_bytes > MAX_VERTEX_BYTES ||
+		(m_indices.size() * sizeof(u16)) + index_bytes > MAX_INDEX_BYTES)
+	{
+		m_last_refusal = GSFlushCause::CapBytes;
 		return Disposition::NeedsFlush;
-	if ((m_indices.size() * sizeof(u16)) + index_bytes > MAX_INDEX_BYTES)
-		return Disposition::NeedsFlush;
+	}
 
 	// Find the run this draw belongs to. A render pass is defined by its attachments, so
 	// that pair is the whole key. Both attachments are conservatively treated as read/write
@@ -449,13 +458,19 @@ GSPassScheduler::Disposition GSPassScheduler::TryEnqueue(const GSHWDrawConfig& c
 	if (!run)
 	{
 		if (m_run_count >= MAX_RUNS)
+		{
+			m_last_refusal = GSFlushCause::MaxRuns;
 			return Disposition::NeedsFlush;
+		}
 
 		// Runs get reordered against each other, so they must not share an attachment. A
 		// partial match - same depth buffer, different colour target, say - is exactly the
 		// aliasing write this cannot allow.
 		if (IsAttachmentOfAnyRun(config.rt) || IsAttachmentOfAnyRun(config.ds))
+		{
+			m_last_refusal = GSFlushCause::AttachAlias;
 			return Disposition::NeedsFlush;
+		}
 
 		run = &m_runs[m_run_count++];
 		run->rt = config.rt;
@@ -480,7 +495,10 @@ GSPassScheduler::Disposition GSPassScheduler::TryEnqueue(const GSHWDrawConfig& c
 	// so an alpha-only or second-pass depth write cannot hide a sampler dependency.
 	// A full sampled set forces a flush rather than silently dropping a hazard.
 	if (!NoteSampled(config.tex) || !NoteSampled(config.pal))
+	{
+		m_last_refusal = GSFlushCause::CapSampled;
 		return Disposition::NeedsFlush;
+	}
 
 	Record& rec = run->records.emplace_back();
 	// Includes all auxiliary selectors, blend/mask/depth state, sampler and constants by

@@ -305,7 +305,10 @@ static void PassReasonLine(const char* tag, u64 frame, const u64* counts, u64 di
 static void PassReasonFrameEnd(u64 frame)
 {
 	if (frame % 60 == 0)
+	{
 		PassReasonLine("frame", frame, s_pass_frame_counts, 1);
+		GSFlushStatsLog(frame);
+	}
 	static const u64 sizes_every = [] {
 		const char* e = std::getenv("EMUCOREX_GS_PASS_SIZES_FRAMES");
 		const long v = e ? std::atol(e) : 0;
@@ -3419,7 +3422,7 @@ GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
 	// The previous frame's present and acquire ran on the present thread; take the swap chain back
 	// before any path (including the early returns) can touch it.
 	DrainPresent();
-	FlushDeferredDraws();
+	FlushDeferredDraws(GSFlushCause::Present);
 	m_present_has_new_frame = false;
 	m_present_geometry={};
 
@@ -3572,7 +3575,7 @@ GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
 
 void GSDeviceVK::EndPresent()
 {
-	FlushDeferredDraws();
+	FlushDeferredDraws(GSFlushCause::Present);
 #ifndef __ANDROID__
 	RenderImGui();
 #endif
@@ -4320,7 +4323,7 @@ std::unique_ptr<GSDownloadTexture> GSDeviceVK::CreateDownloadTexture(u32 width, 
 
 void GSDeviceVK::CopyRect(GSTexture* sTex, GSTexture* dTex, const GSVector4i& r, u32 destX, u32 destY)
 {
-	FlushDeferredDraws();
+	FlushDeferredDraws(GSFlushCause::Copy);
 
 	// Empty rect, abort copy.
 	if (r.rempty())
@@ -4418,7 +4421,7 @@ void GSDeviceVK::DoStretchRect(GSTexture* sTex, const GSVector4& sRect, const GS
 void GSDeviceVK::PresentRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
 	PresentShader shader, float shaderTime, Filter filter)
 {
-	FlushDeferredDraws();
+	FlushDeferredDraws(GSFlushCause::Present);
 	DisplayConstantBuffer cb;
 	cb.SetSource(sRect, sTex->GetSize());
 	cb.SetTarget(dRect, dTex ? dTex->GetSize() : GetPresentationSize());
@@ -4432,7 +4435,7 @@ void GSDeviceVK::PresentRect(GSTexture* sTex, const GSVector4& sRect, GSTexture*
 void GSDeviceVK::DrawMultiStretchRects(
 	const MultiStretchRect* rects, u32 num_rects, GSTexture* dTex, ShaderConvertSelector shader)
 {
-	FlushDeferredDraws();
+	FlushDeferredDraws(GSFlushCause::Copy);
 	GSTexture* last_tex = rects[0].src;
 	Filter last_filter = rects[0].filter;
 	u8 last_wmask = rects[0].wmask.wrgba;
@@ -4737,7 +4740,7 @@ void GSDeviceVK::BlitRect(GSTexture* sTex, const GSVector4i& sRect, u32 sLevel, 
 void GSDeviceVK::UpdateCLUTTexture(
 	GSTexture* sTex, float sScale, u32 offsetX, u32 offsetY, GSTexture* dTex, u32 dOffset, u32 dSize)
 {
-	FlushDeferredDraws();
+	FlushDeferredDraws(GSFlushCause::Copy);
 	// Super annoying, but apparently NVIDIA doesn't like floats/ints packed together in the same vec4?
 	struct alignas(16) Uniforms
 	{
@@ -4758,7 +4761,7 @@ void GSDeviceVK::UpdateCLUTTexture(
 void GSDeviceVK::ConvertToIndexedTexture(
 	GSTexture* sTex, float sScale, u32 offsetX, u32 offsetY, u32 SBW, u32 SPSM, GSTexture* dTex, u32 DBW, u32 DPSM)
 {
-	FlushDeferredDraws();
+	FlushDeferredDraws(GSFlushCause::Copy);
 	struct alignas(16) Uniforms
 	{
 		u32 SBW;
@@ -4780,7 +4783,7 @@ void GSDeviceVK::ConvertToIndexedTexture(
 
 void GSDeviceVK::FilteredDownsampleTexture(GSTexture* sTex, GSTexture* dTex, u32 downsample_factor, const GSVector2i& clamp_min, const GSVector4& dRect)
 {
-	FlushDeferredDraws();
+	FlushDeferredDraws(GSFlushCause::Copy);
 	struct alignas(16) Uniforms
 	{
 		GSVector2i clamp_min;
@@ -10072,6 +10075,7 @@ void GSDeviceVK::PassTimingDump()
 	if (s_pt.frames)
 		PassReasonLine("avg_per_frame", s_pt.frames, s_pass_total_counts, s_pt.frames);
 	PassSizesDump(s_pt.frames);
+	GSFlushStatsLog(s_pt.frames);
 	if (s_pt.passes || s_pt.frames)
 		std::fprintf(stderr, "GS_PASS_TIME_TOTAL frames=%llu passes=%llu gpu_us=%llu\n", static_cast<unsigned long long>(s_pt.frames),
 			static_cast<unsigned long long>(s_pt.passes), static_cast<unsigned long long>(s_pt.total_us));

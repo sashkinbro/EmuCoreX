@@ -324,7 +324,7 @@ void GSDownloadTexture::CopyFromTexture(
 	const GSVector4i& drc, GSTexture* stex, const GSVector4i& src, u32 src_level, bool use_transfer_pitch)
 {
 	if (g_gs_device)
-		g_gs_device->FlushDeferredDraws();
+		g_gs_device->FlushDeferredDraws(GSFlushCause::Readback);
 	DoCopyFromTexture(drc, stex, src, src_level, use_transfer_pitch);
 }
 
