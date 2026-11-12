@@ -210,7 +210,6 @@ import com.sbro.emucorex.data.PerGameSettingsRepository
 import com.sbro.emucorex.data.PerformanceOverlayMetrics
 import com.sbro.emucorex.data.RetroArchShaderPreset
 import com.sbro.emucorex.data.SettingsBackupRepository
-import androidx.compose.material.icons.rounded.CloudSync
 import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.data.ShaderPackInstallProgress
 import com.sbro.emucorex.data.ShaderPackInstallStage
@@ -627,7 +626,7 @@ fun SettingsScreen(
                     showBackupExportDialog = true
                 },
                 launchSettingsBackupImport = { settingsBackupImporter.launch(arrayOf("application/zip", "*/*")) },
-                launchCloudBackup = { showBackupExportDialog = true },
+                launchBackupExport = { showBackupExportDialog = true },
                 openLanguageSheet = openLanguageSheet,
                 onRequestGamepadBinding = { padIndex, actionId ->
                     pendingGamepadPadIndex = padIndex
@@ -1276,7 +1275,7 @@ private fun SettingsContent(
     onResetCustomCovers: () -> Unit,
     launchSettingsBackupExport: () -> Unit,
     launchSettingsBackupImport: () -> Unit,
-    launchCloudBackup: () -> Unit,
+    launchBackupExport: () -> Unit,
     openLanguageSheet: () -> Unit,
     onRequestGamepadBinding: (Int, String) -> Unit,
     onOpenGamepadAssignment: () -> Unit,
@@ -2801,10 +2800,10 @@ private fun SettingsContent(
                             onClick = launchSettingsBackupImport
                         )
                         SettingsItem(
-                            icon = Icons.Rounded.CloudSync,
-                            label = stringResource(R.string.drive_title),
-                            value = stringResource(R.string.drive_private),
-                            onClick = launchCloudBackup
+                            icon = Icons.Rounded.Save,
+                            label = stringResource(R.string.settings_backup_export_title),
+                            value = stringResource(R.string.settings_backup_export_desc),
+                            onClick = launchBackupExport
                         )
                     }
                 }
@@ -5653,7 +5652,6 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Arcade, R.string.settings_arcade_cover_download_url),
         entry(SettingsTab.Library, R.string.settings_backup_export_title),
         entry(SettingsTab.Library, R.string.settings_backup_restore_title),
-        entry(SettingsTab.Library, R.string.drive_title),
         entry(SettingsTab.Emulation, R.string.settings_show_fps),
         entry(SettingsTab.Emulation, R.string.settings_fps_overlay_mode),
         entry(SettingsTab.Emulation, R.string.settings_fps_overlay_position),
