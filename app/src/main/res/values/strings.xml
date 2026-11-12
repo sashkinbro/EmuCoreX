@@ -163,6 +163,8 @@
     <string name="emulation_live_settings">Live Settings</string>
     <string name="emulation_basic_settings">Basic</string>
     <string name="emulation_advanced_settings">Advanced</string>
+    <string name="settings_expert_controls_desc">Show specialist CPU, timing, JIT and speed-hack options.</string>
+    <string name="settings_expert_rendering_fixes_desc">Show specialist hardware and upscaling compatibility fixes.</string>
     <string name="emulation_achievements_tab">Achievements</string>
     <string name="emulation_session_tab">Session</string>
     <string name="emulation_overlay_tab">Overlay</string>
