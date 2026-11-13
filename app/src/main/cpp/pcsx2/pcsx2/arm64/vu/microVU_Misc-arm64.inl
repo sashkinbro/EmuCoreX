@@ -460,6 +460,8 @@ static __fi void mVUClamp1ScalarFast_oaknut(int reg)
 {
 	mVULoadClampLimits_oaknut(OAK_QSCRATCH3, OAK_QSCRATCH);
 	oakAsm->FMINNM(OAK_SSCRATCH2, oakSRegister(reg), OAK_SSCRATCH);
+	// MINNM twice: the first quiets a signaling NaN, the second maps any NaN to +max (x86 MINPS/MAXPS).
+	oakAsm->FMINNM(OAK_SSCRATCH2, OAK_SSCRATCH2, OAK_SSCRATCH);
 	oakAsm->FMAXNM(OAK_SSCRATCH2, OAK_SSCRATCH2, OAK_SSCRATCH3);
 	oakAsm->MOV(oakQRegister(reg).Selem()[0], OAK_QSCRATCH2.Selem()[0]);
 }
@@ -470,6 +472,8 @@ static __fi void mVUClamp1VectorFast_oaknut(int reg, bool limits_ready = false)
 
 	if (!limits_ready)
 		mVULoadClampLimits_oaknut(OAK_QSCRATCH3, OAK_QSCRATCH);
+	oakAsm->FMINNM(reg_q.S4(), reg_q.S4(), OAK_QSCRATCH.S4());
+	// MINNM twice: the first quiets a signaling NaN, the second maps any NaN to +max (x86 MINPS/MAXPS).
 	oakAsm->FMINNM(reg_q.S4(), reg_q.S4(), OAK_QSCRATCH.S4());
 	oakAsm->FMAXNM(reg_q.S4(), reg_q.S4(), OAK_QSCRATCH3.S4());
 }

@@ -164,51 +164,12 @@ static __fi void mVU_clamp4Scalar_oaknut(mV, int reg)
 // Opcode-specific clamp fixups
 //------------------------------------------------------------------
 
-static __fi void mVUUpperClampVu1MaddLaneResult_oaknut(int reg, bool scalar)
-{
-	if (CHECK_VU_OVERFLOW(1))
-	{
-		if (scalar)
-			mVUClamp1ScalarBits_oaknut(reg);
-		else
-			mVUClamp1VectorBits_oaknut(reg);
-	}
-	else if (scalar)
-	{
-		mVUClampDenormalScalarBits_oaknut(reg);
-	}
-	else
-	{
-		mVUClampDenormalVectorBits_oaknut(reg);
-	}
-}
-
 static __fi void mVUUpperClampAccLaneFs_oaknut(mV, int reg, bool scalar)
 {
-	// The interpreter's MULA/MADDA broadcast paths apply vuDouble() to Fs. Its
-	// exponent-255 conversion follows this VU's overflow policy. The bitwise
-	// clamp preserves the NaN sign unlike FMINNM.
-	if (isVU1 && CHECK_VU_OVERFLOW(mVU.index))
-	{
-		if (scalar)
-			mVUClamp1ScalarBits_oaknut(reg);
-		else
-			mVUClamp1VectorBits_oaknut(reg);
-	}
-	else if (scalar)
-	{
+	// x86 mVUclamp2(Fs) for MULAx/y/z, MADDAx/y/z/w: the numeric clamp at Normal
+	// and above, or the sign-preserving bit clamp at Preserve Sign.
+	if (scalar)
 		mVUUpperClamp2Scalar_oaknut(mVU, reg, false);
-	}
 	else
-	{
 		mVUUpperClamp2Vector_oaknut(mVU, reg, false);
-	}
-}
-
-static __fi void mVUUpperClampVu1XyzwMsubResult_oaknut(mV, int reg)
-{
-	if (CHECK_VU_OVERFLOW(mVU.index))
-		mVUClamp1VectorBits_oaknut(reg);
-	else
-		mVUClampDenormalVectorBits_oaknut(reg);
 }

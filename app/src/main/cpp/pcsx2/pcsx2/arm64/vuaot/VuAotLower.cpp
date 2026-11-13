@@ -1308,6 +1308,7 @@ namespace vuaot
 		{
 			const int t = TempV();
 			armAsm->Fminnm(V(t).V4S(), V(src).V4S(), V(kCMax).V4S());
+			armAsm->Fminnm(V(t).V4S(), V(t).V4S(), V(kCMax).V4S()); // second MINNM: any NaN becomes +max like x86 MINPS
 			armAsm->Fmaxnm(V(t).V4S(), V(t).V4S(), V(kCMin).V4S());
 			return t;
 		}
@@ -1544,18 +1545,9 @@ namespace vuaot
 				if (!emit_[id] || in.op != Op::Fmac || (in.imm & 1)) continue;
 				const UpperInst u = DecodeUpper(in.word);
 				if (u.op == UOp::MULAbc)
-					note(SingleSource(in.args, 0), InputClamp::Sign, 4, p);
+					note(SingleSource(in.args, 0), InputClamp::Numeric, 4, p);
 				else if (u.op == UOp::MULbc && u.mask == 15)
 					note(C(in.args[4]), InputClamp::Numeric, in.lane, p);
-				else if (u.op == UOp::ADD || (u.op == UOp::MSUB && u.mask == 15) ||
-					(u.op == UOp::MADDbc && (u.bc == 0 || u.bc == 3)))
-				{
-					const auto kind = env_.softwareFlush ? InputClamp::SignFlush : InputClamp::Sign;
-					note(SingleSource(in.args, 0), kind, 4, p);
-					if (u.op == UOp::MADDbc) note(C(in.args[4]), kind, in.lane, p);
-					else note(SingleSource(in.args, 4), kind, 4, p);
-					if (u.op != UOp::ADD) note(SingleSource(in.args, 8), kind, 4, p);
-				}
 			}
 			for (auto& entry : typedClamps_)
 				if (entry.uses.size() >= 2)
@@ -1579,6 +1571,7 @@ namespace vuaot
 			if (kind == InputClamp::Numeric)
 			{
 				armAsm->Fminnm(V(dst).V4S(), V(src).V4S(), V(kCMax).V4S());
+				armAsm->Fminnm(V(dst).V4S(), V(dst).V4S(), V(kCMax).V4S()); // second MINNM: any NaN becomes +max like x86 MINPS
 				armAsm->Fmaxnm(V(dst).V4S(), V(dst).V4S(), V(kCMin).V4S());
 			}
 			else
@@ -1616,6 +1609,7 @@ namespace vuaot
 			else
 			{
 				armAsm->Fminnm(V(dst).V4S(), V(src).V4S(), V(kCMax).V4S());
+				armAsm->Fminnm(V(dst).V4S(), V(dst).V4S(), V(kCMax).V4S()); // second MINNM: any NaN becomes +max like x86 MINPS
 				armAsm->Fmaxnm(V(dst).V4S(), V(dst).V4S(), V(kCMin).V4S());
 			}
 		}
@@ -1950,7 +1944,7 @@ namespace vuaot
 
 		int Lowerer::StatusPackReg(ValueId id, int tmp)
 		{
-			if (const ValueId m = MacOf(id); m && env_.clampOverflow)
+			if (const ValueId m = MacOf(id); m)
 				return UseReg(m);
 			const Inst& in = I(id);
 			const int p = tmp >= 0 ? tmp : TempG();
@@ -2510,17 +2504,18 @@ namespace vuaot
 				{
 					const ValueId source = SingleSource(in.args, 0);
 					if (u.op == UOp::MULAbc)
-						fs = TypedClampOperand(source, InputClamp::Sign, 4, [&] { return VecOperand(in.args, 0); });
+						fs = TypedClampOperand(source, InputClamp::Numeric, 4, [&] { return VecOperand(in.args, 0); });
 					else fs = ClampOperand(source, [&] { return VecOperand(in.args, 0); });
 				}
 				else fs = VecOperand(in.args, 0);
 				const int ft = UseReg(in.args[4]);
-				const bool materializeFt = u.mask == 15 && (u.op == UOp::MULbc || u.bc == 3) &&
-					(env_.clampOverflow || env_.clampExtra || env_.clampSign);
+				// Clamp 2/3 also clamp the broadcast operand inside the multiply (x86 mVUclamp3),
+				// for every mask; clamp 1/sign only matter for a full vector field.
+				const bool materializeFt = env_.clampExtra ||
+					(u.mask == 15 && (u.op == UOp::MULbc || u.bc == 3) && (env_.clampOverflow || env_.clampSign));
 				if (!TypedClampMode())
 				{
-					if (u.op == UOp::MULAbc && env_.clampOverflow) fs = SignClampInto(fs);
-					else if (!env_.clampExtra && env_.clampOverflow) fs = ClampInto(fs);
+					if (!env_.clampExtra && env_.clampOverflow) fs = ClampInto(fs);
 				}
 				if (!materializeFt)
 				{
@@ -2542,44 +2537,6 @@ namespace vuaot
 				armAsm->Fmul(V(product).V4S(), V(fs).V4S(), V(ftCopy).V4S());
 				const int result = ResultClamp() ? ClampInto(product) : product;
 				armAsm->Mov(V(DefV(id)).V16B(), V(result).V16B());
-				return;
-			}
-			// EmuCoreX's ordinary ADD uses bitwise vuDouble clamps in mode one;
-			// its VU1 MSUB.xyzw sanitizes all three inputs and clamps once after subtraction.
-			const bool localAdd = u.op == UOp::ADD && env_.clampOverflow && !env_.clampExtra;
-			const bool localMsub = u.op == UOp::MSUB && u.mask == 15;
-			const bool localMadd = u.op == UOp::MADDbc && (u.bc == 0 || u.bc == 3);
-			if (localAdd || localMsub || localMadd)
-			{
-				int fs = VuDoubleOperand(in.args, 0);
-				int ft;
-				if (localMadd)
-				{
-					const auto broadcastFt = [&] {
-						const int source = UseReg(in.args[4]), copy = TempV();
-						armAsm->Dup(V(copy).V4S(), V(source).V4S(), in.lane);
-						return copy;
-					};
-					if (TypedClampMode())
-						ft = TypedClampOperand(C(in.args[4]), env_.softwareFlush ? InputClamp::SignFlush : InputClamp::Sign,
-							in.lane, broadcastFt);
-					else ft = VuDoubleInto(broadcastFt(), env_.softwareFlush);
-				}
-				else ft = VuDoubleOperand(in.args, 4);
-				if (localAdd)
-					armAsm->Fadd(V(DefV(id)).V4S(), V(fs).V4S(), V(ft).V4S());
-				else
-				{
-					int acc = VuDoubleOperand(in.args, 8);
-					if (env_.clampExtra) { fs = ClampE(fs); ft = ClampE(ft); acc = ClampE(acc); }
-					const int prod = TempV(), result = TempV();
-					armAsm->Fmul(V(prod).V4S(), V(fs).V4S(), V(ft).V4S());
-					if (localMsub) armAsm->Fsub(V(result).V4S(), V(acc).V4S(), V(prod).V4S());
-					else armAsm->Fadd(V(result).V4S(), V(acc).V4S(), V(prod).V4S());
-					const int clamped = ResultClamp() ? ClampInto(result) : result;
-					const int exact = VuDoubleInto(clamped, !env_.clampOverflow);
-					armAsm->Mov(V(DefV(id)).V16B(), V(exact).V16B());
-				}
 				return;
 			}
 			const bool E = env_.clampExtra;
@@ -2662,6 +2619,7 @@ namespace vuaot
 					emit(t);
 					const int d = DefV(id);
 					armAsm->Fminnm(V(d).V4S(), V(t).V4S(), V(kCMax).V4S());
+					armAsm->Fminnm(V(d).V4S(), V(d).V4S(), V(kCMax).V4S()); // second MINNM: any NaN becomes +max like x86 MINPS
 					armAsm->Fmaxnm(V(d).V4S(), V(d).V4S(), V(kCMin).V4S());
 				}
 				else
@@ -2784,6 +2742,7 @@ namespace vuaot
 			}
 			const auto clampF = [&](int d, int t) {
 				armAsm->Fminnm(V(d).V4S(), V(t).V4S(), V(kCMax).V4S());
+				armAsm->Fminnm(V(d).V4S(), V(d).V4S(), V(kCMax).V4S()); // second MINNM: any NaN becomes +max like x86 MINPS
 				armAsm->Fmaxnm(V(d).V4S(), V(d).V4S(), V(kCMin).V4S());
 			};
 			if (in.op == Op::Opmula)
@@ -3112,10 +3071,9 @@ namespace vuaot
 			if (op != LOp::SQRT)
 				fsR = lane0(in.args[0], l.fsf);
             int ftR = lane0(in.args[1], l.ftf);
-            // Local DIV/RSQRT convert exponent-255 inputs to signed VU max
-            // before sign/zero classification and arithmetic. FP min/max on
-            // the quotient cannot reproduce NaN/infinity operand conversion.
-            if (op != LOp::SQRT && (env_.clampOverflow || env_.softwareFlush))
+            // x86 DIV/RSQRT have no operand clamp; only the software denormal flush
+            // (FPCR without FZ) is emulated, and only where no clamp mode applies.
+            if (op != LOp::SQRT && env_.softwareFlush && !env_.clampOverflow)
             {
                 fsR = VuDoubleInto(fsR, env_.softwareFlush);
                 ftR = VuDoubleInto(ftR, env_.softwareFlush);
@@ -3126,6 +3084,21 @@ namespace vuaot
 			// Every register is taken before the first branch: allocating
 			// later could emit a spill on one path only.
 			const int absc = (op == LOp::DIV) ? -1 : TempV();
+			const int cf = env_.clampExtra ? TempV() : -1, cd = env_.clampExtra ? TempV() : -1;
+			// x86 SSE_DIVSS clamps both operands (mVUclamp3) at the Extra and Preserve Sign modes.
+			const auto clampInto = [&](int dst, int src) {
+				if (env_.clampSign)
+				{
+					armAsm->Smin(V(dst).V4S(), V(src).V4S(), V(kCMax).V4S());
+					armAsm->Umin(V(dst).V4S(), V(dst).V4S(), V(kCMin).V4S());
+				}
+				else
+				{
+					armAsm->Fminnm(V(dst).V4S(), V(src).V4S(), V(kCMax).V4S());
+					armAsm->Fminnm(V(dst).V4S(), V(dst).V4S(), V(kCMax).V4S());
+					armAsm->Fmaxnm(V(dst).V4S(), V(dst).V4S(), V(kCMin).V4S());
+				}
+			};
 
 			a64::Label done, normal;
 			const auto quotient = [&](int divisor) {
@@ -3133,10 +3106,19 @@ namespace vuaot
 				// VF0, and the software flush when the FPCR does not flush.
 				if (env_.softwareFlush)
 					armAsm->Umov(W(g10), V(fsR).V4S(), 0);
-				armAsm->Fdiv(S(q), S(fsR), S(divisor));
+				int dividend = fsR, divisorReg = divisor;
+				if (env_.clampExtra)
+				{
+					clampInto(cf, fsR);
+					clampInto(cd, divisor);
+					dividend = cf;
+					divisorReg = cd;
+				}
+				armAsm->Fdiv(S(q), S(dividend), S(divisorReg));
 				if (!skipClamp && (env_.clampOverflow || env_.clampExtra))
 				{
 					armAsm->Fminnm(S(q), S(q), S(kCMax));
+					armAsm->Fminnm(S(q), S(q), S(kCMax)); // second MINNM: any NaN becomes +max like x86 MINPS
 					armAsm->Fmaxnm(S(q), S(q), S(kCMin));
 				}
 				if (env_.softwareFlush)
@@ -3195,7 +3177,10 @@ namespace vuaot
 					if (env_.softwareFlush)
 						armAsm->Umov(W(g10), V(ftR).V4S(), 0);
 					if (env_.clampOverflow)
+					{
 						armAsm->Fminnm(S(ftR), S(ftR), S(kCMax));
+						armAsm->Fminnm(S(ftR), S(ftR), S(kCMax)); // second MINNM: any NaN becomes +max like x86 MINPS
+					}
 					armAsm->Fsqrt(S(q), S(ftR));
 					if (env_.softwareFlush)
 					{
@@ -3307,8 +3292,8 @@ namespace vuaot
 
 		void Lowerer::Efu(ValueId id)
 		{
-			// Match this core's microVU_Lower-arm64.inl, including fused EFU
-			// terms, double intermediates, signed denormal flush and NaN guards.
+			// Match x86 microVU: single-precision EFU ops in x86 order, separately rounded;
+			// no operand sanitising (clamps only from the SSE_*SS wrappers at clamp 2/3).
 			const Inst& in = I(id);
 			const LOp op = static_cast<LOp>(in.sub);
 			const LowerInst l = DecodeLower(in.word);
@@ -3318,37 +3303,6 @@ namespace vuaot
 			const auto lane = [&](int d, int s, int n) { armAsm->Dup(S(d), V(s).V4S(), n); };
 			const auto constant = [&](int d, const void* p) { armAsm->Ldr(S(d), a64::MemOperand(xGlob, G(p))); };
 			const auto one = [&](int d) { constant(d, mVUglob.one); };
-			const auto input = [&](int x) {
-				a64::Label nonzero, done;
-				armAsm->Fmov(W(g0), S(x));
-				armAsm->And(W(g1), W(g0), 0x7f800000u);
-				armAsm->Cbnz(W(g1), &nonzero);
-				armAsm->And(W(g0), W(g0), 0x80000000u);
-				armAsm->Fmov(S(x), W(g0));
-				armAsm->B(&done);
-				armAsm->Bind(&nonzero);
-				if (env_.clampOverflow)
-				{
-					armAsm->Cmp(W(g1), 0x7f800000u);
-					armAsm->B(&done, a64::ne);
-					armAsm->And(W(g0), W(g0), 0x80000000u);
-					armAsm->Orr(W(g0), W(g0), 0x7f7fffffu);
-					armAsm->Fmov(S(x), W(g0));
-				}
-				armAsm->Bind(&done);
-			};
-			const auto inputVector = [&](int x, int t) {
-				armAsm->Shl(V(t).V4S(), V(x).V4S(), 1);
-				armAsm->Ushr(V(t).V4S(), V(t).V4S(), 24);
-				if (env_.clampOverflow)
-				{
-					armAsm->Smin(V(x).V4S(), V(x).V4S(), V(kCMax).V4S());
-					armAsm->Umin(V(x).V4S(), V(x).V4S(), V(kCMin).V4S());
-				}
-				armAsm->Cmeq(V(t).V4S(), V(t).V4S(), 0);
-				armAsm->Ushr(V(t).V4S(), V(t).V4S(), 1);
-				armAsm->Bic(V(x).V16B(), V(x).V16B(), V(t).V16B());
-			};
 			const auto clamp = [&](int x, bool result) {
 				if (!env_.clampExtra || (result && env_.clampSign))
 					return;
@@ -3360,78 +3314,41 @@ namespace vuaot
 				else
 				{
 					armAsm->Fminnm(S(x), S(x), S(kCMax));
+					armAsm->Fminnm(S(x), S(x), S(kCMax)); // second MINNM: any NaN becomes +max like x86 MINPS
 					armAsm->Fmaxnm(S(x), S(x), S(kCMin));
 				}
 			};
 			const auto mul = [&](int d, int s) { clamp(d,false);clamp(s,false);armAsm->Fmul(S(d),S(d),S(s));clamp(d,true); };
 			const auto add = [&](int d, int s) { clamp(d,false);clamp(s,false);armAsm->Fadd(S(d),S(d),S(s));clamp(d,true); };
 			const auto sub = [&](int d, int s) { clamp(d,false);clamp(s,false);armAsm->Fsub(S(d),S(d),S(s));clamp(d,true); };
-			const auto reciprocal = [&](int p, int o, int t) {
-				a64::Label done;
-				armAsm->Eor(V(t).V16B(), V(t).V16B(), V(t).V16B());
-				armAsm->Fcmeq(S(t), S(t), S(p));
-				armAsm->Fmov(W(g0), S(t));
-				armAsm->Cbnz(W(g0), &done);
-				one(o);
-				armAsm->Fdiv(S(o), S(o), S(p));
-				armAsm->Ins(V(p).V4S(), 0, V(o).V4S(), 0);
-				armAsm->Bind(&done);
-			};
-			const auto sqrtDouble = [&](int p, bool recip, int o, int t) {
-				a64::Label done;
-				armAsm->Fcmp(S(p), 0.0);
-				armAsm->B(&done, a64::Condition::VS);
-				armAsm->B(&done, a64::lt);
-				armAsm->Fcvt(D(c), S(p));
-				armAsm->Fsqrt(D(c), D(c));
-				armAsm->Fcvt(S(c), D(c));
-				armAsm->Ins(V(p).V4S(), 0, V(c).V4S(), 0);
-				if (recip)
-					reciprocal(p, o, t);
-				armAsm->Bind(&done);
-			};
-			const auto eatan = [&](int p, int fs, int t1, int power, int squared) {
-				a64::Label calculate, finite, finish;
-				armAsm->Fmov(W(g0), S(fs));
-				armAsm->And(W(g1), W(g0), 0x7fffffffu);
-				armAsm->Cmp(W(g1), 0x7f800000u);
-				armAsm->B(&finite, a64::Condition::LO);
-				armAsm->Mov(W(g0), 0x7fc00000u);
-				armAsm->Fmov(S(p), W(g0));
-				armAsm->B(&finish);
-				armAsm->Bind(&finite);
-				armAsm->Tst(W(g0), 0x80000000u);
-				armAsm->B(&calculate, a64::ne);
-				armAsm->Cmp(W(g0), 0x3f7ffffeu);
-				armAsm->B(&calculate, a64::Condition::LO);
-				armAsm->Mov(W(g0), 0x3fc90fd9u);
-				armAsm->Fmov(S(p), W(g0));
-				armAsm->B(&finish);
-				armAsm->Bind(&calculate);
-				mov(squared, fs);
-				mul(squared, fs);
-				mov(power, squared);
-				mul(power, fs);
-				mov(t1, power);
-				constant(c, mVUglob.T5);
-				armAsm->Fmul(S(t1), S(t1), S(c));
+			// SSE_DIVSS: operand clamps, divide, result clamp (the same wrappers as mul/add/sub).
+			const auto divss = [&](int d, int s) { clamp(d,false);clamp(s,false);armAsm->Fdiv(S(d),S(d),S(s));clamp(d,true); };
+			// x86 mVU_EATAN_: single precision, separately rounded, in x86 order.
+			const auto eatan = [&](int p, int fs, int t1, int t2) {
+				mov(p, fs);
 				constant(c, mVUglob.T1);
-				armAsm->Fmadd(S(p), S(fs), S(c), S(t1));
-				for (const u32* k : {mVUglob.T2, mVUglob.T3, mVUglob.T4, mVUglob.T6, mVUglob.T7, mVUglob.T8})
+				armAsm->Fmul(S(p), S(p), S(c));
+				mov(t2, fs);
+				for (const u32* k : {mVUglob.T2, mVUglob.T3, mVUglob.T4, mVUglob.T5, mVUglob.T6, mVUglob.T7, mVUglob.T8})
 				{
-					mul(power, squared);
+					mul(t2, fs);
+					mul(t2, fs);
+					mov(t1, t2);
 					constant(c, k);
-					armAsm->Fmadd(S(p), S(power), S(c), S(p));
+					armAsm->Fmul(S(t1), S(t1), S(c));
+					add(p, t1);
 				}
 				constant(c, mVUglob.Pi4);
 				armAsm->Fadd(S(p), S(p), S(c));
-				armAsm->Fmov(W(g0), S(p));
-				armAsm->And(W(g1), W(g0), 0x7fffffffu);
-				armAsm->Cmp(W(g1), 0x7f800000u);
-				armAsm->B(&finish, a64::Condition::LO);
-				armAsm->Mov(W(g0), 0x7fc00000u);
-				armAsm->Fmov(S(p), W(g0));
-				armAsm->Bind(&finish);
+			};
+			// x86 mVU_sumXYZ (DPPS 0x71): (x*x + y*y) + z*z into lane 0 of dst.
+			const auto sumXYZ = [&](int dst, int src, int t) {
+				armAsm->Fmul(V(dst).V4S(), V(src).V4S(), V(src).V4S());
+				lane(t, dst, 1);
+				armAsm->Fadd(S(dst), S(dst), S(t));
+				armAsm->Fmul(V(t).V4S(), V(src).V4S(), V(src).V4S());
+				lane(t, t, 2);
+				armAsm->Fadd(S(dst), S(dst), S(t));
 			};
 			// Operand: the EFU1 forms read lane fsf into lane 0; the EFU2 forms
 			// take the whole register. Either way into a temp the series
@@ -3459,117 +3376,115 @@ namespace vuaot
 			switch (op)
 			{
 				case LOp::EATAN:
-					input(r[0]);
 					mov(r[1], r[0]);
 					one(r[2]);
 					armAsm->Fsub(S(r[0]), S(r[0]), S(r[2]));
 					armAsm->Fadd(S(r[1]), S(r[1]), S(r[2]));
-					armAsm->Fdiv(S(r[0]), S(r[0]), S(r[1]));
-					eatan(r[1], r[0], r[2], r[3], r[4]);
+					divss(r[0], r[1]);
+					eatan(r[1], r[0], r[2], r[3]);
 					break;
 				case LOp::EATANxy:
 				case LOp::EATANxz:
-					inputVector(r[0], r[4]);
 					lane(r[4], r[0], op == LOp::EATANxy ? 1 : 2);
 					mov(r[1], r[4]);
 					sub(r[4], r[0]);
 					add(r[0], r[1]);
-					armAsm->Fdiv(S(r[4]), S(r[4]), S(r[0]));
-					eatan(r[1], r[4], r[0], r[2], r[3]);
+					divss(r[4], r[0]);
+					eatan(r[1], r[4], r[0], r[2]);
 					break;
 				case LOp::EEXP:
-					input(r[0]);
-					one(r[1]);
-					constant(r[2], mVUglob.E1);
-					armAsm->Fmadd(S(r[1]), S(r[2]), S(r[0]), S(r[1]));
-					armAsm->Fcvt(D(r[1]), S(r[1]));
-					armAsm->Fcvt(D(r[0]), S(r[0]));
-					mov(r[3], r[0]);
-					for (const u32* k : {mVUglob.E2, mVUglob.E3, mVUglob.E4, mVUglob.E5, mVUglob.E6})
+					mov(r[1], r[0]);
+					constant(c, mVUglob.E1);
+					armAsm->Fmul(S(r[1]), S(r[1]), S(c));
+					one(c);
+					armAsm->Fadd(S(r[1]), S(r[1]), S(c));
+					mov(r[2], r[0]);
+					mul(r[2], r[0]);
+					mov(r[3], r[2]);
+					constant(c, mVUglob.E2);
+					armAsm->Fmul(S(r[2]), S(r[2]), S(c));
+					add(r[1], r[2]);
+					for (const u32* k : {mVUglob.E3, mVUglob.E4, mVUglob.E5})
 					{
-						armAsm->Fmul(D(r[3]), D(r[3]), D(r[0]));
-						constant(r[2], k);
-						armAsm->Fcvt(D(r[2]), S(r[2]));
-						armAsm->Fmadd(D(r[1]), D(r[2]), D(r[3]), D(r[1]));
+						mul(r[3], r[0]);
+						mov(r[2], r[3]);
+						constant(c, k);
+						armAsm->Fmul(S(r[2]), S(r[2]), S(c));
+						add(r[1], r[2]);
 					}
-					armAsm->Fcvt(S(r[1]), D(r[1]));
-					armAsm->Fcvt(D(r[1]), S(r[1]));
-					mov(r[3], r[1]);
-					armAsm->Fmul(D(r[1]), D(r[1]), D(r[1]));
-					armAsm->Fmul(D(r[1]), D(r[1]), D(r[3]));
-					armAsm->Fmul(D(r[1]), D(r[1]), D(r[3]));
-					armAsm->Fcvt(S(r[1]), D(r[1]));
-					input(r[1]);
-					one(r[0]);
-					armAsm->Fdiv(S(r[0]), S(r[0]), S(r[1]));
-					res = 0;
+					mul(r[3], r[0]);
+					constant(c, mVUglob.E6);
+					armAsm->Fmul(S(r[3]), S(r[3]), S(c));
+					add(r[1], r[3]);
+					mul(r[1], r[1]);
+					mul(r[1], r[1]);
+					one(r[2]);
+					divss(r[2], r[1]);
+					res = 2;
 					break;
 				case LOp::ESIN:
-					input(r[0]);
 					mov(r[1], r[0]);
-					armAsm->Fcvt(D(r[1]), S(r[1]));
-					armAsm->Fcvt(D(r[0]), S(r[0]));
+					mul(r[0], r[0]);
+					mov(r[2], r[0]);
+					mul(r[0], r[1]);
 					mov(r[3], r[0]);
-					for (const u32* k : {mVUglob.S2, mVUglob.S3, mVUglob.S4, mVUglob.S5})
-					{
-						armAsm->Fmul(D(r[3]), D(r[3]), D(r[0]));
-						armAsm->Fmul(D(r[3]), D(r[3]), D(r[0]));
-						constant(r[2], k);
-						armAsm->Fcvt(D(r[2]), S(r[2]));
-						armAsm->Fmul(D(r[2]), D(r[2]), D(r[3]));
-						armAsm->Fadd(D(r[1]), D(r[1]), D(r[2]));
-					}
-					armAsm->Fcvt(S(r[1]), D(r[1]));
-					input(r[1]);
+					constant(c, mVUglob.S2);
+					armAsm->Fmul(S(r[0]), S(r[0]), S(c));
+					add(r[1], r[0]);
+					mul(r[3], r[2]);
+					mov(r[0], r[3]);
+					constant(c, mVUglob.S3);
+					armAsm->Fmul(S(r[0]), S(r[0]), S(c));
+					add(r[1], r[0]);
+					mul(r[3], r[2]);
+					mov(r[0], r[3]);
+					constant(c, mVUglob.S4);
+					armAsm->Fmul(S(r[0]), S(r[0]), S(c));
+					add(r[1], r[0]);
+					mul(r[3], r[2]);
+					constant(c, mVUglob.S5);
+					armAsm->Fmul(S(r[3]), S(r[3]), S(c));
+					add(r[1], r[3]);
 					break;
 				case LOp::ERCPR:
-					input(r[0]);
 					mov(r[1], r[0]);
-					reciprocal(r[1], r[0], r[2]);
+					one(r[2]);
+					divss(r[2], r[1]);
+					res = 2;
 					break;
 				case LOp::ESQRT:
 				case LOp::ERSQRT:
-					input(r[0]);
-					mov(r[1], r[0]);
-					sqrtDouble(r[1], op == LOp::ERSQRT, r[0], r[2]);
+					armAsm->Fabs(S(r[0]), S(r[0]));
+					armAsm->Fsqrt(S(r[1]), S(r[0]));
+					if (op == LOp::ERSQRT)
+					{
+						one(r[2]);
+						divss(r[2], r[1]);
+						res = 2;
+					}
 					break;
 				case LOp::ESADD:
 				case LOp::ERSADD:
-					lane(r[1], r[0], 0);
-					lane(r[2], r[0], 1);
-					lane(r[3], r[0], 2);
-					input(r[1]);
-					input(r[2]);
-					input(r[3]);
-					armAsm->Fmul(S(r[2]), S(r[2]), S(r[2]));
-					armAsm->Fmadd(S(r[2]), S(r[1]), S(r[1]), S(r[2]));
-					armAsm->Fmadd(S(r[2]), S(r[3]), S(r[3]), S(r[2]));
-					if (op == LOp::ERSADD)
-						reciprocal(r[2], r[1], r[3]);
-					res = 2;
-					break;
 				case LOp::ELENG:
 				case LOp::ERLENG:
-					inputVector(r[0], r[1]);
-					lane(r[1], r[0], op == LOp::ELENG ? 1 : 0);
-					armAsm->Fmul(S(r[1]), S(r[1]), S(r[1]));
-					lane(c, r[0], op == LOp::ELENG ? 0 : 1);
-					armAsm->Fmadd(S(r[1]), S(c), S(c), S(r[1]));
-					lane(c, r[0], 2);
-					armAsm->Fmadd(S(r[1]), S(c), S(c), S(r[1]));
-					armAsm->Fsqrt(S(r[1]), S(r[1]));
-					if (op == LOp::ERLENG)
-						reciprocal(r[1], r[0], r[2]);
+					sumXYZ(r[1], r[0], r[3]);
+					if (op == LOp::ELENG || op == LOp::ERLENG)
+						armAsm->Fsqrt(S(r[1]), S(r[1]));
+					if (op == LOp::ERSADD || op == LOp::ERLENG)
+					{
+						one(r[2]);
+						divss(r[2], r[1]);
+						res = 2;
+					}
 					break;
 				case LOp::ESUM:
-					inputVector(r[0], r[1]);
-					lane(r[2], r[0], 0);
-					for (int n = 1; n < 4; ++n)
-					{
-						lane(r[1], r[0], n);
-						armAsm->Fadd(S(r[2]), S(r[2]), S(r[1]));
-					}
-					res = 2;
+					lane(r[1], r[0], 0);
+					lane(r[2], r[0], 3);
+					add(r[1], r[2]);
+					lane(r[3], r[0], 1);
+					lane(r[2], r[0], 2);
+					add(r[3], r[2]);
+					add(r[1], r[3]);
 					break;
 				default:
 					throw std::runtime_error("unsupported EFU operation");
@@ -4251,12 +4166,6 @@ namespace vuaot
 				case Op::MacFlags:
 				{
 					PackFlags(C(in.args[0]), in.mask, true, -1, id);
-					if (!env_.clampOverflow)
-					{
-						const int overflow = OverflowMask(C(in.args[0]), in.mask);
-						const int dst = UseReg(id);
-						armAsm->Orr(W(dst), W(dst), a64::Operand(W(overflow), a64::LSL, 12));
-					}
 					break;
 				}
 				case Op::StatusUpd:
@@ -4310,21 +4219,6 @@ namespace vuaot
 					}
 					else
 						armAsm->Orr(W(d), W(prev), W(p));
-					if (!env_.clampOverflow)
-					{
-						const auto applyOverflow = [&](const Inst& update, bool current) {
-							const u32 savedV = vLock_, savedG = gLock_;
-							const int bits = OverflowMask(C(update.args[1]), update.mask);
-							a64::Label none;
-							armAsm->Cbz(W(bits), &none);
-							armAsm->Orr(W(d), W(d), current ? 0x820000u : 0x800000u);
-							armAsm->Bind(&none);
-							vLock_ = savedV; gLock_ = savedG;
-						};
-						if (ch != statusChain_.end())
-							for (ValueId v : ch->second) applyOverflow(I(v), false);
-						applyOverflow(in, nonSticky);
-					}
 					break;
 				}
 				case Op::StatusDiv:
@@ -5531,6 +5425,7 @@ namespace vuaot
 		else
 		{
 			armAsm->Fminnm(V(dst).V4S(), V(src).V4S(), V(kCMax).V4S());
+			armAsm->Fminnm(V(dst).V4S(), V(dst).V4S(), V(kCMax).V4S()); // second MINNM: any NaN becomes +max like x86 MINPS
 			armAsm->Fmaxnm(V(dst).V4S(), V(dst).V4S(), V(kCMin).V4S());
 		}
 	}
@@ -5565,6 +5460,7 @@ namespace vuaot
 			else
 			{
 				armAsm->Fminnm(V(ch).V4S(), V(src).V4S(), V(kCMax).V4S());
+				armAsm->Fminnm(V(ch).V4S(), V(ch).V4S(), V(kCMax).V4S()); // second MINNM: any NaN becomes +max like x86 MINPS
 				armAsm->Fmaxnm(V(ch).V4S(), V(ch).V4S(), V(kCMin).V4S());
 			}
 		}
@@ -5737,6 +5633,7 @@ namespace vuaot
 			else
 			{
 				armAsm->Fminnm(V(ch).V4S(), V(src).V4S(), V(kCMax).V4S());
+				armAsm->Fminnm(V(ch).V4S(), V(ch).V4S(), V(kCMax).V4S()); // second MINNM: any NaN becomes +max like x86 MINPS
 				armAsm->Fmaxnm(V(ch).V4S(), V(ch).V4S(), V(kCMin).V4S());
 			}
 		}

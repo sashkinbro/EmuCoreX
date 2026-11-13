@@ -673,6 +673,16 @@ Snapshot RunVU(u32 index, bool jit, const std::vector<u32>& program, u32 pc, u64
     return {vu, std::vector<u8>(mem, mem + size), VU0.VI[REG_VPU_STAT].UL, fallback, std::vector<u8>(micro, micro + size), std::move(gif), gifOverflow};
 }
 
+// x86 microVU never computes the MAC/status O and U bits (only the Superman
+// overflow gamefix does), so interpreter-equals-JIT checks that exercise
+// exponent-255 results compare with those bits cleared.
+Snapshot WithoutOverflowUnderflowFlags(Snapshot snapshot)
+{
+    snapshot.regs.VI[REG_MAC_FLAG].UL &= ~0xff00u;
+    snapshot.regs.VI[REG_STATUS_FLAG].UL &= ~(0x4u | 0x8u | 0x100u | 0x200u);
+    return snapshot;
+}
+
 void Compare(const Snapshot& expected, const Snapshot& actual, const char* name)
 {
     auto bytes = [name](const char* field, const void* a, const void* b, size_t size) {
@@ -2425,6 +2435,7 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vif_pair_copy.inl"
 #include "jit_oracle_vif_narrow_load.inl"
 #include "jit_oracle_vuaot_division.inl"
+#include "jit_oracle_vuaot_efu.inl"
 
 void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin_only = false,
     bool maxmin_route_only = false, bool maxmin_broadcast_only = false,
@@ -2579,7 +2590,8 @@ void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin
             program[0] = operand;
             char name[80];
             std::snprintf(name, sizeof(name), "VU%u unclamped ADDi flags operand=%08x", vu, operand);
-            Compare(RunVU(vu, false, program, 0x80), RunVU(vu, true, program, 0x80), name);
+            Compare(WithoutOverflowUnderflowFlags(RunVU(vu, false, program, 0x80)),
+                WithoutOverflowUnderflowFlags(RunVU(vu, true, program, 0x80)), name);
         }
     }
     EmuConfig.Cpu.Recompiler = savedClampOptions;
@@ -2593,7 +2605,9 @@ void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin
             registers[3] = 0x3f800000;
             for (u32 lane = 0; lane < 4; ++lane)
             {
-                registers[4 + lane] = std::array<u32, 4>{0x7f800000, 0xff800000, 0x7fc00000, 0x7f7fffff}[lane];
+                // x86 microVU does not clamp ADD operands at Normal clamp mode, so exponent-255
+                // operands legitimately differ from the interpreter; the x86-parity suites cover those.
+                registers[4 + lane] = std::array<u32, 4>{0x3f800000, 0xc0600000, 0x00800000, 0x7f7fffff}[lane];
                 registers[8 + lane] = 0x40000000;
             }
             const std::vector<u32> program = {NOP_L, (mask << 21) | (2u << 16) | (1u << 11) | (3u << 6) | 0x28u,
@@ -2614,14 +2628,16 @@ void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin
         EmuConfig.Cpu.Recompiler.vu1Overflow = clamp1;
         std::array<u32, 128> registers{};
         registers[3] = 0x3f800000;
-        std::fill_n(registers.data() + 4, 4, 0xffd23d20);
+        // x86 clamp1 maps every NaN to +max (the interpreter keeps the NaN sign), so use -Inf here;
+        // the x86-parity suites cover NaN operands.
+        std::fill_n(registers.data() + 4, 4, 0xff800000);
         const std::vector<u32> program = {NOP_L, (mask << 21) | (1u << 11) | opcode,
             NOP_L, NOP_U | 0x40000000, NOP_L, NOP_U};
         char name[96];
         std::snprintf(name, sizeof(name), "VU1 ACC broadcast op=%x mask=%x independent clamps=%u/%u",
             opcode, mask, clamp0, clamp1);
-        Compare(RunVU(1, false, program, 0x80, 0, 128, false, nullptr, registers.data()),
-            RunVU(1, true, program, 0x80, 0, 128, false, nullptr, registers.data()), name);
+        Compare(WithoutOverflowUnderflowFlags(RunVU(1, false, program, 0x80, 0, 128, false, nullptr, registers.data())),
+            WithoutOverflowUnderflowFlags(RunVU(1, true, program, 0x80, 0, 128, false, nullptr, registers.data())), name);
     }
     EmuConfig.Cpu.Recompiler = savedClampOptions;
     // Real XGKICK opcodes with a two-tag packet, without creating an MTGS
@@ -3217,6 +3233,8 @@ EESnapshot RunEEProgram(bool jit, const std::vector<u32>& program, bool multiBlo
     const GPR_reg* initial_gpr_full = nullptr, const u32* initial_fpr = nullptr, const u32* initial_fcr = nullptr,
     const u32* initial_vu0_vf = nullptr)
 {
+    // The EE FPU policy (FZ/rounding) must be installed for the interpreter and the JIT alike.
+    const FPControlRegisterBackup eeFpcrBackup(EmuConfig.Cpu.FPUFPCR);
     std::memset(&cpuRegs, 0, sizeof(cpuRegs));
     std::memset(&fpuRegs, 0, sizeof(fpuRegs));
     std::memset(&VU0.VF, 0, sizeof(VU0.VF));
@@ -12650,6 +12668,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         RunVuAotSavedTests();
     else if (std::strcmp(suite, "vu-aot-division") == 0)
         RunVuAotDivisionTests();
+    else if (std::strcmp(suite, "vu-aot-efu") == 0)
+        RunVuAotEfuTests();
     else if (std::strcmp(suite, "vu-aot-quiet-generation-cold-write") == 0)
         RunVuAotQuietGenerationTests(true);
     else if (std::strcmp(suite, "vu-aot-quiet-generation-cold-read") == 0)

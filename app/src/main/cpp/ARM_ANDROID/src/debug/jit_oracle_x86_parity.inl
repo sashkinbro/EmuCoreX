@@ -536,7 +536,7 @@ static void applyUpper(VUm& v, const UOp& o, u32 mask, u32 fs, u32 ft, u32 fd, c
 	}
 
 	// Ft operand by form.
-	bool ftIsI = false;
+	[[maybe_unused]] bool ftIsI = false;
 	for (u32 l = 0; l < 4; ++l)
 	{
 		switch (o.form)
@@ -564,13 +564,14 @@ static void applyUpper(VUm& v, const UOp& o, u32 mask, u32 fs, u32 ft, u32 fd, c
 			u32 s = Fs[l], t = Ft[l], a = v.acc[l];
 			if (mode == 1)
 			{
-				if ((ct & CT_FT) && !ftIsI) t = clamp1(t, env);
+				if (ct & CT_FT) t = clamp1(t, env);
 				if (ct & CT_FS) s = clamp1(s, env);
 				if (ct & CT_ACC) a = clamp1(a, env);
 			}
-			// checkVFClamp(): registers loaded from VF00 (isZero) and the I register are never clamped.
+			// checkVFClamp(): registers loaded from VF00 (isZero) are never clamped. The I register is
+			// allocated as allocReg(33, 0, mask) so its map entry is VFreg 0 (not 33) and it IS clamped like Ft.
 			const bool fsC = fs != 0;
-			const bool tC = o.form == F_P ? ft != 0 : !ftIsI;
+			const bool tC = o.form == F_P ? ft != 0 : true;
 			switch (o.kind)
 			{
 				case K_A: res[l] = sse(o.type, s, t, fsC, tC, mode, env); break;
@@ -1337,7 +1338,11 @@ static void sweepUpperOp(const Ctx& c, u32 opIdx, u32 step, u32 randomPerMask)
 		runCase(c, o.name, {in}, init, "");
 	}
 	// 2) every destination mask with random classes
+	// X86P_MASK=<1..15> restricts the random-class pass to one destination mask.
 	for (u32 mask = 1; mask < 16; ++mask)
+	{
+		const u32 onlyMask = std::getenv("X86P_MASK") ? static_cast<u32>(std::strtoul(std::getenv("X86P_MASK"), nullptr, 0)) : 0;
+		if (onlyMask && mask != onlyMask) continue;
 		for (u32 n = 0; n < randomPerMask; ++n)
 		{
 			Rng r(opIdx * 104729ull + mask * 1009ull + n * 13ull + 3);
@@ -1351,6 +1356,7 @@ static void sweepUpperOp(const Ctx& c, u32 opIdx, u32 step, u32 randomPerMask)
 			if (n % 7 == 4) in.ft = in.fs;
 			runCase(c, o.name, {in}, init, "");
 		}
+	}
 	// 3) VF00 as a source (checkVFClamp isZero quirk) and fd = VF00
 	for (u32 n = 0; n < 6; ++n)
 	{

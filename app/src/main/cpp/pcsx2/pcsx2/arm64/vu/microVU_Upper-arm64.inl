@@ -189,7 +189,8 @@ static __fi bool mVUUpperSignClampE_oaknut(mV)
 
 static __fi void mVUUpperAccumulatorIsClampable_oaknut(mV, int reg)
 {
-	if (mVUUpperSignClampE_oaknut(mVU))
+	// Normal-plus clamping (x86 mVUclamp3 on the ACC operand) applies to any clampE mode.
+	if (clampE)
 		mVU.regAlloc->clearVFZeroHint(reg);
 }
 
@@ -698,42 +699,20 @@ static void mVUupdateFlags_oaknut(mV, int reg, int regT1in = VU_HOST_NO_XMM, int
 	oakAsm->ADDV(OAK_SSCRATCH, vZero.S4());
 	oakAsm->FMOV(mac_w, OAK_SSCRATCH);
 
-	// Overflow flags are generated for unclamped results as well, matching
-	// VU_MAC_UPDATE; the overflow hack keeps its own path.
-	const bool want_overflow_flags = CHECK_VUOVERFLOWHACK || !CHECK_VU_OVERFLOW(mVU.index);
-	if ((sFLAG.doFlag || mFLAG.doFlag) && want_overflow_flags)
+	// x86 mVUupdateFlags computes O only for the Superman Returns overflow
+	// gamefix; U is never computed and O is never derived from exponent 255.
+	if (doOverflowHack)
 	{
 		oak::Label no_overflow;
-		if (CHECK_VUOVERFLOWHACK)
-		{
-			oakLoad128(OAK_QSCRATCH3, mVUUpperOakSs4Mem(offsetof(mVU_SSE4, sse4_compvals[0][0])));
-			oakAsm->FACGE(vZero.S4(), src_q.S4(), OAK_QSCRATCH3.S4());
-		}
-		else
-		{
-			// Match VU_MAC_UPDATE for unclamped results, including NaNs.
-			// (v << 1) >= 0xFF000000 unsigned is exactly exp == 255, and unlike
-			// FP comparisons the integer test cannot raise FPCR exception flags.
-			oakAsm->SHL(vZero.S4(), src_q.S4(), 1);
-			oakAsm->MOVI(OAK_QSCRATCH3.S4(), 0xff, oak::LslSymbol::LSL, 24);
-			oakAsm->CMHS(vZero.S4(), vZero.S4(), OAK_QSCRATCH3.S4());
-		}
+		// |x| >= FLT_MAX, true for NaN as well (x86 CMPNLT).
+		oakLoad128(OAK_QSCRATCH3, mVUUpperOakSs4Mem(offsetof(mVU_SSE4, sse4_compvals[0][0])));
+		oakAsm->FACGT(vZero.S4(), OAK_QSCRATCH3.S4(), src_q.S4());
+		oakAsm->MVN(vZero.B16(), vZero.B16());
 		mVUUpperMovmskps_oaknut(temp_w, vZero);
 		mVUUpperMaskActiveLanes_oaknut(temp_w, overflowMask);
 		oakAsm->CBZ(temp_w, no_overflow);
-		if (sFLAG.doFlag)
-		{
-			if (sFLAG.doNonSticky)
-			{
-				oakAsm->MOV(OAK_WSCRATCH, 0x820000);
-				oakAsm->ORR(status_w, status_w, OAK_WSCRATCH);
-			}
-			else
-			{
-				// Single-bit logical immediate: no scratch materialization.
-				oakAsm->ORR(status_w, status_w, 0x800000);
-			}
-		}
+		oakAsm->MOV(OAK_WSCRATCH, 0x820000);
+		oakAsm->ORR(status_w, status_w, OAK_WSCRATCH);
 		if (mFLAG.doFlag)
 		{
 			// Fold the lane shift into the ORR instead of shifting in place.
@@ -838,41 +817,17 @@ static void mVU_ADD_direct_emit_oaknut(mP)
 	}
 
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
-	// Normal clamping must sanitize both ADD operands like vuDouble.
-	// Use a private Ft copy because the source VF remains architecturally unchanged.
-	const bool needsOperandClamp = (!clampE && CHECK_VU_OVERFLOW(mVU.index)) ||
-		(isVU0 && isCOP2 && _X_Y_Z_W == 0xe);
-	int FtDouble = Ft;
-	int t1 = VU_HOST_NO_XMM;
-	if (needsOperandClamp)
-	{
-		FtDouble = mVU.regAlloc->allocRegId();
-		if (!mVUUpperUseHardwareInputFlush_oaknut(mVU.index))
-			t1 = mVU.regAlloc->allocRegId();
-	}
 
 	recBeginOaknutEmit();
-	if (needsOperandClamp)
-	{
-		oakAsm->MOV(oakQRegister(FtDouble).B16(), oakQRegister(Ft).B16());
-		mVUUpperPrepareVuDoubleBounds_oaknut(mVU);
-		mVUUpperVuDoubleVector_oaknut(mVU, Fs, t1, true);
-		mVUUpperVuDoubleVector_oaknut(mVU, FtDouble, t1, true);
-	}
 	if (_XYZW_SS)
-		mVUUpperAddSs_oaknut(mVU, Fs, FtDouble);
+		mVUUpperAddSs_oaknut(mVU, Fs, Ft);
 	else
-		mVUUpperAddPs_oaknut(mVU, Fs, FtDouble);
+		mVUUpperAddPs_oaknut(mVU, Fs, Ft);
 	recEndOaknutEmit();
 
 	mVUupdateFlags_oaknut(mVU, Fs, tempFt);
 
 	mVU.regAlloc->clearNeededXmmId(Fs);
-	if (needsOperandClamp)
-	{
-		mVU.regAlloc->clearNeededXmmId(t1);
-		mVU.regAlloc->clearNeededXmmId(FtDouble);
-	}
 	mVU.regAlloc->clearNeededXmmId(Ft);
 }
 
@@ -1567,62 +1522,10 @@ static void mVU_MADD_direct_emit_oaknut(mP)
 	mVU.regAlloc->clearNeededXmmId(ACC);
 }
 
-static void mVU_MADD_cop2_emit_oaknut(mP)
-{
-	if (mVUtryEmitNoLaneFmacFlags_oaknut(mVU))
-		return;
-
-	int FtRaw;
-	if (_XYZW_SS2)
-		FtRaw = mVU.regAlloc->allocRegId(_Ft_, 0, _X_Y_Z_W);
-	else
-		FtRaw = mVU.regAlloc->allocRegId(_Ft_);
-
-	const int Ft = mVU.regAlloc->allocRegId();
-	const int ACC = mVU.regAlloc->allocRegId(32);
-	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
-	mVUUpperAccumulatorIsClampable_oaknut(mVU, Fs);
-	const int tempFs = mVU.regAlloc->allocRegId();
-	const int t1 = mVU.regAlloc->allocRegId();
-
-	recBeginOaknutEmit();
-	oakAsm->MOV(oakQRegister(Ft).B16(), oakQRegister(FtRaw).B16());
-	oakAsm->MOV(oakQRegister(tempFs).B16(), oakQRegister(Fs).B16());
-	mVUUpperPrepareVuDoubleBounds_oaknut(mVU);
-	mVUUpperVuDoubleVector_oaknut(mVU, Ft, t1, true);
-	mVUUpperVuDoubleVector_oaknut(mVU, tempFs, t1, true);
-	oakAsm->MOV(oakQRegister(Fs).B16(), oakQRegister(ACC).B16());
-	if (_XYZW_SS2 && !mVUUpperNatural_oaknut(mVU))
-		mVUUpperPshufd_oaknut(Fs, Fs, shuffleSS(_X_Y_Z_W));
-	// The SS2 shuffle above may clobber Q29 (negative bound); without it the values
-	// loaded by PrepareVuDoubleBounds are still live and must not be rebuilt.
-	mVUUpperVuDoubleVector_oaknut(mVU, Fs, t1, !_XYZW_SS2);
-	if (_XYZW_SS)
-	{
-		oakAsm->FMUL(OAK_SSCRATCH, oakSRegister(tempFs), oakQRegister(Ft).Selem()[0]);
-		oakAsm->FADD(oakSRegister(Fs), oakSRegister(Fs), OAK_SSCRATCH);
-	}
-	else
-	{
-		oakAsm->FMUL(OAK_QSCRATCH.S4(), oakQRegister(tempFs).S4(), oakQRegister(Ft).S4());
-		oakAsm->FADD(oakQRegister(Fs).S4(), oakQRegister(Fs).S4(), OAK_QSCRATCH.S4());
-	}
-	recEndOaknutEmit();
-
-	mVU.regAlloc->clearNeededXmmId(tempFs);
-	mVUupdateFlags_oaknut(mVU, Fs, Ft);
-
-	mVU.regAlloc->clearNeededXmmId(t1);
-	mVU.regAlloc->clearNeededXmmId(Fs);
-	mVU.regAlloc->clearNeededXmmId(Ft);
-	mVU.regAlloc->clearNeededXmmId(FtRaw);
-	mVU.regAlloc->clearNeededXmmId(ACC);
-}
-
 static void mVU_MADD_emit(mP)
 {
 	pass1 { mVUanalyzeFMAC1(mVU, _Fd_, _Fs_, _Ft_); }
-	pass2 { if (isVU0 && isCOP2) mVU_MADD_cop2_emit_oaknut(mVU, recPass); else mVU_MADD_direct_emit_oaknut(mVU, recPass); }
+	pass2 { mVU_MADD_direct_emit_oaknut(mVU, recPass); }
 	pass3
 	{
 		mVUlog("MADD");
@@ -1639,26 +1542,17 @@ static void mVU_MADDi_direct_emit_oaknut(mP)
 	if (mVUtryEmitNoLaneFmacFlags_oaknut(mVU))
 		return;
 
-	const bool needsVu0Exact = isVU0 && !isCOP2 && (_X_Y_Z_W == 0xf);
 	const int Fi = mVU.regAlloc->allocRegId(33, 0, _X_Y_Z_W);
 	const int ACC = mVU.regAlloc->allocRegId(32);
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
 	mVUUpperAccumulatorIsClampable_oaknut(mVU, Fs);
 	const int tempFs = mVU.regAlloc->allocRegId();
-	const int t1 = needsVu0Exact ? mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
 
 	recBeginOaknutEmit();
 	oakAsm->MOV(oakQRegister(tempFs).B16(), oakQRegister(Fs).B16());
 	oakAsm->MOV(oakQRegister(Fs).B16(), oakQRegister(ACC).B16());
 	if (_XYZW_SS2 && !mVUUpperNatural_oaknut(mVU))
 		mVUUpperPshufd_oaknut(Fs, Fs, shuffleSS(_X_Y_Z_W));
-	if (needsVu0Exact)
-	{
-		mVUUpperPrepareVuDoubleBounds_oaknut(mVU);
-		mVUUpperVuDoubleVector_oaknut(mVU, Fs, t1, true);
-		mVUUpperVuDoubleVector_oaknut(mVU, tempFs, t1, true);
-		mVUUpperVuDoubleVector_oaknut(mVU, Fi, t1, true);
-	}
 	if (_XYZW_SS)
 		mVUUpperFmlaSs_oaknut(mVU, Fs, tempFs, Fi);
 	else
@@ -1669,10 +1563,6 @@ static void mVU_MADDi_direct_emit_oaknut(mP)
 
 	mVUupdateFlags_oaknut(mVU, Fs, Fi);
 
-	if (needsVu0Exact)
-	{
-		mVU.regAlloc->clearNeededXmmId(t1);
-	}
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	mVU.regAlloc->clearNeededXmmId(Fi);
 	mVU.regAlloc->clearNeededXmmId(ACC);
@@ -1762,21 +1652,16 @@ static void mVU_MADD_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 	if (mVUtryEmitNoLaneFmacFlags_oaknut(mVU))
 		return;
 
-	const bool needsVu1MaddLaneVuDouble = isVU1 && (lane == 0 || lane == 3);
 	// x86 clamps Fs for MADDx/y/z/w and, for COP2 MADDw, also ACC and Ft (Normal clamp mode).
 	const bool cop2MaddW = isCOP2 && lane == 3;
-	const bool useFtLane = !clampE && !needsVu1MaddLaneVuDouble && !cop2MaddW;
+	const bool useFtLane = !clampE && !cop2MaddW;
 	const int FtRaw = mVU.regAlloc->allocRegId(_Ft_);
 	int FtL = VU_HOST_NO_XMM;
 	if (!useFtLane)
 	{
 		FtL = mVU.regAlloc->allocRegId();
 		recBeginOaknutEmit();
-		if (needsVu1MaddLaneVuDouble)
-			mVUClampVuDoubleBroadcastBits_oaknut(FtL, FtRaw, lane, CHECK_VU_OVERFLOW(mVU.index),
-				!mVUUpperUseHardwareInputFlush_oaknut(mVU.index));
-		else
-			mVUUpperDupLane_oaknut(FtL, FtRaw, lane);
+		mVUUpperDupLane_oaknut(FtL, FtRaw, lane);
 		recEndOaknutEmit();
 		mVU.regAlloc->clearNeededXmmId(FtRaw);
 	}
@@ -1784,40 +1669,31 @@ static void mVU_MADD_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 	const int ACC = mVU.regAlloc->allocRegId(32);
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
 	mVUUpperAccumulatorIsClampable_oaknut(mVU, Fs);
+	if (cop2MaddW)
+		mVU.regAlloc->clearVFZeroHint(Fs); // ACC is clamped even when Fs was loaded from VF00
 	const int tempFs = mVU.regAlloc->allocRegId();
-	const int t1 = (needsVu1MaddLaneVuDouble && !mVUUpperUseHardwareInputFlush_oaknut(mVU.index)) ?
-		mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
 
 	recBeginOaknutEmit();
 	oakAsm->MOV(oakQRegister(tempFs).B16(), oakQRegister(Fs).B16());
 	oakAsm->MOV(oakQRegister(Fs).B16(), oakQRegister(ACC).B16());
 	if (_XYZW_SS2 && !mVUUpperNatural_oaknut(mVU))
 		mVUUpperPshufd_oaknut(Fs, Fs, shuffleSS(_X_Y_Z_W));
-	if (needsVu1MaddLaneVuDouble)
+	if (_XYZW_SS)
 	{
-		mVUUpperPrepareVuDoubleBounds_oaknut(mVU);
-		mVUUpperVuDoubleVector_oaknut(mVU, Fs, t1, true);
-		mVUUpperVuDoubleVector_oaknut(mVU, tempFs, t1, true);
+		mVUUpperClampOperandScalar_oaknut(mVU, tempFs, false);
+		if (cop2MaddW)
+		{
+			mVUUpperClampOperandScalar_oaknut(mVU, FtL, false);
+			mVUUpperClampOperandScalar_oaknut(mVU, Fs, false);
+		}
 	}
 	else
 	{
-		if (_XYZW_SS)
+		mVUUpperClamp2Vector_oaknut(mVU, tempFs, false);
+		if (cop2MaddW)
 		{
-			mVUUpperClampOperandScalar_oaknut(mVU, tempFs, false);
-			if (cop2MaddW)
-			{
-				mVUUpperClampOperandScalar_oaknut(mVU, FtL, false);
-				mVUUpperClampOperandScalar_oaknut(mVU, Fs, false);
-			}
-		}
-		else
-		{
-			mVUUpperClamp2Vector_oaknut(mVU, tempFs, false);
-			if (cop2MaddW)
-			{
-				mVUUpperClamp2Vector_oaknut(mVU, FtL, false);
-				mVUUpperClamp2Vector_oaknut(mVU, Fs, false);
-			}
+			mVUUpperClamp2Vector_oaknut(mVU, FtL, false);
+			mVUUpperClamp2Vector_oaknut(mVU, Fs, false);
 		}
 	}
 	if (_XYZW_SS)
@@ -1834,18 +1710,10 @@ static void mVU_MADD_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 		else
 			mVUUpperFmlaPs_oaknut(mVU, Fs, tempFs, FtL);
 	}
-	if (needsVu1MaddLaneVuDouble)
-	{
-		mVUUpperClampVu1MaddLaneResult_oaknut(Fs, _XYZW_SS && !mVUUpperNatural_oaknut(mVU));
-	}
 	recEndOaknutEmit();
 
 	mVUupdateFlags_oaknut(mVU, Fs, useFtLane ? tempFs : FtL);
 
-	if (needsVu1MaddLaneVuDouble)
-	{
-		mVU.regAlloc->clearNeededXmmId(t1);
-	}
 	mVU.regAlloc->clearNeededXmmId(tempFs);
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	if (useFtLane)
@@ -1894,8 +1762,6 @@ static void mVU_MSUB_direct_emit_oaknut(mP)
 	if (mVUtryEmitNoLaneFmacFlags_oaknut(mVU))
 		return;
 
-	const bool needsVu1XyzwVuDouble = isVU1 && !isCOP2 && _XYZW_PS;
-
 	int Ft;
 	int tempFt;
 	if (_XYZW_SS2 && !mVUUpperNatural_oaknut(mVU))
@@ -1916,51 +1782,22 @@ static void mVU_MSUB_direct_emit_oaknut(mP)
 
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
 	const int Fd = mVU.regAlloc->allocRegId(32, _Fd_, _X_Y_Z_W);
-	const int FsWork = needsVu1XyzwVuDouble ? mVU.regAlloc->allocRegId() : Fs;
-	const int FtWork = needsVu1XyzwVuDouble ? mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
-	const int t1 = (needsVu1XyzwVuDouble && !mVUUpperUseHardwareInputFlush_oaknut(mVU.index)) ?
-		mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
 
 	recBeginOaknutEmit();
-	if (needsVu1XyzwVuDouble)
-	{
-		oakAsm->MOV(oakQRegister(FsWork).B16(), oakQRegister(Fs).B16());
-		oakAsm->MOV(oakQRegister(FtWork).B16(), oakQRegister(Ft).B16());
-		mVUUpperPrepareVuDoubleBounds_oaknut(mVU);
-		mVUUpperVuDoubleVector_oaknut(mVU, Fd, t1, true);
-		mVUUpperVuDoubleVector_oaknut(mVU, FsWork, t1, true);
-		mVUUpperVuDoubleVector_oaknut(mVU, FtWork, t1, true);
-	}
 	if (isCOP2)
 	{
 		if (_XYZW_SS)
-			mVUUpperClampOperandScalar_oaknut(mVU, FsWork, false);
+			mVUUpperClampOperandScalar_oaknut(mVU, Fs, false);
 		else
-			mVUUpperClamp2Vector_oaknut(mVU, FsWork, false);
+			mVUUpperClamp2Vector_oaknut(mVU, Fs, false);
 	}
 	if (_XYZW_SS)
-		mVUUpperFmlsSs_oaknut(mVU, Fd, FsWork, Ft);
+		mVUUpperFmlsSs_oaknut(mVU, Fd, Fs, Ft);
 	else
-	{
-		mVUUpperFmlsPs_oaknut(mVU, Fd, FsWork, needsVu1XyzwVuDouble ? FtWork : Ft);
-		if (needsVu1XyzwVuDouble)
-		{
-			mVUUpperClampVu1XyzwMsubResult_oaknut(mVU, Fd);
-		}
-	}
+		mVUUpperFmlsPs_oaknut(mVU, Fd, Fs, Ft);
 	recEndOaknutEmit();
 
-	if (needsVu1XyzwVuDouble)
-		mVUupdateFlags_oaknut(mVU, Fd, tempFt);
-	else
-		mVUupdateFlags_oaknut(mVU, Fd, Fs, tempFt);
-
-	if (needsVu1XyzwVuDouble)
-	{
-		mVU.regAlloc->clearNeededXmmId(t1);
-		mVU.regAlloc->clearNeededXmmId(FtWork);
-		mVU.regAlloc->clearNeededXmmId(FsWork);
-	}
+	mVUupdateFlags_oaknut(mVU, Fd, Fs, tempFt);
 
 	mVU.regAlloc->clearNeededXmmId(Fd);
 	mVU.regAlloc->clearNeededXmmId(Ft);
@@ -3911,7 +3748,8 @@ static void mVU_MULA_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 {
 	mVUUpperNaturalScope natural_scope(mVU, true);
 	const bool shouldClampFt = ((lane == 3 && _XYZW_PS) || mVUUpperSignClampE_oaknut(mVU)) && mVUUpperWillClampFt_oaknut(mVU, cFt);
-	const bool useFtLane = !shouldClampFt;
+	// Normal-plus clamping also clamps the broadcast operand inside the multiply (x86 mVUclamp3).
+	const bool useFtLane = !clampE && !shouldClampFt;
 	const int FtRaw = mVU.regAlloc->allocRegId(_Ft_);
 	int FtL = VU_HOST_NO_XMM;
 	if (!useFtLane)
@@ -4156,7 +3994,8 @@ static void mVU_MUL_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane)
 		return;
 
 	const bool shouldClampFt = (_XYZW_PS || mVUUpperSignClampE_oaknut(mVU)) && mVUUpperWillClampFt_oaknut(mVU, cFt);
-	const bool useFtLane = !shouldClampFt;
+	// Normal-plus clamping also clamps the broadcast operand inside the multiply (x86 mVUclamp3).
+	const bool useFtLane = !clampE && !shouldClampFt;
 	const int FtRaw = mVU.regAlloc->allocRegId(_Ft_);
 	int FtL = VU_HOST_NO_XMM;
 	if (!useFtLane)
