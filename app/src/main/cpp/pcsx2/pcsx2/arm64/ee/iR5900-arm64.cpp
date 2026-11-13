@@ -1588,14 +1588,18 @@ static void recMemcheckHit_emit_oaknut(size_t index)
 {
 	recBeginOaknutEmit();
 	oakAsm->MOV(oak::util::X0, static_cast<u64>(index));
+	recFlushReccycle(); // the debugger may pause and exit via fastjmp
 	oakEmitCall(reinterpret_cast<void*>(dynarecMemcheck));
+	recReloadReccycle();
 	recEndOaknutEmit();
 }
 
 static void recBreakpointCheck_emit_oaknut()
 {
 	recBeginOaknutEmit();
+	recFlushReccycle();
 	oakEmitCall(reinterpret_cast<void*>(dynarecCheckBreakpoint));
+	recReloadReccycle();
 	recEndOaknutEmit();
 }
 
@@ -2440,14 +2444,18 @@ static bool recSkipTimeoutLoop(s32 reg, bool is_timeout_loop)
 static void recEELoadMainHook_emit_oaknut()
 {
 	recBeginOaknutEmit();
+	recFlushReccycle(); // the hook may move nextEventCycle (ELF entry callbacks)
 	oakEmitCall(reinterpret_cast<void*>(eeloadHook));
+	recReloadReccycle();
 	recEndOaknutEmit();
 }
 
 static void recEELoadExecHook_emit_oaknut()
 {
 	recBeginOaknutEmit();
+	recFlushReccycle();
 	oakEmitCall(reinterpret_cast<void*>(eeloadHook2));
+	recReloadReccycle();
 	recEndOaknutEmit();
 }
 
