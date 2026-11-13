@@ -2869,8 +2869,6 @@ SCCS-60002:
 SCED-50041:
   name: "Tekken Tag Tournament [Demo]"
   region: "PAL-E"
-  clampModes:
-    vu0ClampMode: 2 # Temporary: fixes exploding polygons until the arm64 VU0 Normal-clamp bug is fixed.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SCED-50065:
@@ -4717,8 +4715,6 @@ SCES-50001:
   name: "Tekken Tag Tournament"
   region: "PAL-M5"
   compat: 5
-  clampModes:
-    vu0ClampMode: 2 # Temporary: fixes exploding polygons until the arm64 VU0 Normal-clamp bug is fixed.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SCES-50002:
@@ -10824,8 +10820,6 @@ SCPS-56002:
   name-en: "Tekken Tag Tournament"
   region: "NTSC-K"
   compat: 5
-  clampModes:
-    vu0ClampMode: 2 # Temporary: fixes exploding polygons until the arm64 VU0 Normal-clamp bug is fixed.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SCPS-56003:
@@ -55295,8 +55289,6 @@ SLPS-20015:
   name-en: "Tekken Tag Tournament"
   region: "NTSC-J"
   compat: 5
-  clampModes:
-    vu0ClampMode: 2 # Temporary: fixes exploding polygons until the arm64 VU0 Normal-clamp bug is fixed.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLPS-20016:
@@ -63898,8 +63890,6 @@ SLPS-71501:
   name-sort: "てっけんたっぐとーなめんと [MEGA HITS!]"
   name-en: "Tekken Tag Tournament [MEGA HITS!]"
   region: "NTSC-J"
-  clampModes:
-    vu0ClampMode: 2 # Temporary: fixes exploding polygons until the arm64 VU0 Normal-clamp bug is fixed.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLPS-71502:
@@ -63997,8 +63987,6 @@ SLPS-73104:
   name-sort: "てっけんたっぐとーなめんと [PlayStation2 the Best]"
   name-en: "Tekken Tag Tournament [PlayStation2 the Best]"
   region: "NTSC-J"
-  clampModes:
-    vu0ClampMode: 2 # Temporary: fixes exploding polygons until the arm64 VU0 Normal-clamp bug is fixed.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLPS-73105:
@@ -64902,8 +64890,6 @@ SLUS-20001:
   name: "Tekken Tag Tournament"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    vu0ClampMode: 2 # Temporary: fixes exploding polygons until the arm64 VU0 Normal-clamp bug is fixed.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLUS-20002:

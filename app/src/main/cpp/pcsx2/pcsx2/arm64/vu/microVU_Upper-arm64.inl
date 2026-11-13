@@ -1763,7 +1763,9 @@ static void mVU_MADD_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 		return;
 
 	const bool needsVu1MaddLaneVuDouble = isVU1 && (lane == 0 || lane == 3);
-	const bool useFtLane = !clampE && !needsVu1MaddLaneVuDouble;
+	// x86 clamps Fs for MADDx/y/z/w and, for COP2 MADDw, also ACC and Ft (Normal clamp mode).
+	const bool cop2MaddW = isCOP2 && lane == 3;
+	const bool useFtLane = !clampE && !needsVu1MaddLaneVuDouble && !cop2MaddW;
 	const int FtRaw = mVU.regAlloc->allocRegId(_Ft_);
 	int FtL = VU_HOST_NO_XMM;
 	if (!useFtLane)
@@ -1796,6 +1798,27 @@ static void mVU_MADD_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 		mVUUpperPrepareVuDoubleBounds_oaknut(mVU);
 		mVUUpperVuDoubleVector_oaknut(mVU, Fs, t1, true);
 		mVUUpperVuDoubleVector_oaknut(mVU, tempFs, t1, true);
+	}
+	else
+	{
+		if (_XYZW_SS)
+		{
+			mVUUpperClampOperandScalar_oaknut(mVU, tempFs, false);
+			if (cop2MaddW)
+			{
+				mVUUpperClampOperandScalar_oaknut(mVU, FtL, false);
+				mVUUpperClampOperandScalar_oaknut(mVU, Fs, false);
+			}
+		}
+		else
+		{
+			mVUUpperClamp2Vector_oaknut(mVU, tempFs, false);
+			if (cop2MaddW)
+			{
+				mVUUpperClamp2Vector_oaknut(mVU, FtL, false);
+				mVUUpperClamp2Vector_oaknut(mVU, Fs, false);
+			}
+		}
 	}
 	if (_XYZW_SS)
 	{

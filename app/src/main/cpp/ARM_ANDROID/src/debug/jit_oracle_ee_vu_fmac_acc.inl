@@ -345,7 +345,90 @@ void EEVuFmacAccTests()
 			Check(seq_failures == 0, name);
 	}
 	s_wild = false;
+
+	// x86-model checks at clamp level 1 (Normal). The interpreter does not model x86's
+	// per-opcode operand clamps, so expected values are asserted directly: upstream
+	// microVU clamps Fs for MADDx/y/z/w and, for COP2 MADDw, ACC and Ft as well.
+	SetClamp(1);
+	{
+		const auto find_op = [&](const char* n) {
+			for (u32 i = 0; i < ops.size(); ++i)
+				if (ops[i].name == n)
+					return i;
+			return 0u;
+		};
+		const u32 inf_p = 0x7f800000u, inf_n = 0xff800000u, nan_p = 0x7fc00000u, one = 0x3f800000u;
+		const u32 max_p = 0x7f7fffffu, max_n = 0xff7fffffu;
+		for (u32 mode = 0; mode < 3; ++mode)
+		for (u32 l = 0; l < 4; ++l)
+		{
+			// Fs is non-finite, Ft lane is zero, ACC = 1.0: x86 gives max*0 + 1 = 1.0 in every lane.
+			const char* const nm[4] = {"MADDx", "MADDy", "MADDz", "MADDw"};
+			FmacInit init{};
+			init.vf[3] = one;
+			const u32 fsv[4] = {inf_p, inf_n, inf_p, nan_p};
+			for (u32 k = 0; k < 4; ++k)
+			{
+				init.vf[1 * 4 + k] = fsv[k];
+				init.acc[k] = one;
+			}
+			const u32 oi = find_op(nm[l]);
+			const std::vector<u32> uppers = {Encode(ops, Instr{oi, 15, 1, 2, 3})};
+			const Result r = mode == 0 ? RunMacro(true, uppers, init) : RunMicro(mode - 1, true, uppers, init);
+			char name[128];
+			std::snprintf(name, sizeof(name), "FMAC x86-model clamp=1 %s %s non-finite Fs * 0 + 1.0 == 1.0",
+				mode_names[mode], nm[l]);
+			Check(r.vf[12] == one && r.vf[13] == one && r.vf[14] == one && r.vf[15] == one, name);
+		}
+		{
+			// COP2 MADDw also clamps ACC (and Ft). Fs = 0, Ft.w = 1.0: result is the clamped ACC
+			// (+/-Inf -> +/-max, +/-qNaN -> +max like MINPS/MAXPS).
+			FmacInit init{};
+			init.vf[3] = one;
+			init.acc[0] = inf_p; init.acc[1] = inf_n; init.acc[2] = 0x7fc00001u; init.acc[3] = 0xffc00001u; // quiet NaNs (FMINNM folds signaling NaNs differently from MINPS)
+			for (u32 k = 0; k < 4; ++k)
+				init.vf[2 * 4 + k] = one;
+			const std::vector<u32> uppers = {Encode(ops, Instr{find_op("MADDw"), 15, 1, 2, 3})};
+			const Result r = RunMacro(true, uppers, init);
+			Check(r.vf[12] == max_p && r.vf[13] == max_n && r.vf[14] == max_p && r.vf[15] == max_p, // Normal clamp folds any NaN to +max
+				"FMAC x86-model clamp=1 macro MADDw clamps ACC");
+			// Ft.w = +Inf with Fs = 0: Ft is clamped, so 0 * max + 1.0 == 1.0.
+			FmacInit init2{};
+			init2.vf[3] = one;
+			for (u32 k = 0; k < 4; ++k)
+			{
+				init2.acc[k] = one;
+				init2.vf[2 * 4 + k] = inf_p;
+			}
+			const Result r2 = RunMacro(true, uppers, init2);
+			Check(r2.vf[12] == one && r2.vf[13] == one && r2.vf[14] == one && r2.vf[15] == one,
+				"FMAC x86-model clamp=1 macro MADDw clamps Ft");
+		}
+	}
+
 	std::printf("fmac-acc oracle: %u informational mismatches with exponent-255 operands below clamp 3 (not gated)\n", wild_failures);
+	// CTC2 -> CFC2 round trip for every VU0 control register, JIT vs interpreter (VI regs, I, R,
+	// flags). Regs written before and after in the same block exercise the EE VI register cache.
+	for (u32 rd = 1; rd < 32; ++rd)
+	for (u32 variant = 0; variant < 3; ++variant)
+	{
+		const u32 pat[3] = {0xdeadbeefu, 0x00000005u, 0xfffff0f3u};
+		GPR_reg gpr[32]{};
+		gpr[8].UD[0] = 0xffffffff00000000ull | pat[variant];
+		if (rd == 28) // FBRST: the interpreter stores before the reset bits clear it, x86/ours after; compare without reset/break bits
+			gpr[8].UD[0] &= ~0x303ull;
+		gpr[10].UD[0] = 0x1111;
+		const auto cop2 = [](u32 rs, u32 rt, u32 fs) { return (0x12u << 26) | (rs << 21) | (rt << 16) | (fs << 11); };
+		std::vector<u32> code = {cop2(6, 10, 1), cop2(6, 8, rd), cop2(2, 9, rd), cop2(2, 11, 1)}; // CTC2 vi1; CTC2 rd; CFC2 rd; CFC2 vi1
+		if (variant == 2)
+			code = {cop2(6, 8, rd), cop2(6, 10, 1), cop2(2, 9, rd), cop2(2, 11, 1), cop2(6, 8, rd), cop2(2, 12, rd)};
+		const EESnapshot interp = RunEEProgram(false, code, false, nullptr, nullptr, gpr);
+		const EESnapshot jit = RunEEProgram(true, code, false, nullptr, nullptr, gpr);
+		char name[96];
+		std::snprintf(name, sizeof(name), "CTC2/CFC2 round trip vi%u variant %u JIT == interpreter", rd, variant);
+		CompareEE(interp, jit, name);
+	}
+
 	EmuCoreXOracleSetEeIrMode(-1);
 	EmuCoreXOracleSetVUIR(0, -1);
 	EmuCoreXOracleSetVUIR(1, -1);
