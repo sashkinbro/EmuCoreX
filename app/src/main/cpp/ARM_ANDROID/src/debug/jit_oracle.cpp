@@ -77,6 +77,10 @@ extern "C" void EmuCoreXOracleHWSoftwareCopies(void (*check)(bool, const char*),
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#include <map>
+#include <set>
+#include <string>
+#include <cstdlib>
 #include <chrono>
 #include <cmath>
 #include <thread>
@@ -569,8 +573,28 @@ struct FmacInit
     u32 vf[128];
     u32 acc[4];
     u32 i, q;
+    u32 r, p, status, mac, clip; // x86-parity oracle: R, P and flag registers (zero = previous behaviour)
 };
 const FmacInit* s_fmac_init = nullptr;
+const u32* s_fpu_acc_init = nullptr; // x86-parity oracle: initial EE FPU ACC
+
+// Applies the optional R/P/flag state of s_fmac_init to a VU register file.
+void ApplyFmacInitExtra(VURegs& vu)
+{
+    if (!s_fmac_init)
+        return;
+    vu.VI[REG_R].UL = s_fmac_init->r;
+    vu.VI[REG_P].UL = s_fmac_init->p;
+    vu.pending_p = s_fmac_init->p;
+    vu.VI[REG_STATUS_FLAG].UL = vu.statusflag = s_fmac_init->status;
+    vu.VI[REG_MAC_FLAG].UL = vu.macflag = s_fmac_init->mac;
+    vu.VI[REG_CLIP_FLAG].UL = vu.clipflag = s_fmac_init->clip;
+    // The micro dispatcher loads its pipelined flag instances from these arrays, not from VI.
+    std::fill_n(vu.micro_statusflags, 4, VUDenormalizeStatus(s_fmac_init->status));
+    std::fill_n(vu.micro_macflags, 4, s_fmac_init->mac);
+    std::fill_n(vu.micro_clipflags, 4, s_fmac_init->clip);
+    vu.pending_q = s_fmac_init->q;
+}
 
 struct Snapshot
 {
@@ -617,6 +641,7 @@ Snapshot RunVU(u32 index, bool jit, const std::vector<u32>& program, u32 pc, u64
         vu.VI[REG_I].UL = s_fmac_init->i;
         vu.VI[REG_Q].UL = s_fmac_init->q;
         vu.q.UL = s_fmac_init->q;
+        ApplyFmacInitExtra(vu);
     }
     const u32 size = index ? 0x4000 : 0x1000;
     for (u32 i = 0; i < size; i += 8)
@@ -635,6 +660,7 @@ Snapshot RunVU(u32 index, bool jit, const std::vector<u32>& program, u32 pc, u64
     BaseVUmicroCPU* cpu = index ? (jit ? static_cast<BaseVUmicroCPU*>(&CpuMicroVU1) : &CpuIntVU1)
                                : (jit ? static_cast<BaseVUmicroCPU*>(&CpuMicroVU0) : &CpuIntVU0);
     cpu->Reset();
+    ApplyFmacInitExtra(vu); // Reset clears R/P/flag registers
     OpcodeFamilies::SetFamilyMask(index ? OpcodeFamilies::CORE_VU1 : OpcodeFamilies::CORE_VU0, familyMask);
     cpu->SetStartPC(pc);
     const bool fallback = (vu.flags & VUFLAG_INTERPRETER) != 0;
@@ -3206,6 +3232,7 @@ EESnapshot RunEEProgram(bool jit, const std::vector<u32>& program, bool multiBlo
         VU0.VI[REG_I].UL = s_fmac_init->i;
         VU0.VI[REG_Q].UL = s_fmac_init->q;
         VU0.q.UL = s_fmac_init->q;
+        ApplyFmacInitExtra(VU0);
     }
     // A self-branch terminates the recompiled block so the forced exit fires
     // at a branch boundary; the interpreter stops after the same steps.
@@ -3233,6 +3260,8 @@ EESnapshot RunEEProgram(bool jit, const std::vector<u32>& program, bool multiBlo
             fpuRegs.fpr[r].UL = initial_fpr[r];
     if (initial_fcr)
         std::memcpy(fpuRegs.fprc, initial_fcr, sizeof(fpuRegs.fprc));
+    if (s_fpu_acc_init)
+        fpuRegs.ACC.UL = *s_fpu_acc_init;
     if (initial_cp0)
         std::memcpy(cpuRegs.CP0.r, initial_cp0, sizeof(cpuRegs.CP0.r));
 
@@ -4289,6 +4318,7 @@ void EECoverageCop2Spec2()
 #include "jit_oracle_ee_fastmem_cold.inl"
 #include "jit_oracle_ee_madd.inl"
 #include "jit_oracle_ee_fpu_hw.inl"
+#include "jit_oracle_x86_parity.inl"
 
 void EEVuAbsSharedTests()
 {
@@ -10188,6 +10218,11 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
         EeMaddNativeOracleTests();
         return;
     }
+    if (direct_suite && std::strncmp(direct_suite, "x86-parity", 10) == 0)
+    {
+        X86ParityTests(direct_suite);
+        return;
+    }
     if (direct_suite && std::strcmp(direct_suite, "ee-fpu-hw") == 0)
     {
         EeFpuHwTests();
@@ -12715,7 +12750,7 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         std::strcmp(suite, "ee-unaligned-stores") == 0 || std::strcmp(suite, "ee-unaligned-word-stores") == 0 ||
         std::strcmp(suite, "ee-vu-local") == 0 || std::strcmp(suite, "ee-vu-status") == 0 ||
         std::strcmp(suite, "ee-vu-local-clip") == 0 || std::strcmp(suite, "ee-vu-local-identity") == 0 || std::strcmp(suite, "ee-vu-zero-tail") == 0 || std::strcmp(suite, "ee-vu-lower-zero-tail") == 0 ||
-        std::strcmp(suite, "ee-vu-fmac-acc") == 0)
+        std::strcmp(suite, "ee-vu-fmac-acc") == 0 || std::strncmp(suite, "x86-parity", 10) == 0)
         EETests(false, false, false, false, false, false, false, false, false,
             false, false, false, false, false, false, 0, false, false, false, false, suite);
     else if (std::strcmp(suite, "ee") == 0)
