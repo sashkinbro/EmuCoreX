@@ -101,6 +101,54 @@ __fi u32 fp_min(u32 a, u32 b)
 	return ((s32)a < 0 && (s32)b < 0) ? std::max<s32>(a, b) : std::min<s32>(a, b);
 }
 
+// x86 JIT parity helpers (iFPU.cpp fpuFloat/fpuFloat2/fpuFloat3 and MAXSS/MINSS semantics).
+// The interpreter follows the x86 recompiler for ABS/NEG/MAX/MIN/SQRT/RSQRT/CFC1 so every
+// execution engine agrees: no O/U clearing, clamp-mode dependent Inf/NaN handling.
+__fi u32 fpuClampSign(u32 x) // fpuFloat3: +-Inf/NaN -> +-fMax by sign bit
+{
+	if ((s32)x > (s32)posFmax)
+		x = posFmax;
+	if (x > 0xff7fffffu)
+		x = 0xff7fffffu;
+	return x;
+}
+
+__fi u32 fpuClampFloat(u32 x) // fpuFloat: any NaN -> +fMax, +-Inf -> +-fMax (CHECK_FPU_OVERFLOW only)
+{
+	if (!CHECK_FPU_OVERFLOW)
+		return x;
+	if ((x & 0x7fffffffu) > 0x7f800000u)
+		return posFmax;
+	if ((x & 0x7fffffffu) == 0x7f800000u)
+		return (x & 0x80000000u) | posFmax;
+	return x;
+}
+
+__fi u32 fpuSseDaz(u32 x) // denormal source operands are treated as zero
+{
+	return (x & 0x7f800000u) ? x : (x & 0x80000000u);
+}
+
+__fi bool fpuSseNaN(u32 x) { return (x & 0x7fffffffu) > 0x7f800000u; }
+
+__fi s32 fpuSseKey(u32 x) // monotonic integer key for non-NaN floats
+{
+	return (s32)x < 0 ? -(s32)(x & 0x7fffffffu) : (s32)x;
+}
+
+// MAXSS/MINSS(a, b): NaN operand or both zero -> b.
+__fi u32 fpuSseMaxMin(u32 a, u32 b, bool isMax)
+{
+	if (fpuSseNaN(a) || fpuSseNaN(b))
+		return b;
+	a = fpuSseDaz(a);
+	b = fpuSseDaz(b);
+	if (!(a & 0x7fffffffu) && !(b & 0x7fffffffu))
+		return b;
+	const s32 ka = fpuSseKey(a), kb = fpuSseKey(b);
+	return (isMax ? ka > kb : ka < kb) ? a : b;
+}
+
 /*	Checks if Divide by Zero will occur. (z/y = x)
 	cFlagsToSet1 = Flags to set if (z != 0)
 	cFlagsToSet2 = Flags to set if (z == 0)
@@ -223,8 +271,10 @@ static u32 fpuDouble2u(u32 f)
 }
 
 void ABS_S() {
-	_FdValUl_ = _FsValUl_ & 0x7fffffff;
-	clearFPUFlags( FPUflagO | FPUflagU );
+	u32 r = _FsValUl_ & 0x7fffffff;
+	if (CHECK_FPU_OVERFLOW && r > posFmax)
+		r = posFmax;
+	_FdValUl_ = r;
 }
 
 void ADD_S() {
@@ -274,12 +324,10 @@ void C_LT() {
 void CFC1() {
 	if (!_Rt_) return;
 
-	if (_Fs_ == 31)
-		cpuRegs.GPR.r[_Rt_].SD[0] = (s32)fpuRegs.fprc[31];	// force sign extension to 64 bit
-	else if (_Fs_ == 0)
-		cpuRegs.GPR.r[_Rt_].SD[0] = 0x2E00;
+	if (_Fs_ >= 16)
+		cpuRegs.GPR.r[_Rt_].SD[0] = (s32)((fpuRegs.fprc[31] & 0x0083c078) | 0x01000001);	// x86 JIT: drop always-zero bits, set always-one bits, sign extend
 	else
-		cpuRegs.GPR.r[_Rt_].SD[0] = 0;
+		cpuRegs.GPR.r[_Rt_].SD[0] = (s32)fpuRegs.fprc[0];
 }
 
 void CTC1() {
@@ -328,8 +376,9 @@ void MADDA_S() {
 }
 
 void MAX_S() {
-	_FdValUl_  = fp_max( _FsValUl_, _FtValUl_ );
-	clearFPUFlags( FPUflagO | FPUflagU );
+	u32 a = _FsValUl_, b = _FtValUl_;
+	if (CHECK_FPU_OVERFLOW) { a = fpuClampSign(a); b = fpuClampSign(b); }
+	_FdValUl_ = fpuSseMaxMin(a, b, true);
 }
 
 void MFC1() {
@@ -338,8 +387,9 @@ void MFC1() {
 }
 
 void MIN_S() {
-	_FdValUl_ = fp_min(_FsValUl_, _FtValUl_);
-	clearFPUFlags( FPUflagO | FPUflagU );
+	u32 a = _FsValUl_, b = _FtValUl_;
+	if (CHECK_FPU_OVERFLOW) { a = fpuClampSign(a); b = fpuClampSign(b); }
+	_FdValUl_ = fpuSseMaxMin(a, b, false);
 }
 
 void MOV_S() {
@@ -379,40 +429,51 @@ void MULA_S() {
 }
 
 void NEG_S() {
-	_FdValUl_  = (_FsValUl_ ^ 0x80000000);
-	clearFPUFlags( FPUflagO | FPUflagU );
+	_FdValUl_ = fpuClampSign(_FsValUl_ ^ 0x80000000);
 }
 
 void RSQRT_S() {
-	FPRreg temp;
 	clearFPUFlags(FPUflagD | FPUflagI);
 
-	if ( ( _FtValUl_ & 0x7F800000 ) == 0 ) { // Ft is zero (Denormals are Zero)
-		_ContVal_ |= FPUflagD | FPUflagSD;
-		_FdValUl_ = ( _FtValUl_ & 0x80000000 ) | posFmax;
+	u32 t = _FtValUl_;
+	const u32 sv = _FsValUl_;
+	if (t & 0x80000000) {
+		_ContVal_ |= FPUflagI | FPUflagSI;
+		t &= 0x7fffffff;
+	}
+	if ((t & 0x7F800000) == 0) { // Ft is zero (Denormals are Zero)
+		_ContVal_ |= ((sv & 0x7F800000) == 0) ? (FPUflagI | FPUflagSI) : (FPUflagD | FPUflagSD);
+		_FdValUl_ = (sv & 0x80000000) | posFmax;
 		return;
 	}
-	else if ( _FtValUl_ & 0x80000000 ) { // Ft is negative
-		_ContVal_ |= FPUflagI | FPUflagSI;
-		temp.f = sqrt( fabs( fpuDouble( _FtValUl_ ) ) );
-		_FdValf_ = fpuDouble( _FsValUl_ ) / fpuDouble( temp.UL );
-	}
-	else { _FdValf_ = fpuDouble( _FsValUl_ ) / sqrt( fpuDouble( _FtValUl_ ) ); } // Ft is positive and not zero
 
-	if (checkOverflow( _FdValUl_, 0)) return;
-	checkUnderflow( _FdValUl_, 0);
+	u32 s2 = sv;
+	if (CHECK_FPU_EXTRA_OVERFLOW) {
+		if (t > posFmax)
+			t = posFmax;
+		s2 = fpuClampSign(s2);
+	}
+	FPRreg ft, fs, res;
+	ft.UL = t;
+	fs.UL = s2;
+	res.f = fs.f / sqrtf(ft.f);
+	_FdValUl_ = fpuClampFloat(res.UL);
 }
 
 void SQRT_S() {
 	clearFPUFlags(FPUflagI | FPUflagD);
 
-	if ( ( _FtValUl_ & 0x7F800000 ) == 0 ) // If Ft = +/-0
-		_FdValUl_ = _FtValUl_ & 0x80000000;// result is 0
-	else if ( _FtValUl_ & 0x80000000 ) { // If Ft is Negative
+	u32 t = _FtValUl_;
+	if (t & 0x80000000) {
 		_ContVal_ |= FPUflagI | FPUflagSI;
-		_FdValf_ = sqrt( fabs( fpuDouble( _FtValUl_ ) ) );
-	} else
-		_FdValf_ = sqrt( fpuDouble( _FtValUl_ ) ); // If Ft is Positive
+		t &= 0x7fffffff;
+	}
+	if (CHECK_FPU_OVERFLOW && t > posFmax)
+		t = posFmax;
+	FPRreg ft, res;
+	ft.UL = t;
+	res.f = sqrtf(ft.f);
+	_FdValUl_ = CHECK_FPU_EXTRA_OVERFLOW ? fpuClampFloat(res.UL) : res.UL;
 }
 
 void SUB_S() {

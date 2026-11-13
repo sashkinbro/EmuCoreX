@@ -4003,9 +4003,10 @@ constexpr EECop1Golden s_eeCop1Golden[] = {
     // Denormal + denormal: the default FPCR has DaZ/FtZ, so denormal inputs
     // flush to zero and the sum is zero.
     {"fpu add denorm denorm", 0x00, 13, 13, {0x00000000, 0x00000000, 0x00000000}, {0, 0, 0}},
-    // Console behaviour: ABS/NEG pass exponent-255 patterns through untouched.
-    {"fpu abs neg nan", 0x05, 12, 0, {0x7fc00000, 0x7fc00000, 0x7fc00000}, {0, 0, 0}},
-    {"fpu neg pinf", 0x07, 9, 0, {0xff800000, 0xff800000, 0xff800000}, {0, 0, 0}},
+    // x86 JIT parity (iFPU.cpp): ABS MINSS(max) after the AND under CHECK_FPU_OVERFLOW
+    // (modes 1-2: NaN -> +max); NEG always applies the sign-preserving fpuFloat3 clamp.
+    {"fpu abs neg nan", 0x05, 12, 0, {0x7fc00000, 0x7f7fffff, 0x7f7fffff}, {0, 0, 0}},
+    {"fpu neg pinf", 0x07, 9, 0, {0xff7fffff, 0xff7fffff, 0xff7fffff}, {0, 0, 0}},
 };
 
 void EECoverageFpuModeSemantics()

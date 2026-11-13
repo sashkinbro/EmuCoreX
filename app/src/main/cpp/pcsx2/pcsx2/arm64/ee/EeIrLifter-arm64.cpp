@@ -635,44 +635,10 @@ namespace EeIr
 							m_b.Emit1(ir::Op::WriteFprBits, ir::Type::Void, bits, Sa(word));
 							return true;
 						}
-						if (funct == 0x05 || funct == 0x07) // abs.s / neg.s
-						{
-							const u32 source = m_b.Emit(ir::Op::ReadFprBits, ir::Type::I32, {}, fs);
-							const u32 result = funct == 0x05 ?
-								Bin(ir::Op::And, source, Const(0x7fffffffu)) :
-								Bin(ir::Op::Xor, source, Const(0x80000000u));
-							m_b.Emit1(ir::Op::WriteFprBits, ir::Type::Void, result, Sa(word));
-
-							// The interpreter clears only the current O/U cause bits for
-							// ABS.S and NEG.S. Sticky flags and all other FCR31 bits survive.
-							const u32 fcr31 = m_b.Emit0(ir::Op::ReadFcr31, ir::Type::I32);
-							m_b.Emit1(ir::Op::WriteFcr31, ir::Type::Void,
-								Bin(ir::Op::And, fcr31, Const(~0x0000c000u)));
-							return true;
-						}
-						if (funct == 0x28 || funct == 0x29) // max.s / min.s
-						{
-							// The EE orders these raw words as signed integers. When both
-							// operands are negative, that order is reversed for MAX/MIN.
-							const u32 lhs = m_b.Emit(ir::Op::ReadFprBits, ir::Type::I32, {}, fs);
-							const u32 rhs = m_b.Emit(ir::Op::ReadFprBits, ir::Type::I32, {}, Rt(word));
-							const u32 both_negative = Bin(ir::Op::CmpLtS,
-								Bin(ir::Op::And, lhs, rhs), Const(0));
-							const u32 lhs_less_raw = Bin(ir::Op::CmpLtS, lhs, rhs);
-							const u32 lhs_less_real = Bin(ir::Op::Xor, lhs_less_raw, both_negative);
-							const bool is_max = funct == 0x28;
-							// Equality can toggle the predicate for negative words, but either
-							// selected operand is then the same raw bit pattern.
-							const u32 result = m_b.Emit3(ir::Op::Select, ir::Type::I32,
-								lhs_less_real, is_max ? rhs : lhs, is_max ? lhs : rhs);
-							m_b.Emit1(ir::Op::WriteFprBits, ir::Type::Void, result, Sa(word));
-
-							// MAX.S and MIN.S clear current O/U causes only.
-							const u32 fcr31 = m_b.Emit0(ir::Op::ReadFcr31, ir::Type::I32);
-							m_b.Emit1(ir::Op::WriteFcr31, ir::Type::Void,
-								Bin(ir::Op::And, fcr31, Const(~0x0000c000u)));
-							return true;
-						}
+						if (funct == 0x05 || funct == 0x07 || funct == 0x28 || funct == 0x29)
+							// abs/neg/max/min follow the x86 JIT: O/U flags are not cleared and the
+							// clamp depends on the FPU clamp mode, so leave them to the direct recompiler.
+							return Fail(error, "COP1 abs/neg/max/min use the direct recompiler", pc);
 						return Fail(error, "unsupported COP1 S-format operation", pc);
 					}
 					if ((format != 0x00 && format != 0x02 && format != 0x04 && format != 0x06) ||
@@ -688,17 +654,17 @@ namespace EeIr
 								WriteGprWide(rt, m_b.Emit1(ir::Op::Sext32, ir::Type::I64, bits));
 							}
 							return true;
-						case 0x02: // cfc1: FCR0 is an architectural constant; only FCR31 is readable
+						case 0x02: // cfc1: x86 semantics (fs >= 16: masked FCR31 | 0x01000001, else FCR0 = 0x2e30)
 							if (rt != 0)
 							{
 								u32 value;
-								if (fs == 0)
-									value = m_b.ConstI64(0x2e00);
-								else if (fs == 31)
-									value = m_b.Emit1(ir::Op::Sext32, ir::Type::I64,
-										m_b.Emit0(ir::Op::ReadFcr31, ir::Type::I32));
+								if (fs >= 16)
+								{
+									const u32 masked = Bin(ir::Op::And, m_b.Emit0(ir::Op::ReadFcr31, ir::Type::I32), Const(0x0083c078u));
+									value = m_b.Emit1(ir::Op::Sext32, ir::Type::I64, Bin(ir::Op::Or, masked, Const(0x01000001u)));
+								}
 								else
-									value = m_b.ConstI64(0);
+									value = m_b.ConstI64(0x2e30);
 								WriteGprWide(rt, value);
 							}
 							return true;
