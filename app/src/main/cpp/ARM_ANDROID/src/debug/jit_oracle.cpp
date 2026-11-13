@@ -577,6 +577,7 @@ struct FmacInit
 };
 const FmacInit* s_fmac_init = nullptr;
 const u32* s_fpu_acc_init = nullptr; // x86-parity oracle: initial EE FPU ACC
+const u32* s_fpu_accflag_init = nullptr; // x86-parity oracle: initial EE FPU ACCflag (fpuFullMode MADD overflow propagation)
 
 // Applies the optional R/P/flag state of s_fmac_init to a VU register file.
 void ApplyFmacInitExtra(VURegs& vu)
@@ -3280,6 +3281,8 @@ EESnapshot RunEEProgram(bool jit, const std::vector<u32>& program, bool multiBlo
         std::memcpy(fpuRegs.fprc, initial_fcr, sizeof(fpuRegs.fprc));
     if (s_fpu_acc_init)
         fpuRegs.ACC.UL = *s_fpu_acc_init;
+    if (s_fpu_accflag_init)
+        fpuRegs.ACCflag = *s_fpu_accflag_init;
     if (initial_cp0)
         std::memcpy(cpuRegs.CP0.r, initial_cp0, sizeof(cpuRegs.CP0.r));
 

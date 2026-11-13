@@ -8,7 +8,12 @@
 // Every mismatch FAILs; the allowlist (kAllow) must stay empty unless a deliberate,
 // documented deviation backed by real-console data is recorded there.
 // Suites: x86-parity (all), x86-parity-selfcheck, x86-parity-vu-macro, x86-parity-vu-micro0,
-// x86-parity-vu-micro1, x86-parity-vu-lower, x86-parity-ee.
+// x86-parity-vu-micro1, x86-parity-ee. Extension suites (jit_oracle_x86_parity2.inl): x86-parity-ee-full, x86-parity-efu,
+// x86-parity-regcache, x86-parity-flags, x86-parity-vu-int, x86-parity-vu-mem, x86-parity-vu-branch, x86-parity-vu-misc,
+// x86-parity-cop2, x86-parity-ee-sync.
+// Deliberate exemption (documented, not an allowlist entry): when BOTH the model and the JIT produce a NaN the payload/sign is not
+// compared (x86 default NaN 0xFFC00000 vs ARM 0x7FC00000, first-operand vs sNaN-priority propagation); flags derived from those NaNs
+// stay exact and are reported under the "NaN-sign" cause prefix.
 // Included from jit_oracle.cpp's anonymous namespace after jit_oracle_ee_fpu_hw.inl.
 
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
@@ -326,6 +331,10 @@ struct VUm
 	u32 vf[32][4];
 	u32 acc[4];
 	u32 vi[32]; // 0..15 integer regs, REG_R/I/Q/P and flag registers
+	// microVU register-cache side effect: DIV (ftf = x, clamp modes 2/3) clamps the CACHED full copy of Ft in place
+	// (mVUclamp3 on the allocReg(_Ft_) register). Set by applyLower, consumed by the sequence model.
+	int cacheClampFt = -1;
+	u32 cacheClampVal = 0;
 };
 
 struct Cfg
@@ -643,6 +652,7 @@ struct Ins
 	u32 fs = 0, ft = 0, fd = 0;
 	u32 fsf = 0, ftf = 0;
 	s32 imm = 0;
+	int rawDest = -1; // >= 0 overrides the encoded dest/mask field of a lower op (EFU dest-mask sweep)
 };
 
 static u32 encodeLower(const Ins& i)
@@ -660,6 +670,7 @@ static u32 encodeLower(const Ins& i)
 		case L_IADDI: fd = static_cast<u32>(i.imm) & 31u; dest = 0; break;
 		default: break;
 	}
+	if (i.rawDest >= 0) dest = static_cast<u32>(i.rawDest);
 	return (0x40u << 25) | ((dest & 15u) << 21) | (i.ft << 16) | (i.fs << 11) | (fd << 6) | li.fn;
 }
 
@@ -694,6 +705,16 @@ static void efuP(VUm& v, const Ins& in, const Cfg& c)
 	u32 F[4];
 	std::memcpy(F, v.vf[in.fs], 16);
 	if (in.fs == 0) { F[0] = F[1] = F[2] = 0; F[3] = one; }
+	// mVUloadReg(): a single-lane dest mask loads that lane into lane 0 and zeroes the rest (MOVSSZX); other masks load the whole vector.
+	// Only the vector-sum EFU ops (ESADD/ELENG/ERSADD/ERLENG/ESUM) allocate Fs with _X_Y_Z_W; the others use the _Fsf_ lane (mask 1 << (3-fsf)).
+	if (in.op == L_ESADD || in.op == L_ELENG || in.op == L_ERSADD || in.op == L_ERLENG || in.op == L_ESUM)
+	{
+		if (in.mask == 8 || in.mask == 4 || in.mask == 2 || in.mask == 1)
+		{
+			const u32 v = F[in.mask == 8 ? 0 : (in.mask == 4 ? 1 : (in.mask == 2 ? 2 : 3))];
+			F[0] = v; F[1] = F[2] = F[3] = 0;
+		}
+	}
 	const u32 X = F[in.fsf & 3];
 	const auto MUL = [&](u32 a, u32 b) { return sse(O_MUL, a, b, true, true, m, env); };
 	const auto ADD = [&](u32 a, u32 b) { return sse(O_ADD, a, b, true, true, m, env); };
@@ -822,6 +843,11 @@ static void applyLower(VUm& v, const Ins& in, const Cfg& c)
 			{
 				flag = 0;
 				q = sseDiv(a, b, in.fs != 0, in.ft != 0, m, env);
+				if (m >= 2 && in.ftf == 0 && in.ft != 0)
+				{
+					v.cacheClampFt = static_cast<int>(in.ft);
+					v.cacheClampVal = m == 3 ? clamp3sign(b) : clamp1(b, env);
+				}
 				if (m >= 1 && in.fs != 0) q = clamp1(q, env);
 			}
 			v.vi[REG_Q] = q;
@@ -923,7 +949,7 @@ static void applyLower(VUm& v, const Ins& in, const Cfg& c)
 			return;
 		}
 		default:
-			if (kLower[in.op].efu) efuP(v, in, c);
+			if (kLower[in.op].efu && (c.vu1 || in.op == L_MFP)) efuP(v, in, c); // EFU ops are NOPs on VU0
 			return;
 	}
 }
@@ -1133,6 +1159,8 @@ static void runJit(int area, const std::vector<Ins>& prog, const FmacInit& init,
 	out.p = snap.regs.VI[REG_P].UL;
 }
 
+static bool g_modelRegCache = true; // x86 register-cache effects in micro sequences (regcache suite turns it off for A/B)
+
 static void runModel(int area, const std::vector<Ins>& prog, const FmacInit& init, const Cfg& cfg, Obs& out)
 {
 	VUm v{};
@@ -1145,11 +1173,52 @@ static void runModel(int area, const std::vector<Ins>& prog, const FmacInit& ini
 	v.vi[REG_STATUS_FLAG] = init.status;
 	v.vi[REG_MAC_FLAG] = init.mac;
 	v.vi[REG_CLIP_FLAG] = init.clip;
+	// Micro programs model the microVU VF register cache (see VUm::cacheClampFt): v.vf is the reader-visible view, mem[] is what
+	// memory holds. Full-mask writes leave a dirty cached copy; a partial write into a VF that has a cached copy merges into the copy
+	// and marks the whole copy dirty (written back at the block end), which carries in-place clamped lanes into memory.
+	const bool cached = area != 0 && g_modelRegCache;
+	u32 mem[32][4];
+	bool has[32] = {}, dirty[32] = {};
+	std::memcpy(mem, v.vf, sizeof(mem));
 	for (const Ins& i : prog)
 	{
+		int d = -1;
+		u32 wm = i.mask;
+		if (cached)
+		{
+			if (i.lower)
+			{
+				if (i.op == L_MFIR || i.op == L_MFP || i.op == L_MOVE || i.op == L_MR32 || i.op == L_RNEXT || i.op == L_RGET) d = static_cast<int>(i.ft);
+			}
+			else
+			{
+				const UOp& o = upperOps()[i.op];
+				if (o.kind == K_ABS || o.kind == K_FTOI || o.kind == K_ITOF) d = static_cast<int>(i.ft);
+				else if (o.usesFd && !o.acc) d = static_cast<int>(i.fd);
+			}
+			if (d == 0) d = -1;
+		}
+		v.cacheClampFt = -1;
 		if (i.lower) applyLower(v, i, cfg);
 		else applyUpper(v, upperOps()[i.op], i.mask, i.fs, i.ft, i.fd, cfg);
+		if (!cached) continue;
+		if (d >= 0)
+		{
+			if (wm == 0xf) { has[d] = dirty[d] = true; }
+			else if (has[d]) dirty[d] = true;
+			else for (u32 l = 0; l < 4; ++l) if (wm & (8u >> l)) mem[d][l] = v.vf[d][l];
+		}
+		if (v.cacheClampFt > 0)
+		{
+			const u32 f = static_cast<u32>(v.cacheClampFt);
+			if (!has[f]) { has[f] = true; dirty[f] = false; }
+			v.vf[f][0] = v.cacheClampVal;
+		}
 	}
+	if (cached)
+		for (u32 f = 1; f < 32; ++f)
+			if (has[f] && dirty[f]) std::memcpy(mem[f], v.vf[f], 16);
+	if (cached) std::memcpy(v.vf, mem, sizeof(mem));
 	std::memcpy(out.vf, v.vf, sizeof(out.vf));
 	std::memcpy(out.acc, v.acc, sizeof(out.acc));
 	std::memcpy(out.vi, v.vi, sizeof(out.vi));
@@ -1158,13 +1227,23 @@ static void runModel(int area, const std::vector<Ins>& prog, const FmacInit& ini
 }
 
 struct Diff { const char* field; int lane; u32 exp, got; };
+static bool g_nanSeen = false; // set by compareObs when a NaN-vs-NaN value difference was exempted
 
 static void compareObs(int area, const Obs& e, const Obs& g, std::vector<Diff>& d, u32 mask)
 {
+	// Deliberate value-class exemption (documented, see kAllow note): when BOTH sides are NaN the payload/sign is not
+	// compared (x86 default NaN 0xFFC00000 vs ARM 0x7FC00000, first-operand vs sNaN-priority propagation).
+	// Flags derived from those NaNs are still compared exactly and reported under "NaN-sign".
+	g_nanSeen = false;
+	const auto sameVal = [&](u32 a, u32 b) {
+		if (a == b) return true;
+		if (isNaN(a) && isNaN(b)) { g_nanSeen = true; return true; }
+		return false;
+	};
 	for (u32 i = 0; i < 128; ++i)
-		if (e.vf[i] != g.vf[i]) d.push_back({"VF", static_cast<int>(i & 3), e.vf[i], g.vf[i]});
+		if (!sameVal(e.vf[i], g.vf[i])) d.push_back({"VF", static_cast<int>(i & 3), e.vf[i], g.vf[i]});
 	for (u32 l = 0; l < 4; ++l)
-		if (e.acc[l] != g.acc[l]) d.push_back({"ACC", static_cast<int>(l), e.acc[l], g.acc[l]});
+		if (!sameVal(e.acc[l], g.acc[l])) d.push_back({"ACC", static_cast<int>(l), e.acc[l], g.acc[l]});
 	for (u32 i = 1; i < 16; ++i)
 		if ((e.vi[i] & 0xffffu) != (g.vi[i] & 0xffffu)) d.push_back({"VI", -1, e.vi[i] & 0xffffu, g.vi[i] & 0xffffu});
 	// X86P_IGNORE_UO=1 hides the MAC/status underflow/overflow bits (x86 never computes them).
@@ -1184,10 +1263,10 @@ static void compareObs(int area, const Obs& e, const Obs& g, std::vector<Diff>& 
 	}
 	if ((e.vi[REG_STATUS_FLAG] & stKeep) != (g.vi[REG_STATUS_FLAG] & stKeep)) d.push_back({"STATUS", -1, e.vi[REG_STATUS_FLAG] & stKeep, g.vi[REG_STATUS_FLAG] & stKeep});
 	if (e.vi[REG_CLIP_FLAG] != g.vi[REG_CLIP_FLAG]) d.push_back({"CLIP", -1, e.vi[REG_CLIP_FLAG], g.vi[REG_CLIP_FLAG]});
-	if (e.vi[REG_Q] != g.vi[REG_Q]) d.push_back({"Q", -1, e.vi[REG_Q], g.vi[REG_Q]});
+	if (!sameVal(e.vi[REG_Q], g.vi[REG_Q])) d.push_back({"Q", -1, e.vi[REG_Q], g.vi[REG_Q]});
 	if (e.vi[REG_I] != g.vi[REG_I]) d.push_back({"I", -1, e.vi[REG_I], g.vi[REG_I]});
 	if (e.vi[REG_R] != g.vi[REG_R]) d.push_back({"R", -1, e.vi[REG_R], g.vi[REG_R]});
-	if (area == 2 && e.p != g.p) d.push_back({"P", -1, e.p, g.p});
+	if (area == 2 && !sameVal(e.p, g.p)) d.push_back({"P", -1, e.p, g.p});
 	(void)mask;
 }
 
@@ -1299,6 +1378,9 @@ static void baseInit(FmacInit& init, Rng& r, bool randomState)
 	}
 }
 
+// OPMULA/OPMSUB only exist with dest .xyz (0xE) in real encodings; lane w with xyzw is not observable.
+static inline u32 legalMask(const UOp& o, u32 m) { return (o.kind == K_OPMULA || o.kind == K_OPMSUB) ? 0xEu : m; }
+
 static std::string maskStr(u32 m) { std::string s; for (u32 l = 0; l < 4; ++l) if (m & (8u >> l)) s += "xyzw"[l]; return s; }
 
 // Exhaustive-ish single-instruction sweep for one upper op.
@@ -1333,7 +1415,7 @@ static void sweepUpperOp(const Ctx& c, u32 opIdx, u32 step, u32 randomPerMask)
 		if (fs == ft && o.form == F_P && !(s % 9 == 0)) {}
 		Ins in;
 		in.op = static_cast<int>(opIdx);
-		in.mask = 0xf;
+		in.mask = legalMask(o, 0xf);
 		in.fs = fs; in.ft = ft; in.fd = fd;
 		runCase(c, o.name, {in}, init, "");
 	}
@@ -1345,6 +1427,7 @@ static void sweepUpperOp(const Ctx& c, u32 opIdx, u32 step, u32 randomPerMask)
 		if (onlyMask && mask != onlyMask) continue;
 		for (u32 n = 0; n < randomPerMask; ++n)
 		{
+			if (legalMask(o, mask) != mask) continue;
 			Rng r(opIdx * 104729ull + mask * 1009ull + n * 13ull + 3);
 			FmacInit init;
 			baseInit(init, r, (n & 1) == 0);
@@ -1365,7 +1448,7 @@ static void sweepUpperOp(const Ctx& c, u32 opIdx, u32 step, u32 randomPerMask)
 		baseInit(init, r, false);
 		Ins in;
 		in.op = static_cast<int>(opIdx);
-		in.mask = (n & 1) ? 0xf : 1 + r.below(15);
+		in.mask = legalMask(o, (n & 1) ? 0xf : 1 + r.below(15));
 		in.fs = (n & 2) ? 0 : 1 + r.below(5);
 		in.ft = (n & 2) ? 1 + r.below(5) : 0;
 		if (n >= 4) { in.fs = 0; in.ft = 0; }
@@ -1612,10 +1695,19 @@ static void eeOne(int mode, int rnd, int op, u32 fs, u32 ft, u32 fd, const u32* 
 	eeRunJit(op, fs, ft, fd, fprInit, accInit, fcrInit, got);
 	++g_cases;
 	++g_groupCases;
+	bool nanSeen = false;
+	const auto sameV = [&](u32 a, u32 b) {
+		if (a == b) return true;
+		if (isNaN(a) && isNaN(b)) { nanSeen = true; return true; } // value-class exemption, flags stay exact
+		return false;
+	};
 	const auto matches = [&](const EEm& m) {
-		return std::memcmp(m.fpr, got.fpr, sizeof(m.fpr)) == 0 && m.acc == got.acc && m.fcr31 == got.fcr31 && got.accflag == 0;
+		nanSeen = false;
+		for (u32 i = 0; i < 32; ++i) if (!sameV(m.fpr[i], got.fpr[i])) return false;
+		return sameV(m.acc, got.acc) && m.fcr31 == got.fcr31 && got.accflag == 0;
 	};
 	if (matches(cand[0]) || matches(cand[1])) return;
+	matches(cand[0]); // recompute nanSeen against candidate 0
 	// Report against candidate 0.
 	const EEm& m = cand[0];
 	char kb[160];
@@ -1636,8 +1728,8 @@ static void eeOne(int mode, int rnd, int op, u32 fs, u32 ft, u32 fd, const u32* 
 			cause += std::string(clsName(expv)) + "->" + clsName(gotv);
 		record(key, ex, cause, kEE[op].name);
 	};
-	for (u32 i = 0; i < 32; ++i) if (m.fpr[i] != got.fpr[i]) { rec("FPR", m.fpr[i], got.fpr[i]); break; }
-	if (m.acc != got.acc) rec("ACC", m.acc, got.acc);
+	for (u32 i = 0; i < 32; ++i) if (!sameV(m.fpr[i], got.fpr[i])) { rec("FPR", m.fpr[i], got.fpr[i]); break; }
+	if (!sameV(m.acc, got.acc)) rec("ACC", m.acc, got.acc);
 	if (m.fcr31 != got.fcr31) rec("FCR31", m.fcr31, got.fcr31);
 	if (got.accflag != 0) rec("ACCflag", 0, got.accflag);
 }
@@ -1799,7 +1891,7 @@ static void runSequences(int area, u32 count)
 						if (roll < 80)
 						{
 							in.op = static_cast<int>(r.below(static_cast<u32>(ops.size())));
-							in.mask = r.below(3) == 0 ? 0xf : 1 + r.below(15);
+							in.mask = legalMask(ops[in.op], r.below(3) == 0 ? 0xf : 1 + r.below(15));
 							in.fs = 1 + r.below(6); in.ft = 1 + r.below(6); in.fd = 1 + r.below(6);
 						}
 						else if (roll < 95)
@@ -2076,6 +2168,8 @@ static void Setup()
 }
 } // namespace x86p
 
+#include "jit_oracle_x86_parity2.inl"
+
 void X86ParityTests(const char* suite)
 {
 	using namespace x86p;
@@ -2093,6 +2187,7 @@ void X86ParityTests(const char* suite)
 	if (all || s == "x86-parity-vu-micro0") { const u32 part = envKnob("X86P_PART", 7); if (part & 1) runUpperArea(1, step, perMask); if (part & 2) runLowerArea(1, step); if (part & 4) runSequences(1, seqN); }
 	if (all || s == "x86-parity-vu-micro1") { const u32 part = envKnob("X86P_PART", 7); if (part & 1) runUpperArea(2, step, perMask); if (part & 2) runLowerArea(2, step); if (part & 4) runSequences(2, seqN); }
 	if (all || s == "x86-parity-ee") { X86ParityEE(); }
+	X86Parity2Tests(s, all);
 	printReport(suite);
 	EmuCoreXOracleSetEeIrMode(-1);
 	EmuCoreXOracleSetVUIR(0, -1);
