@@ -434,3 +434,87 @@ void EEVuFmacAccTests()
 	EmuCoreXOracleSetVUIR(1, -1);
 	EmuConfig = saved;
 }
+
+// CTC2 STATUS shadow flags and VU0 micro-program / EE VI access ordering (cycle commit before VU0 sync).
+void EEVuMicroSyncTests()
+{
+	const auto saved = EmuConfig;
+	EmuCoreXOracleSetEeIrMode(0);
+	EmuCoreXOracleSetVUIR(0, 0);
+	EmuCoreXOracleSetVUIR(1, 0);
+	// CTC2 STATUS must refresh the microVU sticky/status shadow (micro_statusflags) exactly like
+	// x86 mVUallocSFLAGd (SHL 11 / SHL 14, not SHR). The interpreter does not maintain the shadow,
+	// so check the JIT result against the architectural reference.
+	for (u32 pat : {0x00000000u, 0x00000fc0u, 0x00000040u, 0x00000080u, 0x00000100u, 0x00000200u, 0x00000400u, 0x00000800u, 0xffffffffu, 0x5a5a5a5au})
+	{
+		GPR_reg gpr[32]{};
+		gpr[8].UD[0] = pat;
+		const auto cop2 = [](u32 rs, u32 rt, u32 fs) { return (0x12u << 26) | (rs << 21) | (rt << 16) | (fs << 11); };
+		const std::vector<u32> code = {cop2(6, 8, REG_STATUS_FLAG)};
+		RunEEProgram(true, code, false, nullptr, nullptr, gpr);
+		const u32 st = pat & 0xfc0u;
+		const u32 ref = ((st >> 3) & 0x18u) | ((st << 11) & 0x1800u) | ((st << 14) & 0x3cf0000u);
+		bool ok = true;
+		for (u32 lane = 0; lane < 4; ++lane)
+			ok = ok && VU0.micro_statusflags[lane] == ref;
+		Check(ok && VU0.VI[REG_STATUS_FLAG].UL == st, "JIT CTC2 STATUS shadow flags match mVUallocSFLAGd (SHL)");
+	}
+
+	// A running VU0 micro program writes VI1 after N micro cycles while the EE executes M more
+	// instructions inside the same block before CTC2/CFC2 touch VI1: the cycle commit before the
+	// VU0 sync decides whether the micro write lands before or after the EE access.
+	{
+		const auto cop2 = [](u32 rs, u32 rt, u32 fs) { return (0x12u << 26) | (rs << 21) | (rt << 16) | (fs << 11); };
+		const u32 NOP_L = 0x8000033cu, NOP_U = 0x000002ffu, E_U = 0x400002ffu;
+		const u32 IADDIU_VI1_0A = 0x1001000au;
+		for (u32 delay : {1u, 4u, 12u, 30u})
+		for (u32 ee_nops : {0u, 2u, 6u, 14u, 40u, 120u})
+		for (u32 mode = 0; mode < 6; ++mode)
+		{
+			std::memset(VU0.Micro, 0, 4096);
+			u32 pc = 0;
+			for (u32 i = 0; i < delay; ++i, pc += 8)
+			{
+				std::memcpy(VU0.Micro + pc, &NOP_L, 4);
+				std::memcpy(VU0.Micro + pc + 4, &NOP_U, 4);
+			}
+			std::memcpy(VU0.Micro + pc, &IADDIU_VI1_0A, 4);
+			std::memcpy(VU0.Micro + pc + 4, &NOP_U, 4);
+			pc += 8;
+			std::memcpy(VU0.Micro + pc, &NOP_L, 4);
+			std::memcpy(VU0.Micro + pc + 4, &E_U, 4);
+			pc += 8;
+			std::memcpy(VU0.Micro + pc, &NOP_L, 4);
+			std::memcpy(VU0.Micro + pc + 4, &NOP_U, 4);
+			CpuVU0->Clear(0, 4096);
+
+			GPR_reg gpr[32]{};
+			gpr[8].UD[0] = 0x77;
+			gpr[10].UD[0] = 0x1;
+			std::vector<u32> code;
+			code.push_back(cop2(6, 10, 1)); // CTC2 vi1 = 1
+			code.push_back((0x12u << 26) | (1u << 25) | (0u << 6) | 0x38u); // VCALLMS 0
+			for (u32 i = 0; i < ee_nops; ++i)
+				code.push_back(0);
+			switch (mode)
+			{
+				case 0: code.push_back(cop2(6, 8, 1)); code.push_back(cop2(2, 9, 1)); break; // CTC2 then CFC2
+				case 1: code.push_back(cop2(2, 9, 1)); code.push_back(cop2(6, 8, 1)); code.push_back(cop2(2, 11, 1)); break;
+				case 2: code.push_back(cop2(2, 9, 1)); break; // CFC2 alone
+				case 3: code.push_back(cop2(6, 8, 1) | 1u); code.push_back(cop2(2, 9, 1)); break; // interlocked CTC2
+				case 4: code.push_back(cop2(2, 9, 1) | 1u); break; // interlocked CFC2
+				default: code.push_back(cop2(6, 8, 1)); code.push_back(0); code.push_back(cop2(2, 9, 1)); code.push_back(cop2(6, 10, 1)); code.push_back(cop2(2, 11, 1)); break;
+			}
+			const EESnapshot interp = RunEEProgram(false, code, false, nullptr, nullptr, gpr);
+			const EESnapshot jit = RunEEProgram(true, code, false, nullptr, nullptr, gpr);
+			char name[112];
+			std::snprintf(name, sizeof(name), "VU0 micro VI1 write vs EE CTC2/CFC2 delay %u nops %u mode %u JIT == interpreter", delay, ee_nops, mode);
+			CompareEE(interp, jit, name);
+		}
+	}
+
+	EmuCoreXOracleSetEeIrMode(-1);
+	EmuCoreXOracleSetVUIR(0, -1);
+	EmuCoreXOracleSetVUIR(1, -1);
+	EmuConfig = saved;
+}

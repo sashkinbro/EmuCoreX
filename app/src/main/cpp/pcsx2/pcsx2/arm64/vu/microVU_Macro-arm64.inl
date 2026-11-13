@@ -1281,6 +1281,9 @@ static void COP2_Interlock(bool mBitSync)
 				oakMoveAddressToReg(oak::util::X0, CpuVU0);
 				oakAsm->MOV(oak::util::W1, s_nBlockInterlocked ? 1 : 0);
 				oakEmitCall(reinterpret_cast<void*>(BaseVUmicroCPU::ExecuteBlockJIT));
+				// ExecuteBlockJIT/_vu0WaitMicro/_vu0FinishMicro move cpuRegs.cycle/nextEventCycle in memory;
+				// the pinned RECCYCLE register (W24) must be re-derived or it overwrites them at the next flush.
+				recReloadReccycle();
 //				skip.SetTarget();
 				oakAsm->l(skip);
 
@@ -1289,6 +1292,7 @@ static void COP2_Interlock(bool mBitSync)
 			else {
 				oakEmitCall(reinterpret_cast<void*>(_vu0FinishMicro));
 			}
+			recReloadReccycle();
 //			skipvuidle.SetTarget();
 			oakAsm->l(skipvuidle);
 			recEndOaknutEmit();
@@ -1318,6 +1322,7 @@ static void mVUSyncVU0()
 	oakMoveAddressToReg(oak::util::X0, CpuVU0);
 	oakAsm->MOV(oak::util::W1, s_nBlockInterlocked ? 1 : 0);
 	oakEmitCall(reinterpret_cast<void*>(BaseVUmicroCPU::ExecuteBlockJIT));
+	recReloadReccycle(); // VU0 execution moved cpuRegs.cycle/nextEventCycle; resync the pinned W24
 //	skip.SetTarget();
 	oakAsm->l(skip);
 //	skipvuidle.SetTarget();
@@ -1332,7 +1337,9 @@ static void mVUFinishVU0()
 	recBeginOaknutEmit();
 	oak::Label skipvuidle;
 	oakAsm->B(oak::Cond::EQ, skipvuidle);
+	recFlushReccycle(); // memory cpuRegs.cycle may lag the pinned W24
 	oakEmitCall(reinterpret_cast<void*>(_vu0FinishMicro));
+	recReloadReccycle();
 //	skipvuidle.SetTarget();
 	oakAsm->l(skipvuidle);
 	recEndOaknutEmit();
@@ -1515,10 +1522,10 @@ static void recCTC2WriteStatus_emit_oaknut(int xmmtemp)
 	oakAsm->MOV(OAK_WSCRATCH, OAK_WSCRATCH2);
 	oakAsm->LSR(OAK_WSCRATCH2, OAK_WSCRATCH, 3);
 	oakAsm->AND(OAK_WSCRATCH2, OAK_WSCRATCH2, 0x18);
-	oakAsm->LSR(oak::util::W4, OAK_WSCRATCH, 11);
+	oakAsm->LSL(oak::util::W4, OAK_WSCRATCH, 11); // x86 mVUallocSFLAGd uses SHL
 	oakAsm->AND(oak::util::W4, oak::util::W4, 0x1800);
 	oakAsm->ORR(OAK_WSCRATCH2, OAK_WSCRATCH2, oak::util::W4);
-	oakAsm->LSR(OAK_WSCRATCH, OAK_WSCRATCH, 14);
+	oakAsm->LSL(OAK_WSCRATCH, OAK_WSCRATCH, 14);
 	oakAsm->MOV(oak::util::W4, 0x3cf0000);
 	oakAsm->AND(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W4);
 	oakAsm->ORR(OAK_WSCRATCH2, OAK_WSCRATCH2, OAK_WSCRATCH);
@@ -1619,14 +1626,6 @@ static void recCTC2_emit_oaknut()
 	if (!_Rd_)
 		return;
 
-	// [WORKAROUND] CTC2: keep VI writes etc on interpreter, only FBRST/CMSAR1/R/STATUS on JIT
-	// VI1 (and VI 0-15) JIT hangs even with memory-only fix - deeper sync issue
-	if (_Rd_ != REG_FBRST && _Rd_ != REG_CMSAR1 && _Rd_ != REG_R && _Rd_ != REG_STATUS_FLAG)
-	{
-		recCOP2InterpreterCall(CTC2);
-		return;
-	}
-
 	if (!(cpuRegs.code & 1))
 	{
 		if (g_pCurInstInfo->info & EEINST_COP2_SYNC_VU0)
@@ -1654,11 +1653,13 @@ static void recCTC2_emit_oaknut()
 		case REG_CMSAR1: // Execute VU1 Micro SubRoutine
 			iFlushCall(FLUSH_NONE);
 			recBeginOaknutEmit();
+			recFlushReccycle();
 			oakAsm->MOV(oak::util::W0, 1);
 			oakEmitCall(reinterpret_cast<const void*>(vu1Finish));
 			recCTC2MoveRtToW_emit_oaknut(oak::util::W0);
 			oakAsm->UXTH(oak::util::W0, oak::util::W0);
 			oakEmitCall(reinterpret_cast<const void*>(vu1ExecMicro));
+			recReloadReccycle();
 			recEndOaknutEmit();
 			break;
 		case REG_FBRST:
@@ -1690,9 +1691,9 @@ static void recCTC2_emit_oaknut()
 			// sVU's COP2 has a comment that "Donald Duck" needs this too...
 			if (_Rd_ < REG_STATUS_FLAG)
 			{
-				// Force memory-only path for CTC2 VI writes (no X86 cache).
-				// Previous fix (register+memory) still hung, try pure memory.
-				recCTC2WriteNormalVI_emit_oaknut(-1);
+				// Same as x86: if the VI is cached in a host register it is the source of truth;
+				// the helper also stores to memory so VU0 microcode sees the write.
+				recCTC2WriteNormalVI_emit_oaknut(_allocIfUsedVItoX86(_Rd_, MODE_WRITE));
 			}
 			else
 			{
