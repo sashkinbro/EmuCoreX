@@ -663,6 +663,10 @@ static void recFpuCompareNormalizeKey_emit_oaknut(int reg)
 	oakAsm->MOV(oak::util::W4, 0x7f7fffff);
 	oakAsm->ORR(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W4);
 	oakAsm->l(not_exp255);
+	// -0.0 compares equal to +0.0 (UCOMISS on x86, float compare in the interpreter).
+	oakAsm->MOV(oak::util::W4, 0x80000000);
+	oakAsm->CMP(OAK_WSCRATCH, oak::util::W4);
+	oakAsm->CSEL(OAK_WSCRATCH, oak::util::WZR, OAK_WSCRATCH, oak::util::EQ);
 	oakAsm->TST(OAK_WSCRATCH, 0x80000000);
 	oakAsm->MVN(OAK_WSCRATCH2, OAK_WSCRATCH);
 	oakAsm->ORR(OAK_WSCRATCH, OAK_WSCRATCH, 0x80000000);

@@ -217,6 +217,34 @@ void FpuHwCheckCompareSurvives()
     }
 }
 
+// -0.0 and +0.0 compare equal (x86 UCOMISS / interpreter float compare): C.EQ and C.LE set
+// C, C.LT clears it, for every sign combination of the two zeros.
+void FpuHwCheckSignedZeroCompare()
+{
+    constexpr u32 kFlagC = 0x00800000u;
+    const struct { const char* name; u32 funct; bool expect; } ops[3] = {
+        {"C.EQ", 0x32, true}, {"C.LT", 0x34, false}, {"C.LE", 0x36, true}};
+    const u32 zeros[2] = {0x00000000u, 0x80000000u};
+    for (const auto& op : ops)
+        for (u32 si = 0; si < 2; ++si)
+            for (u32 ti = 0; ti < 2; ++ti)
+            {
+                u32 fpr[32]{};
+                fpr[3] = zeros[si];
+                fpr[4] = zeros[ti];
+                const std::vector<u32> code = {
+                    MipsCop1(16, 4, 3, 0, op.funct),
+                    MipsCop1(2, 21, 31, 0, 0), // CFC1 r21, fcr31
+                };
+                const EESnapshot interp = RunEEProgram(false, code, false, nullptr, nullptr, nullptr, fpr);
+                const EESnapshot jit = RunEEProgram(true, code, false, nullptr, nullptr, nullptr, fpr);
+                char name[128];
+                std::snprintf(name, sizeof(name), "ee-fpu-hw %s fs=%08x ft=%08x C flag (JIT matches x86/interpreter)",
+                    op.name, zeros[si], zeros[ti]);
+                Check(((jit.gpr[21] & kFlagC) != 0) == op.expect && ((interp.gpr[21] & kFlagC) != 0) == op.expect, name);
+            }
+}
+
 void EeFpuHwTests()
 {
     const auto saved = EmuConfig.Cpu.Recompiler;
@@ -227,6 +255,7 @@ void EeFpuHwTests()
     FpuHwCheckRows();
     FpuHwCheckBoundaries();
     FpuHwCheckCompareSurvives();
+    FpuHwCheckSignedZeroCompare();
     EmuConfig.Cpu.Recompiler = saved;
 }
 } // namespace
