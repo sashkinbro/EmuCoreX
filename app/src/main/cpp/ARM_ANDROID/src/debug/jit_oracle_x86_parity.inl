@@ -730,7 +730,9 @@ static void efuP(VUm& v, const Ins& in, const Cfg& c)
 	const auto radd = [&](u32 a, u32 b) { return sf_add(a, b, env); };
 	const auto sumxyz = [&]() { return radd(radd(rmul(F[0], F[0]), rmul(F[1], F[1])), radd(rmul(F[2], F[2]), 0u)); };
 	const u32 T[8] = {0x3f7ffff5u, 0xbeaaa61cu, 0x3e4c40a6u, 0xbe0e6c63u, 0x3dc577dfu, 0xbd6501c4u, 0x3cb31652u, 0xbb84d7e7u};
-	const auto eatan = [&](u32 fsv) {
+	// EATANxy/xz reuse the register allocated from VF(fs) as mVU_EATAN_'s t1 temp; with fs == 0 it keeps its isZero flag, so
+	// checkVFClamp() skips t1 as the `from` operand of every SSE_ADDSS(PQ, t1) (EATAN itself passes a fresh temp).
+	const auto eatan = [&](u32 fsv, bool t1Zero) {
 		u32 pq = rmul(fsv, T[0]);
 		u32 t2 = fsv;
 		for (int k = 1; k < 8; ++k)
@@ -738,7 +740,7 @@ static void efuP(VUm& v, const Ins& in, const Cfg& c)
 			t2 = MUL(t2, fsv);
 			t2 = MUL(t2, fsv);
 			const u32 t1 = rmul(t2, T[k]);
-			pq = ADD(pq, t1);
+			pq = sse(O_ADD, pq, t1, true, !t1Zero, m, env);
 		}
 		return radd(pq, 0x3f490fdbu);
 	};
@@ -763,16 +765,18 @@ static void efuP(VUm& v, const Ins& in, const Cfg& c)
 		{
 			const u32 num = sf_sub(X, one, env);
 			const u32 den = sf_add(X, one, env);
-			p = eatan(DIVFs(num, den));
+			p = eatan(DIVFs(num, den), false);
 			break;
 		}
 		case L_EATANXY:
 		case L_EATANXZ:
 		{
 			const u32 x = F[0], y = F[in.op == L_EATANXY ? 1 : 2];
-			const u32 num = SUB(y, x);
-			const u32 den = ADD(x, y);
-			p = eatan(DIV(num, den));
+			// t1 = allocReg(vf(fs)) holds x (isZero for vf00) and is reused for the sum and the divisor; Fs/PQ are plain temps.
+			const bool xc = in.fs != 0;
+			const u32 num = sse(O_SUB, y, x, true, xc, m, env);
+			const u32 den = sse(O_ADD, x, y, xc, true, m, env);
+			p = eatan(sseDiv(num, den, true, xc, m, env), !xc);
 			break;
 		}
 		case L_EEXP:
