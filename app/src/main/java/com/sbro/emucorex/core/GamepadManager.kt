@@ -124,6 +124,8 @@ private const val MAX_PAD_SLOTS = 2
     private const val MISSING_VIBRATOR_LOG_INTERVAL_MS = 1500L
     const val ACTION_QUICK_SAVE = "quick_save"
     const val ACTION_QUICK_LOAD = "quick_load"
+    /** Hold-to-fast-forward; shares the gamepadFastForwardHolds path used by Start long-press. */
+    const val ACTION_FAST_FORWARD = "fast_forward"
     private val FINGERPRINT_UINPUT_DEVICE_TOKENS = setOf(
         "uinput-fpc",
         "uinput-goodix",
@@ -347,6 +349,7 @@ private const val MAX_PAD_SLOTS = 2
         MappableButtonAction("service", PadKey.Service, emptyList()),
         MappableButtonAction(ACTION_QUICK_SAVE, null, emptyList()),
         MappableButtonAction(ACTION_QUICK_LOAD, null, emptyList()),
+        MappableButtonAction(ACTION_FAST_FORWARD, null, emptyList()),
         MappableButtonAction("dpad_up", PadKey.Up, listOf(KeyEvent.KEYCODE_DPAD_UP)),
         MappableButtonAction("dpad_down", PadKey.Down, listOf(KeyEvent.KEYCODE_DPAD_DOWN)),
         MappableButtonAction("dpad_left", PadKey.Left, listOf(KeyEvent.KEYCODE_DPAD_LEFT)),
@@ -361,7 +364,7 @@ private const val MAX_PAD_SLOTS = 2
         MappableButtonAction("right_stick_right", PadKey.RightStickRight, emptyList())
     )
     private val actionsById = mappableActions.associateBy { it.id }
-    private val shortcutActionIds = setOf(ACTION_QUICK_SAVE, ACTION_QUICK_LOAD)
+    private val shortcutActionIds = setOf(ACTION_QUICK_SAVE, ACTION_QUICK_LOAD, ACTION_FAST_FORWARD)
     // Gun cabinet actions must not permanently steal a controller button from the normal
     // pad mapping: their custom bindings only win while a light-gun context is active.
     private val gunActionIds = setOf(
@@ -839,6 +842,16 @@ private const val MAX_PAD_SLOTS = 2
         val shortcutActionId = mapKeyCodeToShortcutActionId(padIndex, event.keyCode)
             ?.takeUnless { selectedActionId != null && GamepadBindingRules.isArcadeAction(selectedActionId) }
         shortcutActionId?.let { actionId ->
+            if (actionId == ACTION_FAST_FORWARD) {
+                when (event.action) {
+                    KeyEvent.ACTION_DOWN -> if (event.repeatCount == 0) {
+                        playGamepadButtonHaptic()
+                        _gamepadFastForwardHolds.tryEmit(true)
+                    }
+                    KeyEvent.ACTION_UP -> _gamepadFastForwardHolds.tryEmit(false)
+                }
+                return true
+            }
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
                 playGamepadButtonHaptic()
                 _gamepadShortcutActions.tryEmit(GamepadShortcutAction(padIndex, actionId))

@@ -29,6 +29,7 @@ fun gamepadActionLabelRes(actionId: String): Int = when (actionId) {
     "service" -> R.string.settings_gamepad_action_service
     GamepadManager.ACTION_QUICK_SAVE -> R.string.emulation_quick_save
     GamepadManager.ACTION_QUICK_LOAD -> R.string.emulation_quick_load
+    GamepadManager.ACTION_FAST_FORWARD -> R.string.emulation_transport_fast_forward
     "dpad_up" -> R.string.settings_gamepad_action_dpad_up
     "dpad_down" -> R.string.settings_gamepad_action_dpad_down
     "dpad_left" -> R.string.settings_gamepad_action_dpad_left

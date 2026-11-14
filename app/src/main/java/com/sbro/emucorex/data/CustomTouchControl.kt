@@ -149,7 +149,7 @@ data class CustomTouchControl(
             "l1", "l2", "r1", "r2", "l3", "r3",
             "select", "start", "pressure",
             "gun_trigger", "gun_pedal", "gun_reload", "gun_recalibrate",
-            "coin", "service"
+            "coin", "service", "fast_forward"
         )
 
         fun defaultLabelFor(actionId: String): String = when (actionId) {
@@ -171,6 +171,7 @@ data class CustomTouchControl(
             "gun_recalibrate" -> "CALIB"
             "coin" -> "COIN"
             "service" -> "SVC"
+            "fast_forward" -> "FF"
             else -> "X"
         }
     }

@@ -63,6 +63,7 @@ fun actionLabel(actionId: String): String = when (actionId) {
     "gun_recalibrate" -> stringResource(R.string.settings_gamepad_action_gun_recalibrate)
     "coin" -> stringResource(R.string.settings_gamepad_action_coin)
     "service" -> stringResource(R.string.settings_gamepad_action_service)
+    "fast_forward" -> stringResource(R.string.emulation_transport_fast_forward)
     else -> actionId.uppercase()
 }
 

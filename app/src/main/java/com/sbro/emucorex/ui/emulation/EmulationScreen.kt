@@ -2981,6 +2981,7 @@ private fun OnScreenControls(
         }
         "coin" -> { pressed -> onPadInput(PadKey.COIN, 0, pressed) }
         "service" -> { pressed -> onPadInput(PadKey.SERVICE, 0, pressed) }
+        "fast_forward" -> { pressed -> onFastForwardHoldChange(pressed) }
         else -> null
     }
 
