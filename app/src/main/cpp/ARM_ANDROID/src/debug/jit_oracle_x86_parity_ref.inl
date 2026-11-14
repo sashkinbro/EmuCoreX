@@ -183,6 +183,10 @@ static void refCase(const RefCfg& cfg, int index, const std::string& kind, const
 		for (u32 i = 0; i < 16; ++i) std::printf(" %04x", g.s.regs.VI[i].UL & 0xffff);
 		std::printf("\n  init STATUS %08x MAC %08x CLIP %08x; interp S/M/C %08x %08x %08x; jit S/M/C %08x %08x %08x", init.fm.status, init.fm.mac, init.fm.clip, e.s.regs.VI[REG_STATUS_FLAG].UL, e.s.regs.VI[REG_MAC_FLAG].UL, e.s.regs.VI[REG_CLIP_FLAG].UL, g.s.regs.VI[REG_STATUS_FLAG].UL, g.s.regs.VI[REG_MAC_FLAG].UL, g.s.regs.VI[REG_CLIP_FLAG].UL);
 		std::printf("\n  prog %s\n", progHex(prog).c_str());
+		if (envKnob("X86P_REFDBG", 0) >= 2)
+			for (u32 i = 0; i < 128; ++i)
+				if (e.s.regs.VF[i >> 2].UL[i & 3] != g.s.regs.VF[i >> 2].UL[i & 3])
+					std::printf("  VF%u.%c interp=%08x jit=%08x init=%08x\n", i >> 2, "xyzw"[i & 3], e.s.regs.VF[i >> 2].UL[i & 3], g.s.regs.VF[i >> 2].UL[i & 3], init.fm.vf[i]);
 	}
 	int shown = 0;
 	for (const D& x : d)
@@ -576,6 +580,11 @@ static void runMiscSuite(int index, u32 count)
 					{
 						u32 up = encodeUpper(upperOps()[findUpper("ADD")], 0xf, 1 + r.below(5), 1 + r.below(5), 1 + r.below(5));
 						up |= (mVariant && r.below(3) == 0 ? kMbit : 0) | (r.below(3) == 0 ? kDbit : 0) | (r.below(3) == 0 ? kTbit : 0);
+						// An M word that also carries a T bit is not generated: x86 microVU (microVU_Compile.inl:832-840 breaks the first pass at
+						// the M pair, but the second-pass else-if chain :903-911 runs mVUDoTBit instead of the M-sync block exit) never emits the
+						// exit, falls out of the pair loop and ends the program at that pair (:991-992). The port is identical; the interpreter
+						// simply continues, so its expectation does not apply (vu-prog-rand drops the same combination).
+						if (up & kMbit) up &= ~kTbit;
 						p.pair(r.below(3) == 0 ? enc::IADDI(1 + r.below(4), 1 + r.below(4), 1) : NOP_L, up);
 					}
 					p.pair(enc::IADDIU(9, 0, 0x55), NOP_U | kEbit | (mVariant && r.below(2) ? kMbit : 0));
