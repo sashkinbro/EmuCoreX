@@ -1239,6 +1239,7 @@ static void runModel(int area, const std::vector<Ins>& prog, const FmacInit& ini
 }
 
 struct Diff { const char* field; int lane; u32 exp, got; };
+static u32 g_nanOperandLanes = 0; // lanes of a single upper op whose operands include a NaN (set by runCase)
 static bool g_nanSeen = false; // set by compareObs when a NaN-vs-NaN value difference was exempted
 
 static void compareObs(int area, const Obs& e, const Obs& g, std::vector<Diff>& d, u32 mask)
@@ -1252,10 +1253,27 @@ static void compareObs(int area, const Obs& e, const Obs& g, std::vector<Diff>& 
 		if (isNaN(a) && isNaN(b)) { g_nanSeen = true; return true; }
 		return false;
 	};
+	// Result lanes where both sides are NaN but the sign differs (x86 propagates the first NaN operand / default NaN
+	// 0xFFC00000, ARM gives sNaN operands priority / default NaN 0x7FC00000). Hardware-order documented exception: the MAC
+	// sign bit and STATUS S/SS bits derived from exactly those lanes inherit the exemption; every other flag stays exact.
+	u32 nanSignLanes = 0;
+	const auto noteNanSign = [&](u32 a, u32 b, u32 lane) {
+		if (a != b && isNaN(a) && isNaN(b) && ((a ^ b) & 0x80000000u)) nanSignLanes |= 1u << lane;
+	};
 	for (u32 i = 0; i < 128; ++i)
+	{
+		noteNanSign(e.vf[i], g.vf[i], i & 3);
 		if (!sameVal(e.vf[i], g.vf[i])) d.push_back({"VF", static_cast<int>(i & 3), e.vf[i], g.vf[i]});
+	}
 	for (u32 l = 0; l < 4; ++l)
+	{
+		noteNanSign(e.acc[l], g.acc[l], l);
 		if (!sameVal(e.acc[l], g.acc[l])) d.push_back({"ACC", static_cast<int>(l), e.acc[l], g.acc[l]});
+	}
+	nanSignLanes |= g_nanOperandLanes;
+	u32 nanSignMacBits = 0;
+	for (u32 l = 0; l < 4; ++l)
+		if (nanSignLanes & (1u << l)) nanSignMacBits |= 1u << (4 + (3 - l));
 	for (u32 i = 1; i < 16; ++i)
 		if ((e.vi[i] & 0xffffu) != (g.vi[i] & 0xffffu)) d.push_back({"VI", -1, e.vi[i] & 0xffffu, g.vi[i] & 0xffffu});
 	// X86P_IGNORE_UO=1 hides the MAC/status underflow/overflow bits (x86 never computes them).
@@ -1263,7 +1281,7 @@ static void compareObs(int area, const Obs& e, const Obs& g, std::vector<Diff>& 
 	const u32 macKeep = ignoreUO ? ~0xff00u : ~0u;
 	const u32 stKeep = ignoreUO ? ~(0x4u | 0x8u | 0x100u | 0x200u) : ~0u;
 	const u32 em = e.vi[REG_MAC_FLAG] & macKeep, gm = g.vi[REG_MAC_FLAG] & macKeep;
-	if (em != gm)
+	if (((em ^ gm) & ~nanSignMacBits) != 0)
 	{
 		int lane = -1;
 		for (u32 l = 0; l < 4 && lane < 0; ++l)
@@ -1273,7 +1291,8 @@ static void compareObs(int area, const Obs& e, const Obs& g, std::vector<Diff>& 
 		}
 		d.push_back({"MAC", lane, em, gm});
 	}
-	if ((e.vi[REG_STATUS_FLAG] & stKeep) != (g.vi[REG_STATUS_FLAG] & stKeep)) d.push_back({"STATUS", -1, e.vi[REG_STATUS_FLAG] & stKeep, g.vi[REG_STATUS_FLAG] & stKeep});
+	const u32 nanSignStatus = nanSignLanes ? ((1u << 1) | (1u << 7)) : 0u; // S, SS
+	if ((((e.vi[REG_STATUS_FLAG] ^ g.vi[REG_STATUS_FLAG]) & stKeep) & ~nanSignStatus) != 0) d.push_back({"STATUS", -1, e.vi[REG_STATUS_FLAG] & stKeep, g.vi[REG_STATUS_FLAG] & stKeep});
 	if (e.vi[REG_CLIP_FLAG] != g.vi[REG_CLIP_FLAG]) d.push_back({"CLIP", -1, e.vi[REG_CLIP_FLAG], g.vi[REG_CLIP_FLAG]});
 	if (!sameVal(e.vi[REG_Q], g.vi[REG_Q])) d.push_back({"Q", -1, e.vi[REG_Q], g.vi[REG_Q]});
 	if (e.vi[REG_I] != g.vi[REG_I]) d.push_back({"I", -1, e.vi[REG_I], g.vi[REG_I]});
@@ -1308,7 +1327,22 @@ static void runCase(const Ctx& c, const std::string& opKey, const std::vector<In
 	++g_cases;
 	++g_groupCases;
 	std::vector<Diff> diffs;
+	// A NaN operand makes the result NaN whose sign x86 takes from the first NaN operand and ARM from the signaling one
+	// first; when the destination is VF00/ACC-hidden only the derived MAC/STATUS sign bits show it (see compareObs).
+	g_nanOperandLanes = 0;
+	if (prog.size() == 1 && !prog.back().lower)
+	{
+		const Ins& l0 = prog.back();
+		const UOp& o0 = upperOps()[l0.op];
+		for (u32 l = 0; l < 4; ++l)
+		{
+			if (!(l0.mask & (8u >> l))) continue;
+			u32 ftv = o0.form <= F_W ? init.vf[l0.ft * 4 + o0.form] : (o0.form == F_I ? init.i : (o0.form == F_Q ? init.q : init.vf[l0.ft * 4 + l]));
+			if (isNaN(init.vf[l0.fs * 4 + l]) || isNaN(ftv) || isNaN(init.acc[l])) g_nanOperandLanes |= 1u << l;
+		}
+	}
 	compareObs(c.area, exp, got, diffs, prog.empty() ? 0 : prog.back().mask);
+	g_nanOperandLanes = 0;
 	if (diffs.empty()) return;
 	const Ins& last = prog.back();
 	int shown = 0;

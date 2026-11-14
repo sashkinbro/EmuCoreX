@@ -332,6 +332,32 @@ static __fi void mVUUpperMulSs_oaknut(mV, int to, int from)
 	mVUUpperClampZeroTailResult_oaknut(mVU, to);
 }
 
+// x86 SSE_PS[0]/[1] (clampOp) run mVUclamp3 on the multiply's result again before the accumulate. Under round-to-zero a
+// product of clamped operands is finite, so that clamp is an identity and is resolved away at recompile time. Other
+// rounding modes can overflow to Inf, which the extra clamp turns back into +-max (or NaN -> +max).
+static __fi bool mVUUpperProductNeedsClamp_oaknut(mV, int left)
+{
+	if (!clampE || !mVU.regAlloc->checkVFClamp(left))
+		return false;
+	const FPControlRegister fpcr = isCOP2 ? EmuConfig.Cpu.FPUFPCR :
+		(isVU1 ? EmuConfig.Cpu.VU1FPCR : EmuConfig.Cpu.VU0FPCR);
+	return fpcr.GetRoundMode() != FPRoundMode::ChopZero;
+}
+
+static __fi void mVUUpperClampProduct_oaknut(mV)
+{
+	mVULoadClampLimits_oaknut(OAK_QSCRATCH3, OAK_QSCRATCH2);
+	if (CHECK_VU_SIGN_OVERFLOW(mVU.index))
+	{
+		oakAsm->SMIN(OAK_QSCRATCH.S4(), OAK_QSCRATCH.S4(), OAK_QSCRATCH2.S4());
+		oakAsm->UMIN(OAK_QSCRATCH.S4(), OAK_QSCRATCH.S4(), OAK_QSCRATCH3.S4());
+		return;
+	}
+	oakAsm->FMINNM(OAK_QSCRATCH.S4(), OAK_QSCRATCH.S4(), OAK_QSCRATCH2.S4());
+	oakAsm->FMINNM(OAK_QSCRATCH.S4(), OAK_QSCRATCH.S4(), OAK_QSCRATCH2.S4());
+	oakAsm->FMAXNM(OAK_QSCRATCH.S4(), OAK_QSCRATCH.S4(), OAK_QSCRATCH3.S4());
+}
+
 static __fi void mVUUpperFmlaPs_oaknut(mV, int acc, int left, int right)
 {
 	const oak::QReg acc_q = oakQRegister(acc);
@@ -342,6 +368,8 @@ static __fi void mVUUpperFmlaPs_oaknut(mV, int acc, int left, int right)
 	mVUUpperClamp3Vector_oaknut(mVU, left, limits_ready);
 	mVUUpperClamp3Vector_oaknut(mVU, right, limits_ready);
 	oakAsm->FMUL(OAK_QSCRATCH.S4(), left_q.S4(), right_q.S4());
+	if (mVUUpperProductNeedsClamp_oaknut(mVU, left))
+		mVUUpperClampProduct_oaknut(mVU);
 	oakAsm->FADD(acc_q.S4(), acc_q.S4(), OAK_QSCRATCH.S4());
 	mVUUpperClamp4Vector_oaknut(mVU, acc);
 }
@@ -357,6 +385,8 @@ static __fi void mVUUpperFmlaSs_oaknut(mV, int acc, int left, int right)
 	mVUUpperClamp3Scalar_oaknut(mVU, left);
 	mVUUpperClamp3Scalar_oaknut(mVU, right);
 	oakAsm->FMUL(OAK_SSCRATCH, oakSRegister(left), oakQRegister(right).Selem()[0]);
+	if (mVUUpperProductNeedsClamp_oaknut(mVU, left))
+		mVUUpperClampProduct_oaknut(mVU);
 	oakAsm->FADD(OAK_SSCRATCH, oakSRegister(acc), OAK_SSCRATCH);
 	oakAsm->MOV(oakQRegister(acc).Selem()[0], OAK_QSCRATCH.Selem()[0]);
 	mVUUpperClamp4Scalar_oaknut(mVU, acc);
@@ -474,6 +504,8 @@ static __fi void mVUUpperFmlsPs_oaknut(mV, int acc, int left, int right)
 	mVUUpperClamp3Vector_oaknut(mVU, left, limits_ready);
 	mVUUpperClamp3Vector_oaknut(mVU, right, limits_ready);
 	oakAsm->FMUL(OAK_QSCRATCH.S4(), left_q.S4(), right_q.S4());
+	if (mVUUpperProductNeedsClamp_oaknut(mVU, left))
+		mVUUpperClampProduct_oaknut(mVU);
 	oakAsm->FSUB(acc_q.S4(), acc_q.S4(), OAK_QSCRATCH.S4());
 	mVUUpperClamp4Vector_oaknut(mVU, acc);
 }
@@ -489,6 +521,8 @@ static __fi void mVUUpperFmlsSs_oaknut(mV, int acc, int left, int right)
 	mVUUpperClamp3Scalar_oaknut(mVU, left);
 	mVUUpperClamp3Scalar_oaknut(mVU, right);
 	oakAsm->FMUL(OAK_SSCRATCH, oakSRegister(left), oakQRegister(right).Selem()[0]);
+	if (mVUUpperProductNeedsClamp_oaknut(mVU, left))
+		mVUUpperClampProduct_oaknut(mVU);
 	oakAsm->FSUB(OAK_SSCRATCH, oakSRegister(acc), OAK_SSCRATCH);
 	oakAsm->MOV(oakQRegister(acc).Selem()[0], OAK_QSCRATCH.Selem()[0]);
 	mVUUpperClamp4Scalar_oaknut(mVU, acc);
