@@ -27,7 +27,7 @@ static void TestClearVUs(u32 madr, u32 qwc, bool isWrite)
 		if ((madr >= 0x11008000) && (VU0.VI[REG_VPU_STAT].UL & 0x100) && (!THREAD_VU1 || !isWrite))
 		{
 			if (THREAD_VU1)
-				vu1Thread.WaitVU();
+				vu1Thread.WaitVU(SYNCPROF_CALLER(SPR));
 			else
 				CpuVU1->Execute(vu1RunCycles);
 			cpuRegs.cycle = VU1.cycle;

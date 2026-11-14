@@ -545,8 +545,14 @@ struct Gif_Path
 		// operation in gsPack.push
 		readAmount.fetch_add(gsPack.size + gsPack.readAmount, std::memory_order_acq_rel);
 		u32 push_attempts = 0;
+#ifdef EMUCOREX_SYNC_PROF
+		SyncProf::BlockTimer prof_push(SyncProf::SiteGifPushFull, false);
+#endif
 		while (!mtvu.gsPackQueue.push(gsPack))
 		{
+#ifdef EMUCOREX_SYNC_PROF
+			prof_push.Arm();
+#endif
 			// Yield after 16 failed attempts to reduce CPU waste
 			// The SPSC queue is lock-free but needs the consumer to drain
 			if ((++push_attempts & 15) == 0)

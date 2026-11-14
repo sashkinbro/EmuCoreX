@@ -292,36 +292,36 @@ _vifT __fi u32 vifRead32(u32 mem)
 	{
 		case caseVif(ROW0):
 			if (wait)
-				vu1Thread.WaitVU();
+				vu1Thread.WaitVU(SYNCPROF_CALLER(Vif));
 			return vif.MaskRow._u32[0];
 		case caseVif(ROW1):
 			if (wait)
-				vu1Thread.WaitVU();
+				vu1Thread.WaitVU(SYNCPROF_CALLER(Vif));
 			return vif.MaskRow._u32[1];
 		case caseVif(ROW2):
 			if (wait)
-				vu1Thread.WaitVU();
+				vu1Thread.WaitVU(SYNCPROF_CALLER(Vif));
 			return vif.MaskRow._u32[2];
 		case caseVif(ROW3):
 			if (wait)
-				vu1Thread.WaitVU();
+				vu1Thread.WaitVU(SYNCPROF_CALLER(Vif));
 			return vif.MaskRow._u32[3];
 
 		case caseVif(COL0):
 			if (wait)
-				vu1Thread.WaitVU();
+				vu1Thread.WaitVU(SYNCPROF_CALLER(Vif));
 			return vif.MaskCol._u32[0];
 		case caseVif(COL1):
 			if (wait)
-				vu1Thread.WaitVU();
+				vu1Thread.WaitVU(SYNCPROF_CALLER(Vif));
 			return vif.MaskCol._u32[1];
 		case caseVif(COL2):
 			if (wait)
-				vu1Thread.WaitVU();
+				vu1Thread.WaitVU(SYNCPROF_CALLER(Vif));
 			return vif.MaskCol._u32[2];
 		case caseVif(COL3):
 			if (wait)
-				vu1Thread.WaitVU();
+				vu1Thread.WaitVU(SYNCPROF_CALLER(Vif));
 			return vif.MaskCol._u32[3];
 	}
 

@@ -56,7 +56,7 @@ void vuMemReset()
 bool SaveStateBase::vuMicroFreeze()
 {
 	if(IsSaving())
-		vu1Thread.WaitVU();
+		vu1Thread.WaitVU(SYNCPROF_CALLER(VUmicroMem));
 
 	if (!FreezeTag("vuMicroRegs"))
 		return false;

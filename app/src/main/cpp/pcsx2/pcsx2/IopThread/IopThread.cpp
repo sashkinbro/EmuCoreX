@@ -163,6 +163,7 @@ namespace IopThread
 		}
 
 		m_sema.Reset();
+		SYNCPROF_SET_TAG(m_sema, Iop);
 		m_started.store(false, std::memory_order_relaxed);
 		if (m_params.stack_size != 0)
 			m_thread.SetStackSize(m_params.stack_size);
@@ -266,6 +267,9 @@ namespace IopThread
 	void Thread::IdleWait()
 	{
 		m_idle_waits.Add();
+#ifdef EMUCOREX_SYNC_PROF
+		SyncProf::BlockTimer prof_idle(SyncProf::SiteIopIdleWait);
+#endif
 		m_iop.idle.store(true, std::memory_order_relaxed);
 		const u64 begin = NowNs();
 		const u64 deadline = begin + m_idle_spin_ns;
@@ -440,6 +444,9 @@ namespace IopThread
 			return !m_ee.shutdown.load(std::memory_order_seq_cst) && m_ee.hold_target.load(std::memory_order_seq_cst) != kNoHold &&
 			       m_ee.hold_gen.load(std::memory_order_seq_cst) == gen;
 		};
+#ifdef EMUCOREX_SYNC_PROF
+		SyncProf::BlockTimer prof_hold(SyncProf::SiteIopHoldWait, still_held());
+#endif
 		while (still_held())
 			ParkUntil([&] { return !still_held(); });
 	}
@@ -457,6 +464,9 @@ namespace IopThread
 	bool Thread::WaitForI2ESpace(u16 kind, u32 arg)
 	{
 		m_i2e_full_waits.Add();
+#ifdef EMUCOREX_SYNC_PROF
+		SyncProf::BlockTimer prof_i2e(SyncProf::SiteIopI2EFull);
+#endif
 		for (u32 n = 0;; n++)
 		{
 			if (m_ee.shutdown.load(std::memory_order_acquire))
@@ -610,6 +620,9 @@ namespace IopThread
 			return true;
 
 		m_lag_spins.Add();
+#ifdef EMUCOREX_SYNC_PROF
+		SyncProf::BlockTimer prof_lag(SyncProf::SiteIopLagSpin);
+#endif
 		// What the IOP was doing when the wait began, read before the wake-up below: asleep (or on its
 		// way), so the EE also waits for it to wake, or idle and awake, watching a watermark that gives it
 		// less than S_min to run.

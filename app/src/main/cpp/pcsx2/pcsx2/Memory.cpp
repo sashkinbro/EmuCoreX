@@ -807,34 +807,34 @@ template<int vunum> static mem8_t vuMicroRead8(u32 addr) {
 	VURegs* vu = vunum ?  &VU1 :  &VU0;
 	addr      &= vunum ? 0x3fff: 0xfff;
 
-	if (vunum && THREAD_VU1) vu1Thread.WaitVU();
+	if (vunum && THREAD_VU1) vu1Thread.WaitVU(SYNCPROF_CALLER(Memory));
 	return vu->Micro[addr];
 }
 template<int vunum> static mem16_t vuMicroRead16(u32 addr) {
 	VURegs* vu = vunum ?  &VU1 :  &VU0;
 	addr      &= vunum ? 0x3fff: 0xfff;
 
-	if (vunum && THREAD_VU1) vu1Thread.WaitVU();
+	if (vunum && THREAD_VU1) vu1Thread.WaitVU(SYNCPROF_CALLER(Memory));
 	return *(u16*)&vu->Micro[addr];
 }
 template<int vunum> static mem32_t vuMicroRead32(u32 addr) {
 	VURegs* vu = vunum ?  &VU1 :  &VU0;
 	addr      &= vunum ? 0x3fff: 0xfff;
 
-	if (vunum && THREAD_VU1) vu1Thread.WaitVU();
+	if (vunum && THREAD_VU1) vu1Thread.WaitVU(SYNCPROF_CALLER(Memory));
 	return *(u32*)&vu->Micro[addr];
 }
 template<int vunum> static mem64_t vuMicroRead64(u32 addr) {
 	VURegs* vu = vunum ?  &VU1 :  &VU0;
 	addr      &= vunum ? 0x3fff: 0xfff;
 
-	if (vunum && THREAD_VU1) vu1Thread.WaitVU();
+	if (vunum && THREAD_VU1) vu1Thread.WaitVU(SYNCPROF_CALLER(Memory));
 	return *(u64*)&vu->Micro[addr];
 }
 template<int vunum> static RETURNS_R128 vuMicroRead128(u32 addr) {
 	VURegs* vu = vunum ?  &VU1 :  &VU0;
 	addr      &= vunum ? 0x3fff: 0xfff;
-	if (vunum && THREAD_VU1) vu1Thread.WaitVU();
+	if (vunum && THREAD_VU1) vu1Thread.WaitVU(SYNCPROF_CALLER(Memory));
 
 	return r128_load(&vu->Micro[addr]);
 }
@@ -914,31 +914,31 @@ template<int vunum> static void TAKES_R128 vuMicroWrite128(u32 addr, r128 data) 
 template<int vunum> static mem8_t vuDataRead8(u32 addr) {
 	VURegs* vu = vunum ?  &VU1 :  &VU0;
 	addr      &= vunum ? 0x3fff: 0xfff;
-	if (vunum && THREAD_VU1) vu1Thread.WaitVU();
+	if (vunum && THREAD_VU1) vu1Thread.WaitVU(SYNCPROF_CALLER(Memory));
 	return vu->Mem[addr];
 }
 template<int vunum> static mem16_t vuDataRead16(u32 addr) {
 	VURegs* vu = vunum ?  &VU1 :  &VU0;
 	addr      &= vunum ? 0x3fff: 0xfff;
-	if (vunum && THREAD_VU1) vu1Thread.WaitVU();
+	if (vunum && THREAD_VU1) vu1Thread.WaitVU(SYNCPROF_CALLER(Memory));
 	return *(u16*)&vu->Mem[addr];
 }
 template<int vunum> static mem32_t vuDataRead32(u32 addr) {
 	VURegs* vu = vunum ?  &VU1 :  &VU0;
 	addr      &= vunum ? 0x3fff: 0xfff;
-	if (vunum && THREAD_VU1) vu1Thread.WaitVU();
+	if (vunum && THREAD_VU1) vu1Thread.WaitVU(SYNCPROF_CALLER(Memory));
 	return *(u32*)&vu->Mem[addr];
 }
 template<int vunum> static mem64_t vuDataRead64(u32 addr) {
 	VURegs* vu = vunum ?  &VU1 :  &VU0;
 	addr      &= vunum ? 0x3fff: 0xfff;
-	if (vunum && THREAD_VU1) vu1Thread.WaitVU();
+	if (vunum && THREAD_VU1) vu1Thread.WaitVU(SYNCPROF_CALLER(Memory));
 	return *(u64*)&vu->Mem[addr];
 }
 template<int vunum> static RETURNS_R128 vuDataRead128(u32 addr) {
 	VURegs* vu = vunum ?  &VU1 :  &VU0;
 	addr      &= vunum ? 0x3fff: 0xfff;
-	if (vunum && THREAD_VU1) vu1Thread.WaitVU();
+	if (vunum && THREAD_VU1) vu1Thread.WaitVU(SYNCPROF_CALLER(Memory));
 	return r128_load(&vu->Mem[addr]);
 }
 

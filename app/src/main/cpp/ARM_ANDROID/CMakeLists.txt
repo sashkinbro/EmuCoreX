@@ -390,6 +390,10 @@ endif()
 if(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	target_compile_definitions(emucore PRIVATE EMUCOREX_ENABLE_NATIVE_SELF_TESTS=1)
 	target_compile_definitions(PCSX2_FLAGS INTERFACE EMUCOREX_ENABLE_NATIVE_SELF_TESTS=1)
+	# Thread-sync wait profiling (common/SyncProf.h); also needs !NDEBUG and debug.emucorex.sync_prof=1.
+	# `common` gets it PUBLIC so WorkSema has the same layout in every target.
+	target_compile_definitions(PCSX2_FLAGS INTERFACE EMUCOREX_SYNC_PROF_BUILD=1)
+	target_compile_definitions(common PUBLIC EMUCOREX_SYNC_PROF_BUILD=1)
 	target_sources(emucore PRIVATE src/debug/jit_oracle.cpp src/debug/tfx_preparation_bridge_oracle.cpp src/debug/signal_chain_oracle.cpp)
 	if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 		target_sources(emucore PRIVATE "${PCSX2_UPSTREAM_DIR}/pcsx2/arm64/vuaot/VuAotSpanDump.cpp")

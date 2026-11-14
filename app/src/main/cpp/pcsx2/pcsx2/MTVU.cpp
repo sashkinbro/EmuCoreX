@@ -90,7 +90,7 @@ void MTVU_ResyncAfterStateLoad()
 	// registers were restored in place, and PreLoadPrep cleared the JIT caches.
 	vu1Thread.WriteCol(vif1);
 	vu1Thread.WriteRow(vif1);
-	vu1Thread.WaitVU();
+	vu1Thread.WaitVU(SYNCPROF_CALLER(Internal));
 }
 
 VU_Thread::VU_Thread()
@@ -110,6 +110,7 @@ void VU_Thread::Open()
 
 	Reset();
 	semaEvent.Reset();
+	SYNCPROF_SET_TAG(semaEvent, Mtvu);
 	m_shutdown_flag.store(false, std::memory_order_release);
 	m_thread.SetStackSize(VMManager::EMU_THREAD_STACK_SIZE);
 	m_thread.Start([this]() { ExecuteRingBuffer(); });
@@ -279,6 +280,9 @@ void VU_Thread::ExecuteRingBuffer()
 __ri void VU_Thread::WaitOnSize(s32 size)
 {
 	constexpr u64 SAFETY_WORDS = _4kb / sizeof(u32);
+#ifdef EMUCOREX_SYNC_PROF
+	SyncProf::BlockTimer prof(SyncProf::SiteVuWaitOnSize, false);
+#endif
 	for (;;)
 	{
 		const u64 cached_used_words = m_write_sequence - m_cached_read_sequence;
@@ -293,6 +297,9 @@ __ri void VU_Thread::WaitOnSize(s32 size)
 			break;
 
 		{          // Let MTVU run to free up buffer space
+#ifdef EMUCOREX_SYNC_PROF
+			prof.Arm();
+#endif
 			KickStart();
 			// Locking might trigger a full flush of the ring buffer. Yield
 			// will be more aggressive, and only flush the minimal size.
@@ -350,7 +357,7 @@ __fi void VU_Thread::CommitWritePos()
 	if (MTVU_ALWAYS_KICK)
 		KickStart();
 	if (MTVU_SYNC_MODE)
-		WaitVU();
+		WaitVU(SYNCPROF_CALLER(Internal));
 }
 
 __fi void VU_Thread::CommitReadPos()
@@ -489,6 +496,9 @@ void VU_Thread::Apply_MTVUChanges(u32 interrupts)
 
 void VU_Thread::KickStart()
 {
+#ifdef EMUCOREX_SYNC_PROF
+	SyncProf::Count(SyncProf::SiteVuKick);
+#endif
 	semaEvent.NotifyOfWork();
 }
 
@@ -497,15 +507,21 @@ bool VU_Thread::IsDone()
 	return m_ato_read_sequence.load(std::memory_order_acquire) == m_write_sequence;
 }
 
-void VU_Thread::WaitVU()
+void VU_Thread::WaitVU(SYNCPROF_CALLER_DEF)
 {
 	MTVU_LOG("MTVU - WaitVU!");
+#ifdef EMUCOREX_SYNC_PROF
+	SyncProf::BlockTimer prof(SyncProf::SiteWaitVUFirst + static_cast<uint32_t>(sp_caller), !IsDone());
+#endif
 	semaEvent.WaitForEmpty();
 }
 
 void VU_Thread::ExecuteVU(u32 vu_addr, u32 vif_top, u32 vif_itop, u32 fbrst)
 {
 	MTVU_LOG("MTVU - ExecuteVU!");
+#ifdef EMUCOREX_SYNC_PROF
+	SyncProf::Count(SyncProf::SiteVuExecute);
+#endif
 	Get_MTVUChanges(); // Clear any pending interrupts
 	ReserveSpace(5);
 	Write(MTVU_VU_EXECUTE);

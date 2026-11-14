@@ -186,6 +186,7 @@ GSState::GSState(GSBackQueue::Channel* shared_chan, bool is_front_parser)
 	{
 		m_chan_storage=std::make_unique<GSBackQueue::Channel>();
 		m_chan=m_chan_storage.get();
+		SYNCPROF_SET_TAG(m_chan->sema, GsBack);
 		StartBackThread();
 	}
 }

@@ -31,7 +31,7 @@ void vu1Finish(bool add_cycles) {
 		//if (VU0.VI[REG_VPU_STAT].UL & 0x100) DevCon.Error("MTVU: VU0.VI[REG_VPU_STAT].UL & 0x100");
 		if (INSTANT_VU1 || add_cycles)
 		{
-			vu1Thread.WaitVU();
+			vu1Thread.WaitVU(SYNCPROF_CALLER(VU1micro));
 		}
 		vu1Thread.Get_MTVUChanges();
 		return;

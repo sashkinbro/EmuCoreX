@@ -123,6 +123,7 @@ void MTGS::StartThread()
 
 	pxAssertRel(!s_open_flag.load(), "GS thread should not be opened when starting");
 	s_sem_event.Reset();
+	SYNCPROF_SET_TAG(s_sem_event, Mtgs);
 	s_shutdown_flag.store(false, std::memory_order_release);
 	s_thread.Start(&MTGS::ThreadEntryPoint);
 }
@@ -243,6 +244,9 @@ struct RingCmdPacket_Vsync
 
 void MTGS::PostVsyncStart(bool registers_written)
 {
+#ifdef EMUCOREX_SYNC_PROF
+	SyncProf::OnVsync();
+#endif
 	// Optimization note: Typically regset1 isn't needed.  The regs in that area are typically
 	// changed infrequently, usually during video mode changes.  However, on modern systems the
 	// 256-byte copy is only a few dozen cycles -- executed 60 times a second -- so probably
@@ -284,6 +288,9 @@ void MTGS::PostVsyncStart(bool registers_written)
 	s_VsyncSignalListener.store(true, std::memory_order_release);
 	//Console.WriteLn( Color_Blue, "(EEcore Sleep) Vsync\t\tringpos=0x%06x, writepos=0x%06x", m_ReadPos.load(), m_WritePos.load() );
 
+#ifdef EMUCOREX_SYNC_PROF
+	SyncProf::BlockTimer prof_vsync(SyncProf::SiteMtgsVsync);
+#endif
 	s_sem_Vsync.WaitWithSpin();
 }
 
@@ -470,6 +477,9 @@ void MTGS::MainLoop()
 				if (!vu1Thread.semaXGkick.TryWait())
 				{
 					mtvu_lock.unlock();
+#ifdef EMUCOREX_SYNC_PROF
+					SyncProf::BlockTimer prof_xgkick(SyncProf::SiteMtgsXgkick);
+#endif
 					// This command is queued before MTVU has completed the VU1 program, so this
 					// handoff is commonly not a short wait. Avoid burning the GS thread's full
 					// userspace spin budget while MTVU is still executing. The semaphore counter
@@ -731,6 +741,9 @@ void MTGS::WaitGS(bool syncRegs, bool weakWait, bool isMTVU)
 		if (startP1Packs)
 		{
 			u64 spin_iterations = 0;
+#ifdef EMUCOREX_SYNC_PROF
+			SyncProf::BlockTimer prof_weak(SyncProf::SiteMtgsWaitGsWeak);
+#endif
 			while (true)
 			{
 				// m_mtx_RingBufferBusy2.Wait();
@@ -748,6 +761,10 @@ void MTGS::WaitGS(bool syncRegs, bool weakWait, bool isMTVU)
 	}
 	else
 	{
+#ifdef EMUCOREX_SYNC_PROF
+		SyncProf::BlockTimer prof_strong(SyncProf::SiteMtgsWaitGsStrong,
+			s_ReadPos.load(std::memory_order_relaxed) != s_WritePos.load(std::memory_order_relaxed));
+#endif
 		if (!s_sem_event.WaitForEmpty())
 			pxFailRel("MTGS Thread Died");
 	}
@@ -868,7 +885,12 @@ void MTGS::GenericStall(uint size)
 			{
 				s_SignalRingEnable.store(true, std::memory_order_release);
 				SetEvent();
-				s_sem_OnRingReset.Wait();
+				{
+#ifdef EMUCOREX_SYNC_PROF
+					SyncProf::BlockTimer prof_reset(SyncProf::SiteMtgsRingResetSleep);
+#endif
+					s_sem_OnRingReset.Wait();
+				}
 				readpos = s_ReadPos.load(std::memory_order_acquire);
 				//Console.WriteLn( Color_Blue, "(EEcore Awake) Report!\tringpos=0x%06x", readpos );
 
@@ -889,6 +911,9 @@ void MTGS::GenericStall(uint size)
 			//Console.WriteLn( Color_StrongGray, "(EEcore Spin) PrepDataPacket!" );
 			SetEvent();
 			u32 spin_count = 0;
+#ifdef EMUCOREX_SYNC_PROF
+			SyncProf::BlockTimer prof_ring_spin(SyncProf::SiteMtgsRingSpin);
+#endif
 			while (true)
 			{
 				Threading::SpinWait();

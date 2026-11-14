@@ -54,6 +54,9 @@ void Threading::WorkSema::WaitForWork()
 	{
 		if (value & STATE_FLAG_WAITING_EMPTY)
 			m_empty_sema.Post();
+#ifdef EMUCOREX_SYNC_PROF
+		SyncProf::BlockTimer prof(SyncProf::WsSite(static_cast<SyncProf::Tag>(m_prof_tag), SyncProf::WsWorkSleep));
+#endif
 		m_sema.Wait();
 		// Acknowledge any additional work added between wake up request and getting here
 		m_state.fetch_and(STATE_FLAG_WAITING_EMPTY, std::memory_order_acquire);
@@ -75,12 +78,19 @@ void Threading::WorkSema::WaitForWorkWithSpin()
 		}
 	}
 	u32 waited = 0;
+#ifdef EMUCOREX_SYNC_PROF
+	SyncProf::SpinSleepTimer prof(SyncProf::WsSite(static_cast<SyncProf::Tag>(m_prof_tag), SyncProf::WsWorkSpin),
+		SyncProf::WsSite(static_cast<SyncProf::Tag>(m_prof_tag), SyncProf::WsWorkSleep), value < 0);
+#endif
 	while (value < 0)
 	{
 		if (waited > SPIN_TIME_NS)
 		{
 			if (!m_state.compare_exchange_weak(value, STATE_SLEEPING, std::memory_order_relaxed))
 				continue;
+#ifdef EMUCOREX_SYNC_PROF
+			prof.Sleeping();
+#endif
 			m_sema.Wait();
 			break;
 		}
@@ -103,6 +113,9 @@ bool Threading::WorkSema::WaitForEmpty()
 			break;
 	}
 	pxAssertMsg(!(value & STATE_FLAG_WAITING_EMPTY), "Multiple threads attempted to wait for empty (not currently supported)");
+#ifdef EMUCOREX_SYNC_PROF
+	SyncProf::BlockTimer prof(SyncProf::WsSite(static_cast<SyncProf::Tag>(m_prof_tag), SyncProf::WsEmptySleep));
+#endif
 	m_empty_sema.Wait();
 	return !IsDead(m_state.load(std::memory_order_relaxed));
 }
@@ -111,6 +124,10 @@ bool Threading::WorkSema::WaitForEmptyWithSpin()
 {
 	s32 value = m_state.load(std::memory_order_acquire);
 	u32 waited = 0;
+#ifdef EMUCOREX_SYNC_PROF
+	SyncProf::SpinSleepTimer prof(SyncProf::WsSite(static_cast<SyncProf::Tag>(m_prof_tag), SyncProf::WsEmptySpin),
+		SyncProf::WsSite(static_cast<SyncProf::Tag>(m_prof_tag), SyncProf::WsEmptySleep), value >= 0);
+#endif
 	while (true)
 	{
 		if (value < 0)
@@ -121,6 +138,9 @@ bool Threading::WorkSema::WaitForEmptyWithSpin()
 		value = m_state.load(std::memory_order_acquire);
 	}
 	pxAssertMsg(!(value & STATE_FLAG_WAITING_EMPTY), "Multiple threads attempted to wait for empty (not currently supported)");
+#ifdef EMUCOREX_SYNC_PROF
+	prof.Sleeping();
+#endif
 	m_empty_sema.Wait();
 	return !IsDead(m_state.load(std::memory_order_relaxed));
 }

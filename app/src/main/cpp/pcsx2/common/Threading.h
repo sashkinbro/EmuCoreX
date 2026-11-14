@@ -4,6 +4,7 @@
 #pragma once
 
 #include "common/Pcsx2Defs.h"
+#include "common/SyncProf.h"
 
 #if defined(__APPLE__)
 #include <mach/semaphore.h>
@@ -158,6 +159,10 @@ namespace Threading
 		KernelSemaphore m_empty_sema;
 		/// Current state (see enum below)
 		alignas(__cachelinesize) std::atomic<s32> m_state{0};
+#ifdef EMUCOREX_SYNC_PROF
+		/// Which WorkSema instance this is, for wait profiling (SyncProf::Tag)
+		u8 m_prof_tag = 0;
+#endif
 
 		// Expected call frequency is NotifyOfWork > WaitForWork > WaitForEmpty
 		// So optimize states for fast NotifyOfWork
@@ -200,8 +205,17 @@ namespace Threading
 			// RUNNING_N: Stay in RUNNING_N
 			s32 old = m_state.fetch_add(2, std::memory_order_release);
 			if (old == STATE_SLEEPING)
+			{
+#ifdef EMUCOREX_SYNC_PROF
+				SyncProf::Count(SyncProf::WsSite(static_cast<SyncProf::Tag>(m_prof_tag), SyncProf::WsWake));
+#endif
 				m_sema.Post();
+			}
 		}
+
+#ifdef EMUCOREX_SYNC_PROF
+		void SetProfTag(SyncProf::Tag tag) { m_prof_tag = static_cast<u8>(tag); }
+#endif
 
 		/// Checks if there's any work in the queue
 		bool CheckForWork();

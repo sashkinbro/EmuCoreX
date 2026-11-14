@@ -50,6 +50,7 @@ public:
 		, m_shutdown(std::move(shutdown))
 		, m_exit(false)
 	{
+		SYNCPROF_SET_TAG(m_sema, GsJob);
 		m_thread = std::thread(&GSJobQueue::ThreadProc, this);
 	}
 

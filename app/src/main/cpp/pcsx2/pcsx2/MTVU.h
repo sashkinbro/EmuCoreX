@@ -85,7 +85,7 @@ public:
 	bool IsDone();
 
 	// Waits till MTVU is done processing
-	void WaitVU();
+	void WaitVU(SYNCPROF_CALLER_PARAM);
 
 	// Most EE/GS polling points have no new VU-thread messages. Keep the
 	// acquire load here and call out only when something needs applying.
