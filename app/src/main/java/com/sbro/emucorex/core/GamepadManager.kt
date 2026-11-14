@@ -138,6 +138,8 @@ private const val MAX_PAD_SLOTS = 2
     private const val AXIS_CODE_BASE = 0x20000
     private const val AXIS_BUTTON_PRESS = 0.65f
     private const val AXIS_BUTTON_RELEASE = 0.35f
+    private const val AXIS_BUTTON_MIN_DELTA = 0.5f
+    private const val AXIS_REST_MAX = 0.35f
     private val BINDABLE_BUTTON_AXES = intArrayOf(
         MotionEvent.AXIS_GENERIC_1, MotionEvent.AXIS_GENERIC_2, MotionEvent.AXIS_GENERIC_3,
         MotionEvent.AXIS_GENERIC_4, MotionEvent.AXIS_GENERIC_5, MotionEvent.AXIS_GENERIC_6,
@@ -183,15 +185,6 @@ private const val MAX_PAD_SLOTS = 2
         KeyEvent.KEYCODE_BUTTON_8,
         KeyEvent.KEYCODE_BUTTON_9,
         KeyEvent.KEYCODE_BUTTON_10,
-        KeyEvent.KEYCODE_BUTTON_11,
-        KeyEvent.KEYCODE_BUTTON_12,
-        KeyEvent.KEYCODE_BUTTON_13,
-        KeyEvent.KEYCODE_BUTTON_14,
-        KeyEvent.KEYCODE_BUTTON_15,
-        KeyEvent.KEYCODE_BUTTON_16,
-        KeyEvent.KEYCODE_BUTTON_C,
-        KeyEvent.KEYCODE_BUTTON_Z,
-        KeyEvent.KEYCODE_BUTTON_MODE,
         KeyEvent.KEYCODE_DPAD_UP,
         KeyEvent.KEYCODE_DPAD_DOWN,
         KeyEvent.KEYCODE_DPAD_LEFT,
@@ -657,6 +650,13 @@ private const val MAX_PAD_SLOTS = 2
                 (sources and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK ||
                 (sources and InputDevice.SOURCE_KEYBOARD) == InputDevice.SOURCE_KEYBOARD
         if (!hasSource) return false
+        if (keyCode <= KeyEvent.KEYCODE_UNKNOWN) {
+            // Scancode-only keys are accepted from controllers (or their sibling nodes), never plain keyboards.
+            val controllerSource =
+                (sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
+                    (sources and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
+            if (!controllerSource && resolveSiblingPadIndex(device.id) == null) return false
+        }
         return keyCode == KeyEvent.KEYCODE_UNKNOWN ||
             keyCode < 0 ||
             isAxisButtonCode(keyCode) ||
@@ -724,6 +724,7 @@ private const val MAX_PAD_SLOTS = 2
     }
 
     fun startBindingCapture(padIndex: Int, onCaptured: (Int) -> Unit) {
+        axisCaptureBaselines.clear()
         bindingCaptureState = BindingCaptureState(normalizePadIndex(padIndex), onCaptured)
     }
 
@@ -736,7 +737,9 @@ private const val MAX_PAD_SLOTS = 2
         val code = physicalKeyCode(event)
         // BACK/HOME/volume/etc. are never captured; BACK falls through so the dialog cancels.
         if (!isCapturableDevice(event.device, code)) return false
-        val eventPadIndex = resolvePadIndexForDevice(event.deviceId) ?: return false
+        val eventPadIndex = resolvePadIndexForDevice(event.deviceId)
+            // Controllers without a slot stay swallowed; only secondary nodes fall through.
+            ?: return isGameController(event.device)
         if (eventPadIndex != captureState.padIndex) {
             // Keep another player's input from leaking into the binding dialog or
             // overwriting the selected player's mapping.
@@ -757,8 +760,7 @@ private const val MAX_PAD_SLOTS = 2
         val capturedKey = when {
             left > 0.65f && left >= right -> KeyEvent.KEYCODE_BUTTON_L2
             right > 0.65f -> KeyEvent.KEYCODE_BUTTON_R2
-            else -> BINDABLE_BUTTON_AXES.firstOrNull { event.getAxisValue(it) > AXIS_BUTTON_PRESS }
-                ?.let(::axisButtonCode)
+            else -> captureAxisButton(event)
         }
         if (capturedKey != null) {
             bindingCaptureState = null
@@ -766,6 +768,22 @@ private const val MAX_PAD_SLOTS = 2
         }
         return true
     }
+
+    private val axisCaptureBaselines = mutableMapOf<Int, FloatArray>()
+
+    /** Resting values are recorded on the first event per device, so only a real push counts. */
+    private fun captureAxisButton(event: MotionEvent): Int? {
+        val baseline = axisCaptureBaselines.getOrPut(event.deviceId) {
+            FloatArray(BINDABLE_BUTTON_AXES.size) { event.getAxisValue(BINDABLE_BUTTON_AXES[it]) }
+        }
+        BINDABLE_BUTTON_AXES.forEachIndexed { index, axis ->
+            if (axisButtonPressed(baseline[index], event.getAxisValue(axis))) return axisButtonCode(axis)
+        }
+        return null
+    }
+
+    internal fun axisButtonPressed(baseline: Float, value: Float): Boolean =
+        baseline <= AXIS_REST_MAX && value > AXIS_BUTTON_PRESS && value - baseline > AXIS_BUTTON_MIN_DELTA
 
     fun isGameController(device: InputDevice?): Boolean {
         if (device == null) return false
@@ -798,7 +816,9 @@ private const val MAX_PAD_SLOTS = 2
             synchronized(connectionLock) {
                 heldButtonsByDeviceAndKey.clear()
                 heldAxisButtons.clear()
+                axisBaselines.clear()
             }
+            removeFastForwardHolders { it.startsWith("ff:") }
             cancelStartTransportHolds()
             resetAnalogState()
             stopAllGamepadVibrations()
@@ -946,12 +966,11 @@ private const val MAX_PAD_SLOTS = 2
         if (!emulationInputEnabled) return false
         val code = physicalKeyCode(event)
         val isController = isGameController(event.device)
-        if (!isController && !isBindableInputDevice(event.device, code)) return false
-
-        val padIndex = resolvePadIndexForDevice(event.deviceId) ?: return false
-        // Secondary/keyboard-class nodes only act on keys the user explicitly bound.
-        if (!isController && !isKeyBoundForPad(padIndex, code)) return false
         val physicalKey = event.deviceId to code
+        // Releases are processed before any gating, so a binding change mid-hold cannot strand a button.
+        if (event.action == KeyEvent.ACTION_UP) {
+            setFastForwardHolder("ff:${physicalKey.first}:${physicalKey.second}", false)
+        }
         val heldButton = synchronized(connectionLock) { heldButtonsByDeviceAndKey[physicalKey] }
         if (event.action == KeyEvent.ACTION_UP && heldButton != null) {
             synchronized(connectionLock) { heldButtonsByDeviceAndKey.remove(physicalKey) }
@@ -962,6 +981,10 @@ private const val MAX_PAD_SLOTS = 2
             setGamepadButton(heldButton.padIndex, heldButton.padKey, 0, false)
             return true
         }
+        if (!isController && !isBindableInputDevice(event.device, code)) return false
+        val padIndex = resolvePadIndexForDevice(event.deviceId) ?: return false
+        // Secondary/keyboard-class nodes only act on keys the user explicitly bound.
+        if (!isController && !isKeyBoundForPad(padIndex, code)) return false
         if (event.action == KeyEvent.ACTION_DOWN && heldButton != null) return true
         val selectedActionId = resolveMappedActionIdForKeyCode(
             code, customBindingsByPad[normalizePadIndex(padIndex)].orEmpty()
@@ -973,9 +996,9 @@ private const val MAX_PAD_SLOTS = 2
                 when (event.action) {
                     KeyEvent.ACTION_DOWN -> if (event.repeatCount == 0) {
                         playGamepadButtonHaptic()
-                        _gamepadFastForwardHolds.tryEmit(true)
+                        setFastForwardHolder("ff:${physicalKey.first}:${physicalKey.second}", true)
                     }
-                    KeyEvent.ACTION_UP -> _gamepadFastForwardHolds.tryEmit(false)
+                    KeyEvent.ACTION_UP -> setFastForwardHolder("ff:${physicalKey.first}:${physicalKey.second}", false)
                 }
                 return true
             }
@@ -1028,6 +1051,25 @@ private const val MAX_PAD_SLOTS = 2
 
     private val turboJobs = mutableMapOf<Pair<Int, Int>, Job>()
     private val heldAxisButtons = mutableSetOf<Pair<Int, Int>>()
+    private val axisBaselines = mutableMapOf<Pair<Int, Int>, Float>()
+    private val fastForwardHolders = FastForwardHolders()
+    private var boundAxisCodesByPad: Map<Int, Set<Int>> = emptyMap()
+
+    private fun setFastForwardHolder(id: String, held: Boolean) {
+        val changed = synchronized(connectionLock) { fastForwardHolders.set(id, held) }
+        changed?.let { _gamepadFastForwardHolds.tryEmit(it) }
+    }
+
+    private fun removeFastForwardHolders(predicate: (String) -> Boolean) {
+        val changed = synchronized(connectionLock) { fastForwardHolders.removeWhere(predicate) }
+        changed?.let { _gamepadFastForwardHolds.tryEmit(it) }
+    }
+
+    private fun updateBoundAxisCodes() {
+        boundAxisCodesByPad = customBindingsByPad
+            .mapValues { (_, bindings) -> bindings.values.filter(::isAxisButtonCode).toSet() }
+            .filterValues { it.isNotEmpty() }
+    }
 
     private fun startTurbo(key: Pair<Int, Int>, padIndex: Int, padKey: Int) {
         turboJobs.remove(key)?.cancel()
@@ -1043,8 +1085,8 @@ private const val MAX_PAD_SLOTS = 2
 
     /** Feeds generic-axis "buttons" (see [axisButtonCode]) through the normal key path. */
     private fun dispatchBoundAxisButtons(event: MotionEvent, padIndex: Int) {
-        val bound = customBindingsByPad[normalizePadIndex(padIndex)]
-            ?.values?.filter(::isAxisButtonCode)?.toSet().orEmpty()
+        val bound = boundAxisCodesByPad[normalizePadIndex(padIndex)].orEmpty()
+        if (bound.isEmpty() && synchronized(connectionLock) { heldAxisButtons.isEmpty() }) return
         val deviceId = event.deviceId
         val stale = synchronized(connectionLock) {
             heldAxisButtons.filter { it.first == deviceId && it.second !in bound }
@@ -1054,8 +1096,9 @@ private const val MAX_PAD_SLOTS = 2
         for (code in bound) {
             val value = event.getAxisValue(code - AXIS_CODE_BASE)
             val key = deviceId to code
+            val baseline = synchronized(connectionLock) { axisBaselines.getOrPut(key) { value } }
             val held = synchronized(connectionLock) { key in heldAxisButtons }
-            if (!held && value > AXIS_BUTTON_PRESS) {
+            if (!held && axisButtonPressed(baseline, value)) {
                 synchronized(connectionLock) { heldAxisButtons.add(key) }
                 dispatchSyntheticKey(deviceId, code, true)
             } else if (held && value < AXIS_BUTTON_RELEASE) {
@@ -1109,7 +1152,7 @@ private const val MAX_PAD_SLOTS = 2
                 }
             }
             if (activated) {
-                _gamepadFastForwardHolds.tryEmit(true)
+                setFastForwardHolder("start:$padIndex", true)
             }
         }
         synchronized(connectionLock) {
@@ -1122,12 +1165,7 @@ private const val MAX_PAD_SLOTS = 2
         val state = synchronized(connectionLock) { startTransportHolds.remove(padIndex) } ?: return false
         state.job?.cancel()
         if (!state.turboActive) return false
-        val stillHeld = synchronized(connectionLock) {
-            startTransportHolds.values.any { it.turboActive }
-        }
-        if (!stillHeld) {
-            _gamepadFastForwardHolds.tryEmit(false)
-        }
+        setFastForwardHolder("start:$padIndex", false)
         return true
     }
 
@@ -1139,7 +1177,7 @@ private const val MAX_PAD_SLOTS = 2
             active
         }
         if (wasHolding) {
-            _gamepadFastForwardHolds.tryEmit(false)
+            removeFastForwardHolders { it.startsWith("start:") }
         }
     }
 
@@ -1404,6 +1442,7 @@ private const val MAX_PAD_SLOTS = 2
         previousBindingsByPad: Map<Int, Map<String, Int>>,
         bindingsByPad: Map<Int, Map<String, Int>>
     ) {
+        updateBoundAxisCodes()
         if (previousBindingsByPad == bindingsByPad) return
         val changedPadIndices = (previousBindingsByPad.keys + bindingsByPad.keys)
             .filterTo(mutableSetOf()) { padIndex ->
@@ -1675,22 +1714,30 @@ private const val MAX_PAD_SLOTS = 2
         val device = InputDevice.getDevice(deviceId) ?: return null
         if (device.isVirtual) return null
         val key = gamepadDeviceKey(device)
+        val keyMatches = linkedSetOf<Int>()
         val candidates = linkedSetOf<Int>()
         synchronized(connectionLock) {
             for ((otherId, pad) in deviceToPadIndex) {
                 val other = InputDevice.getDevice(otherId) ?: continue
-                if (gamepadDeviceKey(other) == key) return pad
-                if (device.vendorId != 0 && device.vendorId == other.vendorId &&
+                if (gamepadDeviceKey(other) == key) {
+                    keyMatches.add(pad)
+                } else if (device.vendorId != 0 && device.vendorId == other.vendorId &&
                     device.productId == other.productId
                 ) candidates.add(pad)
             }
         }
+        // Identical pads can share a key (blank descriptor): only a unique match is trustworthy.
+        if (keyMatches.isNotEmpty()) return keyMatches.singleOrNull()
         return candidates.singleOrNull()
     }
 
     private fun refreshConnectedGamepads(): List<ConnectedGamepad> {
         val releasedAssignments = mutableListOf<Pair<Int, Int>>()
+        val liveDeviceIds = InputDevice.getDeviceIds().toSet()
         val connectedSnapshot = synchronized(connectionLock) {
+            heldButtonsByDeviceAndKey.keys.removeAll { it.first !in liveDeviceIds }
+            heldAxisButtons.removeAll { it.first !in liveDeviceIds }
+            axisBaselines.keys.removeAll { it.first !in liveDeviceIds }
             val connectedDevices = buildList {
                 for (deviceId in InputDevice.getDeviceIds()) {
                     val device = InputDevice.getDevice(deviceId) ?: continue
@@ -1719,6 +1766,8 @@ private const val MAX_PAD_SLOTS = 2
                 if (updatedAssignments[deviceId] != padIndex) {
                     analogStatesByDeviceId.remove(deviceId)
                     heldButtonsByDeviceAndKey.keys.removeAll { it.first == deviceId }
+                    heldAxisButtons.removeAll { it.first == deviceId }
+                    axisBaselines.keys.removeAll { it.first == deviceId }
                     rumbleStatesByPad.remove(padIndex)
                     releasedAssignments += (padIndex to deviceId)
                 }
@@ -1748,7 +1797,12 @@ private const val MAX_PAD_SLOTS = 2
             snapshot
         }
 
+        removeFastForwardHolders { id ->
+            id.startsWith("ff:") && id.split(":").getOrNull(1)?.toIntOrNull()?.let { it !in liveDeviceIds } == true
+        }
         releasedAssignments.forEach { (padIndex, deviceId) ->
+            removeFastForwardHolders { it.startsWith("ff:$deviceId:") }
+            endStartTransportHold(padIndex)
             stopPhysicalGamepadVibrationForDevice(deviceId)
             clearFallbackPadVibration(padIndex)
             if (emulationInputEnabled) {

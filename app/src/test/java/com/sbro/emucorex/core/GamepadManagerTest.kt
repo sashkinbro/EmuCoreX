@@ -505,6 +505,34 @@ class GamepadManagerTest {
         assertEquals("cross", GamepadManager.turboBaseActionId("turbo_cross"))
     }
 
+    @Test
+    fun fastForwardHoldersEmitOnlyOnEmptyTransitions() {
+        val holders = FastForwardHolders()
+        assertEquals(true, holders.set("start:0", true))
+        assertNull(holders.set("ff:7:99", true))
+        assertNull(holders.set("start:0", false))
+        assertEquals(false, holders.set("ff:7:99", false))
+        assertNull(holders.set("ff:7:99", false))
+    }
+
+    @Test
+    fun fastForwardHoldersDropADisconnectedDevice() {
+        val holders = FastForwardHolders()
+        holders.set("ff:7:99", true)
+        holders.set("ff:8:99", true)
+        assertNull(holders.removeWhere { it.startsWith("ff:7:") })
+        assertEquals(false, holders.removeWhere { it.startsWith("ff:8:") })
+    }
+
+    @Test
+    fun axisButtonsNeedARealPushFromARestingBaseline() {
+        assertTrue(GamepadManager.axisButtonPressed(0f, 1f))
+        assertTrue(GamepadManager.axisButtonPressed(-1f, 1f))
+        assertTrue(!GamepadManager.axisButtonPressed(0f, 0.5f))
+        assertTrue(!GamepadManager.axisButtonPressed(1f, 1f))
+        assertTrue(!GamepadManager.axisButtonPressed(0.8f, 1f))
+    }
+
     private companion object {
         // android.view.MotionEvent.AXIS_GENERIC_1
         const val MotionEvent_AXIS_GENERIC_1 = 32
