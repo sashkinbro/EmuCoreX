@@ -185,7 +185,9 @@ static void BlockPrograms(u32 count, u32 mode /*0 next-block, 1 self-earlier, 2 
         const u32 pa = AluWord(r, cx), pb = AluWord(r, cx);
         Result p;
         std::vector<u32>& c = p.code;
-        emitConst64(c, 17, EE_TEST_PC, 26);
+        // ahead-in-block: $17 comes from p.init / p.initRef (the reference redirects the store through it); an in-program constant would
+        // overwrite the redirect and make the interpreter reference store into the code too (it then runs the NEW word, unlike x86).
+        if (mode != 2) emitConst64(c, 17, EE_TEST_PC, 26);
         emitConst64(c, 28, pa, 26);
         emitConst64(c, 29, pb, 26);
         c.push_back(ADDIU(30, 0, mode == 2 ? 1 : kIters));

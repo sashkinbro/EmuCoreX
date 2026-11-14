@@ -76,7 +76,6 @@ void SetBranchReg();
 void SetBranchImm(u32 imm);
 
 void iFlushCall(int flushtype);
-void recEmitArithmeticOverflowException();
 void recEmitExceptionExit();
 void recBranchCall(void (*func)());
 void recCall(void (*func)());

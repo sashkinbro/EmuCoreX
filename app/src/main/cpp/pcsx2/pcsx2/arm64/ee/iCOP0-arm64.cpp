@@ -408,18 +408,9 @@ REC_SYS(MTC0);
 
 static u32 recCOP0TakePriorBlockCycles()
 {
-	// recompileNextInstruction() accounts for the current opcode before calling
-	// its rec. COP0 timing registers observe the cycle at instruction entry, so
-	// flush only preceding instructions and leave this opcode for the block tail.
-	const u32 current_cycles = GetCurrentInstruction().cycles *
-		(2 - ((cpuRegs.CP0.n.Config >> 18) & 0x1));
-	pxAssert(s_nBlockCycles >= current_cycles);
-	s_nBlockCycles -= current_cycles;
-	// The generic scaler deliberately returns at least one cycle for a block.
-	// There is no preceding block at all when this is zero, so do not invent one.
-	const u32 prior_cycles = (s_nBlockCycles != 0) ? scaleblockcycles_clear() : 0;
-	s_nBlockCycles += current_cycles;
-	return prior_cycles;
+	// x86 parity: upstream iCOP0.cpp:139,168,179,208,... xADD(reg, scaleblockcycles_clear()) flushes every cycle accumulated so far,
+	// including this opcode's own cost (recompileNextInstruction() adds it before calling rec), and never returns less than 1.
+	return scaleblockcycles_clear();
 }
 
 static void recMFC0UpdateCount_emit_oaknut()
@@ -435,11 +426,7 @@ static void recMFC0UpdateCount_emit_oaknut()
 
 	oakAsm->MOV(OAK_WSCRATCH, OAK_WSCRATCH2);
 	oakLoad32(oak::util::W4, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.lastCOP0Cycle))});
-	oakAsm->SUB(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W4);
-	oak::Label nonzero_increment;
-	oakAsm->CBNZ(OAK_WSCRATCH, nonzero_increment);
-	oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, 1);
-	oakAsm->l(nonzero_increment);
+	oakAsm->SUB(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W4);   // x86 iCOP0.cpp:141-143: Count += cycle - lastCOP0Cycle, no forced +1
 
 	oakLoad32(oak::util::W4, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.CP0.n.Count))});
 	oakAsm->ADD(oak::util::W4, oak::util::W4, OAK_WSCRATCH);

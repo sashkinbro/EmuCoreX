@@ -472,7 +472,8 @@ static void compareBlockRun(const Prog& p, bool probe, const std::vector<u32>& c
 			// The recompiler carries the fractional block cycles in a compile-order static (s_nBlockCycles &= 7), the interpreter in
 			// execution order, so the error grows with every block boundary (probes sit at block starts, with a few non-probed
 			// boundaries between them): allow two cycles per probe.
-			const s32 lo = -(3 + 2 * static_cast<s32>(k)), hi = 4 + static_cast<s32>(k);
+			// x86 model: MFC0 Count adds scaleblockcycles_clear() including the MFC0's own cost (iCOP0.cpp:139), i.e. one cycle more than the interpreter.
+			const s32 lo = -(2 + 2 * static_cast<s32>(k)), hi = 5 + static_cast<s32>(k);
 			if (delta > hi || delta < lo)
 			{
 				std::string all;
@@ -566,6 +567,9 @@ static void runExcMidBlock()
 			char nm[96];
 			std::snprintf(nm, sizeof(nm), "ee-exc-mid-block kind=%u %s", kind, where ? "delay-slot" : "body");
 			if (!onlyMatch(nm)) continue;
+			// kinds 0..5 (ADD/SUB/ADDI/DADD/DSUB/DADDI overflow) never trap on the x86 JIT (iR5900Arit.cpp:17, iR5900AritImm.cpp), while
+			// the interpreter does: no interpreter reference exists. The JIT behaviour is gated by "ee-int-rand trap-model".
+			if (kind <= 5) continue;
 			gBegin(nm);
 			const u32 per = std::max<u32>(10, n / 20);
 			for (u32 k = 0; k < per; ++k)
@@ -613,9 +617,11 @@ static void runExcMidBlock()
 				gCase();
 				DiffOpt d;
 				d.cp0Mask = (1u << 4) | (1u << 8) | (1u << 10) | (1u << 12) | (1u << 13) | (1u << 14) | (1u << 30);
-				// A fault in a delay slot: the interpreter only knows it is in a delay slot when the branch was taken, the recompiler
-				// (like hardware) always reports Cause.BD=1 and EPC=branch. Gate Cause.BD/EPC against that architectural model instead
-				// of against the interpreter. Cause's exception code is still compared (BD masked out below).
+				// A fault in a delay slot: the interpreter only knows it is in a delay slot when the branch was taken. The x86 JIT
+				// never sets cpuRegs.branch, so BREAK/SYSCALL/trap there reach cpuException(code, 0) (iR5900.cpp:792-799 recCall
+				// -> R5900OpcodeImpl.cpp:1207/1212/1243) with cpuRegs.pc = delay-slot address, Interpreter does pc -= 4: Cause.BD=0 and
+				// EPC=branch address. Gate Cause.BD/EPC against that x86 model instead of against the interpreter.
+				// Cause's exception code is still compared (BD masked out below).
 				// Only when the fault slot was actually executed: the interpreter reached the vector with EPC at the slot (or EXL was already set). Programs
 				// can branch over the chosen slot, and the overflow kinds (ADD/SUB/DADD/DSUB/ADDI/DADDI) never trap on the upstream EE, so
 				// without this gate the model "expects" an exception that never happened.
@@ -633,11 +639,16 @@ static void runExcMidBlock()
 					std::snprintf(tag, sizeof(tag), "%s k=%u status=%x", names[v], k, cp0[12]);
 					const EESnapshot& rf = v == 3 ? refLinked : ref;
 					const u64 failsBefore = g_grp.fails;
-					compareRecord(rf, got, d, tag, v == 3 ? linked : plain, p.init);
+					// x86 quirk: a BREAK/SYSCALL in a delay slot raises the exception inside the slot (recCall, iR5900.cpp:792-799), but the
+					// branch tail then stores the branch target into cpuRegs.pc and ends the block (SetBranchImm/SetBranchReg,
+					// iR5900.cpp:887-905), so execution continues at the target instead of the vector. The interpreter jumps to the
+					// vector. Only the exception state (Cause/EPC, below) is gated for these kinds.
+					if (!(p.faultInDelay && (kind == 6 || kind == 7)))
+						compareRecord(rf, got, d, tag, v == 3 ? linked : plain, p.init);
 					if (bdModel)
 					{
 						const bool exl0 = !(cp0[12] & 2u);
-						const u32 wantCause = (rf.cp0[13] & 0x7fffffffu) | (exl0 ? 0x80000000u : 0u);
+						const u32 wantCause = rf.cp0[13] & 0x7fffffffu;   // x86 JIT: BD never set (cpuException bd == 0)
 						const u32 wantEpc = exl0 ? p.faultAddr - 4 : cp0[14];
 						if (got.cp0[13] != wantCause || got.cp0[14] != wantEpc)
 						{

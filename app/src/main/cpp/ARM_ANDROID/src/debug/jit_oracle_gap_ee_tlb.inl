@@ -199,10 +199,17 @@ static void runCop0Tlb()
 			ro.realEvents = true;
 			ro.interpSteps = static_cast<u32>(p.code.size()) + 16;
 			ro.jitVariant = variant ? 1 : 0; // 1: warm (the same JIT instance re-runs the compiled blocks)
+			// GAP_TLB_JITFIRST=1 (diagnostic): run the JIT before the interpreter, to tell a run-order / leftover-state artefact from a JIT bug.
+			const bool jitFirst = knob("GAP_TLB_JITFIRST", 0) != 0;
+			EESnapshot got0;
+			if (jitFirst) { got0 = gapRun(true, p.code, p.init, p.cp0, ro); }
+			u8 jitTlb0[sizeof(g_lastTlb)];
+			if (jitFirst) std::memcpy(jitTlb0, g_lastTlb, sizeof(jitTlb0));
 			const EESnapshot ref = gapRun(false, p.code, p.init, p.cp0, ro);
 			u8 refTlb[sizeof(g_lastTlb)];
 			std::memcpy(refTlb, g_lastTlb, sizeof(refTlb));
-			const EESnapshot got = gapRun(true, p.code, p.init, p.cp0, ro);
+			const EESnapshot got = jitFirst ? got0 : gapRun(true, p.code, p.init, p.cp0, ro);
+			if (jitFirst) std::memcpy(g_lastTlb, jitTlb0, sizeof(g_lastTlb));
 			gCase();
 			DiffOpt d;
 			d.cp0Mask = 0xffffffffu & ~((1u << 1) | (1u << 9) | (1u << 11) | (1u << 13) | (1u << 14) | (1u << 25) | (1u << 24)); // Cause: only the JIT run services the timer (IP7), the interpreter run does not

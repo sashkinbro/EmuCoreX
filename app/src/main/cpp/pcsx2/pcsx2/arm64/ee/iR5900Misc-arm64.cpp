@@ -123,12 +123,10 @@ static void recTrapScheduleImmediateTest_emit_oaknut()
 static void recTrapException_emit_oaknut()
 {
 	recBeginOaknutEmit();
-	if (!g_recompilingDelaySlot)
-	{
-		oakLoad32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.pc))});
-		oakAsm->SUB(OAK_WSCRATCH, OAK_WSCRATCH, 4);
-		oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.pc))});
-	}
+	// x86: Interpreter trap() (R5900OpcodeImpl.cpp:1240) does pc -= 4 unconditionally (also in a delay slot).
+	oakLoad32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.pc))});
+	oakAsm->SUB(OAK_WSCRATCH, OAK_WSCRATCH, 4);
+	oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.pc))});
 	oakAsm->MOV(OAK_WARG1, 0x34);
 	oakLoad32(OAK_WARG2, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.branch))});
 	oakEmitCall(reinterpret_cast<void*>(cpuException));

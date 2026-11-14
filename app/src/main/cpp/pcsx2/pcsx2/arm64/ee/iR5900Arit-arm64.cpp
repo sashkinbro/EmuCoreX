@@ -90,110 +90,6 @@ static void recArithmeticMoveGPRtoOakX(oak::XReg to, int fromgpr)
 		{oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.GPR.r[fromgpr].UD[0]))});
 }
 
-static bool recAddOverflows32(u32 lhs, u32 rhs, u32 result)
-{
-	return ((~(lhs ^ rhs) & (lhs ^ result)) >> 31) != 0;
-}
-
-static bool recAddOverflows64(u64 lhs, u64 rhs, u64 result)
-{
-	return ((~(lhs ^ rhs) & (lhs ^ result)) >> 63) != 0;
-}
-
-static bool recSubOverflows32(u32 lhs, u32 rhs, u32 result)
-{
-	return (((lhs ^ rhs) & (lhs ^ result)) >> 31) != 0;
-}
-
-static bool recSubOverflows64(u64 lhs, u64 rhs, u64 result)
-{
-	return (((lhs ^ rhs) & (lhs ^ result)) >> 63) != 0;
-}
-
-template <bool Is64Bit, bool IsSubtract>
-static void recSignedArithmetic_emit_oaknut()
-{
-	oak::Label no_overflow;
-	recBeginOaknutEmit();
-	if constexpr (Is64Bit)
-	{
-		recArithmeticMoveGPRtoOakX(OAK_XSCRATCH, _Rs_);
-		recArithmeticMoveGPRtoOakX(OAK_XSCRATCH2, _Rt_);
-		if constexpr (IsSubtract)
-			oakAsm->SUBS(OAK_XSCRATCH, OAK_XSCRATCH, OAK_XSCRATCH2);
-		else
-			oakAsm->ADDS(OAK_XSCRATCH, OAK_XSCRATCH, OAK_XSCRATCH2);
-	}
-	else
-	{
-		recArithmeticMoveGPRtoOakW(OAK_WSCRATCH, _Rs_);
-		recArithmeticMoveGPRtoOakW(OAK_WSCRATCH2, _Rt_);
-		if constexpr (IsSubtract)
-			oakAsm->SUBS(OAK_WSCRATCH, OAK_WSCRATCH, OAK_WSCRATCH2);
-		else
-			oakAsm->ADDS(OAK_WSCRATCH, OAK_WSCRATCH, OAK_WSCRATCH2);
-	}
-	oakAsm->B(oak::Cond::VC, no_overflow);
-	recEndOaknutEmit();
-
-	recEmitArithmeticOverflowException();
-
-	recBeginOaknutEmit();
-	oakAsm->l(no_overflow);
-	recEndOaknutEmit();
-	if (_Rd_ != 0)
-	{
-		_deleteEEreg(_Rd_, 0);
-		const int regd = _allocX86reg(X86TYPE_GPR, _Rd_, MODE_WRITE);
-		recBeginOaknutEmit();
-		if constexpr (Is64Bit)
-			oakAsm->MOV(oakXRegister(regd), OAK_XSCRATCH);
-		else
-				oakAsm->SXTW(oakXRegister(regd), OAK_WSCRATCH);
-		GPR_DEL_CONST(_Rd_);
-		recEndOaknutEmit();
-	}
-}
-
-template <bool Is64Bit, bool IsSubtract>
-static void recSignedArithmetic()
-{
-	EE::Profiler.EmitOp(Is64Bit ? (IsSubtract ? eeOpcode::DSUB : eeOpcode::DADD) :
-		(IsSubtract ? eeOpcode::SUB : eeOpcode::ADD));
-
-	if (GPR_IS_CONST2(_Rs_, _Rt_))
-	{
-		const u64 lhs = g_cpuConstRegs[_Rs_].UD[0];
-		const u64 rhs = g_cpuConstRegs[_Rt_].UD[0];
-		const u64 result = IsSubtract ? lhs - rhs : lhs + rhs;
-		const bool overflow = Is64Bit ?
-			(IsSubtract ? recSubOverflows64(lhs, rhs, result) : recAddOverflows64(lhs, rhs, result)) :
-			(IsSubtract ? recSubOverflows32(static_cast<u32>(lhs), static_cast<u32>(rhs), static_cast<u32>(result)) :
-				recAddOverflows32(static_cast<u32>(lhs), static_cast<u32>(rhs), static_cast<u32>(result)));
-		if (overflow)
-		{
-			recEmitArithmeticOverflowException();
-			return;
-		}
-		if (_Rd_ != 0)
-		{
-			_deleteGPRtoX86reg(_Rd_, DELETE_REG_FREE_NO_WRITEBACK);
-			_deleteGPRtoXMMreg(_Rd_, DELETE_REG_FLUSH_AND_FREE);
-			GPR_SET_CONST(_Rd_);
-			g_cpuConstRegs[_Rd_].UD[0] = Is64Bit ? result :
-				static_cast<u64>(static_cast<s64>(static_cast<s32>(result)));
-		}
-		return;
-	}
-
-	recSignedArithmetic_emit_oaknut<Is64Bit, IsSubtract>();
-}
-
-void recADD() { recSignedArithmetic<false, false>(); }
-void recDADD() { recSignedArithmetic<true, false>(); }
-void recSUB() { recSignedArithmetic<false, true>(); }
-void recDSUB() { recSignedArithmetic<true, true>(); }
-
 //// ADD
 static void recADD_const()
 {
@@ -289,6 +185,12 @@ static void recADD_emit_oaknut(int info)
 static void recADD_(int info)
 {
 	recADD_emit_oaknut(info);
+}
+
+void recADD(void)
+{
+	EE::Profiler.EmitOp(eeOpcode::ADD);
+	eeRecompileCodeRC0(recADD_const, recADD_consts, recADD_constt, recADD_, (XMMINFO_WRITED | XMMINFO_READS | XMMINFO_READT));
 }
 
 //// ADDU
@@ -390,6 +292,12 @@ static void recDADD_emit_oaknut(int info)
 static void recDADD_(int info)
 {
 	recDADD_emit_oaknut(info);
+}
+
+void recDADD(void)
+{
+	EE::Profiler.EmitOp(eeOpcode::DADD);
+	eeRecompileCodeRC0(recDADD_const, recDADD_consts, recDADD_constt, recDADD_, (XMMINFO_WRITED | XMMINFO_READS | XMMINFO_READT | XMMINFO_64BITOP));
 }
 
 //// DADDU
@@ -496,6 +404,12 @@ static void recSUB_emit_oaknut(int info)
 static void recSUB_(int info)
 {
 	recSUB_emit_oaknut(info);
+}
+
+void recSUB(void)
+{
+	EE::Profiler.EmitOp(eeOpcode::SUB);
+	eeRecompileCodeRC0(recSUB_const, recSUB_consts, recSUB_constt, recSUB_, (XMMINFO_READS | XMMINFO_READT | XMMINFO_WRITED));
 }
 
 //// SUBU
@@ -608,6 +522,12 @@ static void recDSUB_emit_oaknut(int info)
 static void recDSUB_(int info)
 {
 	recDSUB_emit_oaknut(info);
+}
+
+void recDSUB(void)
+{
+	EE::Profiler.EmitOp(eeOpcode::DSUB);
+	eeRecompileCodeRC0(recDSUB_const, recDSUB_consts, recDSUB_constt, recDSUB_, (XMMINFO_READS | XMMINFO_READT | XMMINFO_WRITED | XMMINFO_64BITOP));
 }
 
 //// DSUBU

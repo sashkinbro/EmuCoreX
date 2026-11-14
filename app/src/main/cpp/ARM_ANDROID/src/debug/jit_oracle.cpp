@@ -4197,7 +4197,13 @@ void EECoverageExceptions()
         code.push_back(MipsR(8, 9, 10, 0, fn));
         return code;
     };
-    RunEEExceptionCase("ee exception add overflow", overflow(0x20u));
+    // x86 JIT parity: upstream iR5900Arit.cpp:17 ("TODO: overflow checks") / recADD_ is a plain add + sign extension, so ADD and ADDI
+    // never trap and write the wrapped result. The interpreter traps, so these two are gated against the x86 model, not interp.
+    const auto wrapNoTrap = [&](const char* name, const std::vector<u32>& code) {
+        const EESnapshot jit = RunEEProgram(true, code, true);
+        Check((jit.cp0[12] & 2u) == 0 && jit.gpr[10] == 0xffffffff80000000ull, name);
+    };
+    wrapNoTrap("ee add overflow wraps without trap (x86 parity)", overflow(0x20u));
     RunEEExceptionCase("ee exception sub overflow", overflow(0x22u));
 
     {
@@ -4211,7 +4217,7 @@ void EECoverageExceptions()
         code.push_back(MipsI(15, 0, 8, 0x7fff));
         code.push_back(MipsI(13, 8, 8, 0xffff));
         code.push_back(MipsI(8, 8, 10, 1)); // addi t2, t0, 1 -> overflow
-        RunEEExceptionCase("ee exception addi overflow", code);
+        wrapNoTrap("ee addi overflow wraps without trap (x86 parity)", code);
     }
 
     // REGIMM traps: taken and not-taken forms.
