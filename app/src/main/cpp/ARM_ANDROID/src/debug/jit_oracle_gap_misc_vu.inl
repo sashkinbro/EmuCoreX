@@ -2,11 +2,19 @@
 // vu-prog-rand: random VU0 / VU1 micro programs (upper + lower pairs, dense FMAC/flag/Q/P hazards, forward branches with delay slots,
 // I-bit pairs, mid-program E-bit, M/D/T bits, VI/VF/ACC/memory traffic) run through the arm64 VU JIT and the VU interpreter, both started
 // from the same deterministic state through the x86-parity harness (x86p::refExec, x86p::refInitData). The interpreter is the reference
-// because the x86-parity suites already established where it equals the x86 microVU; the O/U bits of MAC/STATUS are masked on both sides
-// (x86 microVU never computes them, the interpreter does) and the operand ranges avoid NaN/Inf/denormals (covered by x86-parity-vu-*).
+// where it equals the x86 microVU: the O/U bits of MAC/STATUS are masked on both sides (x86 microVU never computes them), operands avoid
+// NaN/Inf/denormals and integer bit patterns (covered by x86-parity-vu-*), Q/P operations use exact power-of-two operands (the interpreter
+// rounds DIV/SQRT/EFU differently from x86), FSSET (the interpreter re-derives sticky Z/S bits), OPMULA/OPMSUB (interpreter MAC w lane) and
+// M+T bits on one word are generated only on request. Every failing case is classified: minimized (delta debugging), "cause isolation"
+// (remove MAC readers / M / D / T bits and see whether it then matches) and, for upper-only programs, judged against the x86 model
+// (JIT!=x86model = the JIT deviates, INTERP!=x86model = the reference deviates).
 // Compared: VF, VI0..15, ACC, MAC/STATUS/CLIP, Q, P (VU1), I, R, VU data memory, VPU_STAT busy, and for VU0 the VU1 register window.
-// Knobs: GAP_VU_SEED (default 1), GAP_VU_COUNT (programs per VU, default 3000), GAP_VU_MIN=0 (disable the minimizer),
-//        GAP_VU_NOBRANCH=1 / GAP_VU_NOEBIT=1 / GAP_VU_NOIBIT=1 (generator feature switches for bisecting a mismatch group).
+// Also runs directed cases (GAP_VU_DIRECTED=0 to skip): T-bit with a DIV in flight, MAC/STATUS/CLIP readers 1..6 pairs after an FMAC,
+// conditional branches on a VI written directly before them.
+// Knobs: GAP_VU_SEED (default 1), GAP_VU_COUNT (programs per VU, default 3000), GAP_VU_MIN=0 (no minimizer), GAP_VU_ISOLATE=0,
+//        GAP_VU_NOBRANCH/NOEBIT/NOIBIT/NOMDT=1 (generator switches), GAP_VU_CLASSES (lower classes: 1 int/move, 2 memory, 4 flag ops,
+//        8 Q/P/EFU; default 15), GAP_VU_UPPER=0, GAP_VU_MDT (1 M, 2 D, 4 T; default 7), GAP_VU_MDTFORCE=<bits> (bits on every upper),
+//        GAP_VU_OPMUL=1, GAP_VU_FSSET=1.
 
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
 namespace GapVu
@@ -375,6 +383,42 @@ static std::string Signature(const VProg& p)
     return o;
 }
 
+// Cause isolation: the first feature whose removal makes the program match is the root-cause class of the mismatch (0 = none found).
+// Known classes: MAC-read pipeline window (FMAND/FMOR/FMEQ read within 4 cycles of the first FMACs of a program), M-bit, D-bit, T-bit.
+static const char* const kCauseName[] = {"", "MAC-reader-in-pipeline-window", "M-bit", "D-bit", "T-bit", "MAC-reader+M-bit", "any of MAC-reader/M/D/T-bit"};
+
+static VProg StripCause(const VProg& in, u32 cause)
+{
+    VProg p = in;
+    const bool mac = cause == 1 || cause == 5 || cause == 6, mb = cause == 2 || cause == 5 || cause == 6, db = cause == 3 || cause == 6, tb = cause == 4 || cause == 6;
+    for (size_t i = 0; i + 1 < p.w.size(); i += 2)
+    {
+        if (mac && !(p.w[i] & 0x80000000u) && !(p.w[i + 1] & x86p::kIbit))
+        {
+            const u32 op = p.w[i] >> 25;
+            if (op == 0x18 || op == 0x1a || op == 0x1b)
+                p.w[i] = NOP_L;
+        }
+        if (mb) p.w[i + 1] &= ~x86p::kMbit;
+        if (db) p.w[i + 1] &= ~x86p::kDbit;
+        if (tb) p.w[i + 1] &= ~x86p::kTbit;
+    }
+    return p;
+}
+
+static u32 IsolateCause(u32 index, const VProg& p, const RefInit& ri)
+{
+    for (u32 c : {1u, 2u, 3u, 4u, 5u, 6u})
+    {
+        const VProg q = StripCause(p, c);
+        if (q.w == p.w)
+            continue;
+        if (!Fails(index, q, ri))
+            return g_crashed ? 0 : c;
+    }
+    return 0;
+}
+
 // Triage aid: for programs made only of upper FMAC instructions (no lower, no I-bit) the x86 model of x86-parity runs the same program
 // and says which engine deviates from it. Empty string when the program is outside the model.
 // Coarse root-cause signature: lower-op classes present (reads of MAC/STATUS/CLIP, flag sets, branches, memory, integer, Q/P) plus the
@@ -573,6 +617,50 @@ static void DirectedFlagWindow(GapGroups& groups)
                 }
 }
 
+// Integer-register hazards at a conditional branch: VI4 is written by an ISUBIU `gap` pairs earlier (or not at all), then by an IADDI directly
+// before the branch, and the branch tests VI4 (negative results are the interesting ones).
+static void DirectedBranchHazard(GapGroups& groups)
+{
+    static const char* const bn[4] = {"IBGEZ", "IBLTZ", "IBEQ", "IBNE"};
+    for (u32 index = 0; index < 2; ++index)
+        for (u32 bk = 0; bk < 4; ++bk)
+            for (u32 variant = 0; variant < 3; ++variant) // 0: no earlier writer, 1: earlier ISUBIU, 2: earlier ISUBIU + one more pair
+                for (u32 k = 0; k < 48; ++k)
+                {
+                    Rng r(0xb2a9ull + index * 977 + bk * 131 + variant * 17 + k * 7919);
+                    RefInit ri;
+                    GenData(ri, r, index, false);
+                    VProg p;
+                    if (variant >= 1) p.lower(E::ISUBIU(4, 3, 0x100 + r.below(0x2000)));
+                    p.nop(1 + r.below(3));
+                    if (variant == 2) p.lower(E::IADDIU(5, 5, 1));
+                    p.lower(E::IADDI(4, 4, -1));
+                    const int d = 3;
+                    switch (bk)
+                    {
+                        case 0: p.lower(E::IBGEZ(4, d)); break;
+                        case 1: p.lower(E::IBLTZ(4, d)); break;
+                        case 2: p.lower(E::IBEQ(4, 6, d)); break;
+                        default: p.lower(E::IBNE(4, 6, d)); break;
+                    }
+                    p.nop(1);
+                    p.lower(E::IADDIU(10, 10, 3)); // skipped when taken
+                    p.lower(E::IADDIU(10, 10, 5)); // skipped when taken
+                    p.lower(E::IADDIU(11, 11, 1)); // landing
+                    p.nop(4);
+                    p.pair(NOP_L, NOP_U | x86p::kEbit);
+                    p.nop(2);
+                    ++groups.cases;
+                    std::vector<Diff> d2;
+                    if (!Fails(index, p, ri, &d2) || d2.empty())
+                        continue;
+                    char ex[700];
+                    std::snprintf(ex, sizeof(ex), "%s interp=%08x jit=%08x vi0{%x %x %x %x %x %x} prog{%s}", d2[0].field.c_str(), d2[0].a, d2[0].b, ri.vi[1], ri.vi[2], ri.vi[3], ri.vi[4], ri.vi[5], ri.vi[6],
+                        Sparse(p).c_str());
+                    groups.Record("directed vu" + std::to_string(index) + " " + bn[bk] + " on VI written by IADDI directly before it, variant " + std::to_string(variant), p.w.size(), ex);
+                }
+}
+
 static void Run()
 {
     const u64 seed = GapKnob("GAP_VU_SEED", GapKnob("GAP_SEED", 1));
@@ -597,6 +685,8 @@ static void Run()
         Directed(groups);
     if (GapKnob("GAP_VU_DIRECTED", 1))
         DirectedFlagWindow(groups);
+    if (GapKnob("GAP_VU_DIRECTED", 1))
+        DirectedBranchHazard(groups);
     for (u32 index = 0; index < 2; ++index)
     {
         for (u32 k = 0; k < count; ++k)
@@ -625,7 +715,8 @@ static void Run()
             else if (fam.rfind("MEM", 0) == 0) fam = "MEM";
             else if (fam.rfind("VU1.VF", 0) == 0) fam = "VU1.VF";
             else if (fam.rfind("VI", 0) == 0 && fam.size() <= 4) fam = "VI";
-            const std::string famKey = "vu" + std::to_string(index) + " " + fam;
+            const u32 cause = GapKnob("GAP_VU_ISOLATE", 1) ? IsolateCause(index, g.p, ri) : 0;
+            const std::string famKey = "vu" + std::to_string(index) + " " + fam + (cause ? std::string(" <") + kCauseName[cause] + ">" : std::string());
             VProg prog = g.p;
             bool hasJr = false;
             for (size_t i = 0; i < g.p.w.size(); i += 2)
