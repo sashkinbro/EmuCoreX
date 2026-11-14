@@ -91,6 +91,10 @@ class GameplayProfilingDeviceTest {
                 putExtra("${context.packageName}.extra.RENDERER", renderer)
                 for (key in listOf("EE", "IOP", "VU0", "VU1"))
                     putExtra("${context.packageName}.extra.ENABLE_${key}_RECOMPILER", true)
+                // Optional: force MTVU on/off (debug builds); absent keeps the user setting (default on).
+                args.getString("mtvu")?.toBooleanStrict()?.let {
+                    putExtra("${context.packageName}.extra.ENABLE_MTVU", it)
+                }
                 // Optional A/B knob: run the IOP on its own thread or on the EE thread.
                 args.getString("iopThread")?.toBooleanStrict()?.let {
                     putExtra("${context.packageName}.extra.ENABLE_IOP_THREAD", it)
@@ -112,6 +116,7 @@ class GameplayProfilingDeviceTest {
                     JSONObject().apply {
                         for (key in listOf("Renderer", "upscale_multiplier", "accurate_blending_unit", "HWDownloadMode"))
                             put(key, NativeApp.getSetting("EmuCore/GS", key, if (key == "upscale_multiplier") "float" else "int"))
+                        put("vuThread", NativeApp.getSetting("EmuCore/Speedhacks", "vuThread", "bool"))
                     }).toString(2))
             val deadline = SystemClock.elapsedRealtime() + timeout
             while (!stop && SystemClock.elapsedRealtime() < deadline) {
