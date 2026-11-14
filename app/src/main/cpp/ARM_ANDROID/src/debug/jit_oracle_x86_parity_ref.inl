@@ -521,7 +521,10 @@ static void runMiscSuite(int index, u32 count)
 					const u32 which = variant == 6 ? r.below(3) : 0;
 					const u32 fsf = r.below(4), ftf = r.below(4);
 					if (r.below(4) == 0) ri.fm.vf[2 * 4 + ftf] = 0; // divide by zero
-					if (r.below(6) == 0) ri.fm.vf[2 * 4 + ftf] = 0x80000000u | ri.fm.vf[2 * 4 + ftf];
+					// RSQRT with a -0.0 divisor: the interpreter ORs I (negative) and D (zero) while x86 microVU's divide-by-zero path
+					// overwrites divFlag with D (or I for 0/0), so the interpreter reference does not apply; the x86-parity suites model it.
+					if (r.below(6) == 0 && !(which == 2 && (ri.fm.vf[2 * 4 + ftf] & 0x7fffffffu) == 0))
+						ri.fm.vf[2 * 4 + ftf] = 0x80000000u | ri.fm.vf[2 * 4 + ftf];
 					if (which == 0) p.lower(enc::DIVq(fsf, ftf, 2, 1));
 					else if (which == 1) p.lower(enc::SQRTq(ftf, 2));
 					else p.lower(enc::RSQRTq(fsf, ftf, 2, 1));

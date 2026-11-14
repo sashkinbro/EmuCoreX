@@ -222,11 +222,9 @@ static void mVU_RSQRT_direct_emit_oaknut(mP)
 	oakAsm->B(signed_max);
 
 	oakAsm->l(divide_zero);
-	const oak::WReg flag = oakWRegister(VU_HOST_T1);
-	oakLoad32(flag, mVU_divFlag_oaknut(mVU));
-	oakAsm->ORR(flag, flag, 0x80000u);
-	oakAsm->ORR(flag, flag, 0x2000000u);
-	oakStore32(flag, mVU_divFlag_oaknut(mVU));
+	// Upstream x86 microVU overwrites divFlag with divD here (dropping a
+	// negative-operand I flag set by the sqrt operand prepare), not ORs.
+	mVU_storeDivFlag_oaknut(mVU, divD);
 
 	oakAsm->l(signed_max);
 	mVU_makeRsqrtSignedMax_oaknut(t1);
@@ -2966,21 +2964,11 @@ static void mVU_RXOR_direct_emit_oaknut(mP)
 		oakAsm->AND(OAK_WSCRATCH, OAK_WSCRATCH, 0x7fffff);
 		oakLoad32(OAK_WSCRATCH2, mVU_R_mem_oaknut(mVU));
 		oakAsm->EOR(OAK_WSCRATCH2, OAK_WSCRATCH2, OAK_WSCRATCH);
-		oakAsm->AND(OAK_WSCRATCH2, OAK_WSCRATCH2, 0x007fffff);
-		oakAsm->ORR(OAK_WSCRATCH2, OAK_WSCRATCH2, 0x3f800000);
 		oakStore32(OAK_WSCRATCH2, mVU_R_mem_oaknut(mVU));
 		recEndOaknutEmit();
 		mVU.regAlloc->clearNeededXmmId(Fs);
 	}
-	else
-	{
-		recBeginOaknutEmit();
-		oakLoad32(OAK_WSCRATCH, mVU_R_mem_oaknut(mVU));
-		oakAsm->AND(OAK_WSCRATCH, OAK_WSCRATCH, 0x007fffff);
-		oakAsm->ORR(OAK_WSCRATCH, OAK_WSCRATCH, 0x3f800000);
-		oakStore32(OAK_WSCRATCH, mVU_R_mem_oaknut(mVU));
-		recEndOaknutEmit();
-	}
+	// else: upstream mVU_RXOR emits nothing (R is left untouched).
 }
 
 static void mVU_RXOR_emit(mP)

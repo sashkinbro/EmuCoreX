@@ -3283,20 +3283,25 @@ namespace vuaot
 					armAsm->Mov(W(f), 0);
 				return;
 			}
-			if (zf >= 0)
+			if (op == LOp::RSQRT && nf >= 0)
+			{
+				// x86 mVU_RSQRT: a negative divisor sets I, but a zero divisor (-0.0
+				// included) then overwrites divFlag with I (0/0) or D, it does not OR.
+				armAsm->Tst(W(ftw), 0x80000000u);
+				armAsm->Csel(W(f), W(nf), a64::wzr, a64::ne);
+				armAsm->Tst(W(ftw), kExpMask);
+				if (zf >= 0)
+					armAsm->Csel(W(f), W(zf), W(f), a64::eq);
+				else
+					armAsm->Csel(W(f), a64::wzr, W(f), a64::eq);
+			}
+			else if (zf >= 0)
 			{
 				armAsm->Tst(W(ftw), kExpMask);
 				armAsm->Csel(W(f), W(zf), a64::wzr, a64::eq);
 			}
 			else
 				armAsm->Mov(W(f), 0);
-			if (op == LOp::RSQRT && nf >= 0)
-			{
-				// (a negative divisor's I with a zero one's flags: -0.0 is both)
-				armAsm->Tst(W(ftw), 0x80000000u);
-				armAsm->Csel(W(nf), W(nf), a64::wzr, a64::ne);
-				armAsm->Orr(W(f), W(f), W(nf));
-			}
 		}
 
 		void Lowerer::Efu(ValueId id)
