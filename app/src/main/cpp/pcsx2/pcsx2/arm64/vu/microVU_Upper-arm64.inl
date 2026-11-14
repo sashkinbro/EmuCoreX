@@ -2010,8 +2010,6 @@ static void mVU_MSUBA_direct_emit_oaknut(mP)
 		{
 			const int tempACC = mVU.regAlloc->allocRegId();
 			recBeginOaknutEmit();
-			if (isCOP2)
-				mVUUpperClampOperandScalar_oaknut(mVU, Fs, false);
 			const int laneIdx = (_X ? 0 : (_Y ? 1 : (_Z ? 2 : 3)));
 			if (mVUUpperNatural_oaknut(mVU))
 				oakAsm->MOV(oakQRegister(tempACC).B16(), oakQRegister(ACC).B16());
@@ -2028,13 +2026,6 @@ static void mVU_MSUBA_direct_emit_oaknut(mP)
 		else
 		{
 			recBeginOaknutEmit();
-			if (isCOP2)
-			{
-				if (_XYZW_SS)
-					mVUUpperClampOperandScalar_oaknut(mVU, Fs, false);
-				else
-					mVUUpperClamp2Vector_oaknut(mVU, Fs, false);
-			}
 			if (_XYZW_SS)
 				mVUUpperFmlsSs_oaknut(mVU, ACC, Fs, Ft);
 			else
@@ -2047,8 +2038,6 @@ static void mVU_MSUBA_direct_emit_oaknut(mP)
 	{
 		const int tempACC = mVU.regAlloc->allocRegId();
 		recBeginOaknutEmit();
-		if (isCOP2)
-			mVUUpperClamp2Vector_oaknut(mVU, Fs, false);
 		oakAsm->MOV(oakQRegister(tempACC).B16(), oakQRegister(ACC).B16());
 		mVU_FMACbSubPs_oaknut(mVU, tempACC, Fs, Ft);
 		mVUUpperMergeRegs_oaknut(ACC, tempACC, _X_Y_Z_W);
@@ -2903,10 +2892,9 @@ static void mVU_SUB_direct_emit_oaknut(mP)
 	if (mVUtryEmitNoLaneFmacFlags_oaknut(mVU))
 		return;
 
-	// x - x is only unconditionally zero when exponent-255 inputs are clamped.
-	// In Normal mode, infinities and NaNs must still go through FSUB so their
-	// result and MAC/STATUS flags match the interpreter.
-	if (_Ft_ == _Fs_ && CHECK_VU_OVERFLOW(mVU.index))
+	// Matches upstream doSafeSub (microVU_Upper.inl): x - x is forced to +0
+	// regardless of the overflow clamp mode.
+	if (_Ft_ == _Fs_)
 	{
 		const int Fs = mVU.regAlloc->allocRegId(-1, _Fd_, _X_Y_Z_W);
 		recBeginOaknutEmit();
@@ -3178,7 +3166,8 @@ static void mVU_SUBw_emit(mP)
 static void mVU_SUBA_direct_emit_oaknut(mP)
 {
 	mVUUpperNaturalScope natural_scope(mVU, true);
-	if (_Ft_ == _Fs_ && CHECK_VU_OVERFLOW(mVU.index))
+	// Matches upstream doSafeSub: ungated by the overflow clamp mode.
+	if (_Ft_ == _Fs_)
 	{
 		const int Fs = mVU.regAlloc->allocRegId(-1, 32, _X_Y_Z_W);
 		recBeginOaknutEmit();
