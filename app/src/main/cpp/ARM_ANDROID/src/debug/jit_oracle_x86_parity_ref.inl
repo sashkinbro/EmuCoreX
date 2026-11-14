@@ -133,6 +133,43 @@ static std::string progHex(const VProg& p)
 	return s;
 }
 
+// Destination VIs of FMAND/FMEQ/FMOR readers that sit at most 3 pairs after an FMAC. x86 microVU ends every VU0 program with
+// needExactMatch |= 7 (microVU_Compile.inl:713-717, State of Emergency 2 / Driving Emotion Type-S), which makes mVUsetFlags give the
+// last four instructions a MAC write (microVU_Flags.inl:6-25 via __Mac). In a first (non exact) block xMac[] starts at -1, so
+// findFlagInst (microVU_Flags.inl:62-71) falls back to instance 0 for a reader no earlier write has retired for, and instance 0 is the
+// slot the block's first MAC write already overwrote. The reader therefore sees that FMAC's result instead of the block-entry MAC
+// the 4-cycle pipeline (and the interpreter) delivers. The port reproduces this (VU1 has no such forcing and matches the interpreter);
+// those destination registers are not compared against the interpreter. Conservative: stalls only lengthen the real distance.
+// VU1 has no such forcing, but the same fallback happens when a MAC reader four or more pairs after an FMAC makes that FMAC the first
+// MAC writer (microVU_Analyze.inl:367-391 flagSet, j >= 3): an earlier reader inside the FMAC's 4-cycle window then reads its result.
+static inline u32 x86MacWindowSkipMask(const VProg& p, int index)
+{
+	u32 mask = 0;
+	const int n = static_cast<int>(p.w.size() / 2);
+	std::vector<int> fmacs, readers;
+	for (int pair = 0; pair < n; ++pair)
+	{
+		const u32 lo = p.w[2 * pair], up = p.w[2 * pair + 1];
+		const u32 op = lo >> 25;
+		if (!(lo & 0x80000000u) && (op == 0x18 || op == 0x1a || op == 0x1b))
+			readers.push_back(pair);
+		if (!(up & 0x80000000u) && (up & 0x07ffffffu) != (NOP_U & 0x07ffffffu))
+			fmacs.push_back(pair);
+	}
+	for (int r : readers)
+		for (int f : fmacs)
+		{
+			if (f >= r || r - f > 3)
+				continue;
+			bool quirk = index == 0;
+			for (int r2 : readers)
+				quirk |= r2 >= f + 4;
+			if (quirk)
+				mask |= 1u << ((p.w[2 * r] >> 16) & 15u);
+		}
+	return mask;
+}
+
 // One interpreter-vs-JIT case. 'kind' groups the mismatch report; 'tag' is reproduction info.
 static void refCase(const RefCfg& cfg, int index, const std::string& kind, const VProg& prog, const RefInit& init, const std::string& tag,
 	const VProg* interpProg = nullptr)
@@ -145,7 +182,8 @@ static void refCase(const RefCfg& cfg, int index, const std::string& kind, const
 	struct D { std::string f; u32 a, b; };
 	std::vector<D> d;
 	for (u32 i = 0; i < 128; ++i) if (e.s.regs.VF[i >> 2].UL[i & 3] != g.s.regs.VF[i >> 2].UL[i & 3]) d.push_back({"VF" + std::to_string(i >> 2) + "." + "xyzw"[i & 3], e.s.regs.VF[i >> 2].UL[i & 3], g.s.regs.VF[i >> 2].UL[i & 3]});
-	for (u32 i = 0; i < 16; ++i) if ((e.s.regs.VI[i].UL & 0xffff) != (g.s.regs.VI[i].UL & 0xffff)) d.push_back({"VI" + std::to_string(i), e.s.regs.VI[i].UL & 0xffff, g.s.regs.VI[i].UL & 0xffff});
+	const u32 skipVi = x86MacWindowSkipMask(prog, index);
+	for (u32 i = 0; i < 16; ++i) if (!(skipVi & (1u << i)) && (e.s.regs.VI[i].UL & 0xffff) != (g.s.regs.VI[i].UL & 0xffff)) d.push_back({"VI" + std::to_string(i), e.s.regs.VI[i].UL & 0xffff, g.s.regs.VI[i].UL & 0xffff});
 	const u32* ea = reinterpret_cast<const u32*>(&e.s.regs.ACC);
 	const u32* ga = reinterpret_cast<const u32*>(&g.s.regs.ACC);
 	for (u32 l = 0; l < 4; ++l) if (ea[l] != ga[l]) d.push_back({std::string("ACC.") + "xyzw"[l], ea[l], ga[l]});

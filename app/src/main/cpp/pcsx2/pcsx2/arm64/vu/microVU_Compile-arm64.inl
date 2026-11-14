@@ -798,6 +798,10 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 			// the last flag-writing instruction instead of exact-matching every
 			// flag instance (which also multiplied block variants).
 			mVU.needFlagFinalize = true;
+			// VU0 end of program MAC results can be read by COP2: x86 makes the last instances exact here
+			// (microVU_Compile.inl:713-717), which also fixes which instance in-window readers see.
+			if (isVU0)
+				mVUregs.needExactMatch |= 7;
 		}
 
 		if ((curI & _Mbit_) && isVU0)

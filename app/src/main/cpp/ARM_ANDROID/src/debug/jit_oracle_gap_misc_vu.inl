@@ -277,13 +277,15 @@ struct Diff
 };
 
 // Compare interpreter vs JIT observations; returns the differing fields (empty = match).
-static void Compare(u32 index, const RefObs& e, const RefObs& g, std::vector<Diff>& d)
+static void Compare(u32 index, const VProg& prog, const RefObs& e, const RefObs& g, std::vector<Diff>& d)
 {
+    // x86 flag-window behaviour (see x86p::x86MacWindowSkipMask): those reader destinations are not compared.
+    const u32 skipVi = x86p::x86MacWindowSkipMask(prog, static_cast<int>(index));
     for (u32 i = 0; i < 128; ++i)
         if (e.s.regs.VF[i >> 2].UL[i & 3] != g.s.regs.VF[i >> 2].UL[i & 3])
             d.push_back({"VF" + std::to_string(i >> 2) + "." + "xyzw"[i & 3], e.s.regs.VF[i >> 2].UL[i & 3], g.s.regs.VF[i >> 2].UL[i & 3]});
     for (u32 i = 0; i < 16; ++i)
-        if ((e.s.regs.VI[i].UL & 0xffff) != (g.s.regs.VI[i].UL & 0xffff))
+        if (!(skipVi & (1u << i)) && (e.s.regs.VI[i].UL & 0xffff) != (g.s.regs.VI[i].UL & 0xffff))
             d.push_back({"VI" + std::to_string(i), e.s.regs.VI[i].UL & 0xffff, g.s.regs.VI[i].UL & 0xffff});
     const u32* ea = reinterpret_cast<const u32*>(&e.s.regs.ACC);
     const u32* ga = reinterpret_cast<const u32*>(&g.s.regs.ACC);
@@ -326,7 +328,7 @@ static bool Fails(u32 index, const VProg& prog, const RefInit& ri, std::vector<D
             x86p::refExec(static_cast<int>(index), false, prog, ri, e);
             x86p::refExec(static_cast<int>(index), true, prog, ri, g);
             std::vector<Diff> d;
-            Compare(index, e, g, d);
+            Compare(index, prog, e, g, d);
             if (out) *out = d;
             result = !d.empty();
         }))
