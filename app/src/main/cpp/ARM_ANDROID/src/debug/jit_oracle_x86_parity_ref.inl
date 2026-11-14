@@ -134,10 +134,11 @@ static std::string progHex(const VProg& p)
 }
 
 // One interpreter-vs-JIT case. 'kind' groups the mismatch report; 'tag' is reproduction info.
-static void refCase(const RefCfg& cfg, int index, const std::string& kind, const VProg& prog, const RefInit& init, const std::string& tag)
+static void refCase(const RefCfg& cfg, int index, const std::string& kind, const VProg& prog, const RefInit& init, const std::string& tag,
+	const VProg* interpProg = nullptr)
 {
 	RefObs e{}, g{};
-	refExec(index, false, prog, init, e);
+	refExec(index, false, interpProg ? *interpProg : prog, init, e);
 	refExec(index, true, prog, init, g);
 	++g_cases;
 	++g_groupCases;
@@ -271,7 +272,10 @@ static void runFlagsSuite(int index, u32 count)
 			// The register state (VI 7..12) of every reader is part of the compared state.
 			if (variant == 2)
 			{
-				p.lower(enc::FSSET(r.next() & 0xcf3));
+				// x86 FSSET (microVU_Lower.inl FSSET) rewrites the sticky nibbles outright and never re-derives ZS/SS from a set
+				// Z/S bit the way the interpreter's flag flush does, so only the reachable "all sticky bits set" immediate is
+				// compared against the interpreter (a cleared sticky bit under a set Z/S is not a reachable hardware state).
+				p.lower(enc::FSSET(0xcc0u | (r.next() & 0x33u)));
 				p.lower(enc::FCSET(r.next() & 0xffffff));
 			}
 			for (u32 j = 0; j < len; ++j)
@@ -498,7 +502,7 @@ static void runMiscSuite(int index, u32 count)
 						const u32 it = 7 + r.below(6), is = 1 + r.below(5);
 						switch (r.below(13))
 						{
-							case 0: p.lower(enc::FSSET(r.next() & 0xcf3)); break;
+							case 0: p.lower(enc::FSSET(0xcc0u | (r.next() & 0x33u))); break; // all sticky bits set: see runFlagsSuite note
 							case 1: p.lower(enc::FCSET(r.next() & 0xffffff)); break;
 							case 2: p.lower(enc::FSAND(it, r.next() & 0xcf3)); break;
 							case 3: p.lower(enc::FSEQ(it, r.next() & 0xcf3)); break;
@@ -539,8 +543,12 @@ static void runMiscSuite(int index, u32 count)
 				}
 				case 2:
 				{
+					for (u32 l = 0; l < 4; ++l) ri.fm.vf[4 + l] = 0x3f800000u + (r.below(4) << 23); // 1,2,4,8: ESUM is exact in any order
 					const u32 fsf = r.below(4);
-					const u32 e = r.below(3);
+					// Latency suite: ESIN/ESQRT results are x86 SSE polynomial/approximation values that deliberately differ from the
+					// interpreter (microVU_Lower.inl EFU helpers; covered against the x86 model by x86-parity-efu), so only ESUM,
+					// whose result both engines compute identically, is used as the P producer here.
+					const u32 e = 2; (void)r.below(3);
 					p.lower(e == 0 ? enc::ESIN(fsf, 1) : (e == 1 ? enc::ESQRT(fsf, 1) : enc::ESUMv(1)));
 					p.nop(r.below(60));
 					if (r.below(2)) p.lower(enc::WAITP());
@@ -577,6 +585,7 @@ static void runMiscSuite(int index, u32 count)
 				}
 				default:
 				{
+					for (u32 l = 0; l < 4; ++l) ri.fm.vf[4 + l] = 0x3f800000u + (r.below(4) << 23); // exact ESUM, see P-latency
 					const u32 fsf = r.below(4), ftf = r.below(4);
 					p.lower(enc::DIVq(fsf, ftf, 2, 1));
 					p.nop(r.below(4));
@@ -584,7 +593,7 @@ static void runMiscSuite(int index, u32 count)
 					p.upper(encodeUpper(upperOps()[addq], 0xf, 3, 4, 5));
 					if (index == 1)
 					{
-						p.lower(enc::ESIN(r.below(4), 1));
+						p.lower(enc::ESUMv(1)); // see the P-latency note: x86 ESIN differs numerically from the interpreter
 						p.nop(r.below(3));
 						p.lower(enc::WAITP());
 						p.lower(enc::MFP(0xf, 6));
@@ -595,7 +604,18 @@ static void runMiscSuite(int index, u32 count)
 			}
 			p.pair(NOP_L, NOP_U | kEbit);
 			p.nop(1);
-			refCase(cfg, index, mn[variant], p, ri, "k=" + std::to_string(k));
+			if (mVariant)
+			{
+				// x86 ends the block at an M-bit upper (microVU_Compile.inl:832-840, 911-950: needExactMatch |= 7, flushed
+				// P/Q/flag pipelines, relink through lpState) and the interpreter's M stop re-enters with its own pipeline state,
+				// so their in-flight FMAC/flag timing legitimately differs. The M bit itself must not change any architectural
+				// result: the JIT program (with M) is compared with the interpreter running the same program without M.
+				VProg noM = p;
+				for (size_t i = 1; i < noM.w.size(); i += 2) noM.w[i] &= ~kMbit;
+				refCase(cfg, index, mn[variant], p, ri, "k=" + std::to_string(k), &noM);
+			}
+			else
+				refCase(cfg, index, mn[variant], p, ri, "k=" + std::to_string(k));
 		}
 		char nm[96];
 		std::snprintf(nm, sizeof(nm), "vu-misc vu%d %s", index, mn[variant]);

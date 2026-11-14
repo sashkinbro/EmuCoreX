@@ -2112,6 +2112,57 @@ static int findUpper(const char* n)
 	return 0;
 }
 
+// x86 model result for one vectors-suite instruction pair (see VectorsTests): the final VF3.w (upper op) or Q (divider op) for
+// vf1=fs, vf2=ft, vf0 lanes 1.0. Returns false when the case is not modelable. mode: 0 none, 1 normal, 2 extra, 3 extra+sign.
+bool VectorModel(int vu, int mode, u32 primary, u32 lowerWord, u32 fs, u32 ft, u32 acc, bool expectQ, u32& result)
+{
+	Ins in;
+	if (primary)
+	{
+		const char* name = nullptr;
+		switch (primary)
+		{
+			case 0x2a: name = "MUL"; break;
+			case 0x28: name = "ADD"; break;
+			case 0x2c: name = "SUB"; break;
+			case 0x29: name = "MADD"; break;
+			case 0x2d: name = "MSUB"; break;
+			case 0x2b: name = "MAX"; break;
+			case 0x2f: name = "MINI"; break;
+			default: return false;
+		}
+		in.op = findUpper(name);
+		in.mask = 0xf; in.fs = 1; in.ft = 2; in.fd = 3;
+	}
+	else
+	{
+		in.lower = true; in.fs = 1; in.ft = 2; in.fsf = 0; in.ftf = 0;
+		switch (lowerWord & 0xffu)
+		{
+			case 0xbc: in.op = L_DIV; break;
+			case 0xbd: in.op = L_SQRT; break;
+			case 0xbe: in.op = L_RSQRT; break;
+			default: return false;
+		}
+	}
+	FmacInit init{};
+	for (u32 l = 0; l < 4; ++l)
+	{
+		init.vf[l] = 0x3f800000u;
+		init.vf[4 + l] = fs;
+		init.vf[8 + l] = ft;
+		init.acc[l] = acc;
+	}
+	Cfg cfg;
+	cfg.mode = mode;
+	cfg.env = makeEnv(0); // chop, DAZ/FTZ: the shipping VU FPCR
+	cfg.vu1 = vu == 1;
+	Obs out{};
+	runModel(vu == 0 ? 1 : 2, std::vector<Ins>{in}, init, cfg, out);
+	result = expectQ ? out.vi[REG_Q] : out.vf[3 * 4 + 3];
+	return true;
+}
+
 static void SelfCheck()
 {
 	const u32 one = 0x3f800000u;
