@@ -22,7 +22,7 @@ void VUZeroTailDividePrimitiveTests()
         oakAsm->RET();oakEndBlock();return reinterpret_cast<Kernel>(entry);
     };
     u32 oldBytes=0,newBytes=0;const auto reference=compile(false,0,oldBytes),actual=compile(true,0x1000,newBytes);
-    Check(oldBytes==16&&newBytes==12,"FDIV zero-tail numeric clamp removes one INS");
+    Check(oldBytes==20&&newBytes==16,"FDIV zero-tail numeric clamp removes one INS"); // 20/16 since x86 clamp1 got its second FMINNM (765e433ae1)
     constexpr std::array<u32,16> edges{0,0x80000000,1,0x807fffff,0x00800000,0x80800000,
         0x3f800000,0xbf800000,0x7f7fffff,0xff7fffff,0x7f800000,0xff800000,
         0x7fc12345,0xffa00001,0x7f800001,0xffffffff};

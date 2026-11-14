@@ -242,6 +242,9 @@ struct mVU_Globals
     // Flag-pack weight vectors. Appended last so existing [x27, #imm] offsets
     // into mVUglob do not move.
     mVU_MacWeights macWeights = mVUmakeMacWeights();
+    // ARM64 FP default NaN (positive). x86 SSE yields 0xffc00000 for invalid operations, so the flag
+    // packs read a result lane equal to this as negative (x86 S flag parity).
+    u32   defNaN  [4] = __four(0x7fc00000);
 #undef __four
 };
 

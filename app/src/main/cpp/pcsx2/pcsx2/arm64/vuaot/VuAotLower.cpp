@@ -1798,6 +1798,13 @@ namespace vuaot
 			const int sgn = TempV();
 			const int z = pid ? AllocReg(Cls::V, pid) : TempV();
 			armAsm->Cmlt(V(sgn).V4S(), V(src).V4S(), 0);
+			if (!env_.clampExtra)
+			{
+				// x86 SSE's default NaN (0xffc00000, from 0*Inf / Inf-Inf) is negative; ARM's is +0x7fc00000.
+				armAsm->Ldr(Q(z), a64::MemOperand(xGlob, G(&mVUglob.defNaN[0])));
+				armAsm->Cmeq(V(z).V4S(), V(src).V4S(), V(z).V4S());
+				armAsm->Orr(V(sgn).V16B(), V(sgn).V16B(), V(z).V16B());
+			}
 			armAsm->Fcmeq(V(z).V4S(), V(src).V4S(), 0.0);
 			armAsm->Sli(V(z).V4S(), V(sgn).V4S(), 4);
 			scratch = sgn;
@@ -2529,6 +2536,8 @@ namespace vuaot
 				};
 				int ftCopy = TypedClampMode() && u.op == UOp::MULbc ?
 					TypedClampOperand(C(in.args[4]), InputClamp::Numeric, in.lane, broadcastFt) : broadcastFt();
+				// x86 MULAw with a full vector field clamps Ft too (cFs | cFt); the typed Normal-mode path only did so for MULbc.
+				if (TypedClampMode() && u.op == UOp::MULAbc) ftCopy = ClampInto(ftCopy);
 				if (env_.clampExtra) { fs = ClampE(fs); ftCopy = ClampE(ftCopy); }
 				// MULA.w materializes Ft for the vector multiply helper, but that
 				// helper only clamps inputs in extra mode. MUL has an explicit Ft clamp.
@@ -3323,6 +3332,24 @@ namespace vuaot
 			const auto sub = [&](int d, int s) { clamp(d,false);clamp(s,false);armAsm->Fsub(S(d),S(d),S(s));clamp(d,true); };
 			// SSE_DIVSS: operand clamps, divide, result clamp (the same wrappers as mul/add/sub).
 			const auto divss = [&](int d, int s) { clamp(d,false);clamp(s,false);armAsm->Fdiv(S(d),S(d),S(s));clamp(d,true); };
+			// The same divide when the destination is the register allocated from VF(fs): for fs == 0 it is flagged isZero, so
+			// x86 checkVFClamp() skips its operand and result clamps.
+			const auto divFs = [&](int d, int s) {
+				if (l.fs != 0) { divss(d, s); return; }
+				clamp(s,false);armAsm->Fdiv(S(d),S(d),S(s));
+			};
+			// x86 SSE returns the negative default NaN (0xffc00000) for 0/0; ARM's is +0x7fc00000, which the sign-preserving
+			// operand clamp of the following EATAN series would turn into +max instead of -max.
+			const auto fixDefaultNaN = [&](int d) {
+				if (!env_.clampExtra || !env_.clampSign)
+					return;
+				armAsm->Fmov(W(g0), S(d));
+				armAsm->Mov(W(g1), 0x7fc00000);
+				armAsm->Cmp(W(g0), W(g1));
+				armAsm->Orr(W(g1), W(g0), 0x80000000);
+				armAsm->Csel(W(g0), W(g1), W(g0), a64::eq);
+				armAsm->Fmov(S(d), W(g0));
+			};
 			// x86 mVU_EATAN_: single precision, separately rounded, in x86 order.
 			const auto eatan = [&](int p, int fs, int t1, int t2) {
 				mov(p, fs);
@@ -3370,7 +3397,15 @@ namespace vuaot
 				}
 			}
 			else
+			{
 				armAsm->Mov(V(r[0]).V16B(), V(VecOperand(in.args, 0)).V16B());
+				// x86 allocReg(Fs, 0, dest) -> mVUloadReg: a single-lane dest MOVSSZXes that lane into lane 0, every other
+				// dest loads the whole register, and a VF00 source without the W bit is zeroed (PXOR) instead of loaded.
+				if (l.fs == 0 && !(l.mask & 1))
+					armAsm->Movi(V(r[0]).V2D(), 0);
+				else if (l.mask == 8 || l.mask == 4 || l.mask == 2 || l.mask == 1)
+					lane(r[0], r[0], l.mask == 8 ? 0 : l.mask == 4 ? 1 : l.mask == 2 ? 2 : 3);
+			}
 
 			int res = 1;
 			switch (op)
@@ -3380,7 +3415,8 @@ namespace vuaot
 					one(r[2]);
 					armAsm->Fsub(S(r[0]), S(r[0]), S(r[2]));
 					armAsm->Fadd(S(r[1]), S(r[1]), S(r[2]));
-					divss(r[0], r[1]);
+					divFs(r[0], r[1]);
+					fixDefaultNaN(r[0]);
 					eatan(r[1], r[0], r[2], r[3]);
 					break;
 				case LOp::EATANxy:
@@ -3390,6 +3426,7 @@ namespace vuaot
 					sub(r[4], r[0]);
 					add(r[0], r[1]);
 					divss(r[4], r[0]);
+					fixDefaultNaN(r[4]);
 					eatan(r[1], r[4], r[0], r[2]);
 					break;
 				case LOp::EEXP:
@@ -3449,7 +3486,7 @@ namespace vuaot
 				case LOp::ERCPR:
 					mov(r[1], r[0]);
 					one(r[2]);
-					divss(r[2], r[1]);
+					divFs(r[2], r[1]);
 					res = 2;
 					break;
 				case LOp::ESQRT:
@@ -3459,7 +3496,7 @@ namespace vuaot
 					if (op == LOp::ERSQRT)
 					{
 						one(r[2]);
-						divss(r[2], r[1]);
+						divFs(r[2], r[1]);
 						res = 2;
 					}
 					break;
@@ -3473,7 +3510,7 @@ namespace vuaot
 					if (op == LOp::ERSADD || op == LOp::ERLENG)
 					{
 						one(r[2]);
-						divss(r[2], r[1]);
+						divFs(r[2], r[1]);
 						res = 2;
 					}
 					break;

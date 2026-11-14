@@ -42,7 +42,7 @@ void RunVUZeroTailClampTests()
         };
         u32 old_bytes=0,new_bytes=0;
         const auto reference=compile(false,0,old_bytes),actual=compile(true,0x1000,new_bytes);
-        Check(old_bytes==16&&new_bytes==12,"zero-tail numeric result clamp removes exactly one INS");
+        Check(old_bytes==20&&new_bytes==16,"zero-tail numeric result clamp removes exactly one INS"); // 20/16 since x86 clamp1 got its second FMINNM (765e433ae1)
         bool exact=true,zero=true,unit=true;
         u32 cases=0;
         for(u64 rounding=0;rounding<4;++rounding)

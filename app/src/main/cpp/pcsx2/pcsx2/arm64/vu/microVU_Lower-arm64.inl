@@ -381,6 +381,14 @@ static __fi void mVU_EFUclearGlobSS_oaknut(int reg)
 	oakAsm->EOR(oakQRegister(reg).B16(), oakQRegister(reg).B16(), oakQRegister(reg).B16());
 }
 
+// x86 loads the vector-sum EFU source with mVUloadReg(): single-lane masks MOVSSZX the lane, every other mask (xy included)
+// is a full MOVAPS. The register allocator's partial 64-bit load for xy must not reach these ops, so ask for the
+// equivalent W-less full load (VF00 still zero-fills, exactly like x86 without the W bit).
+static __fi int mVU_EFUsumMask_oaknut(mV)
+{
+	return _X_Y_Z_W == 0xc ? 0xe : _X_Y_Z_W;
+}
+
 // x86 mVU_sumXYZ: DPPS 0x71, i.e. (x*x + y*y) + (z*z + 0), products rounded separately.
 static __fi void mVU_sumXYZ_oaknut(int PQ, int Fs, int t)
 {
@@ -421,6 +429,20 @@ static __fi void mVU_addGlobSS_oaknut(int reg, s64 offset)
 	oakAsm->FADD(oakSRegister(reg), oakSRegister(reg), OAK_SSCRATCH3);
 }
 
+// x86 SSE returns the negative default NaN (0xffc00000) for 0/0; ARM's is +0x7fc00000, which the sign-preserving
+// operand clamp (mode 3) of the following EATAN series would turn into +max instead of -max. Only emitted in that mode.
+static __fi void mVU_fixDefaultNaNSign_oaknut(mV, int reg)
+{
+	if (!(clampE && CHECK_VU_SIGN_OVERFLOW(mVU.index)))
+		return;
+	oakAsm->FMOV(OAK_WSCRATCH, oakSRegister(reg));
+	oakAsm->MOV(OAK_WSCRATCH2, 0x7fc00000u);
+	oakAsm->CMP(OAK_WSCRATCH, OAK_WSCRATCH2);
+	oakAsm->ORR(OAK_WSCRATCH2, OAK_WSCRATCH, 0x80000000u);
+	oakAsm->CSEL(OAK_WSCRATCH, OAK_WSCRATCH2, OAK_WSCRATCH, oak::util::EQ);
+	oakAsm->FMOV(oakSRegister(reg), OAK_WSCRATCH);
+}
+
 static __fi void mVU_EATANx86_oaknut(mV, int P, int Fs, int t1, int t2)
 {
 	oakAsm->MOV(oakQRegister(P).Selem()[0], oakQRegister(Fs).Selem()[0]);
@@ -450,6 +472,7 @@ static void mVU_EATAN_direct_emit_oaknut(mP)
 	oakAsm->FSUB(oakSRegister(Fs), oakSRegister(Fs), oakSRegister(t1));
 	oakAsm->FADD(oakSRegister(P), oakSRegister(P), oakSRegister(t1));
 	mVU_divScalar_oaknut(mVU, Fs, P);
+	mVU_fixDefaultNaNSign_oaknut(mVU, Fs);
 	mVU_EATANx86_oaknut(mVU, P, Fs, t1, t2);
 	mVU_EFUwriteP_oaknut(mVU, P);
 	recEndOaknutEmit();
@@ -490,6 +513,7 @@ static void mVU_EATANxy_direct_emit_oaknut(mP)
 	mVU_subScalar_oaknut(mVU, Fs, t1);
 	mVU_addScalar_oaknut(mVU, t1, P);
 	mVU_divScalar_oaknut(mVU, Fs, t1);
+	mVU_fixDefaultNaNSign_oaknut(mVU, Fs);
 	mVU_EATANx86_oaknut(mVU, P, Fs, t1, t2);
 	mVU_EFUwriteP_oaknut(mVU, P);
 	recEndOaknutEmit();
@@ -530,6 +554,7 @@ static void mVU_EATANxz_direct_emit_oaknut(mP)
 	mVU_subScalar_oaknut(mVU, Fs, t1);
 	mVU_addScalar_oaknut(mVU, t1, P);
 	mVU_divScalar_oaknut(mVU, Fs, t1);
+	mVU_fixDefaultNaNSign_oaknut(mVU, Fs);
 	mVU_EATANx86_oaknut(mVU, P, Fs, t1, t2);
 	mVU_EFUwriteP_oaknut(mVU, P);
 	recEndOaknutEmit();
@@ -615,7 +640,7 @@ static void mVU_EEXP_emit(mP)
 
 static void mVU_ELENG_direct_emit_oaknut(mP)
 {
-	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
+	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, mVU_EFUsumMask_oaknut(mVU));
 	const int t1 = mVU.regAlloc->allocRegId();
 	const int P = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
@@ -682,7 +707,7 @@ static void mVU_ERCPR_emit(mP)
 
 static void mVU_ERLENG_direct_emit_oaknut(mP)
 {
-	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
+	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, mVU_EFUsumMask_oaknut(mVU));
 	const int t1 = mVU.regAlloc->allocRegId();
 	const int P = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
@@ -718,7 +743,7 @@ static void mVU_ERLENG_emit(mP)
 
 static void mVU_ERSADD_direct_emit_oaknut(mP)
 {
-	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
+	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, mVU_EFUsumMask_oaknut(mVU));
 	const int t1 = mVU.regAlloc->allocRegId();
 	const int P = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
@@ -787,7 +812,7 @@ static void mVU_ERSQRT_emit(mP)
 
 static void mVU_ESADD_direct_emit_oaknut(mP)
 {
-	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
+	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, mVU_EFUsumMask_oaknut(mVU));
 	const int t1 = mVU.regAlloc->allocRegId();
 	const int P = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
@@ -906,7 +931,7 @@ static void mVU_ESQRT_direct_emit_oaknut(mP)
 
 static void mVU_ESUM_direct_emit_oaknut(mP)
 {
-	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
+	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, mVU_EFUsumMask_oaknut(mVU));
 	const int t1 = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
 	mVU_pshufd_oaknut(t1, Fs, 0x1b);

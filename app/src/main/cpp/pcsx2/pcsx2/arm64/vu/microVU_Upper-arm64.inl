@@ -686,6 +686,15 @@ static void mVUupdateFlags_oaknut(mV, int reg, int regT1in = VU_HOST_NO_XMM, int
 
 	recBeginOaknutEmit();
 	oakAsm->CMLT(vSign.S4(), src_q.S4(), 0);
+	if (!clampE)
+	{
+		// x86 SSE returns the negative default NaN (0xffc00000) for 0*Inf / Inf-Inf, so S/MAC sign
+		// is set; ARM returns +0x7fc00000. Only unclamped modes can see such a result here.
+		oakLoad128(OAK_QSCRATCH, mVUAllocOakCpuMem(static_cast<s64>(offsetof(cpuRegistersPack, mVUglob)) +
+			static_cast<s64>(offsetof(mVU_Globals, defNaN))));
+		oakAsm->CMEQ(OAK_QSCRATCH.S4(), src_q.S4(), OAK_QSCRATCH.S4());
+		oakAsm->ORR(vSign.B16(), vSign.B16(), OAK_QSCRATCH.B16());
+	}
 	oakAsm->FCMEQ(vZero.S4(), src_q.S4(), 0.0);
 	oakAsm->SLI(vZero.S4(), vSign.S4(), 4);
 	oakLoad128(vSign, mVUmacWeightVecMem_oaknut(keepMask, macPath, foldShift));
@@ -3790,6 +3799,9 @@ static void mVU_MULA_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 	else
 	{
 		recBeginOaknutEmit();
+		// x86 MULAw with a full vector field clamps Ft as well (cFs | cFt). Clamp modes 2/3 clamp it inside the multiply.
+		if (!useFtLane && !clampE && _XYZW_PS)
+			mVUUpperClamp2Vector_oaknut(mVU, FtL, false);
 		if (_XYZW_SS)
 			mVUUpperClampAccLaneFs_oaknut(mVU, Fs, !mVUUpperNatural_oaknut(mVU));
 		else

@@ -171,6 +171,18 @@ static void refCase(const RefCfg& cfg, int index, const std::string& kind, const
 	if (cfg.cmpCycle && e.s.regs.cycle != g.s.regs.cycle) d.push_back({"CYCLE", e.s.regs.cycle, g.s.regs.cycle});
 	if (e.s.busy != g.s.busy) d.push_back({"BUSY", e.s.busy, g.s.busy});
 	if (d.empty()) return;
+	// X86P_REFDBG=1: dump the initial VI state and both final VI states of every mismatching case.
+	if (envKnob("X86P_REFDBG", 0))
+	{
+		std::printf("REFDBG %s vu%d %s %s\n  init VI:", cfg.suite, index, kind.c_str(), tag.c_str());
+		for (u32 i = 0; i < 16; ++i) std::printf(" %04x", init.vi[i] & 0xffff);
+		std::printf("\n  interp VI:");
+		for (u32 i = 0; i < 16; ++i) std::printf(" %04x", e.s.regs.VI[i].UL & 0xffff);
+		std::printf("\n  jit    VI:");
+		for (u32 i = 0; i < 16; ++i) std::printf(" %04x", g.s.regs.VI[i].UL & 0xffff);
+		std::printf("\n  init STATUS %08x MAC %08x CLIP %08x; interp S/M/C %08x %08x %08x; jit S/M/C %08x %08x %08x", init.fm.status, init.fm.mac, init.fm.clip, e.s.regs.VI[REG_STATUS_FLAG].UL, e.s.regs.VI[REG_MAC_FLAG].UL, e.s.regs.VI[REG_CLIP_FLAG].UL, g.s.regs.VI[REG_STATUS_FLAG].UL, g.s.regs.VI[REG_MAC_FLAG].UL, g.s.regs.VI[REG_CLIP_FLAG].UL);
+		std::printf("\n  prog %s\n", progHex(prog).c_str());
+	}
 	int shown = 0;
 	for (const D& x : d)
 	{
@@ -198,6 +210,8 @@ static void refInitData(RefInit& ri, Rng& r, bool randomFlags)
 	// Keep U/O (and their sticky bits) out of the initial flag state: the O/U deviation of both the interpreter and the arm64 JIT from
 	// x86 is covered by the FMAC suites; here only the pipeline/timing behaviour is under test.
 	ri.fm.status &= 0xcf3u;
+	// Reachable hardware state: a set Z/S bit implies its sticky ZS/SS (the interpreter's FMAC flush re-derives them from Z/S, x86 does not).
+	ri.fm.status |= (ri.fm.status & 3u) << 6;
 	ri.fm.mac &= 0x00ffu;
 	for (u32 i = 4; i < 128; ++i) ri.fm.vf[i] = refNormal(r);
 	for (u32 l = 0; l < 4; ++l) ri.fm.acc[l] = refNormal(r);
@@ -313,7 +327,7 @@ static void runIntSuite(int index, u32 count)
 				case 9: p.lower(enc::FCGET(a)); break;
 				case 10: if (index == 1) p.lower(enc::XTOP(a)); else p.lower(enc::IADD(a, b, c)); break;
 				case 11: if (index == 1) p.lower(enc::XITOP(a)); else p.lower(enc::ISUB(a, b, c)); break;
-				case 12: p.upper(upperWord("ADD", 1 + r.below(15), 1 + r.below(6), 1 + r.below(6), 1 + r.below(6))); break; // upper/lower overlap
+				case 12: p.upper(upperWord("ABS", 1 + r.below(15), 1 + r.below(6), 1 + r.below(6), 1 + r.below(6))); break; // upper/lower overlap (ABS: MFIR sign-extended words are NaNs, which x86 ADD no longer clamps while the interpreter does)
 				default: p.lower(enc::IADD(a, a, a)); break;
 			}
 		}
@@ -398,9 +412,15 @@ static void runBranchSuite(int index, u32 count)
 			const u32 blocks = 1 + r.below(3);
 			// Per block: optional VI writer (prev-instruction hazard), branch, delay slot, 0..2 skipped filler pairs, landing marker.
 			std::vector<u32> branchIdx, branchKind;
+			// x86 microVU quirk (mVUregs.viBackUp, identical in upstream): a VI written in a branch delay slot makes the NEXT block's
+			// branch on that same VI read the delay slot's backup instead of its own predecessor's, which differs from the interpreter.
+			// Stay clear of that combination so the suite only reports genuine deviations.
+			u32 delayVi = 0;
 			for (u32 b = 0; b < blocks; ++b)
 			{
-				const u32 a = 1 + r.below(4), c = 1 + r.below(4);
+				u32 a = 1 + r.below(4);
+				const u32 c = 1 + r.below(4);
+				if (a == delayVi && bk != 2 && bk != 3) a = 1 + (a % 4);
 				const bool writePrev = r.below(2) != 0;
 				if (r.below(2)) p.lower(enc::IADDI(1 + r.below(4), 1 + r.below(4), static_cast<int>(r.below(32)) - 16));
 				const u32 fill = r.below(3);
@@ -424,13 +444,14 @@ static void runBranchSuite(int index, u32 count)
 					default: p.lower(enc::IBGEZ(a, d)); break;
 				}
 				// Delay slot.
+				delayVi = 0;
 				switch (r.below(5))
 				{
 					case 0: p.nop(1); break;
 					case 1: p.lower(enc::IADDIU(7 + b, 0, 0x100 + b)); break;
-					case 2: p.lower(enc::IADDI(a, a, 3)); break;                 // modifies the compared reg in the delay slot
+					case 2: p.lower(enc::IADDI(a, a, 3)); delayVi = a; break;   // modifies the compared reg in the delay slot
 					case 3: p.upper(upperWord("ADD", 0xf, 1, 2, 3 + b)); break;
-					default: p.lower(enc::ISUBIU(1 + r.below(4), 1 + r.below(4), r.below(100))); break;
+					default: { const u32 dv = 1 + r.below(4); p.lower(enc::ISUBIU(dv, 1 + r.below(4), r.below(100))); delayVi = dv; break; }
 				}
 				for (u32 f = 0; f < fill + (static_cast<u32>(d) > fill + 1 ? 1 : 0); ++f) p.lower(enc::IADDIU(10 + b, 10 + b, 1 + f)); // skipped if taken
 				p.lower(enc::IADDIU(13, 13, 1 + b));                               // landing marker (always executed)

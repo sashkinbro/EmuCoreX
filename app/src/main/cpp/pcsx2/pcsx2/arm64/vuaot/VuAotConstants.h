@@ -129,6 +129,8 @@ struct mVU_Globals
 	// -component ones, w weightless in both. Appended for the reason above.
 	u16 clipWeights[8] = {1, 4, 16, 0, 2, 8, 32, 0};
 	mVU_SSLaneWeights ssLaneWeights = mVUmakeSSLaneWeights();
+	// ARM64 FP default NaN (positive); x86 SSE yields 0xffc00000, so the flag packs read it as negative.
+	u32 defNaN[4] = __four(0x7fc00000);
 #undef __four
 };
 

@@ -709,6 +709,9 @@ static void efuP(VUm& v, const Ins& in, const Cfg& c)
 	// Only the vector-sum EFU ops (ESADD/ELENG/ERSADD/ERLENG/ESUM) allocate Fs with _X_Y_Z_W; the others use the _Fsf_ lane (mask 1 << (3-fsf)).
 	if (in.op == L_ESADD || in.op == L_ELENG || in.op == L_ERSADD || in.op == L_ERLENG || in.op == L_ESUM)
 	{
+		// allocReg(vf0, 0, mask): a mask without W zeroes the register (PXOR) instead of loading VF00.
+		if (in.fs == 0 && !(in.mask & 1))
+			F[0] = F[1] = F[2] = F[3] = 0;
 		if (in.mask == 8 || in.mask == 4 || in.mask == 2 || in.mask == 1)
 		{
 			const u32 v = F[in.mask == 8 ? 0 : (in.mask == 4 ? 1 : (in.mask == 2 ? 2 : 3))];
@@ -720,6 +723,9 @@ static void efuP(VUm& v, const Ins& in, const Cfg& c)
 	const auto ADD = [&](u32 a, u32 b) { return sse(O_ADD, a, b, true, true, m, env); };
 	const auto SUB = [&](u32 a, u32 b) { return sse(O_SUB, a, b, true, true, m, env); };
 	const auto DIV = [&](u32 a, u32 b) { return sseDiv(a, b, true, true, m, env); };
+	// ERCPR/ERSQRT/ERSADD/ERLENG/EATAN divide in the register allocated from VF(fs): when fs == 0 that register is flagged isZero,
+	// so checkVFClamp() skips the operand and result clamps of the divide's destination (mVUclamp3/4).
+	const auto DIVFs = [&](u32 a, u32 b) { return sseDiv(a, b, in.fs != 0, true, m, env); };
 	const auto rmul = [&](u32 a, u32 b) { return sf_mul(a, b, env); };
 	const auto radd = [&](u32 a, u32 b) { return sf_add(a, b, env); };
 	const auto sumxyz = [&]() { return radd(radd(rmul(F[0], F[0]), rmul(F[1], F[1])), radd(rmul(F[2], F[2]), 0u)); };
@@ -741,10 +747,10 @@ static void efuP(VUm& v, const Ins& in, const Cfg& c)
 	{
 		case L_ESADD: p = sumxyz(); break;
 		case L_ELENG: p = sf_sqrt(sumxyz(), env); break;
-		case L_ERSADD: p = DIV(one, sumxyz()); break;
-		case L_ERLENG: p = DIV(one, sf_sqrt(sumxyz(), env)); break;
-		case L_ERCPR: p = DIV(one, X); break;
-		case L_ERSQRT: p = DIV(one, sf_sqrt(X & 0x7fffffffu, env)); break;
+		case L_ERSADD: p = DIVFs(one, sumxyz()); break;
+		case L_ERLENG: p = DIVFs(one, sf_sqrt(sumxyz(), env)); break;
+		case L_ERCPR: p = DIVFs(one, X); break;
+		case L_ERSQRT: p = DIVFs(one, sf_sqrt(X & 0x7fffffffu, env)); break;
 		case L_ESQRT: p = sf_sqrt(X & 0x7fffffffu, env); break;
 		case L_ESUM:
 		{
@@ -757,7 +763,7 @@ static void efuP(VUm& v, const Ins& in, const Cfg& c)
 		{
 			const u32 num = sf_sub(X, one, env);
 			const u32 den = sf_add(X, one, env);
-			p = eatan(DIV(num, den));
+			p = eatan(DIVFs(num, den));
 			break;
 		}
 		case L_EATANXY:
@@ -968,10 +974,12 @@ struct Rng
 	u32 below(u32 n) { return next() % n; }
 };
 
+// 0x7fc00000 (ARM's default NaN) is deliberately absent: the VU flag packs read an exact +0x7fc00000 as the negative x86 default NaN
+// (0xffc00000, S flag), so that bit pattern as an externally supplied operand is a documented flag-only exception.
 static const u32 kVals[] = {
 	0x00000000u, 0x80000000u, 0x00000001u, 0x80000001u, 0x007fffffu, 0x807fffffu, 0x00800000u, 0x80800000u,
 	0x3f800000u, 0xbf800000u, 0x40490fdbu, 0xc0a00000u, 0x3f000000u, 0x3f800001u, 0x01000000u, 0x7e800000u,
-	0xfe800000u, 0x4b800000u, 0x7f7fffffu, 0xff7fffffu, 0x7f800000u, 0xff800000u, 0x7fc00000u, 0xffc00000u,
+	0xfe800000u, 0x4b800000u, 0x7f7fffffu, 0xff7fffffu, 0x7f800000u, 0xff800000u, 0x7fc00001u, 0xffc00000u,
 	0x7f800001u, 0xff800001u, 0x7fc12345u, 0xffffffffu, 0x7fffffffu, 0x7fbfffffu, 0x3effffffu, 0x4effffffu};
 constexpr u32 kN = sizeof(kVals) / sizeof(kVals[0]);
 

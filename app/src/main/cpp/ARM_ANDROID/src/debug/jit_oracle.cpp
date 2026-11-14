@@ -2585,7 +2585,7 @@ void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin
     {
         EmuConfig.Cpu.Recompiler.vu0Overflow = false;
         EmuConfig.Cpu.Recompiler.vu1Overflow = false;
-        for (u32 operand : {0x7f800000u, 0xff800000u, 0x7fc00000u})
+        for (u32 operand : {0x7f800000u, 0xff800000u, 0x7fc00001u}) // exact +0x7fc00000 reads as the x86 negative default NaN in the flag packs (x86 parity)
         {
             auto program = clampProbe;
             program[0] = operand;

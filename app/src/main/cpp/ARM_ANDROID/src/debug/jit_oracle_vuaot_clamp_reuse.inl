@@ -84,9 +84,11 @@ void CheckAotClampReuseEmission(bool mula, u32 bc, bool mixed)
     }
     // MULA repeats one immutable Fs transform. MADD repeats Fs/Ft/ACC
     // transforms but keeps the three distinct result transforms unchanged.
-    const u32 expectedPairs = mula ? 1u : 6u;
+    // Normal clamp mode is x86 mVUclamp1 (numeric FMINNM/FMAXNM), so no bitwise sign transform (SMIN/UMIN pair) is
+    // emitted any more (that is the sign-preserving mode 3 clamp); MADD now clamps only Fs (x86 cFs).
+    const u32 expectedPairs = 0u;
     Check(signedMin == expectedPairs && unsignedMin == expectedPairs,
-        "immutable exact-sign inputs clamp once per source and shape in actual A64 code");
+        "Normal clamp mode emits numeric clamps and no bitwise sign transforms in actual A64 code");
     std::printf("AOT_CLAMP_REUSE mula=%u bc=%u mixed=%u numeric_vf1=%u smin=%u umin=%u bytes=%u\n",
         mula, bc, mixed, numericUses[1], signedMin, unsignedMin, bytes);
 }
@@ -186,10 +188,15 @@ ClampNodeKernel MakeClampReferenceKernel(bool mula, u32 bc, bool mixed, bool flu
     const auto load = [](u32 host, u32 vf) {
         oakLoad128(oak::QReg(host), {oak::util::X19, static_cast<s64>(offsetof(VURegs, VF) + vf * 16)});
     };
-    const auto sign = [&](u32 host, bool denormal) {
+    const auto sign = [&](u32 host, bool denormal, bool clamp = true) {
         const auto q = oak::QReg(host);
-        oakAsm->SMIN(q.S4(), q.S4(), oak::QReg(25).S4());
-        oakAsm->UMIN(q.S4(), q.S4(), oak::QReg(26).S4());
+        if (clamp) {
+        // Normal clamp mode (c1) is x86 mVUclamp1: numeric clamp, any NaN becomes +max (since 765e433ae1;
+        // the old reference used the bitwise sign-preserving clamp, which now belongs to clamp mode 3 only).
+        oakAsm->FMINNM(q.S4(), q.S4(), oak::QReg(25).S4());
+        oakAsm->FMINNM(q.S4(), q.S4(), oak::QReg(25).S4());
+        oakAsm->FMAXNM(q.S4(), q.S4(), oak::QReg(26).S4());
+        }
         if (denormal)
         {
             const auto e = oak::QReg(7);
@@ -201,18 +208,20 @@ ClampNodeKernel MakeClampReferenceKernel(bool mula, u32 bc, bool mixed, bool flu
     const auto numeric = [](u32 host) {
         const auto q = oak::QReg(host);
         oakAsm->FMINNM(q.S4(), q.S4(), oak::QReg(25).S4());
+        oakAsm->FMINNM(q.S4(), q.S4(), oak::QReg(25).S4()); // second FMINNM: sNaN -> +max like x86 MINPS
         oakAsm->FMAXNM(q.S4(), q.S4(), oak::QReg(26).S4());
     };
     // Deliberately re-read and transform each immutable input on every step:
     // this is the previous arithmetic sequence, independent of cache metadata.
     for (u32 iteration = 0; iteration < 3; ++iteration)
     {
-        load(0, 1); load(1, 2); sign(0, !mula && flush);
+        load(0, 1); load(1, 2); sign(0, false); // no software denormal flush at Normal mode: x86 relies on MXCSR.DAZ
         if (mula)
         {
             if (bc == 3)
             {
                 oakAsm->DUP(oak::QReg(1).S4(), oak::QReg(1).Selem()[bc]);
+                sign(1, false); // x86 MULAw (full vector field): cFs | cFt
                 oakAsm->FMUL(oak::QReg(0).S4(), oak::QReg(0).S4(), oak::QReg(1).S4());
             }
             else oakAsm->FMUL(oak::QReg(0).S4(), oak::QReg(0).S4(), oak::QReg(1).Selem()[bc]);
@@ -223,10 +232,11 @@ ClampNodeKernel MakeClampReferenceKernel(bool mula, u32 bc, bool mixed, bool flu
         }
         else
         {
-            oakAsm->DUP(oak::QReg(1).S4(), oak::QReg(1).Selem()[bc]); sign(1, flush);
-            oakLoad128(oak::QReg(2), {oak::util::X19, offsetof(VURegs, ACC)}); sign(2, flush);
+            // x86 MADDx/MADDw (VU1): cFs only; Ft, ACC and the result are not clamped at Normal mode.
+            oakAsm->DUP(oak::QReg(1).S4(), oak::QReg(1).Selem()[bc]);
+            oakLoad128(oak::QReg(2), {oak::util::X19, offsetof(VURegs, ACC)});
             oakAsm->FMUL(oak::QReg(0).S4(), oak::QReg(0).S4(), oak::QReg(1).S4());
-            oakAsm->FADD(oak::QReg(0).S4(), oak::QReg(2).S4(), oak::QReg(0).S4()); sign(0, false);
+            oakAsm->FADD(oak::QReg(0).S4(), oak::QReg(2).S4(), oak::QReg(0).S4());
         }
         oakStore128(oak::QReg(0), {oak::util::X19, static_cast<s64>(offsetof(VURegs, VF) + (3 + iteration) * 16)});
     }
