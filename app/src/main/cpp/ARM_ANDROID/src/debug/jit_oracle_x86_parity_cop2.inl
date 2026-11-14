@@ -144,7 +144,11 @@ static EESnapshot runEeWithIntVu0(bool jit, const std::vector<std::pair<u32, std
 	CpuVU0 = &CpuIntVU0;
 	CpuVU0->Reset();
 	prepareVu0MicroFwd(micro);
+	// The real EE interpreter runs with EnableEE=false: _vu0run then flushes the pending block cycles (intUpdateCPUCycles) before it waits.
+	const bool savedEnableEE = EmuConfig.Cpu.Recompiler.EnableEE;
+	EmuConfig.Cpu.Recompiler.EnableEE = jit;
 	const EESnapshot snap = RunEEProgram(jit, code, true, nullptr, nullptr, gpr);
+	EmuConfig.Cpu.Recompiler.EnableEE = savedEnableEE;
 	CpuVU0 = saved;
 	return snap;
 }
@@ -269,16 +273,14 @@ static void runCop2Suite(u32 count)
 // x86-parity-ee-sync: multi-block programs with COP2 sync points; cycle probes at block starts
 //------------------------------------------------------------------
 // Scratch layout: one word per probe / result, written through a moving pointer ($s0). 'probeSlots' lists the words that hold MFC0 Count
-// readings; everything else is compared exactly. Count readings are compared against the interpreter with a drift allowance: the two
-// engines account a few cycles differently per COP2 instruction (baseline skew of 1-2 cycles per sync item, measured on fixed code),
-// while a lost VU0 wait (the pinned-W24 bug) is as large as the micro program's remaining run time (tens to hundreds of cycles).
+// readings; everything else is compared exactly. Count readings are compared against the interpreter (run with EnableEE=false like the
+// real interpreter) under an x86-parity model, see the cycle-probe comment below.
 struct SyncCase { std::vector<u32> code; std::vector<u32> probeSlots; };
 
 static void runEeSyncSuite(u32 count)
 {
 	configure(1, 0);
 	static const char* const names[4] = {"loop+VCALLMS+CTC2/CFC2.I", "loop+QMFC2.I/BC2", "branch ladder + VCALLMS + hw store", "Twinsanity VI1 handshake"};
-	const u32 drift = envKnob("X86P_SYNCDRIFT", 4); // allowed |jit - interp| growth per loop iteration
 	s32 maxSeen[4] = {0, 0, 0, 0}, pi1Seen[4] = {0, 0, 0, 0};
 	const bool strict = envKnob("X86P_SYNCSTRICT", 0) != 0;
 	for (u32 variant = 0; variant < 4; ++variant)
@@ -290,7 +292,7 @@ static void runEeSyncSuite(u32 count)
 			eeRandomGpr(gpr, r);
 			gpr[19].UD[0] = 0x10000010ull + (static_cast<u64>(r.below(4)) << 11); // T0..T3_MODE
 			static const u32 kDelays[] = {2, 12, 40, 90, 160, 300};
-			const std::vector<std::pair<u32, std::array<u32, 3>>> micro = {{0, {kDelays[r.below(6)], r.below(4), r.next()}}};
+			const std::vector<std::pair<u32, std::array<u32, 3>>> micro = {{0, {(envKnob("X86P_SYNCDELAY",0)?envKnob("X86P_SYNCDELAY",0):kDelays[r.below(6)]), r.below(4), r.next()}}};
 			SyncCase sc;
 			std::vector<u32>& code = sc.code;
 			u32 slot = 0;
@@ -305,8 +307,10 @@ static void runEeSyncSuite(u32 count)
 			code.push_back(ee::ADDIU(18, 0, static_cast<int>(iters)));
 			const u32 loopTop = static_cast<u32>(code.size());
 			probe();
+			bool lazySync = false; // a CTC2/CFC2 without the .I bit: the recompiler (like x86) does not sync VU0 there, the interpreter does (vu0Sync)
 			const auto syncItem = [&]() {
 				const u32 i = r.below(2);
+				if (variant == 0 && i == 0) lazySync = true;
 				switch (variant)
 				{
 					case 0:
@@ -385,20 +389,33 @@ static void runEeSyncSuite(u32 count)
 				std::memcpy(&y, jit.scratch + w * 4, 4);
 				if (x != y) { d.push_back({"MEM" + std::to_string(w * 4), x, y}); break; }
 			}
-			// Cycle probes: |jit - interp| may drift by 'drift' cycles per iteration plus a constant for the first block.
+			// Cycle probes. Target is x86-JIT parity; the EE interpreter is only a proxy and differs from the x86 recompiler in one defined way:
+			// the interpreter starts a micro program (vu0ExecMicro: VU0.cycle = cpuRegs.cycle) with cpuRegs.cycle lacking the pending cycles of the
+			// block it is executing (they are only flushed at the next taken branch), whereas the recompiler - like upstream x86 iR5900/microVU
+			// (mVUAddBlockCyclesToCpuCycle before VCALLMS) - adds the block cycles first. So after every VCALLMS that the EE then has to wait for,
+			// jit - interp is positive by up to the cycles of the instructions that precede VCALLMS in its block (one MFC0/SW/ADDIU probe, <= 13).
+			// A lost or unreloaded VU0 wait (pinned W24 bug) makes the JIT lag instead, by the micro program's remaining run time, so the negative
+			// side keeps a tight bound: the recompiler (like x86) drops the fractional 1/8 cycle of s_nBlockCycles at every block end while the
+			// interpreter carries it (cpuBlockCycles &= 7), so jit - interp falls by < 1 cycle per block boundary (about one per probe).
+			// Lazy-sync programs (a CTC2/CFC2 without .I, VU0 left running into the next VCALLMS): the interpreter's vu0Sync lets VU0 finish by itself,
+			// while recompiler and x86 resolve it in the next VCALLMS' _vu0FinishMicro, which sets cpuRegs.cycle to the VU0 end time even when that
+			// lies behind the EE (upstream _vu0run code, shared by both). The JIT then lags by the EE time elapsed since the micro start (<= ~40).
+			const u32 perVc = variant != 3 ? 2 : 1;
+			const u32 itersTotal = static_cast<u32>(sc.probeSlots.size() - 1) / 2;
 			for (size_t pi = 0; pi < sc.probeSlots.size(); ++pi)
 			{
 				u32 x, y;
 				std::memcpy(&x, interp.scratch + sc.probeSlots[pi] * 4, 4);
 				std::memcpy(&y, jit.scratch + sc.probeSlots[pi] * 4, 4);
 				const s32 delta = static_cast<s32>(y - x);
-				// Default gate: 24 + 14 cycles per loop iteration (fixed code measures <= 48 cycles of engine accounting skew over 4 iterations,
-				// the old unreloaded-W24 code loses the whole remaining micro run time, up to ~300). X86P_SYNCSTRICT=1 uses 4 + 4 per iteration.
-				const s32 allow = strict ? 4 + static_cast<s32>(drift * (pi / 2 + 1)) : 24 + 14 * static_cast<s32>(pi / 2);
+				const u32 it = static_cast<u32>(pi / 2);
+				const s32 nVc = static_cast<s32>(it >= itersTotal ? itersTotal * perVc : it * perVc + static_cast<u32>(pi & 1));
+				const s32 lo = -(3 + static_cast<s32>(pi)) - (lazySync ? 40 * nVc : 0);
+				const s32 hi = strict ? 2 + 14 * nVc : 4 + 20 * nVc;
 				if (delta > maxSeen[variant]) maxSeen[variant] = delta;
 				if (-delta > maxSeen[variant]) maxSeen[variant] = -delta;
 				if (pi == 1 && std::abs(delta) > pi1Seen[variant]) pi1Seen[variant] = std::abs(delta);
-				if (delta > allow || delta < -allow) { d.push_back({"CYCLE-PROBE" + std::to_string(pi), x, y}); break; }
+				if (delta > hi || delta < lo) { d.push_back({"CYCLE-PROBE" + std::to_string(pi), x, y}); break; }
 			}
 			if (!d.empty()) eeRecordDiffs("x86-parity-ee-sync", names[variant], d, code, "k=" + std::to_string(k));
 		}
