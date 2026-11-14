@@ -43,6 +43,11 @@
 using namespace x86Emitter;
 #endif
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) ||     (defined(EMUCOREX_ENABLE_EXPERIMENTAL_IR) && EMUCOREX_ENABLE_EXPERIMENTAL_IR)
+#define EMUCOREX_IOP_IR_COMPILED 1
+#endif
+
+#ifdef EMUCOREX_IOP_IR_COMPILED
 static u64 s_iopIrInstructions = 0;
 static u64 s_iopIrSpillSequences = 0;
 static u64 s_iopIrMemoryOperations = 0;
@@ -118,6 +123,7 @@ static bool IopIrNativeDivisionEnabled()
     return true;
 #endif
 }
+#endif // EMUCOREX_IOP_IR_COMPILED
 
 extern void psxBREAK();
 
@@ -1742,6 +1748,7 @@ void psxRecompileNextInstruction(bool delayslot, bool swapped_delayslot)
 }
 
 
+#ifdef EMUCOREX_IOP_IR_COMPILED
 // This exit only restores the temporary IR frame and falls through into the
 // same legacy block. The IOP block tail owns PC, cycles, linking and events.
 static void IopIrFallThrough(void*, u32, bool) {}
@@ -1893,6 +1900,7 @@ static bool TryIopIrSequence()
 #endif
     return true;
 }
+#endif // EMUCOREX_IOP_IR_COMPILED
 
 static void iopRecRecompile(u32 startpc)
 {
@@ -2139,8 +2147,12 @@ StartRecomp:
 	g_pCurInstInfo = s_pInstCache;
     // Include temporary breakpoints. Debugger/profiler paths retain their
     // instruction-by-instruction hooks; unsupported/forced delays stay legacy.
+#ifdef EMUCOREX_IOP_IR_COMPILED
     const bool use_ir = IopIrEnabled() && !JitProfiler::IsActive() &&
         CBreakPoints::GetBreakpoints(BREAKPOINT_IOP, true).empty() && CBreakPoints::GetNumMemchecks() == 0;
+#else
+    constexpr bool use_ir = false;
+#endif
 	while (!psxbranch && psxpc < s_nEndBlock)
 	{
         // A page of IR memory operations can exceed the legacy 64 KiB block
@@ -2152,7 +2164,9 @@ StartRecomp:
             willbranch3 = 1;
             break;
         }
+#ifdef EMUCOREX_IOP_IR_COMPILED
         if (use_ir && TryIopIrSequence()) continue;
+#endif
 		psxRecompileNextInstruction(false, false);
 	}
 

@@ -2582,6 +2582,11 @@ extern "C" bool EmuCoreXOracleGetEeCompiledBlock(u32 guest_pc, const void** host
 }
 #endif
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) || 	(defined(EMUCOREX_ENABLE_EXPERIMENTAL_IR) && EMUCOREX_ENABLE_EXPERIMENTAL_IR)
+#define EMUCOREX_EE_IR_COMPILED 1
+#endif
+
+#ifdef EMUCOREX_EE_IR_COMPILED
 static bool EeIrEnabled()
 {
 #if defined(__ANDROID__) && defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && \
@@ -3001,6 +3006,7 @@ static bool TryCompileEeIrBlock(const u32 startpc)
 
 	return true;
 }
+#endif // EMUCOREX_EE_IR_COMPILED
 
 static void recRecompile(const u32 startpc)
 {
@@ -3437,6 +3443,7 @@ StartRecomp:
 		// Finally: Generate ARM64 recompiled code!
 		g_pCurInstInfo = s_pInstCache;
 		bool ir_compiled = false;
+#ifdef EMUCOREX_EE_IR_COMPILED
 		if (EeIrEnabled() && EeIrInRange(HWADDR(startpc)))
 		{
 			ir_compiled = TryCompileEeIrBlock(startpc);
@@ -3448,6 +3455,7 @@ StartRecomp:
 				willbranch3 = 0;
 			}
 		}
+#endif
 		if (!ir_compiled)
 		{
 			while (!g_branch && pc < s_nEndBlock)

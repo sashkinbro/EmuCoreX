@@ -25,6 +25,12 @@
 #include <sys/system_properties.h>
 #endif
 
+// Present-timing / tuning knobs (env vars, debug.emucorex.* properties, GS_PRESENT_TIME logs) exist
+// only in debug self-test builds. Release uses the built-in defaults.
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+#define EMUCOREX_VK_PRESENT_TUNING 1
+#endif
+
 #if defined(VK_USE_PLATFORM_XLIB_KHR)
 #include <X11/Xlib.h>
 #endif
@@ -281,6 +287,7 @@ static const char* PresentModeToString(VkPresentModeKHR mode)
 	}
 }
 
+#ifdef EMUCOREX_VK_PRESENT_TUNING
 // Experiment knobs. Environment variable first, then (Android) the system property, which is the
 // practical route for an app process:  adb shell setprop debug.emucorex.<name> <value>
 static bool ReadPresentTuning(const char* env_name, [[maybe_unused]] const char* prop_name, char* out, size_t out_size)
@@ -303,15 +310,20 @@ static bool ReadPresentTuning(const char* env_name, [[maybe_unused]] const char*
 #endif
 	return false;
 }
+#endif
 
 bool VKSwapChain::PresentTimingEnabled()
 {
+#ifdef EMUCOREX_VK_PRESENT_TUNING
 	static const bool enabled = [] {
 		char v[8];
 		return ReadPresentTuning("EMUCOREX_GS_PRESENT_TIMING", "debug.emucorex.present_timing", v, sizeof(v)) &&
 		       v[0] != '0';
 	}();
 	return enabled;
+#else
+	return false;
+#endif
 }
 
 u64 VKSwapChain::PresentTimingNowNs()
@@ -322,18 +334,25 @@ u64 VKSwapChain::PresentTimingNowNs()
 
 bool VKSwapChain::AsyncPresentEnabled()
 {
+#ifdef EMUCOREX_VK_PRESENT_TUNING
 	static const bool enabled = [] {
 		char v[8];
 		return !(ReadPresentTuning("EMUCOREX_GS_ASYNC_PRESENT", "debug.emucorex.async_present", v, sizeof(v)) &&
 		         v[0] == '0');
 	}();
 	return enabled;
+#else
+	return true;
+#endif
 }
 
+#ifdef EMUCOREX_VK_PRESENT_TUNING
 static std::atomic<u64> s_gs_enqueue_sum_ns{0}, s_gs_enqueue_max_ns{0}, s_gs_wait_sum_ns{0}, s_gs_wait_max_ns{0};
+#endif
 
 void VKSwapChain::RecordGsPresentCost(u64 enqueue_ns, u64 wait_ns)
 {
+#ifdef EMUCOREX_VK_PRESENT_TUNING
 	if (enqueue_ns)
 	{
 		s_gs_enqueue_sum_ns.fetch_add(enqueue_ns, std::memory_order_relaxed);
@@ -350,10 +369,15 @@ void VKSwapChain::RecordGsPresentCost(u64 enqueue_ns, u64 wait_ns)
 		{
 		}
 	}
+#else
+	(void)enqueue_ns;
+	(void)wait_ns;
+#endif
 }
 
 void VKSwapChain::RecordPresentTime(u64 present_ns)
 {
+#ifdef EMUCOREX_VK_PRESENT_TUNING
 	m_pt_frames++;
 	m_pt_present_sum_ns += present_ns;
 	m_pt_present_max_ns = std::max(m_pt_present_max_ns, present_ns);
@@ -383,6 +407,9 @@ void VKSwapChain::RecordPresentTime(u64 present_ns)
 #endif
 	m_pt_frames = m_pt_present_sum_ns = m_pt_present_max_ns = 0;
 	m_pt_acquires = m_pt_acquire_sum_ns = m_pt_acquire_max_ns = 0;
+#else
+	(void)present_ns;
+#endif
 }
 
 bool VKSwapChain::SelectPresentMode(VkSurfaceKHR surface, GSVSyncMode* vsync_mode, VkPresentModeKHR* present_mode)
@@ -488,6 +515,7 @@ bool VKSwapChain::SelectPresentMode(VkSurfaceKHR surface, GSVSyncMode* vsync_mod
 			jNO_DEFAULT
 	}
 
+#ifdef EMUCOREX_VK_PRESENT_TUNING
 	// Experiment override: EMUCOREX_VK_PRESENT_MODE / debug.emucorex.present_mode = fifo|mailbox|immediate|relaxed.
 	{
 		char ov[16];
@@ -523,6 +551,7 @@ bool VKSwapChain::SelectPresentMode(VkSurfaceKHR surface, GSVSyncMode* vsync_mod
 			}
 		}
 	}
+#endif
 
 	return true;
 }
@@ -616,6 +645,7 @@ bool VKSwapChain::CreateSwapChain()
 		preferred_image_count =
 			std::max(preferred_image_count, surface_capabilities.minImageCount + extra);
 	}
+#ifdef EMUCOREX_VK_PRESENT_TUNING
 	{
 		// Experiment override: EMUCOREX_VK_SWAPCHAIN_IMAGES / debug.emucorex.swapchain_images (clamped just below).
 		char ov[16];
@@ -626,6 +656,7 @@ bool VKSwapChain::CreateSwapChain()
 				preferred_image_count = static_cast<u32>(n);
 		}
 	}
+#endif
 	u32 image_count = std::clamp<u32>(
 		preferred_image_count, surface_capabilities.minImageCount,
 		(surface_capabilities.maxImageCount == 0) ? std::numeric_limits<u32>::max() : surface_capabilities.maxImageCount);
@@ -813,7 +844,7 @@ bool VKSwapChain::CreateSwapChain()
 		return false;
 	}
 
-#if defined(__ANDROID__)
+#if defined(__ANDROID__) && defined(EMUCOREX_VK_PRESENT_TUNING)
 	{
 		// One line per swapchain creation: what the surface supports, and what was chosen.
 		u32 mode_count = 0;
@@ -838,6 +869,8 @@ bool VKSwapChain::CreateSwapChain()
 			modes, surface_capabilities.minImageCount, surface_capabilities.maxImageCount,
 			PresentModeToString(m_present_mode) + 16, requested_image_count, image_count);
 	}
+#endif
+#if defined(__ANDROID__)
 	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX",
 		"Vulkan swapchain presentMode=%s requestedImages=%u actualImages=%u surfaceMin=%u surfaceMax=%u",
 		PresentModeToString(m_present_mode), requested_image_count, image_count,
