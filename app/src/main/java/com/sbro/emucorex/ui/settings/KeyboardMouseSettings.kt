@@ -375,7 +375,9 @@ private fun KeyboardMouseMappingDialog(
     onDismiss: () -> Unit
 ) {
     val capture by KeyboardMouseManager.bindingCapture.collectAsState()
-    val actions = remember { GamepadManager.mappableButtonActions() }
+    val actions = remember {
+        GamepadManager.mappableButtonActions().filterNot { it.id in GamepadManager.gamepadOnlyActionIds }
+    }
     var selectedPad by rememberSaveable { mutableIntStateOf(settings.keyboardTargetPad) }
     var source by rememberSaveable { mutableIntStateOf(initialSource.ordinal) }
     val mappingSource = if (source == KeyboardMouseMappingSource.MOUSE.ordinal) {

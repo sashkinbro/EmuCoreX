@@ -1682,6 +1682,7 @@
     <string name="settings_game_folders_count">تم تحديد %1$d مجلد/مجلدات</string>
     <string name="game_folders_remove">إزالة المجلد</string>
     <string name="settings_gamepad_action_pressure">مُعدِّل الضغط</string>
+    <string name="settings_gamepad_action_turbo_format">تيربو %1$s</string>
     <string name="settings_gamepad_action_gun_trigger">زناد المسدس الضوئي</string>
     <string name="settings_gamepad_action_gun_pedal">دواسة المسدس الضوئي</string>
     <string name="settings_gamepad_action_gun_reload">إعادة تلقيم المسدس الضوئي</string>

@@ -1247,6 +1247,7 @@
     <string name="settings_gamepad_action_start">Start</string>
     <string name="settings_gamepad_action_left_input_toggle">Przełącznik podwójnego sterowania (Left Toggle)</string>
     <string name="settings_gamepad_action_pressure">Modyfikator stopnia wciśnięcia / nacisku w grach dla przycisków (Pressure Modifier)</string>
+    <string name="settings_gamepad_action_turbo_format">Turbo %1$s</string>
     <string name="settings_gamepad_action_gun_trigger">Spust pistoletu świetlnego</string>
     <string name="settings_gamepad_action_gun_pedal">Pedał pistoletu świetlnego</string>
     <string name="settings_gamepad_action_gun_reload">Przeładowanie pistoletu świetlnego</string>

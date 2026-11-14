@@ -1684,6 +1684,7 @@
     <string name="settings_game_folders_count">%1$d dossiers sélectionnés</string>
     <string name="game_folders_remove">Supprimer le dossier</string>
     <string name="settings_gamepad_action_pressure">Modificateur de pression</string>
+    <string name="settings_gamepad_action_turbo_format">Turbo %1$s</string>
     <string name="settings_gamepad_action_gun_trigger">Gâchette pistolet optique</string>
     <string name="settings_gamepad_action_gun_pedal">Pédale pistolet optique</string>
     <string name="settings_gamepad_action_gun_reload">Rechargement pistolet optique</string>

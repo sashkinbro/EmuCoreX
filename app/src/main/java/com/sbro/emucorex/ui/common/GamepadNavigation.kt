@@ -4,6 +4,7 @@ import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.MotionEvent
 import androidx.compose.runtime.Composable
+import com.sbro.emucorex.core.GamepadManager
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -137,8 +138,9 @@ object GamepadUiInputRouter {
     fun handleEmulationOverlayKeyEvent(event: KeyEvent): Boolean {
         if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount > 0) return false
         return when (event.keyCode) {
-            KeyEvent.KEYCODE_MENU,
-            KeyEvent.KEYCODE_BUTTON_MODE -> invokeMenuAction()
+            KeyEvent.KEYCODE_MENU -> invokeMenuAction()
+            // A bound Mode button belongs to the game mapping, not to the overlay menu.
+            KeyEvent.KEYCODE_BUTTON_MODE -> if (GamepadManager.isKeyBound(event)) false else invokeMenuAction()
             else -> false
         }
     }

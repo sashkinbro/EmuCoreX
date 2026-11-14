@@ -1697,6 +1697,7 @@
     <string name="settings_game_folders_count">%1$d folder dipilih</string>
     <string name="game_folders_remove">Hapus folder</string>
     <string name="settings_gamepad_action_pressure">Pengubah Tekanan</string>
+    <string name="settings_gamepad_action_turbo_format">Turbo %1$s</string>
     <string name="settings_gamepad_action_gun_trigger">Pemicu pistol cahaya</string>
     <string name="settings_gamepad_action_gun_pedal">Pedal pistol cahaya</string>
     <string name="settings_gamepad_action_gun_reload">Muat ulang pistol cahaya</string>

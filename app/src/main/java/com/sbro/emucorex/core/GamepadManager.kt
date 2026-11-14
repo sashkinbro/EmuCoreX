@@ -126,6 +126,32 @@ private const val MAX_PAD_SLOTS = 2
     const val ACTION_QUICK_LOAD = "quick_load"
     /** Hold-to-fast-forward; shares the gamepadFastForwardHolds path used by Start long-press. */
     const val ACTION_FAST_FORWARD = "fast_forward"
+    const val ACTION_PAUSE = "pause"
+    const val ACTION_OPEN_MENU = "open_menu"
+    /** Bindable "turbo_<button>" actions: the bound physical button auto-fires that PS2 button. */
+    private const val TURBO_ACTION_PREFIX = "turbo_"
+    private const val TURBO_HALF_PERIOD_MS = 42L
+    private val TURBO_BASE_ACTION_IDS = listOf("cross", "circle", "square", "triangle", "l1", "r1", "l2", "r2")
+    // Negative codes stand for scancode-only keys (KEYCODE_UNKNOWN); codes in
+    // [AXIS_CODE_BASE, AXIS_CODE_BASE + 0xFFFF] stand for a generic axis pushed past a threshold.
+    private const val SCAN_CODE_BASE = 0x10000
+    private const val AXIS_CODE_BASE = 0x20000
+    private const val AXIS_BUTTON_PRESS = 0.65f
+    private const val AXIS_BUTTON_RELEASE = 0.35f
+    private val BINDABLE_BUTTON_AXES = intArrayOf(
+        MotionEvent.AXIS_GENERIC_1, MotionEvent.AXIS_GENERIC_2, MotionEvent.AXIS_GENERIC_3,
+        MotionEvent.AXIS_GENERIC_4, MotionEvent.AXIS_GENERIC_5, MotionEvent.AXIS_GENERIC_6,
+        MotionEvent.AXIS_GENERIC_7, MotionEvent.AXIS_GENERIC_8, MotionEvent.AXIS_GENERIC_9,
+        MotionEvent.AXIS_GENERIC_10, MotionEvent.AXIS_GENERIC_11, MotionEvent.AXIS_GENERIC_12,
+        MotionEvent.AXIS_GENERIC_13, MotionEvent.AXIS_GENERIC_14, MotionEvent.AXIS_GENERIC_15,
+        MotionEvent.AXIS_GENERIC_16, MotionEvent.AXIS_THROTTLE, MotionEvent.AXIS_RUDDER
+    )
+    private val RESERVED_SYSTEM_KEY_CODES = setOf(
+        KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_HOME, KeyEvent.KEYCODE_POWER,
+        KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN, KeyEvent.KEYCODE_VOLUME_MUTE,
+        KeyEvent.KEYCODE_APP_SWITCH, KeyEvent.KEYCODE_ASSIST, KeyEvent.KEYCODE_SLEEP,
+        KeyEvent.KEYCODE_WAKEUP
+    )
     private val FINGERPRINT_UINPUT_DEVICE_TOKENS = setOf(
         "uinput-fpc",
         "uinput-goodix",
@@ -157,6 +183,15 @@ private const val MAX_PAD_SLOTS = 2
         KeyEvent.KEYCODE_BUTTON_8,
         KeyEvent.KEYCODE_BUTTON_9,
         KeyEvent.KEYCODE_BUTTON_10,
+        KeyEvent.KEYCODE_BUTTON_11,
+        KeyEvent.KEYCODE_BUTTON_12,
+        KeyEvent.KEYCODE_BUTTON_13,
+        KeyEvent.KEYCODE_BUTTON_14,
+        KeyEvent.KEYCODE_BUTTON_15,
+        KeyEvent.KEYCODE_BUTTON_16,
+        KeyEvent.KEYCODE_BUTTON_C,
+        KeyEvent.KEYCODE_BUTTON_Z,
+        KeyEvent.KEYCODE_BUTTON_MODE,
         KeyEvent.KEYCODE_DPAD_UP,
         KeyEvent.KEYCODE_DPAD_DOWN,
         KeyEvent.KEYCODE_DPAD_LEFT,
@@ -350,6 +385,16 @@ private const val MAX_PAD_SLOTS = 2
         MappableButtonAction(ACTION_QUICK_SAVE, null, emptyList()),
         MappableButtonAction(ACTION_QUICK_LOAD, null, emptyList()),
         MappableButtonAction(ACTION_FAST_FORWARD, null, emptyList()),
+        MappableButtonAction(ACTION_PAUSE, null, emptyList()),
+        MappableButtonAction(ACTION_OPEN_MENU, null, emptyList()),
+        MappableButtonAction("turbo_cross", PadKey.Cross, emptyList()),
+        MappableButtonAction("turbo_circle", PadKey.Circle, emptyList()),
+        MappableButtonAction("turbo_square", PadKey.Square, emptyList()),
+        MappableButtonAction("turbo_triangle", PadKey.Triangle, emptyList()),
+        MappableButtonAction("turbo_l1", PadKey.L1, emptyList()),
+        MappableButtonAction("turbo_r1", PadKey.R1, emptyList()),
+        MappableButtonAction("turbo_l2", PadKey.L2, emptyList()),
+        MappableButtonAction("turbo_r2", PadKey.R2, emptyList()),
         MappableButtonAction("dpad_up", PadKey.Up, listOf(KeyEvent.KEYCODE_DPAD_UP)),
         MappableButtonAction("dpad_down", PadKey.Down, listOf(KeyEvent.KEYCODE_DPAD_DOWN)),
         MappableButtonAction("dpad_left", PadKey.Left, listOf(KeyEvent.KEYCODE_DPAD_LEFT)),
@@ -364,7 +409,7 @@ private const val MAX_PAD_SLOTS = 2
         MappableButtonAction("right_stick_right", PadKey.RightStickRight, emptyList())
     )
     private val actionsById = mappableActions.associateBy { it.id }
-    private val shortcutActionIds = setOf(ACTION_QUICK_SAVE, ACTION_QUICK_LOAD, ACTION_FAST_FORWARD)
+    private val shortcutActionIds = setOf(ACTION_QUICK_SAVE, ACTION_QUICK_LOAD, ACTION_FAST_FORWARD, ACTION_PAUSE, ACTION_OPEN_MENU)
     // Gun cabinet actions must not permanently steal a controller button from the normal
     // pad mapping: their custom bindings only win while a light-gun context is active.
     private val gunActionIds = setOf(
@@ -568,6 +613,65 @@ private const val MAX_PAD_SLOTS = 2
 
     fun mappableButtonActions(): List<MappableButtonAction> = mappableActions
 
+    /** Actions that only make sense for a gamepad (hotkeys, turbo); hidden from keyboard/mouse mapping. */
+    val gamepadOnlyActionIds: Set<String> = setOf(ACTION_FAST_FORWARD, ACTION_PAUSE, ACTION_OPEN_MENU) +
+        TURBO_BASE_ACTION_IDS.map { TURBO_ACTION_PREFIX + it }
+
+    fun isTurboAction(actionId: String): Boolean = actionId.startsWith(TURBO_ACTION_PREFIX)
+
+    fun turboBaseActionId(actionId: String): String = actionId.removePrefix(TURBO_ACTION_PREFIX)
+
+    /** Stored binding code for an event: scancode-only keys (KEYCODE_UNKNOWN) become negative synthetic codes. */
+    internal fun physicalKeyCode(keyCode: Int, scanCode: Int): Int =
+        if (keyCode == KeyEvent.KEYCODE_UNKNOWN && scanCode > 0) -(SCAN_CODE_BASE or (scanCode and 0xFFFF)) else keyCode
+
+    internal fun physicalKeyCode(event: KeyEvent): Int = physicalKeyCode(event.keyCode, event.scanCode)
+
+    internal fun axisButtonCode(axis: Int): Int = AXIS_CODE_BASE or axis
+
+    internal fun isAxisButtonCode(code: Int): Boolean = code >= AXIS_CODE_BASE && code < AXIS_CODE_BASE + 0x10000
+
+    internal fun isScanButtonCode(code: Int): Boolean = code <= -SCAN_CODE_BASE
+
+    internal fun isReservedSystemKey(keyCode: Int): Boolean = keyCode in RESERVED_SYSTEM_KEY_CODES
+
+    /** True when the key code is bound to some action for the pad that owns the event's device. */
+    fun isKeyBound(event: KeyEvent): Boolean {
+        val padIndex = resolvePadIndexForDevice(event.deviceId) ?: return false
+        return isKeyBoundForPad(padIndex, physicalKeyCode(event))
+    }
+
+    private fun isKeyBoundForPad(padIndex: Int, code: Int): Boolean =
+        customBindingsByPad[normalizePadIndex(padIndex)]?.values?.contains(code) == true
+
+    /**
+     * Wider than [isGameController]: also accepts secondary nodes of a controller (paddles, M1/M2,
+     * Share often arrive on a keyboard-class node). Only for binding capture and mapped-key handling.
+     */
+    fun isBindableInputDevice(device: InputDevice?, keyCode: Int): Boolean {
+        if (device == null || device.isVirtual || isFingerprintUinputDevice(device)) return false
+        if (isReservedSystemKey(keyCode)) return false
+        val sources = device.sources
+        val hasSource =
+            (sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
+                (sources and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK ||
+                (sources and InputDevice.SOURCE_KEYBOARD) == InputDevice.SOURCE_KEYBOARD
+        if (!hasSource) return false
+        return keyCode == KeyEvent.KEYCODE_UNKNOWN ||
+            keyCode < 0 ||
+            isAxisButtonCode(keyCode) ||
+            KeyEvent.isGamepadButton(keyCode) ||
+            keyCode in KeyEvent.KEYCODE_BUTTON_1..KeyEvent.KEYCODE_BUTTON_16 ||
+            keyCode == KeyEvent.KEYCODE_BUTTON_MODE ||
+            keyCode == KeyEvent.KEYCODE_BUTTON_C ||
+            keyCode == KeyEvent.KEYCODE_BUTTON_Z
+    }
+
+    private fun isCapturableDevice(device: InputDevice?, keyCode: Int): Boolean {
+        if (isReservedSystemKey(keyCode)) return false
+        return isGameController(device) || isBindableInputDevice(device, keyCode)
+    }
+
     fun resolveBindingForAction(actionId: String, customBindings: Map<String, Int>): Int? {
         return customBindings[actionId] ?: actionsById[actionId]?.defaultKeyCodes?.firstOrNull()
     }
@@ -590,6 +694,18 @@ private const val MAX_PAD_SLOTS = 2
             KeyEvent.KEYCODE_DPAD_DOWN -> "D-Pad Down"
             KeyEvent.KEYCODE_DPAD_LEFT -> "D-Pad Left"
             KeyEvent.KEYCODE_DPAD_RIGHT -> "D-Pad Right"
+            KeyEvent.KEYCODE_BUTTON_11 -> "Button 11"
+            KeyEvent.KEYCODE_BUTTON_12 -> "Button 12"
+            KeyEvent.KEYCODE_BUTTON_13 -> "Button 13"
+            KeyEvent.KEYCODE_BUTTON_14 -> "Button 14"
+            KeyEvent.KEYCODE_BUTTON_15 -> "Button 15"
+            KeyEvent.KEYCODE_BUTTON_16 -> "Button 16"
+            KeyEvent.KEYCODE_BUTTON_C -> "C"
+            KeyEvent.KEYCODE_BUTTON_Z -> "Z"
+            KeyEvent.KEYCODE_BUTTON_MODE -> "Mode"
+            in Int.MIN_VALUE..-SCAN_CODE_BASE -> "Key #${(-keyCode) and 0xFFFF}"
+            in AXIS_CODE_BASE until AXIS_CODE_BASE + 0x10000 ->
+                "Axis " + MotionEvent.axisToString(keyCode - AXIS_CODE_BASE).removePrefix("AXIS_").replace('_', ' ')
             else -> KeyEvent.keyCodeToString(keyCode).removePrefix("KEYCODE_").replace('_', ' ')
         }
     }
@@ -617,15 +733,17 @@ private const val MAX_PAD_SLOTS = 2
 
     fun handleBindingCapture(event: KeyEvent): Boolean {
         val captureState = bindingCaptureState ?: return false
-        if (!isGameController(event.device)) return false
-        val eventPadIndex = resolvePadIndexForDevice(event.deviceId)
+        val code = physicalKeyCode(event)
+        // BACK/HOME/volume/etc. are never captured; BACK falls through so the dialog cancels.
+        if (!isCapturableDevice(event.device, code)) return false
+        val eventPadIndex = resolvePadIndexForDevice(event.deviceId) ?: return false
         if (eventPadIndex != captureState.padIndex) {
             // Keep another player's input from leaking into the binding dialog or
             // overwriting the selected player's mapping.
             return true
         }
         if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount != 0) return true
-        captureState.onCaptured(event.keyCode)
+        captureState.onCaptured(code)
         bindingCaptureState = null
         return true
     }
@@ -639,7 +757,8 @@ private const val MAX_PAD_SLOTS = 2
         val capturedKey = when {
             left > 0.65f && left >= right -> KeyEvent.KEYCODE_BUTTON_L2
             right > 0.65f -> KeyEvent.KEYCODE_BUTTON_R2
-            else -> null
+            else -> BINDABLE_BUTTON_AXES.firstOrNull { event.getAxisValue(it) > AXIS_BUTTON_PRESS }
+                ?.let(::axisButtonCode)
         }
         if (capturedKey != null) {
             bindingCaptureState = null
@@ -676,7 +795,10 @@ private const val MAX_PAD_SLOTS = 2
         emulationInputEnabled = enabled
         if (!enabled) {
             _lightGunStickByPad.value = emptyMap()
-            synchronized(connectionLock) { heldButtonsByDeviceAndKey.clear() }
+            synchronized(connectionLock) {
+                heldButtonsByDeviceAndKey.clear()
+                heldAxisButtons.clear()
+            }
             cancelStartTransportHolds()
             resetAnalogState()
             stopAllGamepadVibrations()
@@ -822,13 +944,18 @@ private const val MAX_PAD_SLOTS = 2
 
     fun handleKeyEvent(event: KeyEvent): Boolean {
         if (!emulationInputEnabled) return false
-        if (!isGameController(event.device)) return false
+        val code = physicalKeyCode(event)
+        val isController = isGameController(event.device)
+        if (!isController && !isBindableInputDevice(event.device, code)) return false
 
         val padIndex = resolvePadIndexForDevice(event.deviceId) ?: return false
-        val physicalKey = event.deviceId to event.keyCode
+        // Secondary/keyboard-class nodes only act on keys the user explicitly bound.
+        if (!isController && !isKeyBoundForPad(padIndex, code)) return false
+        val physicalKey = event.deviceId to code
         val heldButton = synchronized(connectionLock) { heldButtonsByDeviceAndKey[physicalKey] }
         if (event.action == KeyEvent.ACTION_UP && heldButton != null) {
             synchronized(connectionLock) { heldButtonsByDeviceAndKey.remove(physicalKey) }
+            turboJobs.remove(physicalKey)?.cancel()
             if (heldButton.padKey == PadKey.Start) {
                 return handleStartTransportEvent(heldButton.padIndex, event)
             }
@@ -837,9 +964,9 @@ private const val MAX_PAD_SLOTS = 2
         }
         if (event.action == KeyEvent.ACTION_DOWN && heldButton != null) return true
         val selectedActionId = resolveMappedActionIdForKeyCode(
-            event.keyCode, customBindingsByPad[normalizePadIndex(padIndex)].orEmpty()
+            code, customBindingsByPad[normalizePadIndex(padIndex)].orEmpty()
         )
-        val shortcutActionId = mapKeyCodeToShortcutActionId(padIndex, event.keyCode)
+        val shortcutActionId = mapKeyCodeToShortcutActionId(padIndex, code)
             ?.takeUnless { selectedActionId != null && GamepadBindingRules.isArcadeAction(selectedActionId) }
         shortcutActionId?.let { actionId ->
             if (actionId == ACTION_FAST_FORWARD) {
@@ -862,7 +989,7 @@ private const val MAX_PAD_SLOTS = 2
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
             val normalizedPadIndex = normalizePadIndex(padIndex)
             val resolvedActionId = resolveMappedActionIdForKeyCode(
-                keyCode = event.keyCode,
+                keyCode = code,
                 customBindings = customBindingsByPad[normalizedPadIndex].orEmpty()
             )
             if (resolvedActionId == "gun_recalibrate") {
@@ -891,8 +1018,58 @@ private const val MAX_PAD_SLOTS = 2
         if (pressed && event.repeatCount == 0) {
             playGamepadButtonHaptic()
         }
+        if (selectedActionId != null && isTurboAction(selectedActionId) && padKey !in ANALOG_STICK_DIRECTION_KEYS) {
+            if (pressed && event.repeatCount == 0) startTurbo(physicalKey, padIndex, padKey)
+            return true
+        }
         setGamepadButton(padIndex, padKey, range, pressed)
         return true
+    }
+
+    private val turboJobs = mutableMapOf<Pair<Int, Int>, Job>()
+    private val heldAxisButtons = mutableSetOf<Pair<Int, Int>>()
+
+    private fun startTurbo(key: Pair<Int, Int>, padIndex: Int, padKey: Int) {
+        turboJobs.remove(key)?.cancel()
+        turboJobs[key] = scope.launch {
+            while (synchronized(connectionLock) { heldButtonsByDeviceAndKey.containsKey(key) }) {
+                setGamepadButton(padIndex, padKey, 0, true)
+                delay(TURBO_HALF_PERIOD_MS.milliseconds)
+                setGamepadButton(padIndex, padKey, 0, false)
+                delay(TURBO_HALF_PERIOD_MS.milliseconds)
+            }
+        }
+    }
+
+    /** Feeds generic-axis "buttons" (see [axisButtonCode]) through the normal key path. */
+    private fun dispatchBoundAxisButtons(event: MotionEvent, padIndex: Int) {
+        val bound = customBindingsByPad[normalizePadIndex(padIndex)]
+            ?.values?.filter(::isAxisButtonCode)?.toSet().orEmpty()
+        val deviceId = event.deviceId
+        val stale = synchronized(connectionLock) {
+            heldAxisButtons.filter { it.first == deviceId && it.second !in bound }
+                .also { heldAxisButtons.removeAll(it.toSet()) }
+        }
+        stale.forEach { dispatchSyntheticKey(deviceId, it.second, false) }
+        for (code in bound) {
+            val value = event.getAxisValue(code - AXIS_CODE_BASE)
+            val key = deviceId to code
+            val held = synchronized(connectionLock) { key in heldAxisButtons }
+            if (!held && value > AXIS_BUTTON_PRESS) {
+                synchronized(connectionLock) { heldAxisButtons.add(key) }
+                dispatchSyntheticKey(deviceId, code, true)
+            } else if (held && value < AXIS_BUTTON_RELEASE) {
+                synchronized(connectionLock) { heldAxisButtons.remove(key) }
+                dispatchSyntheticKey(deviceId, code, false)
+            }
+        }
+    }
+
+    private fun dispatchSyntheticKey(deviceId: Int, code: Int, down: Boolean) {
+        val now = SystemClock.uptimeMillis()
+        handleKeyEvent(
+            KeyEvent(now, now, if (down) KeyEvent.ACTION_DOWN else KeyEvent.ACTION_UP, code, 0, 0, deviceId, 0)
+        )
     }
 
     private fun handleStartTransportEvent(padIndex: Int, event: KeyEvent): Boolean {
@@ -975,6 +1152,7 @@ private const val MAX_PAD_SLOTS = 2
         val state = synchronized(connectionLock) {
             analogStatesByDeviceId.getOrPut(event.deviceId) { AnalogState() }
         }
+        dispatchBoundAxisButtons(event, padIndex)
 
         val leftX = processStickAxis(
             value = event.getAxisValue(MotionEvent.AXIS_X),
@@ -1489,7 +1667,25 @@ private const val MAX_PAD_SLOTS = 2
 
     private fun resolvePadIndexForDevice(deviceId: Int): Int? {
         refreshConnectedGamepads()
-        return synchronized(connectionLock) { deviceToPadIndex[deviceId] }
+        return synchronized(connectionLock) { deviceToPadIndex[deviceId] } ?: resolveSiblingPadIndex(deviceId)
+    }
+
+    /** Secondary evdev nodes of an assigned controller share its pad (same descriptor, else same vendor:product). */
+    private fun resolveSiblingPadIndex(deviceId: Int): Int? {
+        val device = InputDevice.getDevice(deviceId) ?: return null
+        if (device.isVirtual) return null
+        val key = gamepadDeviceKey(device)
+        val candidates = linkedSetOf<Int>()
+        synchronized(connectionLock) {
+            for ((otherId, pad) in deviceToPadIndex) {
+                val other = InputDevice.getDevice(otherId) ?: continue
+                if (gamepadDeviceKey(other) == key) return pad
+                if (device.vendorId != 0 && device.vendorId == other.vendorId &&
+                    device.productId == other.productId
+                ) candidates.add(pad)
+            }
+        }
+        return candidates.singleOrNull()
     }
 
     private fun refreshConnectedGamepads(): List<ConnectedGamepad> {

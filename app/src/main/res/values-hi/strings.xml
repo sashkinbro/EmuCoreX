@@ -1682,6 +1682,7 @@
     <string name="settings_game_folders_count">%1$d फ़ोल्डर चुने गए</string>
     <string name="game_folders_remove">फ़ोल्डर हटाएं</string>
     <string name="settings_gamepad_action_pressure">दबाव संशोधक</string>
+    <string name="settings_gamepad_action_turbo_format">टर्बो %1$s</string>
     <string name="settings_gamepad_action_gun_trigger">लाइट गन ट्रिगर</string>
     <string name="settings_gamepad_action_gun_pedal">लाइट गन पेडल</string>
     <string name="settings_gamepad_action_gun_reload">लाइट गन रीलोड</string>

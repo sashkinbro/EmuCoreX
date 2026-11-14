@@ -461,4 +461,52 @@ class GamepadManagerTest {
             0.001f
         )
     }
+
+    @Test
+    fun scancodeOnlyKeysUseNegativeSyntheticCodes() {
+        val code = GamepadManager.physicalKeyCode(KeyEvent.KEYCODE_UNKNOWN, 0x13c)
+        assertEquals(-(0x10000 or 0x13c), code)
+        assertTrue(GamepadManager.isScanButtonCode(code))
+        assertEquals(KeyEvent.KEYCODE_BUTTON_A, GamepadManager.physicalKeyCode(KeyEvent.KEYCODE_BUTTON_A, 0x130))
+        assertEquals(KeyEvent.KEYCODE_UNKNOWN, GamepadManager.physicalKeyCode(KeyEvent.KEYCODE_UNKNOWN, 0))
+    }
+
+    @Test
+    fun axisButtonCodesDoNotCollideWithKeyOrScanCodes() {
+        val code = GamepadManager.axisButtonCode(MotionEvent_AXIS_GENERIC_1)
+        assertTrue(GamepadManager.isAxisButtonCode(code))
+        assertTrue(!GamepadManager.isAxisButtonCode(KeyEvent.KEYCODE_BUTTON_16))
+        assertTrue(!GamepadManager.isAxisButtonCode(-(0x10000 or 5)))
+    }
+
+    @Test
+    fun systemKeysAreNeverBindable() {
+        listOf(
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_HOME, KeyEvent.KEYCODE_POWER,
+            KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN, KeyEvent.KEYCODE_APP_SWITCH,
+            KeyEvent.KEYCODE_ASSIST
+        ).forEach { assertTrue(GamepadManager.isReservedSystemKey(it)) }
+        assertTrue(!GamepadManager.isReservedSystemKey(KeyEvent.KEYCODE_BUTTON_MODE))
+    }
+
+    @Test
+    fun syntheticAndTurboBindingsResolveToTheirActions() {
+        val scan = GamepadManager.physicalKeyCode(KeyEvent.KEYCODE_UNKNOWN, 0x2c4)
+        val axis = GamepadManager.axisButtonCode(MotionEvent_AXIS_GENERIC_1)
+        val bindings = mapOf(
+            "fast_forward" to scan,
+            "turbo_cross" to axis,
+            "pause" to KeyEvent.KEYCODE_BUTTON_MODE
+        )
+        assertEquals("fast_forward", GamepadManager.resolveMappedActionIdForKeyCode(scan, bindings))
+        assertEquals("turbo_cross", GamepadManager.resolveMappedActionIdForKeyCode(axis, bindings))
+        assertEquals("pause", GamepadManager.resolveMappedActionIdForKeyCode(KeyEvent.KEYCODE_BUTTON_MODE, bindings))
+        assertTrue(GamepadManager.isTurboAction("turbo_cross"))
+        assertEquals("cross", GamepadManager.turboBaseActionId("turbo_cross"))
+    }
+
+    private companion object {
+        // android.view.MotionEvent.AXIS_GENERIC_1
+        const val MotionEvent_AXIS_GENERIC_1 = 32
+    }
 }

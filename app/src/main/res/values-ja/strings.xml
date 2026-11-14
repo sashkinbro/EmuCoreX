@@ -1682,6 +1682,7 @@
     <string name="settings_game_folders_count">%1$d個のフォルダを選択しました</string>
     <string name="game_folders_remove">フォルダを削除</string>
     <string name="settings_gamepad_action_pressure">圧力モディファイア</string>
+    <string name="settings_gamepad_action_turbo_format">ターボ %1$s</string>
     <string name="settings_gamepad_action_gun_trigger">ライトガントリガー</string>
     <string name="settings_gamepad_action_gun_pedal">ライトガンペダル</string>
     <string name="settings_gamepad_action_gun_reload">ライトガンリロード</string>

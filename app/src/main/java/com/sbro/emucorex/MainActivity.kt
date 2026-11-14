@@ -394,6 +394,14 @@ open class MainActivity : ComponentActivity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (KeyboardMouseManager.handleKeyBindingCapture(event)) return true
 
+        if (!GamepadManager.isGameController(event.device) &&
+            GamepadManager.isBindableInputDevice(event.device, GamepadManager.physicalKeyCode(event))
+        ) {
+            // Secondary controller nodes (paddles, M1/M2, Share on a keyboard-class device).
+            if (GamepadManager.handleBindingCapture(event)) return true
+            if (GamepadManager.isEmulationInputEnabled() && GamepadManager.handleKeyEvent(event)) return true
+        }
+
         if (GamepadManager.isGameController(event.device)) {
             if (GamepadManager.handleBindingCapture(event)) return true
             if (GamepadManager.isEmulationInputEnabled()) {

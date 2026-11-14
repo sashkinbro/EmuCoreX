@@ -1371,6 +1371,8 @@ fun EmulationScreen(
                         viewModel.quickLoad()
                     }
                 }
+                GamepadManager.ACTION_PAUSE -> viewModel.togglePause()
+                GamepadManager.ACTION_OPEN_MENU -> viewModel.toggleMenu()
                 "gun_recalibrate" -> {
                     gyroController.recalibrate()
                     publishLightGunAim(0.5f, 0.5f)

@@ -1684,6 +1684,7 @@
     <string name="settings_game_folders_count">%1$d Ordner ausgewählt</string>
     <string name="game_folders_remove">Ordner entfernen</string>
     <string name="settings_gamepad_action_pressure">Druckmodifikator</string>
+    <string name="settings_gamepad_action_turbo_format">Turbo %1$s</string>
     <string name="settings_gamepad_action_gun_trigger">Lightgun-Abzug</string>
     <string name="settings_gamepad_action_gun_pedal">Lightgun-Pedal</string>
     <string name="settings_gamepad_action_gun_reload">Lightgun-Nachladen</string>

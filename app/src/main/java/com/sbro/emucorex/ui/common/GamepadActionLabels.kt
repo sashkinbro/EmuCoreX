@@ -30,6 +30,8 @@ fun gamepadActionLabelRes(actionId: String): Int = when (actionId) {
     GamepadManager.ACTION_QUICK_SAVE -> R.string.emulation_quick_save
     GamepadManager.ACTION_QUICK_LOAD -> R.string.emulation_quick_load
     GamepadManager.ACTION_FAST_FORWARD -> R.string.emulation_transport_fast_forward
+    GamepadManager.ACTION_PAUSE -> R.string.emulation_pause
+    GamepadManager.ACTION_OPEN_MENU -> R.string.emulation_sidebar_title
     "dpad_up" -> R.string.settings_gamepad_action_dpad_up
     "dpad_down" -> R.string.settings_gamepad_action_dpad_down
     "dpad_left" -> R.string.settings_gamepad_action_dpad_left
@@ -51,5 +53,12 @@ fun gamepadActionLabel(actionId: String): String = when (actionId) {
     "circle" -> "\u25cb"
     "square" -> "\u25a1"
     "triangle" -> "\u25b3"
-    else -> stringResource(gamepadActionLabelRes(actionId))
+    else -> if (GamepadManager.isTurboAction(actionId)) {
+        stringResource(
+            R.string.settings_gamepad_action_turbo_format,
+            gamepadActionLabel(GamepadManager.turboBaseActionId(actionId))
+        )
+    } else {
+        stringResource(gamepadActionLabelRes(actionId))
+    }
 }

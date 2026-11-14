@@ -1299,6 +1299,7 @@
     <string name="settings_gamepad_action_start">Start</string>
     <string name="settings_gamepad_action_left_input_toggle">Left Input Toggle</string>
     <string name="settings_gamepad_action_pressure">Pressure Modifier</string>
+    <string name="settings_gamepad_action_turbo_format">Turbo %1$s</string>
     <string name="settings_gamepad_action_gun_trigger">Light Gun Trigger</string>
     <string name="settings_gamepad_action_gun_pedal">Light Gun Pedal</string>
     <string name="settings_gamepad_action_gun_reload">Light Gun Reload</string>

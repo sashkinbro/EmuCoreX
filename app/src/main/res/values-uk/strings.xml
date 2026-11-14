@@ -1710,6 +1710,7 @@
     <string name="settings_game_folders_count">Вибрано папок: %1$d</string>
     <string name="game_folders_remove">Видалити папку</string>
     <string name="settings_gamepad_action_pressure">Модифікатор натискання</string>
+    <string name="settings_gamepad_action_turbo_format">Турбо %1$s</string>
     <string name="settings_gamepad_action_gun_trigger">Курок світлового пістолета</string>
     <string name="settings_gamepad_action_gun_pedal">Педаль світлового пістолета</string>
     <string name="settings_gamepad_action_gun_reload">Перезарядка світлового пістолета</string>
