@@ -88,6 +88,10 @@ extern "C" void EmuCoreXOracleHWSoftwareCopies(void (*check)(bool, const char*),
 #include <unistd.h>
 #include <android/log.h>
 #include <cerrno>
+#include <csetjmp>
+#include <csignal>
+#include <signal.h>
+#include <ucontext.h>
 
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
 extern "C" bool EmuCoreXOracleCaptureMaddRange = false;
@@ -4341,6 +4345,7 @@ void EECoverageCop2Spec2()
 #include "jit_oracle_ee_madd.inl"
 #include "jit_oracle_ee_fpu_hw.inl"
 #include "jit_oracle_x86_parity.inl"
+#include "jit_oracle_gap_ee.inl"
 
 void EEVuAbsSharedTests()
 {
@@ -10235,6 +10240,11 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
         EEUnalignedStoreTests();
         return;
     }
+    if (direct_suite && gapee::GapEeIsSuite(direct_suite))
+    {
+        gapee::GapEeTests(direct_suite);
+        return;
+    }
     if (direct_suite && std::strcmp(direct_suite, "ee-madd") == 0)
     {
         EeMaddNativeOracleTests();
@@ -12167,6 +12177,7 @@ void IOPSharedStateTests()
 #include "jit_oracle_iop_avsz_fusion.inl"
 #include "jit_oracle_iop_address.inl"
 #include "jit_oracle_iop_thread.inl"
+#include "jit_oracle_gap_misc.inl"
 
 void IOPTests(bool cop2_only = false, bool cop2_memory_only = false, bool nclip_only = false,
     bool avsz_only = false, bool direct_only = false)
@@ -12779,7 +12790,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         std::strcmp(suite, "ee-unaligned-stores") == 0 || std::strcmp(suite, "ee-unaligned-word-stores") == 0 ||
         std::strcmp(suite, "ee-vu-local") == 0 || std::strcmp(suite, "ee-vu-status") == 0 ||
         std::strcmp(suite, "ee-vu-local-clip") == 0 || std::strcmp(suite, "ee-vu-local-identity") == 0 || std::strcmp(suite, "ee-vu-zero-tail") == 0 || std::strcmp(suite, "ee-vu-lower-zero-tail") == 0 ||
-        std::strcmp(suite, "ee-vu-fmac-acc") == 0 || std::strcmp(suite, "ee-vu-micro-sync") == 0 || std::strncmp(suite, "x86-parity", 10) == 0)
+        std::strcmp(suite, "ee-vu-fmac-acc") == 0 || std::strcmp(suite, "ee-vu-micro-sync") == 0 || std::strncmp(suite, "x86-parity", 10) == 0 ||
+        gapee::GapEeIsSuite(suite))
         EETests(false, false, false, false, false, false, false, false, false,
             false, false, false, false, false, false, 0, false, false, false, false, suite);
     else if (std::strcmp(suite, "ee") == 0)
@@ -12840,6 +12852,9 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         IOPTests(false, false, false, true);
     else if (std::strcmp(suite, "gif-copy") == 0)
         GifCopyTests();
+    else if (RunGapMiscSuite(suite))
+    {
+    }
     else if (std::strcmp(suite, "gs-framegen") == 0)
         EmuCoreXOracleFrameGen(Check,"/data/local/tmp/emucorex-hitman-gs/lsfg-fixture.dll");
     else if (std::strcmp(suite, "gs-present-upscalers") == 0)
