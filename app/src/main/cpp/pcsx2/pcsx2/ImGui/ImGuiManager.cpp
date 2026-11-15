@@ -278,6 +278,12 @@ void ImGuiManager::WindowResized()
 
 	s_window_width = static_cast<float>(new_width);
 	s_window_height = static_cast<float>(new_height);
+
+	// Android never creates the ImGui context (the Kotlin UI draws the overlay), but the Vulkan
+	// present path still reports swap chain resizes (rotation) here.
+	if (!ImGui::GetCurrentContext())
+		return;
+
 	ImGui::GetIO().DisplaySize = ImVec2(s_window_width, s_window_height);
 
 	// Scale might have changed as a result of window resize.
