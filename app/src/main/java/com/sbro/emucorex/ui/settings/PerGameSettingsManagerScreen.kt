@@ -80,6 +80,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -3379,13 +3380,22 @@ private fun GpuBackendProfileControls(
         val lifecycleOwner = LocalLifecycleOwner.current
         val driverManager = remember(context) { GpuDriverManager(context) }
         val deviceGpuSnapshot by com.sbro.emucorex.core.DeviceGpuInfoProvider.snapshot.collectAsState()
-        var installedDrivers by remember(context, deviceGpuSnapshot) {
-            mutableStateOf(driverManager.listInstalledDrivers().filter { it.isUsable })
+        // Driver discovery scans the filesystem: do it off the main thread instead of during composition.
+        var driverRefresh by remember { mutableIntStateOf(0) }
+        val installedDrivers by produceState(
+            initialValue = emptyList(),
+            driverManager,
+            deviceGpuSnapshot,
+            driverRefresh
+        ) {
+            value = withContext(Dispatchers.IO) {
+                driverManager.listInstalledDrivers().filter { it.isUsable }
+            }
         }
         DisposableEffect(lifecycleOwner, driverManager, deviceGpuSnapshot) {
             val observer = LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
-                    installedDrivers = driverManager.listInstalledDrivers().filter { it.isUsable }
+                    driverRefresh++
                 }
             }
             lifecycleOwner.lifecycle.addObserver(observer)

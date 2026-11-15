@@ -621,12 +621,12 @@ fun SettingsScreen(
                 },
                 onOpenCoverUrlEditor = {
                     editingArcadeCoverUrl = false
-                    pendingCoverUrl.value = uiState.coverDownloadBaseUrl.orEmpty()
+                    pendingCoverUrl.value = viewModel.uiState.value.coverDownloadBaseUrl.orEmpty()
                     showCoverUrlDialog.value = true
                 },
                 onOpenArcadeCoverUrlEditor = {
                     editingArcadeCoverUrl = true
-                    pendingCoverUrl.value = uiState.arcadeCoverDownloadBaseUrl.orEmpty()
+                    pendingCoverUrl.value = viewModel.uiState.value.arcadeCoverDownloadBaseUrl.orEmpty()
                     showCoverUrlDialog.value = true
                 },
                 onOpenNamcoArcadeGuide = { showNamcoArcadeGuide = true },
@@ -1329,7 +1329,8 @@ private fun SettingsContent(
     )
     val defaults = remember { SettingsSnapshot() }
     val overlayDefaults = remember { OverlayLayoutSnapshot() }
-    val searchEntries = rememberSettingsSearchEntries()
+    // ~130 string lookups: only worth doing while the search box actually has a query.
+    val searchEntries = rememberSettingsSearchEntries(active = searchQuery.isNotBlank())
     val notSetLabel = stringResource(R.string.settings_not_set)
     var selectedGamepadPadIndex by rememberSaveable { mutableIntStateOf(0) }
     Box(
@@ -5846,11 +5847,12 @@ private data class SettingsSearchEntry(
 )
 
 @Composable
-private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
+private fun rememberSettingsSearchEntries(active: Boolean): List<SettingsSearchEntry> {
     @Composable
     fun entry(tab: SettingsTab, @StringRes titleRes: Int): SettingsSearchEntry {
         return SettingsSearchEntry(tab = tab, title = stringResource(titleRes), summary = tab.label())
     }
+    if (!active) return emptyList()
     return listOfNotNull(
         entry(SettingsTab.General, R.string.settings_language),
         entry(SettingsTab.General, R.string.settings_tv_interface),

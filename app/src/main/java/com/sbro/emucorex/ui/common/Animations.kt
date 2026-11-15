@@ -9,6 +9,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +39,9 @@ import com.sbro.emucorex.ui.theme.neon.neonShape
 fun Modifier.shimmer(
     showShimmer: Boolean = true
 ): Modifier = composed {
+    if (!showShimmer) return@composed this
+    // The infinite transition exists only while shimmering, so placeholders that
+    // stopped shimmering no longer keep an animation clock running.
     val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
     val translateAnimation by infiniteTransition.animateFloat(
         initialValue = -800f,
@@ -47,24 +52,27 @@ fun Modifier.shimmer(
         ),
         label = "shimmerTranslate"
     )
-
-    if (showShimmer) {
-        val shimmerColors = listOf(
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+    val baseColor = remember(surfaceVariant) { surfaceVariant.copy(alpha = 0.3f) }
+    val shimmerColors = remember(surfaceVariant) {
+        listOf(
+            surfaceVariant.copy(alpha = 0.5f),
+            surfaceVariant.copy(alpha = 0.9f),
+            surfaceVariant.copy(alpha = 0.5f),
         )
-
-        val brush = Brush.linearGradient(
-            colors = shimmerColors,
-            start = Offset(translateAnimation, translateAnimation),
-            end = Offset(translateAnimation + 400f, translateAnimation + 400f)
-        )
-        this.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-            .background(brush)
-    } else {
-        this
     }
+    this.background(baseColor)
+        .drawBehind {
+            // Read in the draw phase: the animation redraws only, no recomposition.
+            val t = translateAnimation
+            drawRect(
+                Brush.linearGradient(
+                    colors = shimmerColors,
+                    start = Offset(t, t),
+                    end = Offset(t + 400f, t + 400f)
+                )
+            )
+        }
 }
 
 @Composable

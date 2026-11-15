@@ -466,8 +466,8 @@ fun HomeScreen(
     ) {
         AnimatedVisibility(
             visible = !isShelfView && uiState.homeBackgroundType != HomeBackgroundType.NONE,
-            enter = fadeIn(animationSpec = tween(380, easing = EaseOut)),
-            exit = fadeOut(animationSpec = tween(280, easing = EaseIn))
+            enter = fadeIn(animationSpec = tween(180, easing = EaseOut)),
+            exit = fadeOut(animationSpec = tween(140, easing = EaseIn))
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 HomeBackgroundMedia(
@@ -512,46 +512,46 @@ fun HomeScreen(
                         (
                             slideInHorizontally(
                                 initialOffsetX = { it / 5 },
-                                animationSpec = tween(440, easing = EaseOut)
+                                animationSpec = tween(190, easing = EaseOut)
                             ) +
-                                fadeIn(animationSpec = tween(360, easing = EaseOut)) +
+                                fadeIn(animationSpec = tween(170, easing = EaseOut)) +
                                 scaleIn(
                                     initialScale = 0.97f,
-                                    animationSpec = tween(440, easing = EaseOut)
+                                    animationSpec = tween(190, easing = EaseOut)
                                 )
                             ) togetherWith
                             (
                                 slideOutHorizontally(
                                     targetOffsetX = { -it / 8 },
-                                    animationSpec = tween(300, easing = EaseIn)
+                                    animationSpec = tween(150, easing = EaseIn)
                                 ) +
-                                    fadeOut(animationSpec = tween(260, easing = EaseIn)) +
+                                    fadeOut(animationSpec = tween(130, easing = EaseIn)) +
                                     scaleOut(
                                         targetScale = 0.985f,
-                                        animationSpec = tween(300, easing = EaseIn)
+                                        animationSpec = tween(150, easing = EaseIn)
                                     )
                                 )
                     } else {
                         (
                             slideInHorizontally(
                                 initialOffsetX = { -it / 5 },
-                                animationSpec = tween(420, easing = EaseOut)
+                                animationSpec = tween(190, easing = EaseOut)
                             ) +
-                                fadeIn(animationSpec = tween(350, easing = EaseOut)) +
+                                fadeIn(animationSpec = tween(170, easing = EaseOut)) +
                                 scaleIn(
                                     initialScale = 0.985f,
-                                    animationSpec = tween(420, easing = EaseOut)
+                                    animationSpec = tween(190, easing = EaseOut)
                                 )
                             ) togetherWith
                             (
                                 slideOutHorizontally(
                                     targetOffsetX = { it / 5 },
-                                    animationSpec = tween(340, easing = EaseIn)
+                                    animationSpec = tween(160, easing = EaseIn)
                                 ) +
-                                    fadeOut(animationSpec = tween(290, easing = EaseIn)) +
+                                    fadeOut(animationSpec = tween(140, easing = EaseIn)) +
                                     scaleOut(
                                         targetScale = 0.97f,
-                                        animationSpec = tween(340, easing = EaseIn)
+                                        animationSpec = tween(160, easing = EaseIn)
                                     )
                                 )
                     }
@@ -737,10 +737,13 @@ fun HomeScreen(
                                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                                         ) {
                                             rowGames.forEach { game ->
-                                                val showCoverPlaceholder = uiState.isCoverArtDisabled &&
-                                                    !customCoverRepository.isCustomCoverPath(game.coverArtPath)
+                                                val coverArtDisabled = uiState.isCoverArtDisabled
+                                                val isCustomCover = remember(game.coverArtPath) {
+                                                    customCoverRepository.isCustomCoverPath(game.coverArtPath)
+                                                }
+                                                val showCoverPlaceholder = coverArtDisabled && !isCustomCover
                                                 Box(modifier = Modifier.weight(1f)) {
-                                                    val itemFocusModifier = if (game == rowGames.first()) {
+                                                    val itemFocusModifier = if (game.path == rowGames.first().path) {
                                                         Modifier.focusRequester(rowFocusRequester)
                                                     } else {
                                                         Modifier

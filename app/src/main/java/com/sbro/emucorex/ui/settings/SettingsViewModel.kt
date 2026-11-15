@@ -1,5 +1,6 @@
 package com.sbro.emucorex.ui.settings
 
+import androidx.compose.runtime.Immutable
 import android.app.Activity
 import android.app.Application
 import android.net.Uri
@@ -99,6 +100,7 @@ data class WorkerOptimizationUiState(
     val enableVUAot: Boolean = true
 )
 
+@Immutable
 data class SettingsUiState(
     val isLoaded: Boolean = false,
     val showMediatekCompatibilityNotice: Boolean = false,
