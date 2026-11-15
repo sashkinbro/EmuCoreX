@@ -30,7 +30,7 @@ public:
  virtual void OnBranch(u8*,const void*,BranchForm)=0;
 };
 extern thread_local OakAddressRecorder* oakAddressRecorder;
-inline constexpr u32 kMvuCompilerAbiVersion = 3; // AOT VU1 conditional fall tails also carry private-target B26 slots.
+inline constexpr u32 kMvuCompilerAbiVersion = 4; // 4: VU x86-parity changes in 0.5.9 (SUB/MSUBA/RSQRT/RXOR/MADD); 3: AOT VU1 conditional fall tails carry private-target B26 slots.
 
 struct MvuContentKey;
 struct microVU;
