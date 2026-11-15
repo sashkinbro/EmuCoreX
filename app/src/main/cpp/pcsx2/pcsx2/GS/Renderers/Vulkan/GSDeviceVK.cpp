@@ -223,6 +223,16 @@ static constexpr VkClearValue s_present_clear_color = {{{0.0f, 0.0f, 0.0f, 1.0f}
 // We need to synchronize instance creation because of adapter enumeration from the UI thread.
 static std::mutex s_instance_mutex;
 
+// Pipelines built on the live cache: the warmup workers merge their transient caches into it under this
+// mutex, and a merge needs its destination externally synchronised. Held for the create call only
+// (std::mutex is not recursive, so never hold it across several creates).
+template <typename Builder>
+static VkPipeline CreateWithLiveCache(Builder& builder, VkDevice device)
+{
+	std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex());
+	return builder.Create(device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+}
+
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
 // Debug-only per-render-pass GPU timing (EMUCOREX_GS_PASS_TIMING=1), see GSDeviceVK::PassTiming*.
 static const bool s_pass_timing = std::getenv("EMUCOREX_GS_PASS_TIMING") != nullptr;
@@ -5970,8 +5980,7 @@ bool GSDeviceVK::CompileConvertPipelines()
 		ScopedGuard ps_guard([this, &ps]() { vkDestroyShaderModule(m_device, ps, nullptr); });
 		gpb.SetFragmentShader(ps);
 
-		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
-		VkPipeline pipe = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+		VkPipeline pipe = CreateWithLiveCache(gpb, m_device);
 					
 		if (!pipe)
 			return false;
@@ -5995,8 +6004,7 @@ bool GSDeviceVK::CompileConvertPipelines()
 					gpb.SetRenderPass(GetTFXRenderPass(true, ds != 0, is_setup, false, fbl != 0, false,
 						VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_LOAD_OP_DONT_CARE),
 						0);
-					std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
-					arr[ds][fbl] = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+					arr[ds][fbl] = CreateWithLiveCache(gpb, m_device);
 					if (!arr[ds][fbl])
 						return false;
 
@@ -6041,9 +6049,8 @@ bool GSDeviceVK::CompileConvertPipelines()
 		for (u32 ds = 0; ds < 2; ds++)
 		{
 			gpb.SetRenderPass(m_primid_image_setup_render_passes[ds][0], 0);
-			std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
 			m_primid_image_setup_pipelines[ds][datm] =
-				gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+				CreateWithLiveCache(gpb, m_device);
 			if (!m_primid_image_setup_pipelines[ds][datm])
 				return false;
 
@@ -6100,8 +6107,7 @@ bool GSDeviceVK::CompilePresentPipelines()
 		ScopedGuard ps_guard([this, &ps]() { vkDestroyShaderModule(m_device, ps, nullptr); });
 		gpb.SetFragmentShader(ps);
 
-		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
-		m_present[index] = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+		m_present[index] = CreateWithLiveCache(gpb, m_device);
 		if (!m_present[index])
 			return false;
 
@@ -6152,8 +6158,7 @@ bool GSDeviceVK::CompileInterlacePipelines()
 
 		gpb.SetFragmentShader(ps);
 
-		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
-		m_interlace[i] = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+		m_interlace[i] = CreateWithLiveCache(gpb, m_device);
 		vkDestroyShaderModule(m_device, ps, nullptr);
 		if (!m_interlace[i])
 			return false;
@@ -6205,8 +6210,7 @@ bool GSDeviceVK::CompileMergePipelines()
 		gpb.SetBlendAttachment(0, true, VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD,
 			VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD);
 
-		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
-		m_merge[i] = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+		m_merge[i] = CreateWithLiveCache(gpb, m_device);
 		vkDestroyShaderModule(m_device, ps, nullptr);
 		if (!m_merge[i])
 			return false;
@@ -6264,8 +6268,7 @@ bool GSDeviceVK::CompilePostProcessingPipelines()
 		gpb.SetVertexShader(vs);
 		gpb.SetFragmentShader(ps);
 
-		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
-		m_fxaa_pipeline = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+		m_fxaa_pipeline = CreateWithLiveCache(gpb, m_device);
 		if (!m_fxaa_pipeline)
 			return false;
 
@@ -6293,8 +6296,7 @@ bool GSDeviceVK::CompilePostProcessingPipelines()
 		gpb.SetVertexShader(vs);
 		gpb.SetFragmentShader(ps);
 
-		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
-		m_shadeboost_pipeline = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+		m_shadeboost_pipeline = CreateWithLiveCache(gpb, m_device);
 		if (!m_shadeboost_pipeline)
 			return false;
 
@@ -6340,8 +6342,7 @@ bool GSDeviceVK::CompileCASPipelines()
 		cpb.SetPipelineLayout(m_cas_pipeline_layout);
 		cpb.SetShader(mod, "main");
 		cpb.SetSpecializationBool(0, sharpen_only != 0);
-		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
-		m_cas_pipelines[sharpen_only] = cpb.Create(dev, g_vulkan_shader_cache->GetPipelineCache(true), false);
+		m_cas_pipelines[sharpen_only] = CreateWithLiveCache(cpb, dev);
 		if (!m_cas_pipelines[sharpen_only])
 			return false;
 	}
@@ -6394,8 +6395,7 @@ bool GSDeviceVK::CompileImGuiPipeline()
 	gpb.AddDynamicState(VK_DYNAMIC_STATE_BLEND_CONSTANTS);
 	gpb.AddDynamicState(VK_DYNAMIC_STATE_LINE_WIDTH);
 
-	std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
-	m_imgui_pipeline = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(), false);
+	m_imgui_pipeline = CreateWithLiveCache(gpb, m_device);
 	if (!m_imgui_pipeline)
 	{
 		Console.Error("VK: Failed to compile ImGui pipeline");
@@ -10631,8 +10631,7 @@ VkPipeline GSDeviceVK::GetStencilCounterResolvePipeline(u32 rgb_mask)
 		gpb.SetDynamicViewportAndScissorState();
 		gpb.SetVertexShader(vs);
 		gpb.SetFragmentShader(fs);
-		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
-		pipeline = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+		pipeline = CreateWithLiveCache(gpb, m_device);
 		if (pipeline != VK_NULL_HANDLE)
 			Vulkan::SetObjectName(m_device, pipeline, "Stencil counter resolve (mask=%x)", rgb_mask);
 	}
@@ -12012,8 +12011,7 @@ bool GSDeviceVK::CompileFSR1Pipelines()
 		Vulkan::ComputePipelineBuilder cpb;
 		cpb.SetPipelineLayout(m_fsr1_pipeline_layout);
 		cpb.SetShader(mod, "main");
-		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
-		m_fsr1_pipelines[easu_pass] = cpb.Create(dev, g_vulkan_shader_cache->GetPipelineCache(true), false);
+		m_fsr1_pipelines[easu_pass] = CreateWithLiveCache(cpb, dev);
 		if (!m_fsr1_pipelines[easu_pass])
 			return false;
 	}
@@ -12063,8 +12061,7 @@ bool GSDeviceVK::CompileSGSRPipeline()
 		Vulkan::ComputePipelineBuilder cpb;
 		cpb.SetPipelineLayout(m_sgsr_pipeline_layout);
 		cpb.SetShader(mod, "main");
-		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
-		m_sgsr_pipelines[edge] = cpb.Create(dev, g_vulkan_shader_cache->GetPipelineCache(true), false);
+		m_sgsr_pipelines[edge] = CreateWithLiveCache(cpb, dev);
 		if (!m_sgsr_pipelines[edge])
 			return false;
 	}
