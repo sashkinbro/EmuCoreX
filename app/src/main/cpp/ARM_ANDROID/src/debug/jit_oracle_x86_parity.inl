@@ -1344,6 +1344,30 @@ static void runCase(const Ctx& c, const std::string& opKey, const std::vector<In
 	compareObs(c.area, exp, got, diffs, prog.empty() ? 0 : prog.back().mask);
 	g_nanOperandLanes = 0;
 	if (diffs.empty()) return;
+	if (prog.size() > 1 && std::getenv("X86P_SEQDBG"))
+	{
+		std::printf("SEQDBG %s tag=%s\n", ctxKey(c, opKey).c_str(), tag.c_str());
+		for (const Ins& in : prog)
+		{
+			const std::string nm = in.lower ? std::string(kLower[in.op].name) : std::string(upperOps()[in.op].name);
+			std::printf("  %s %s mask=%x fs=%d ft=%d fd=%d fsf=%d ftf=%d\n", in.lower ? "L" : "U", nm.c_str(), in.mask, in.fs, in.ft, in.fd, in.fsf, in.ftf);
+		}
+		for (u32 r = 1; r <= 6; ++r)
+			std::printf("  VF%u %08x %08x %08x %08x\n", r, init.vf[r * 4], init.vf[r * 4 + 1], init.vf[r * 4 + 2], init.vf[r * 4 + 3]);
+		std::printf("  ACC %08x %08x %08x %08x I=%08x Q=%08x\n", init.acc[0], init.acc[1], init.acc[2], init.acc[3], init.i, init.q);
+		for (size_t len = 1; len < prog.size(); ++len)
+		{
+			const std::vector<Ins> pre(prog.begin(), prog.begin() + len);
+			Obs pe{}, pg{};
+			runModel(c.area, pre, init, c.cfg, pe);
+			runJit(c.area, pre, init, pg);
+			for (u32 i = 0; i < 128; ++i) if (pe.vf[i] != pg.vf[i]) std::printf("  PREFIX %zu VF%u.%u model=%08x jit=%08x\n", len, i >> 2, i & 3, pe.vf[i], pg.vf[i]);
+			for (u32 l = 0; l < 4; ++l) if (pe.acc[l] != pg.acc[l]) std::printf("  PREFIX %zu ACC.%u model=%08x jit=%08x\n", len, l, pe.acc[l], pg.acc[l]);
+			std::printf("  STATE %zu ACC.w model=%08x jit=%08x VF2.w m=%08x j=%08x VF3.w m=%08x j=%08x VF5.y m=%08x j=%08x\n", len, pe.acc[3], pg.acc[3], pe.vf[11], pg.vf[11], pe.vf[15], pg.vf[15], pe.vf[21], pg.vf[21]);
+		}
+		for (u32 i = 0; i < 128; ++i) if (exp.vf[i] != got.vf[i]) std::printf("  VF%u.%u model=%08x jit=%08x\n", i >> 2, i & 3, exp.vf[i], got.vf[i]);
+		for (u32 l = 0; l < 4; ++l) if (exp.acc[l] != got.acc[l]) std::printf("  ACC.%u model=%08x jit=%08x\n", l, exp.acc[l], got.acc[l]);
+	}
 	const Ins& last = prog.back();
 	int shown = 0;
 	for (const Diff& d : diffs)

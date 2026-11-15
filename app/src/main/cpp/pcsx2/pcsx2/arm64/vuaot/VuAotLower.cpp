@@ -2657,7 +2657,14 @@ namespace vuaot
 					if (u.kind == FmacKind::Msub)
 						armAsm->Fsub(V(d).V4S(), V(acc).V4S(), V(prod).V4S());
 					else
-						armAsm->Fadd(V(d).V4S(), V(acc).V4S(), V(prod).V4S());
+					{
+						// x86 MADD adds ACC into the product (microVU_Upper.inl:355 SSE_PS[0](Fs=product, ACC)); MADDA adds the
+						// product into ACC (:310). The first operand decides a two-NaN result on both ISAs.
+						if (u.isAcc)
+							armAsm->Fadd(V(d).V4S(), V(acc).V4S(), V(prod).V4S());
+						else
+							armAsm->Fadd(V(d).V4S(), V(prod).V4S(), V(acc).V4S());
+					}
 				});
 				return;
 			}

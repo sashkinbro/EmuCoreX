@@ -370,7 +370,9 @@ static __fi void mVUUpperFmlaPs_oaknut(mV, int acc, int left, int right)
 	oakAsm->FMUL(OAK_QSCRATCH.S4(), left_q.S4(), right_q.S4());
 	if (mVUUpperProductNeedsClamp_oaknut(mVU, left))
 		mVUUpperClampProduct_oaknut(mVU);
-	oakAsm->FADD(acc_q.S4(), acc_q.S4(), OAK_QSCRATCH.S4());
+	// x86 MADD adds ACC into the product (SSE_PS[0](Fs=product, ACC), microVU_Upper.inl:355): with two NaN operands
+	// the first one (the product) wins on both ISAs, so keep that order.
+	oakAsm->FADD(acc_q.S4(), OAK_QSCRATCH.S4(), acc_q.S4());
 	mVUUpperClamp4Vector_oaknut(mVU, acc);
 }
 
@@ -387,7 +389,7 @@ static __fi void mVUUpperFmlaSs_oaknut(mV, int acc, int left, int right)
 	oakAsm->FMUL(OAK_SSCRATCH, oakSRegister(left), oakQRegister(right).Selem()[0]);
 	if (mVUUpperProductNeedsClamp_oaknut(mVU, left))
 		mVUUpperClampProduct_oaknut(mVU);
-	oakAsm->FADD(OAK_SSCRATCH, oakSRegister(acc), OAK_SSCRATCH);
+	oakAsm->FADD(OAK_SSCRATCH, OAK_SSCRATCH, oakSRegister(acc));
 	oakAsm->MOV(oakQRegister(acc).Selem()[0], OAK_QSCRATCH.Selem()[0]);
 	mVUUpperClamp4Scalar_oaknut(mVU, acc);
 }
@@ -395,7 +397,7 @@ static __fi void mVUUpperFmlaSs_oaknut(mV, int acc, int left, int right)
 static __fi void mVUUpperFmlaPsLane_oaknut(int acc, int left, int right, int lane)
 {
 	oakAsm->FMUL(OAK_QSCRATCH.S4(), oakQRegister(left).S4(), oakQRegister(right).Selem()[lane]);
-	oakAsm->FADD(oakQRegister(acc).S4(), oakQRegister(acc).S4(), OAK_QSCRATCH.S4());
+	oakAsm->FADD(oakQRegister(acc).S4(), OAK_QSCRATCH.S4(), oakQRegister(acc).S4());
 }
 
 static __fi void mVUUpperFmlaSsLane_oaknut(mV, int acc, int left, int right, int lane)
@@ -406,7 +408,7 @@ static __fi void mVUUpperFmlaSsLane_oaknut(mV, int acc, int left, int right, int
 		return;
 	}
 	oakAsm->FMUL(OAK_SSCRATCH, oakSRegister(left), oakQRegister(right).Selem()[lane]);
-	oakAsm->FADD(OAK_SSCRATCH, oakSRegister(acc), OAK_SSCRATCH);
+	oakAsm->FADD(OAK_SSCRATCH, OAK_SSCRATCH, oakSRegister(acc));
 	oakAsm->MOV(oakQRegister(acc).Selem()[0], OAK_QSCRATCH.Selem()[0]);
 }
 
