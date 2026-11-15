@@ -236,7 +236,10 @@ static void runCop2Suite(u32 count)
 					case 6:
 					{
 						u32 op;
-						do op = r.below(static_cast<u32>(ops.size())); while (ops[op].kind == K_FTOI || ops[op].kind == K_ITOF);
+						// OPMULA/OPMSUB are left out: with dest .xyz the interpreter still derives a MAC W bit from the (unwritten) w lane, x86 microVU
+						// masks it out (microVU_Macro.inl:258-259 REC_COP2_mVU0(OPMULA/OPMSUB, mode 0x110) -> mVUupdateFlags with AND_XYZW,
+						// microVU_Upper.inl:10). x86-parity-vu-macro checks the JIT against the x86 model for both.
+						do op = r.below(static_cast<u32>(ops.size())); while (ops[op].kind == K_FTOI || ops[op].kind == K_ITOF || ops[op].kind == K_OPMULA || ops[op].kind == K_OPMSUB);
 						code.push_back(ee::macro(encodeUpper(ops[op], 1 + r.below(15), 1 + r.below(6), 1 + r.below(6), 1 + r.below(6))));
 						code.push_back(ee::CFC2(1 + r.below(15), 16 + r.below(3), r.below(2)));
 						break;
