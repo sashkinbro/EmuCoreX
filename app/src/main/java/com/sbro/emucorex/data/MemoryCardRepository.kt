@@ -37,40 +37,22 @@ class MemoryCardRepository(
     private val preferences: AppPreferences
 ) {
 
+    /**
+     * Returns the cards the emulator should mount, without ever creating, renaming or
+     * rewriting a card the user already has. A default card is created only on a pristine
+     * install (no cards in the folder and nothing assigned). A slot may be empty, and a
+     * stored name whose file is gone resolves to an empty slot instead of being recreated.
+     */
     suspend fun ensureDefaultCardsAssigned(): MemoryCardAssignments {
         syncNativeMemoryCardDirectory()
-        val initialCards = listCards()
-        val defaultSlot1 = DEFAULT_CARD_SLOT_1
-        val defaultSlot2 = DEFAULT_CARD_SLOT_2
-
-        migrateDefaultCardToStandardFileIfNeeded(defaultSlot1, initialCards)
-        migrateDefaultCardToStandardFileIfNeeded(defaultSlot2, initialCards)
-
-        val existingNames = listCards().map { it.name }.toSet()
-
-        if (defaultSlot1 !in existingNames) {
-            createStandardDefaultCard(defaultSlot1)
+        var current = currentAssignments()
+        if (current.slot1 == null && current.slot2 == null && listCards().isEmpty()) {
+            if (createStandardDefaultCard(DEFAULT_CARD_SLOT_1)) {
+                current = MemoryCardAssignments(slot1 = DEFAULT_CARD_SLOT_1, slot2 = null)
+                assignSlots(current.slot1, current.slot2)
+            }
         }
-        if (defaultSlot2 !in existingNames) {
-            createStandardDefaultCard(defaultSlot2)
-        }
-
-        val refreshedNames = listCards().map { it.name }.toSet()
-        val current = currentAssignments()
-        val resolved = resolveMemoryCardAssignments(current, refreshedNames, defaultSlot1, defaultSlot2)
-        val resolvedSlot1 = resolved.slot1
-        val resolvedSlot2 = resolved.slot2
-
-        if (!current.slot1.equals(resolvedSlot1, ignoreCase = true) ||
-            !current.slot2.equals(resolvedSlot2, ignoreCase = true)
-        ) {
-            assignSlots(resolvedSlot1, resolvedSlot2)
-        }
-
-        return MemoryCardAssignments(
-            slot1 = resolvedSlot1,
-            slot2 = resolvedSlot2
-        )
+        return resolveMemoryCardAssignments(current, listCards().map { it.name }.toSet())
     }
 
     fun listCards(): List<MemoryCardInfo> {
@@ -375,35 +357,6 @@ class MemoryCardRepository(
             STANDARD_DEFAULT_MEMORY_CARD_SPEC.fileType
         )
     }
-
-    private fun migrateDefaultCardToStandardFileIfNeeded(
-        cardName: String,
-        availableCards: List<MemoryCardInfo>
-    ) {
-        val existingCard = availableCards.firstOrNull { it.name.equals(cardName, ignoreCase = true) } ?: return
-        val target = File(existingCard.path)
-        val migration = existingCard.defaultCardMigration(target)
-        if (migration == DefaultCardMigration.None) {
-            return
-        }
-
-        val preservedName = buildUniqueCardName(
-            when (migration) {
-                DefaultCardMigration.PreserveFolder -> "${cardName.removeSuffix(".ps2")} Folder"
-                DefaultCardMigration.ReplaceBrokenFile -> "${cardName.removeSuffix(".ps2")} Legacy"
-                DefaultCardMigration.None -> return
-            }
-        )
-        val preservedCard = File(memoryCardsDir(), preservedName)
-
-        migrateDefaultCardStorage(
-            target = target,
-            preservedCard = preservedCard,
-            discardPreservedOnSuccess = migration == DefaultCardMigration.ReplaceBrokenFile
-        ) {
-            createStandardDefaultCard(cardName)
-        }
-    }
 }
 
 internal const val MEMORY_CARD_TYPE_FILE = 1
@@ -424,44 +377,6 @@ internal val STANDARD_DEFAULT_MEMORY_CARD_SPEC = MemoryCardCreationSpec(
     type = MEMORY_CARD_TYPE_FILE,
     fileType = MEMORY_CARD_FILE_TYPE_PS2_8_MB
 )
-
-internal enum class DefaultCardMigration {
-    None,
-    PreserveFolder,
-    ReplaceBrokenFile
-}
-
-internal fun migrateDefaultCardStorage(
-    target: File,
-    preservedCard: File,
-    discardPreservedOnSuccess: Boolean,
-    createStandardCard: () -> Boolean
-): Boolean {
-    val preserved = runCatching { target.renameTo(preservedCard) }.getOrDefault(false)
-    if (!preserved) {
-        return false
-    }
-
-    val created = runCatching(createStandardCard).getOrDefault(false)
-    if (created) {
-        if (discardPreservedOnSuccess) {
-            preservedCard.delete()
-        }
-        return true
-    }
-
-    // A failed native creation may leave a partial card behind. Remove only
-    // that newly-created target, then restore the user's original card.
-    runCatching {
-        if (target.isDirectory) {
-            target.deleteRecursively()
-        } else {
-            target.delete()
-        }
-        preservedCard.renameTo(target)
-    }
-    return false
-}
 
 private fun isDefaultMemoryCardName(name: String): Boolean {
     return name.equals(DEFAULT_CARD_SLOT_1, ignoreCase = true) ||
@@ -534,66 +449,20 @@ private fun ZipOutputStream.putMemoryCard(file: File, entryName: String) {
     }
 }
 
-private fun File.looksLikeLegacyBlankPs2Card(): Boolean {
-    if (!exists() || !isFile || length() <= 0L) return false
-    return runCatching {
-        inputStream().buffered().use { input ->
-            val sampleSize = minOf(length(), LEGACY_BLANK_SAMPLE_BYTES.toLong()).toInt()
-            val sample = ByteArray(sampleSize)
-            val bytesRead = input.read(sample)
-            bytesRead == sampleSize && sample.all { it == 0xFF.toByte() }
-        }
-    }.getOrDefault(false)
-}
-
-internal fun MemoryCardInfo.defaultCardMigration(file: File): DefaultCardMigration {
-    if (!isDefaultMemoryCardName(name)) {
-        return DefaultCardMigration.None
-    }
-
-    if (isFolder && file.isDirectory) {
-        return DefaultCardMigration.PreserveFolder
-    }
-
-    if (!file.isFile) {
-        return DefaultCardMigration.None
-    }
-
-    if (file.looksLikeLegacyBlankPs2Card()) {
-        return DefaultCardMigration.ReplaceBrokenFile
-    }
-
-    val looksLikeBrokenLegacyCard = type == 1 &&
-        fileType == 0 &&
-        !formatted &&
-        sizeBytes in 8_000_000L..9_000_000L
-
-    return if (looksLikeBrokenLegacyCard) {
-        DefaultCardMigration.ReplaceBrokenFile
-    } else {
-        DefaultCardMigration.None
-    }
-}
-
-private const val LEGACY_BLANK_SAMPLE_BYTES = 64 * 1024
-
-/** Resolve both user selections before choosing replacements for empty or missing slots. */
+/**
+ * Maps the stored slot names onto cards that actually exist. Names are used exactly as
+ * stored (spaces included); a missing card or one already used by slot 1 leaves the slot empty.
+ */
 internal fun resolveMemoryCardAssignments(
     current: MemoryCardAssignments,
-    existingNames: Set<String>,
-    defaultSlot1: String = "Mcd001.ps2",
-    defaultSlot2: String = "Mcd002.ps2"
+    existingNames: Set<String>
 ): MemoryCardAssignments {
-    fun existing(name: String?) = existingNames.firstOrNull { it.equals(name, ignoreCase = true) }
-    var slot1 = existing(current.slot1)
-    var slot2 = existing(current.slot2)?.takeUnless { it.equals(slot1, ignoreCase = true) }
-    if (slot1 == null) {
-        slot1 = existing(defaultSlot1)?.takeUnless { it.equals(slot2, ignoreCase = true) }
-            ?: existingNames.firstOrNull { !it.equals(slot2, ignoreCase = true) }
+    fun existing(name: String?): String? {
+        if (name == null) return null
+        return name.takeIf { it in existingNames }
+            ?: existingNames.firstOrNull { it.equals(name, ignoreCase = true) }
     }
-    if (slot2 == null) {
-        slot2 = existing(defaultSlot2)?.takeUnless { it.equals(slot1, ignoreCase = true) }
-            ?: existingNames.firstOrNull { !it.equals(slot1, ignoreCase = true) }
-    }
+    val slot1 = existing(current.slot1)
+    val slot2 = existing(current.slot2)?.takeUnless { it.equals(slot1, ignoreCase = true) }
     return MemoryCardAssignments(slot1, slot2)
 }
