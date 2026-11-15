@@ -1439,7 +1439,8 @@ void ImGuiManager::DestroySoftwareCursorTextures()
 void ImGuiManager::UpdateSoftwareCursorTexture(u32 index)
 {
 	SoftwareCursor& sc = s_software_cursors[index];
-	if (sc.image_path.empty())
+	// Without an ImGui context (Android) the cursor is never drawn, so don't upload a texture for it.
+	if (sc.image_path.empty() || !ImGui::GetCurrentContext())
 	{
 		sc.texture.reset();
 		return;
