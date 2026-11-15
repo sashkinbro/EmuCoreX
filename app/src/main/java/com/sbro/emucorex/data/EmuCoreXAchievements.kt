@@ -173,24 +173,15 @@ class EmuAchievementRepository(context: Context) {
             unlocks[definition.id] == null && snapshot.progressFor(definition) >= definition.target
         }
 
-        val newlyUnlocked = if (candidates.isEmpty()) emptyList() else runCatching { firestore.runTransaction { transaction ->
-            // Firestore transactions require every read to happen before the first write.
-            val unreadUnlocks = candidates.map { definition ->
-                val unlockReference = firestore.collection(UNLOCKS).document("${uid}_${definition.id}")
-                val eventReference = firestore.collection(PUBLIC_PROFILES).document(uid)
-                    .collection(FEED).document("achievement_${definition.id}")
-                AchievementSyncCandidate(
-                    definition = definition,
-                    unlockReference = unlockReference,
-                    unlockExists = transaction.get(unlockReference).exists(),
-                    eventReference = eventReference,
-                    eventExists = transaction.get(eventReference).exists()
-                )
-            }
-            unreadUnlocks.filterNot(AchievementSyncCandidate::unlockExists).map { candidate ->
-                val definition = candidate.definition
+        // Never get() possibly-missing unlock/feed docs: the deployed read rules dereference
+        // resource.data, which errors (PERMISSION_DENIED) for a non-existent document. Existing unlocks
+        // come from the own-unlocks query/cache above; only missing ones are created, without reads.
+        val newlyUnlocked = ArrayList<EmuAchievementDefinition>()
+        if (candidates.isNotEmpty()) {
+            val unlockedBatch = firestore.batch()
+            candidates.forEach { definition ->
                 val progress = snapshot.progressFor(definition)
-                transaction.set(candidate.unlockReference, mapOf(
+                unlockedBatch.set(firestore.collection(UNLOCKS).document("${uid}_${definition.id}"), mapOf(
                     "uid" to uid,
                     "achievementId" to definition.id,
                     "unlockedAt" to FieldValue.serverTimestamp(),
@@ -200,20 +191,29 @@ class EmuAchievementRepository(context: Context) {
                     "sourceGameSerial" to snapshot.lastSerial.orEmpty().take(32),
                     "visibility" to "public"
                 ))
-                if (!candidate.eventExists) {
-                    val eventId = "achievement_${definition.id}"
-                    transaction.set(candidate.eventReference, mapOf(
-                        "uid" to uid,
-                        "eventId" to eventId,
-                        "type" to "achievement_unlocked",
-                        "achievementId" to definition.id,
-                        "visibility" to "public",
-                        "createdAt" to FieldValue.serverTimestamp()
-                    ))
-                }
-                definition
             }
-        }.await() }.onFailure { Log.w(TAG, "Unable to sync achievement unlocks", it) }.getOrDefault(emptyList())
+            val created = runCatching { unlockedBatch.commit().await() }
+                .onFailure { Log.w(TAG, "Unable to sync achievement unlocks", it) }.isSuccess
+            if (created) {
+                newlyUnlocked += candidates
+                // Feed events are separate writes: create-only by rules, so a pre-existing event
+                // (denied as update) must not fail the unlock sync.
+                candidates.forEach { definition ->
+                    val eventId = "achievement_${definition.id}"
+                    runCatching {
+                        firestore.collection(PUBLIC_PROFILES).document(uid).collection(FEED).document(eventId)
+                            .set(mapOf(
+                                "uid" to uid,
+                                "eventId" to eventId,
+                                "type" to "achievement_unlocked",
+                                "achievementId" to definition.id,
+                                "visibility" to "public",
+                                "createdAt" to FieldValue.serverTimestamp()
+                            )).await()
+                    }
+                }
+            }
+        }
         if (newlyUnlocked.isNotEmpty()) {
             val unlockedNow = System.currentTimeMillis()
             storeUnlockedCache(uid, unlocks + newlyUnlocked.associate { it.id to unlockedNow })
@@ -375,14 +375,6 @@ class EmuAchievementRepository(context: Context) {
         val serial: String?,
         val totalPlayTimeMs: Long,
         val sessions: Long
-    )
-
-    private data class AchievementSyncCandidate(
-        val definition: EmuAchievementDefinition,
-        val unlockReference: com.google.firebase.firestore.DocumentReference,
-        val unlockExists: Boolean,
-        val eventReference: com.google.firebase.firestore.DocumentReference,
-        val eventExists: Boolean
     )
 
     private fun PlayerProfile.toAchievementSnapshot() = AchievementSnapshot(
