@@ -88,9 +88,13 @@ static void genTlbProgram(Rng& r, TlbProgram& p)
 		const bool use1 = (e.flags1 & 2) && (r.below(2) || !(e.flags0 & 2));
 		if (!(e.flags0 & 2) && !(e.flags1 & 2)) return;
 		const u32 pg = pageSize(e.mask);
-		const u32 va = e.va + (use1 ? pg : 0) + 0x40 + 4 * r.below(16);
+		u32 va = e.va + (use1 ? pg : 0) + 0x40 + 4 * r.below(16);
+		// The interpreter cancels a misaligned LW/LD without raising an exception (R5900OpcodeImpl.cpp RaiseAddressError), while the x86
+		// recompiler performs the access (iR5900LoadStore.cpp has no alignment check): only aligned accesses are comparable.
+		const bool useLd = r.below(2) == 0;
+		if (useLd) va &= ~7u;
 		emitConst64(c, 4, va, 29);
-		c.push_back(iI(r.below(2) ? 0x23u : 0x37u, 4, 5, 0));
+		c.push_back(iI(useLd ? 0x37u : 0x23u, 4, 5, 0));
 		out(5);
 		// a store into a dirty page, read back through a second window
 		if ((use1 ? e.d1 : e.d0) && r.below(2))
@@ -151,8 +155,11 @@ static void genTlbProgram(Rng& r, TlbProgram& p)
 		else if (kind < 9)
 		{
 			// Status / Config round trips (no interrupt-enabling bits that could become pending)
-			static const u32 kStatus[] = {0x20000000u, 0x30000000u, 0x20010000u, 0x2000ff00u, 0x20400000u & ~0x400000u, 0x70000000u};
-			setCp0(12, kStatus[r.below(6)] | (r.next() & 0x0000ff00u));
+			// IM7 (0x8000) stays clear: the timer interrupt fires whenever Status.IM7 is set and Count is within 1000 of Compare, with no
+			// IE/EXL/ERL test (upstream R5900.cpp:329-334 _cpuTestTIMR). Only the JIT run processes events, so the programs would
+			// diverge at the interrupt vector.
+			static const u32 kStatus[] = {0x20000000u, 0x30000000u, 0x20010000u, 0x20007f00u, 0x20400000u & ~0x400000u, 0x70000000u};
+			setCp0(12, kStatus[r.below(6)] | (r.next() & 0x00007f00u));
 			c.push_back(MFC0(9, 12));
 			out(9);
 			setCp0(16, r.below(4) == 0 ? r.next() & 0x7fffffffu : (r.next() & 0x00070000u) | 0x440u);

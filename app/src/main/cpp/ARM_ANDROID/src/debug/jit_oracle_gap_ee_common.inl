@@ -353,11 +353,29 @@ static void gapInitState(const std::vector<u32>& code, const GPR_reg* gpr, const
 		o.prep(o.prepCtx);
 }
 
+extern "C" u32 EmuCoreXOracleInterpBlockCycles();
+// Count-probe support: while g_recordPend is set the interpreter runs one instruction at a time and, after every MFC0 Count, records
+// its pending block cycles (3-bit fixed point, including the MFC0's own cost). The x86 recompiler adds all pending block cycles to Count
+// at MFC0 (upstream iCOP0.cpp:134-136 scaleblockcycles_clear()), the interpreter only adds them when a branch completes, so the expected
+// JIT - interpreter difference at a probe is that pending amount (more for a probe in the middle of a block).
+static bool g_recordPend = false;
+static std::vector<u32> g_pendRec;
+
 static void interpExecute(const std::vector<u32>& code, const RunOpt& o)
 {
 	Cpu = &intCpu;
 	Cpu->Reset();
 	const u32 steps = o.interpSteps ? o.interpSteps : static_cast<u32>(code.size()) + 16;
+	if (g_recordPend && !o.stopAtVector)
+	{
+		for (u32 i = 0; i < steps; ++i)
+		{
+			const u32 w = memRead32(cpuRegs.pc);
+			EmuCoreXOracleEESteps(1);
+			if ((w & 0xffe0f800u) == 0x40004800u) g_pendRec.push_back(EmuCoreXOracleInterpBlockCycles());
+		}
+		return;
+	}
 	if (o.stopAtVector)
 	{
 		for (u32 i = 0; i < steps; ++i)

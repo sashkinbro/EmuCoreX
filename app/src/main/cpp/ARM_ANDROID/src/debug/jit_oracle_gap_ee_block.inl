@@ -435,7 +435,7 @@ static std::vector<u32> withPad(const Prog& p, bool linked)
 struct CountStat { s32 maxPos = 0, maxNeg = 0; u64 probes = 0; };
 static CountStat g_countStat;
 
-static void compareBlockRun(const Prog& p, bool probe, const std::vector<u32>& code, const EESnapshot& ref, const EESnapshot& got, const std::string& tag)
+static void compareBlockRun(const Prog& p, bool probe, const std::vector<u32>& code, const EESnapshot& ref, const EESnapshot& got, const std::string& tag, const std::vector<u32>& pend)
 {
 	DiffOpt d;
 	d.cmpScratch = true;
@@ -465,15 +465,18 @@ static void compareBlockRun(const Prog& p, bool probe, const std::vector<u32>& c
 			std::memcpy(&y, got.scratch + PROBE_OFF + k * 4, 4);
 			const s32 delta = static_cast<s32>(y - x);
 			++g_countStat.probes;
-			if (delta > g_countStat.maxPos) g_countStat.maxPos = delta;
-			if (delta < g_countStat.maxNeg) g_countStat.maxNeg = delta;
-			// x86-parity bound (see x86-parity-ee-sync): the recompiler drops the fractional 1/8 cycle at every block end, so
-			// jit - interp may fall by about one cycle per probe, and may exceed the interpreter by a few cycles.
-			// The recompiler carries the fractional block cycles in a compile-order static (s_nBlockCycles &= 7), the interpreter in
-			// execution order, so the error grows with every block boundary (probes sit at block starts, with a few non-probed
-			// boundaries between them): allow two cycles per probe.
-			// x86 model: MFC0 Count adds scaleblockcycles_clear() including the MFC0's own cost (iCOP0.cpp:139), i.e. one cycle more than the interpreter.
-			const s32 lo = -(2 + 2 * static_cast<s32>(k)), hi = 5 + static_cast<s32>(k);
+			// x86 model: MFC0 Count adds scaleblockcycles_clear() (upstream iCOP0.cpp:134-136), i.e. every cycle accumulated by the block
+			// so far, including the earlier instructions of the same block and the MFC0 itself. The interpreter only adds its pending
+			// block cycles to cpuRegs.cycle when a branch completes, so it reads 'pending' cycles less. pend[k] is the interpreter's
+			// pending block cycles (including the MFC0) recorded at that probe. A fall-through "block" puts a probe in mid-block.
+			const s32 expected = k < pend.size() ? static_cast<s32>(pend[k] >> 3) : 0;
+			const s32 dev = delta - expected;
+			if (dev > g_countStat.maxPos) g_countStat.maxPos = dev;
+			if (dev < g_countStat.maxNeg) g_countStat.maxNeg = dev;
+			// Residual error (see x86-parity-ee-sync): the recompiler drops the fractional 1/8 cycle at every block end and carries the
+			// fraction in a compile-order static (s_nBlockCycles &= 7) while the interpreter carries it in execution order, so the
+			// error grows with every block boundary (probes sit at block starts, with a few non-probed boundaries between them).
+			const s32 lo = expected - (2 + 2 * static_cast<s32>(k)), hi = expected + 2;
 			if (delta > hi || delta < lo)
 			{
 				std::string all;
@@ -506,8 +509,14 @@ static void runBlockPrograms(u32 mode, u32 count, u32 seedSalt)
 		ro.interpSteps = 1800;
 		const bool probe = mode == PM_PROBE;
 		const std::vector<u32> plain = withPad(p, false), linked = withPad(p, true);
+		g_recordPend = probe;
+		g_pendRec.clear();
 		const EESnapshot ref = gapRun(false, plain, p.init, nullptr, ro);
+		const std::vector<u32> pendPlain = g_pendRec;
+		g_pendRec.clear();
 		const EESnapshot refLinked = gapRun(false, linked, p.init, nullptr, ro);
+		const std::vector<u32> pendLinked = g_pendRec;
+		g_recordPend = false;
 		gCase();
 		g_suppressRepro = false;
 		static const char* const names[4] = {"cold", "warm", "recompile", "linked"};
@@ -517,7 +526,7 @@ static void runBlockPrograms(u32 mode, u32 count, u32 seedSalt)
 			o.jitVariant = v == 3 ? 0 : v;
 			const EESnapshot got = gapRun(true, v == 3 ? linked : plain, p.init, nullptr, o);
 			const u64 failsBefore = g_grp.fails;
-			compareBlockRun(p, probe, v == 3 ? linked : plain, v == 3 ? refLinked : ref, got, std::string(names[v]) + " k=" + std::to_string(k));
+			compareBlockRun(p, probe, v == 3 ? linked : plain, v == 3 ? refLinked : ref, got, std::string(names[v]) + " k=" + std::to_string(k), v == 3 ? pendLinked : pendPlain);
 			if (g_grp.fails != failsBefore) g_suppressRepro = true;
 		}
 		g_suppressRepro = false;

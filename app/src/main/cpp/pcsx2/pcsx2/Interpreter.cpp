@@ -681,6 +681,12 @@ static void intStep()
 // Differential oracle stepping. Exceptions longjmp through intJmpBuf, which
 // intExecute() normally arms; arm it per step here so address errors and
 // similar instructions abort cleanly instead of jumping into a dead frame.
+// Pending (not yet added to cpuRegs.cycle) block cycles of the interpreter, 3-bit fixed point; used by the Count-probe oracle.
+extern "C" u32 EmuCoreXOracleInterpBlockCycles()
+{
+	return cpuBlockCycles;
+}
+
 extern "C" void EmuCoreXOracleEESteps(u32 steps)
 {
 	for (u32 i = 0; i < steps; ++i)
