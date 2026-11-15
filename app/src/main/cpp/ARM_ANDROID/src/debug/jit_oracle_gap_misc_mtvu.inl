@@ -92,7 +92,12 @@ static Case Generate(u64 seed, u32 k)
     std::memcpy(c.vi, ri.vi, sizeof(c.vi));
     const u32 kicks = 1 + r.below(3);
     u32 next = 0x80 + r.below(0x40); // packets live in [0x80, 0x3d0); qwords 0x60..0x6f are the program scratch stores; a wrapping chain spills into [0, 0x50)
-    const u32 wrapIdx = r.below(kicks * 4); // at most one chain wraps (two overlapping chains would corrupt each other's tags)
+    // At most one chain wraps (two overlapping chains would corrupt each other's tags). The draw is kept so the random stream stays
+    // the same, but a chain that runs over the end of VU memory is only generated with GAP_MTVU_WRAP=1: x86 microVU sizes the packet
+    // with gifUnit.GetGSPacketSize(Mem, addr) which walks the tag chain linearly (no wrap of the tag reads) and only then splits the
+    // copy at 0x4000 (microVU_Lower.inl:1698-1714 mVU_XGKICK_); the interpreter wraps the tag reads too. The port is identical.
+    const u32 wrapDraw = r.below(kicks * 4);
+    const u32 wrapIdx = GapKnob("GAP_MTVU_WRAP", 0) ? wrapDraw : ~0u;
     for (u32 n = 0; n < kicks; ++n)
     {
         u32 at = next;

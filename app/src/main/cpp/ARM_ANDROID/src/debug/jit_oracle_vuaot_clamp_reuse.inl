@@ -236,7 +236,7 @@ ClampNodeKernel MakeClampReferenceKernel(bool mula, u32 bc, bool mixed, bool flu
             oakAsm->DUP(oak::QReg(1).S4(), oak::QReg(1).Selem()[bc]);
             oakLoad128(oak::QReg(2), {oak::util::X19, offsetof(VURegs, ACC)});
             oakAsm->FMUL(oak::QReg(0).S4(), oak::QReg(0).S4(), oak::QReg(1).S4());
-            oakAsm->FADD(oak::QReg(0).S4(), oak::QReg(2).S4(), oak::QReg(0).S4());
+            oakAsm->FADD(oak::QReg(0).S4(), oak::QReg(0).S4(), oak::QReg(2).S4()); // x86 adds ACC into the product (microVU_Upper.inl:355)
         }
         oakStore128(oak::QReg(0), {oak::util::X19, static_cast<s64>(offsetof(VURegs, VF) + (3 + iteration) * 16)});
     }
