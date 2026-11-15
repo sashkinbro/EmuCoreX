@@ -377,7 +377,7 @@ private fun ShaderPackCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .animateContentSize(animationSpec = tween(220))
+                .animateContentSize(animationSpec = tween(130))
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {

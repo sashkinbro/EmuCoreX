@@ -15,10 +15,6 @@ internal fun EmulationUiState.withCurrentSession(current: EmulationUiState): Emu
     currentGameTitle = current.currentGameTitle,
     currentGameSubtitle = current.currentGameSubtitle,
     currentGameCoverArtPath = current.currentGameCoverArtPath,
-    currentSlotLastModified = current.currentSlotLastModified,
-    currentSlotPreviewPath = current.currentSlotPreviewPath,
-    autoSaveLastModified = current.autoSaveLastModified,
-    autoSavePreviewPath = current.autoSavePreviewPath,
     isAutoSaveInProgress = current.isAutoSaveInProgress,
     activePlayTimeMs = current.activePlayTimeMs
 )

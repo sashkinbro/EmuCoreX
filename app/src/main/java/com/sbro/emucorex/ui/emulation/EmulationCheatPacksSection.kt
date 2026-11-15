@@ -130,7 +130,7 @@ internal fun EmulationCheatPacksSection(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .animateContentSize(animationSpec = tween(220))
+                .animateContentSize(animationSpec = tween(130))
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -455,7 +455,7 @@ private fun CheatPackCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = tween(200)),
+            .animateContentSize(animationSpec = tween(130)),
         shape = neonShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))

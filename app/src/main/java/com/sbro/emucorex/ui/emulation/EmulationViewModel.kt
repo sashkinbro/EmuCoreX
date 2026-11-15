@@ -145,6 +145,17 @@ internal fun replacePerformanceCpuName(text: String, cpuName: String): String {
     }
 }
 
+/**
+ * Save-slot thumbnail metadata. Kept out of [EmulationUiState] so the asynchronous
+ * file lookups that finish after the menu opens do not recompose the whole menu.
+ */
+data class SaveSlotMetadata(
+    val currentSlotLastModified: Long = 0L,
+    val currentSlotPreviewPath: String? = null,
+    val autoSaveLastModified: Long = 0L,
+    val autoSavePreviewPath: String? = null
+)
+
 data class EmulationUiState(
     val isRunning: Boolean = false,
     val ps2GunProfileActive: Boolean = false,
@@ -316,14 +327,10 @@ data class EmulationUiState(
     val currentGameSubtitle: String = "",
     val currentGameCoverArtPath: String? = null,
     val gameSettingsProfileActive: Boolean = false,
-    val currentSlotLastModified: Long = 0L,
-    val currentSlotPreviewPath: String? = null,
     val autoSaveEnabled: Boolean = false,
     val autoSaveIntervalMinutes: Int = 1,
     val autoSaveOnExit: Boolean = false,
     val autoLoadOnStart: Boolean = false,
-    val autoSaveLastModified: Long = 0L,
-    val autoSavePreviewPath: String? = null,
     val isAutoSaveInProgress: Boolean = false,
     val activePlayTimeMs: Long = 0L
 )
@@ -642,6 +649,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         )
     )
     val uiState: StateFlow<EmulationUiState> = _uiState.asStateFlow()
+    private val _saveSlotMetadata = MutableStateFlow(SaveSlotMetadata())
+    val saveSlotMetadata: StateFlow<SaveSlotMetadata> = _saveSlotMetadata.asStateFlow()
     private val _performanceState = MutableStateFlow(EmulationPerformanceState())
     val performanceState: StateFlow<EmulationPerformanceState> = _performanceState.asStateFlow()
     private val _shaderPreparationUiState = MutableStateFlow(
@@ -2210,14 +2219,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         pendingPlayTimeSyncMs = 0L
         shouldCountCurrentProfileSession = false
         shouldTrackCurrentProfilePlayTime = false
+        _saveSlotMetadata.value = SaveSlotMetadata()
         _uiState.value = applyInterfaceSettings(
             _uiState.value
                 .copy(
                     activePlayTimeMs = 0L,
-                    currentSlotLastModified = 0L,
-                    currentSlotPreviewPath = null,
-                    autoSaveLastModified = 0L,
-                    autoSavePreviewPath = null,
                     isAutoSaveInProgress = false,
                     currentGameCoverArtPath = null
                 )
@@ -5672,7 +5678,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         val normalized = normalizeManualSaveSlot(slot)
         _uiState.value = if (normalized != state.currentSlot) {
             // Do not show the previous slot's availability while its replacement loads.
-            state.copy(currentSlot = normalized, currentSlotLastModified = 0L, currentSlotPreviewPath = null)
+            _saveSlotMetadata.value = _saveSlotMetadata.value.copy(
+                currentSlotLastModified = 0L,
+                currentSlotPreviewPath = null
+            )
+            state.copy(currentSlot = normalized)
         } else {
             state
         }
@@ -5731,12 +5741,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             fun isCurrentScope() = currentGamePath == path && _uiState.value.currentSlot == slot &&
                 currentGameSerial == serial && currentGameCrc == crc
             if (path.isNullOrBlank()) {
-                _uiState.value = _uiState.value.copy(
-                    currentSlotLastModified = 0L,
-                    currentSlotPreviewPath = null,
-                    autoSaveLastModified = 0L,
-                    autoSavePreviewPath = null
-                )
+                _saveSlotMetadata.value = SaveSlotMetadata()
                 return@launch
             }
 
@@ -5750,7 +5755,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     )
                 }
                 if (!isCurrentScope()) return@preview
-                _uiState.value = _uiState.value.copy(
+                _saveSlotMetadata.value = _saveSlotMetadata.value.copy(
                     currentSlotLastModified = metadata.currentModified,
                     autoSaveLastModified = metadata.autoModified
                 )
@@ -5766,7 +5771,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 // Cancellation and scope checks keep an old game/slot from publishing late.
                 if (!isCurrentScope()) return@preview
-                _uiState.value = _uiState.value.copy(
+                _saveSlotMetadata.value = _saveSlotMetadata.value.copy(
                     currentSlotPreviewPath = previews.first,
                     autoSavePreviewPath = previews.second
                 )

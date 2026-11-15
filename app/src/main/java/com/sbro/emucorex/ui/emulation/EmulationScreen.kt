@@ -16,6 +16,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -112,6 +113,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -729,6 +731,7 @@ fun EmulationScreen(
     val uiState by viewModel.uiState.collectAsState()
     val cheatPackBrowserState by viewModel.cheatPackBrowser.collectAsState()
     val shaderBrowserState by viewModel.shaderBrowser.collectAsState()
+    val saveSlotMetadataState = viewModel.saveSlotMetadata.collectAsState()
     val shaderPreparationState by viewModel.shaderPreparationUiState.collectAsState()
     val activePatchNotice by viewModel.activePatchNotice.collectAsState()
     val retroAchievementsState by RetroAchievementsLiveStateManager.state.collectAsState()
@@ -2102,8 +2105,14 @@ fun EmulationScreen(
         // Sidebar Menu
         AnimatedVisibility(
             visible = uiState.showMenu && !showControlsEditor,
-            enter = androidx.compose.animation.slideInHorizontally(initialOffsetX = { fullWidth -> fullWidth }) + fadeIn(tween(300)),
-            exit = androidx.compose.animation.slideOutHorizontally(targetOffsetX = { fullWidth -> fullWidth }) + fadeOut(tween(250)),
+            enter = androidx.compose.animation.slideInHorizontally(
+                animationSpec = tween(170, easing = FastOutSlowInEasing),
+                initialOffsetX = { fullWidth -> fullWidth }
+            ) + fadeIn(tween(120)),
+            exit = androidx.compose.animation.slideOutHorizontally(
+                animationSpec = tween(130, easing = FastOutSlowInEasing),
+                targetOffsetX = { fullWidth -> fullWidth }
+            ) + fadeOut(tween(100)),
             modifier = Modifier.fillMaxHeight()
         ) {
             gameMenuStateHolder.SaveableStateProvider("emulation_game_menu") {
@@ -2122,6 +2131,7 @@ fun EmulationScreen(
 
                 EmulationSidebarMenu(
                     uiState = uiState,
+                    saveSlotMetadata = saveSlotMetadataState,
                     gamepadConnected = gamepadConnected,
                     currentGamePath = gamePath,
                     retroState = retroAchievementsState,
@@ -2138,8 +2148,8 @@ fun EmulationScreen(
                     onSetAutoSaveOnExit = { viewModel.setAutoSaveOnExit(it) },
                     onSetAutoLoadOnStart = { viewModel.setAutoLoadOnStart(it) },
                     onResetGameSettingsProfile = { viewModel.resetCurrentGameSettingsProfile() },
-                    onNextSlot = { viewModel.setSlot(uiState.currentSlot + 1) },
-                    onPrevSlot = { viewModel.setSlot(uiState.currentSlot - 1) },
+                    onNextSlot = { viewModel.setSlot(viewModel.uiState.value.currentSlot + 1) },
+                    onPrevSlot = { viewModel.setSlot(viewModel.uiState.value.currentSlot - 1) },
                     onToggleFps = { viewModel.toggleFpsVisibility() },
                     onSetFpsOverlayMode = { viewModel.setFpsOverlayMode(it) },
                     onSetFpsOverlayCorner = { viewModel.setFpsOverlayCorner(it) },
@@ -3879,6 +3889,7 @@ private fun formatPlayTime(milliseconds: Long): String {
 @Composable
 private fun EmulationSidebarMenu(
     uiState: EmulationUiState,
+    saveSlotMetadata: State<SaveSlotMetadata>,
     gamepadConnected: Boolean,
     currentGamePath: String?,
     retroState: com.sbro.emucorex.core.utils.RetroAchievementsLiveUiState,
@@ -4110,6 +4121,14 @@ private fun EmulationSidebarMenu(
 
     val menuContent: LazyListScope.() -> Unit = {
             item(key = "game-header", contentType = "game-header") {
+                val headerGradientBrush = remember {
+                    Brush.horizontalGradient(
+                        listOf(
+                            GradientStart.copy(alpha = 0.14f),
+                            GradientEnd.copy(alpha = 0.08f)
+                        )
+                    )
+                }
                 Surface(
                     shape = neonShape(22.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
@@ -4118,14 +4137,7 @@ private fun EmulationSidebarMenu(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(
-                                        GradientStart.copy(alpha = 0.14f),
-                                        GradientEnd.copy(alpha = 0.08f)
-                                    )
-                                )
-                            )
+                            .background(headerGradientBrush)
                             .padding(horizontal = 18.dp, vertical = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -4291,13 +4303,15 @@ private fun EmulationSidebarMenu(
                                     }
                                 }
 
-                                SaveSlotPreview(
-                                    slot = uiState.currentSlot,
-                                    previewPath = uiState.currentSlotPreviewPath,
-                                    lastModified = uiState.currentSlotLastModified,
-                                    isSaving = uiState.actionLabel == "saving",
-                                    gameTitle = uiState.currentGameTitle
-                                )
+                                SaveSlotMetadataScope(saveSlotMetadata) { slotMetadata ->
+                                    SaveSlotPreview(
+                                        slot = uiState.currentSlot,
+                                        previewPath = slotMetadata.currentSlotPreviewPath,
+                                        lastModified = slotMetadata.currentSlotLastModified,
+                                        isSaving = uiState.actionLabel == "saving",
+                                        gameTitle = uiState.currentGameTitle
+                                    )
+                                }
 
                                 }
 
@@ -4310,31 +4324,35 @@ private fun EmulationSidebarMenu(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    SaveSlotThumbnail(
-                                        previewPath = uiState.autoSavePreviewPath,
-                                        lastModified = uiState.autoSaveLastModified,
-                                        contentDescription = stringResource(R.string.emulation_auto_save_title),
-                                        modifier = Modifier
-                                            .width(74.dp)
-                                            .aspectRatio(16f / 9f)
-                                    )
+                                    SaveSlotMetadataScope(saveSlotMetadata) { slotMetadata ->
+                                        SaveSlotThumbnail(
+                                            previewPath = slotMetadata.autoSavePreviewPath,
+                                            lastModified = slotMetadata.autoSaveLastModified,
+                                            contentDescription = stringResource(R.string.emulation_auto_save_title),
+                                            modifier = Modifier
+                                                .width(74.dp)
+                                                .aspectRatio(16f / 9f)
+                                        )
+                                    }
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = stringResource(R.string.emulation_auto_save_title),
                                             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
-                                        Text(
-                                            text = if (uiState.autoSaveLastModified > 0L) {
-                                                formatSaveTimestamp(uiState.autoSaveLastModified)
-                                            } else {
-                                                stringResource(R.string.emulation_auto_save_empty)
-                                            },
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
+                                        SaveSlotMetadataScope(saveSlotMetadata) { slotMetadata ->
+                                            Text(
+                                                text = if (slotMetadata.autoSaveLastModified > 0L) {
+                                                    formatSaveTimestamp(slotMetadata.autoSaveLastModified)
+                                                } else {
+                                                    stringResource(R.string.emulation_auto_save_empty)
+                                                },
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
                                     }
                                     Switch(
                                         checked = uiState.autoSaveEnabled,
@@ -4400,39 +4418,45 @@ private fun EmulationSidebarMenu(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                SaveSlotThumbnail(
-                                    previewPath = uiState.autoSavePreviewPath,
-                                    lastModified = uiState.autoSaveLastModified,
-                                    contentDescription = stringResource(R.string.emulation_auto_save_restore_title),
-                                    modifier = Modifier
-                                        .width(64.dp)
-                                        .aspectRatio(16f / 9f)
-                                )
+                                SaveSlotMetadataScope(saveSlotMetadata) { slotMetadata ->
+                                    SaveSlotThumbnail(
+                                        previewPath = slotMetadata.autoSavePreviewPath,
+                                        lastModified = slotMetadata.autoSaveLastModified,
+                                        contentDescription = stringResource(R.string.emulation_auto_save_restore_title),
+                                        modifier = Modifier
+                                            .width(64.dp)
+                                            .aspectRatio(16f / 9f)
+                                    )
+                                }
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = stringResource(R.string.emulation_auto_save_restore_title),
                                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
-                                    Text(
-                                        text = if (uiState.autoSaveLastModified > 0L) {
-                                            formatSaveTimestamp(uiState.autoSaveLastModified)
-                                        } else {
-                                            stringResource(R.string.emulation_auto_save_empty)
-                                        },
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                    SaveSlotMetadataScope(saveSlotMetadata) { slotMetadata ->
+                                        Text(
+                                            text = if (slotMetadata.autoSaveLastModified > 0L) {
+                                                formatSaveTimestamp(slotMetadata.autoSaveLastModified)
+                                            } else {
+                                                stringResource(R.string.emulation_auto_save_empty)
+                                            },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                SaveSlotMetadataScope(saveSlotMetadata) { slotMetadata ->
+                                    CompactIconActionButton(
+                                        icon = Icons.Rounded.Restore,
+                                        contentDescription = stringResource(R.string.emulation_quick_load_desc),
+                                        onClick = onLoadAutoSave,
+                                        enabled = !uiState.isActionInProgress && slotMetadata.autoSaveLastModified > 0L,
+                                        showProgress = uiState.actionLabel == "loading"
                                     )
                                 }
-                                CompactIconActionButton(
-                                    icon = Icons.Rounded.Restore,
-                                    contentDescription = stringResource(R.string.emulation_quick_load_desc),
-                                    onClick = onLoadAutoSave,
-                                    enabled = !uiState.isActionInProgress && uiState.autoSaveLastModified > 0L,
-                                    showProgress = uiState.actionLabel == "loading"
-                                )
                             }
                         }
 
@@ -8123,6 +8147,16 @@ private fun MenuButton(
 }
 
 @Composable
+private fun SaveSlotMetadataScope(
+    metadata: State<SaveSlotMetadata>,
+    content: @Composable (SaveSlotMetadata) -> Unit
+) {
+    // The state is read here, in its own scope, so a late metadata update recomposes
+    // only this small block instead of the whole sidebar menu.
+    content(metadata.value)
+}
+
+@Composable
 private fun SaveSlotPreview(
     slot: Int,
     previewPath: String?,
@@ -8132,19 +8166,26 @@ private fun SaveSlotPreview(
     modifier: Modifier = Modifier
 ) {
     val shape = neonShape(14.dp)
+    val colorScheme = MaterialTheme.colorScheme
+    val slotBackdropBrush = remember(colorScheme) {
+        Brush.linearGradient(
+            colors = listOf(
+                colorScheme.primaryContainer.copy(alpha = 0.38f),
+                colorScheme.surface.copy(alpha = 0.72f)
+            )
+        )
+    }
+    val slotScrimBrush = remember {
+        Brush.verticalGradient(
+            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f))
+        )
+    }
     Box(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(16f / 9f)
             .clip(shape)
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.38f),
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
-                    )
-                )
-            )
+            .background(slotBackdropBrush)
     ) {
         if (previewPath != null) {
             GameCoverArt(
@@ -8190,11 +8231,7 @@ private fun SaveSlotPreview(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f))
-                    )
-                )
+                .background(slotScrimBrush)
                 .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
             Text(
