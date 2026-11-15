@@ -151,9 +151,9 @@ static inline u32 x86MacWindowSkipMask(const VProg& p, int index)
 	{
 		const u32 lo = p.w[2 * pair], up = p.w[2 * pair + 1];
 		const u32 op = lo >> 25;
-		if (!(lo & 0x80000000u) && (op == 0x18 || op == 0x1a || op == 0x1b))
+		if (!(up & 0x80000000u) && !(lo & 0x80000000u) && (op == 0x18 || op == 0x1a || op == 0x1b))
 			readers.push_back(pair);
-		if (!(up & 0x80000000u) && (up & 0x07ffffffu) != (NOP_U & 0x07ffffffu))
+		if ((up & 0x07ffffffu) != (NOP_U & 0x07ffffffu))
 			fmacs.push_back(pair);
 	}
 	for (int r : readers)

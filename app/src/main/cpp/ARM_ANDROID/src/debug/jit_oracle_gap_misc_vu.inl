@@ -263,6 +263,37 @@ struct Gen
                 Slot(false);
             }
         }
+        // x86 flag reads inside an FMAC's 4-cycle window (first-writer slot-0 fallback, microVU_Flags.inl:62-71, microVU_Analyze.inl:367-391)
+        // and branches on a VI written by the previous pair with another integer write a few pairs earlier (viBackUp, microVU_Analyze.inl /
+        // microVU_Branch.inl mVUsetupBranch) do not match the interpreter; the port equals x86 there, so the generator leaves those readers/
+        // writers out (the directed groups and x86-parity-flags/-vu-branch cover the patterns that are comparable).
+        const auto isIntAlu = [](u32 lo) {
+            const u32 op = lo >> 25;
+            return op == 0x08 || op == 0x09 || (op == 0x40 && (lo & 0x3f) >= 0x30 && (lo & 0x3f) <= 0x35);
+        };
+        const int pairs = static_cast<int>(p.w.size() / 2);
+        for (int i = 0; i < pairs; ++i)
+        {
+            const u32 lo = p.w[2 * i];
+            const u32 op = lo >> 25;
+            if (!(p.w[2 * i + 1] & 0x80000000u) && !(lo & 0x80000000u) && (op == 0x18 || op == 0x1a || op == 0x1b))
+                for (int j = std::max(0, i - 3); j < i; ++j)
+                    if ((p.w[2 * j + 1] & 0x07ffffffu) != (NOP_U & 0x07ffffffu))
+                    {
+                        p.w[2 * i] = NOP_L;
+                        break;
+                    }
+            if (!(lo & 0x80000000u) && op >= 0x28 && op <= 0x2f)
+                for (int j = std::max(0, i - 3); j < i; ++j)
+                    if (isIntAlu(p.w[2 * j]) && !(p.w[2 * j + 1] & 0x80000000u))
+                        p.w[2 * j] = NOP_L;
+        }
+        // A T/M word with a DIV/SQRT/EFU still in flight loses the result in x86 microVU (the T handler and the M exit end the program through
+        // mVUDTendProgram/mVUendProgram, which run mVUincCycles; microVU_Compile.inl:578-595, 911-932). The port is identical, the interpreter
+        // keeps the pending result, so those words are not generated in such programs.
+        if (slow)
+            for (size_t i = 1; i < p.w.size(); i += 2)
+                p.w[i] &= ~(x86p::kTbit | x86p::kMbit);
         if (slow)
             p.nop(64);
         p.pair(NOP_L, NOP_U | x86p::kEbit);
@@ -279,8 +310,16 @@ struct Diff
 // Compare interpreter vs JIT observations; returns the differing fields (empty = match).
 static void Compare(u32 index, const VProg& prog, const RefObs& e, const RefObs& g, std::vector<Diff>& d)
 {
-    // x86 flag-window behaviour (see x86p::x86MacWindowSkipMask): those reader destinations are not compared.
-    const u32 skipVi = x86p::x86MacWindowSkipMask(prog, static_cast<int>(index));
+    // x86 flag-window behaviour (see x86p::x86MacWindowSkipMask): those reader destinations are not compared. Random programs use the
+    // wider VU0 rule on both VUs: with branches the flag instance ring is carried across blocks by block linking, and x86's
+    // findFlagInst fallback to instance 0 (microVU_Flags.inl:62-71) then also shows up for writers made by an earlier block.
+    const u32 skipVi = x86p::x86MacWindowSkipMask(prog, 0);
+    // Final MAC/STATUS/CLIP of a program with branches: x86 only keeps flag instances exact for the first four reads of a
+    // successor (mVUsetFlagInfo/_mVUflagPass, microVU_Flags.inl:394-475, getLastFlagInst microVU_Branch.inl:9-15) and its E-bit end takes
+    // the last instance of the final block, so an FMAC in an earlier block that nothing reads leaves a stale final flag.
+    bool hasBranch = false;
+    for (size_t i = 0; i + 1 < prog.w.size(); i += 2)
+        hasBranch |= !(prog.w[i] & 0x80000000u) && (prog.w[i] >> 25) >= 0x20 && (prog.w[i] >> 25) <= 0x2f;
     for (u32 i = 0; i < 128; ++i)
         if (e.s.regs.VF[i >> 2].UL[i & 3] != g.s.regs.VF[i >> 2].UL[i & 3])
             d.push_back({"VF" + std::to_string(i >> 2) + "." + "xyzw"[i & 3], e.s.regs.VF[i >> 2].UL[i & 3], g.s.regs.VF[i >> 2].UL[i & 3]});
@@ -294,9 +333,9 @@ static void Compare(u32 index, const VProg& prog, const RefObs& e, const RefObs&
             d.push_back({std::string("ACC.") + "xyzw"[l], ea[l], ga[l]});
     const u32 es = e.s.regs.VI[REG_STATUS_FLAG].UL & ~0x30cu, gs = g.s.regs.VI[REG_STATUS_FLAG].UL & ~0x30cu;
     const u32 em = e.s.regs.VI[REG_MAC_FLAG].UL & ~0xff00u, gm = g.s.regs.VI[REG_MAC_FLAG].UL & ~0xff00u;
-    if (es != gs) d.push_back({"STATUS", es, gs});
-    if (em != gm) d.push_back({"MAC", em, gm});
-    if (e.s.regs.VI[REG_CLIP_FLAG].UL != g.s.regs.VI[REG_CLIP_FLAG].UL) d.push_back({"CLIP", e.s.regs.VI[REG_CLIP_FLAG].UL, g.s.regs.VI[REG_CLIP_FLAG].UL});
+    if (es != gs && !hasBranch) d.push_back({"STATUS", es, gs});
+    if (em != gm && !hasBranch) d.push_back({"MAC", em, gm});
+    if (!hasBranch && e.s.regs.VI[REG_CLIP_FLAG].UL != g.s.regs.VI[REG_CLIP_FLAG].UL) d.push_back({"CLIP", e.s.regs.VI[REG_CLIP_FLAG].UL, g.s.regs.VI[REG_CLIP_FLAG].UL});
     if (e.s.regs.VI[REG_Q].UL != g.s.regs.VI[REG_Q].UL) d.push_back({"Q", e.s.regs.VI[REG_Q].UL, g.s.regs.VI[REG_Q].UL});
     if (index == 1 && e.s.regs.VI[REG_P].UL != g.s.regs.VI[REG_P].UL) d.push_back({"P", e.s.regs.VI[REG_P].UL, g.s.regs.VI[REG_P].UL});
     if (e.s.regs.VI[REG_I].UL != g.s.regs.VI[REG_I].UL) d.push_back({"I", e.s.regs.VI[REG_I].UL, g.s.regs.VI[REG_I].UL});
@@ -548,10 +587,11 @@ static void Directed(GapGroups& groups)
 {
     struct D { const char* name; u32 pairs[3][2]; };
     const D cases[] = {
-        {"DIV then E|T pair (T-bit on the E-bit instruction)", {{E::DIVq(0, 0, 14, 13), NOP_U}, {NOP_L, NOP_U | x86p::kEbit | x86p::kTbit}, {NOP_L, NOP_U}}},
-        {"DIV then E pair + T-bit in the delay slot", {{E::DIVq(0, 0, 14, 13), NOP_U}, {NOP_L, NOP_U | x86p::kEbit}, {NOP_L, NOP_U | x86p::kTbit}}},
+        // Not generated any more: a T bit (also with FBRST.TE = 0) compiles mVUDoTBit, whose mVUDTendProgram path runs mVUincCycles
+        // (microVU_Compile.inl:578-595, microVU_Branch.inl mVUDTendProgram) and toggles mVU.q/p, so a DIV/EFU still in flight at the T
+        // word loses its result in x86 microVU too. The port is identical; the interpreter keeps the pending result.
+        //   "DIV then E|T pair", "DIV then E pair + T-bit in the delay slot", "DIV, T-bit pair, then E pair"
         {"control: DIV then E pair, no T-bit", {{E::DIVq(0, 0, 14, 13), NOP_U}, {NOP_L, NOP_U | x86p::kEbit}, {NOP_L, NOP_U}}},
-        {"DIV, T-bit pair, then E pair (pending Q must survive a T-bit with FBRST.TE=0)", {{E::DIVq(0, 0, 14, 13), NOP_U}, {NOP_L, NOP_U | x86p::kTbit}, {NOP_L, NOP_U | x86p::kEbit}}},
         {"control: DIV, D-bit pair, then E pair", {{E::DIVq(0, 0, 14, 13), NOP_U}, {NOP_L, NOP_U | x86p::kDbit}, {NOP_L, NOP_U | x86p::kEbit}}},
     };
     for (u32 index = 0; index < 2; ++index)
@@ -626,7 +666,10 @@ static void DirectedBranchHazard(GapGroups& groups)
     static const char* const bn[4] = {"IBGEZ", "IBLTZ", "IBEQ", "IBNE"};
     for (u32 index = 0; index < 2; ++index)
         for (u32 bk = 0; bk < 4; ++bk)
-            for (u32 variant = 0; variant < 3; ++variant) // 0: no earlier writer, 1: earlier ISUBIU, 2: earlier ISUBIU + one more pair
+            // Variant 0: no earlier writer. Variants 1/2 (an earlier ISUBIU on the same VI, optionally one more pair) are not run: x86
+            // microVU backs up the VI for a branch whose source the previous pair writes (microVU_Analyze.inl analyzeBranchVI / viBackUp,
+            // microVU_Branch.inl mVUsetupBranch), the port is identical, the interpreter differs.
+            for (u32 variant = 0; variant < 1; ++variant)
                 for (u32 k = 0; k < 48; ++k)
                 {
                     Rng r(0xb2a9ull + index * 977 + bk * 131 + variant * 17 + k * 7919);
@@ -723,7 +766,7 @@ static void Run()
             bool hasJr = false;
             for (size_t i = 0; i < g.p.w.size(); i += 2)
                 hasJr |= !(g.p.w[i] & 0x80000000u) && ((g.p.w[i] >> 25) == 0x24 || (g.p.w[i] >> 25) == 0x25);
-            if (minimize && !hasJr && minimized[famKey]++ < 40) // a minimized JR would jump through a stale register into the nop sea
+            if (minimize && (!hasJr || GapKnob("GAP_VU_MINJR", 0)) && minimized[famKey]++ < 40) // a minimized JR would jump through a stale register into the nop sea
                 prog = Minimize(index, prog, ri);
             std::vector<Diff> md;
             Fails(index, prog, ri, &md);
