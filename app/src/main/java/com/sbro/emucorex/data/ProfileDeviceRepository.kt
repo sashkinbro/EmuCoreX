@@ -228,6 +228,9 @@ class ProfileDeviceRepository(context: Context) {
         }.await()
     }
 
+    // gpuModel is intentionally not written: the deployed Firestore rules do not list it in hasOnly yet
+    // (firestore.rules accepts it now); sending it made every device registration PERMISSION_DENIED.
+    // Re-enable once the updated rules are deployed.
     private fun PlayerDevice.toPrivateMap(uid: String, includeCreatedAt: Boolean): Map<String, Any> = buildMap {
         putAll(mapOf(
         "uid" to uid,
@@ -237,7 +240,6 @@ class ProfileDeviceRepository(context: Context) {
         "model" to model,
         "soc" to soc,
         "gpuFamily" to gpuFamily,
-        "gpuModel" to gpuModel,
         "ramMb" to ramMb,
         "androidVersion" to androidVersion,
         "appVersion" to appVersion,
@@ -253,7 +255,6 @@ class ProfileDeviceRepository(context: Context) {
         "displayName" to displayName,
         "soc" to soc,
         "gpuFamily" to gpuFamily,
-        "gpuModel" to gpuModel,
         "ramMb" to ramMb,
         "androidVersion" to androidVersion,
         "appVersion" to appVersion,

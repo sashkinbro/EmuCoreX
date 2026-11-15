@@ -152,6 +152,7 @@ class EmuAchievementRepository(context: Context) {
     private val appContext = context.applicationContext
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
+    private val cachePrefs = appContext.getSharedPreferences("emucorex_achievement_cache", Context.MODE_PRIVATE)
 
     suspend fun evaluate(profile: PlayerProfile): List<EmuAchievementState> {
         if (auth.currentUser?.uid != profile.uid) return loadPublic(profile.uid, profile)
@@ -167,11 +168,7 @@ class EmuAchievementRepository(context: Context) {
 
     private suspend fun evaluateAndSync(snapshot: AchievementSnapshot): List<EmuAchievementState> {
         val uid = auth.currentUser?.uid ?: return emptyList()
-        val unlockDocuments = runCatching {
-            firestore.collection(UNLOCKS).whereEqualTo("uid", uid).get().await().documents
-        }.onFailure { Log.w(TAG, "Unable to load achievement unlocks; using local progress", it) }
-            .getOrDefault(emptyList())
-        val unlocks = unlockDocuments.associate { it.getString("achievementId").orEmpty() to it.unlockedAtMs() }
+        val unlocks = loadUnlockedCache(uid)
         val candidates = EmuCoreXAchievementCatalog.definitions.filter { definition ->
             unlocks[definition.id] == null && snapshot.progressFor(definition) >= definition.target
         }
@@ -217,6 +214,10 @@ class EmuAchievementRepository(context: Context) {
                 definition
             }
         }.await() }.onFailure { Log.w(TAG, "Unable to sync achievement unlocks", it) }.getOrDefault(emptyList())
+        if (newlyUnlocked.isNotEmpty()) {
+            val unlockedNow = System.currentTimeMillis()
+            storeUnlockedCache(uid, unlocks + newlyUnlocked.associate { it.id to unlockedNow })
+        }
 
         if (newlyUnlocked.size <= 3) {
             newlyUnlocked.forEach(::notifyUnlocked)
@@ -240,6 +241,9 @@ class EmuAchievementRepository(context: Context) {
 
     private suspend fun syncPublicSummary(uid: String, states: List<EmuAchievementState>) {
         val unlocked = states.filter(EmuAchievementState::unlocked)
+        val summary = "${unlocked.size}:${unlocked.sumOf { it.definition.points }}:${EmuCoreXAchievementCatalog.VERSION}"
+        // Skip the write when nothing changed since the last successful sync (every play-time flush calls this).
+        if (cachePrefs.getString("summary_$uid", null) == summary) return
         runCatching {
             firestore.collection(PUBLIC_PROFILES).document(uid).set(
                 mapOf(
@@ -251,7 +255,33 @@ class EmuAchievementRepository(context: Context) {
                 ),
                 SetOptions.merge()
             ).await()
+            cachePrefs.edit().putString("summary_$uid", summary).apply()
         }.onFailure { Log.w(TAG, "Unable to sync public achievement summary", it) }
+    }
+
+    /**
+     * Own unlocks are queried once per app process per uid (picks up unlocks from other devices);
+     * afterwards, and when that query fails, the locally persisted map is used.
+     */
+    private suspend fun loadUnlockedCache(uid: String): Map<String, Long> {
+        if (uid !in queriedUnlockUids) {
+            val fetched = runCatching {
+                firestore.collection(UNLOCKS).whereEqualTo("uid", uid).get().await().documents
+                    .associate { it.getString("achievementId").orEmpty() to it.unlockedAtMs() }
+            }.onFailure { Log.w(TAG, "Unable to load achievement unlocks; using cached/local progress", it) }
+                .getOrNull()
+            if (fetched != null) {
+                queriedUnlockUids += uid
+                storeUnlockedCache(uid, fetched)
+                return fetched
+            }
+        }
+        return unlockMemoryCache.getOrPut(uid) { parseUnlockedCache(cachePrefs.getString("unlocks_$uid", null)) }
+    }
+
+    private fun storeUnlockedCache(uid: String, unlocks: Map<String, Long>) {
+        unlockMemoryCache[uid] = unlocks
+        cachePrefs.edit().putString("unlocks_$uid", encodeUnlockedCache(unlocks)).apply()
     }
 
     private suspend fun loadPublic(uid: String, profile: PlayerProfile): List<EmuAchievementState> {
@@ -398,5 +428,21 @@ class EmuAchievementRepository(context: Context) {
         const val CHANNEL_ID = "emucorex_achievements"
         const val TAG = "EmuAchievements"
         const val BULK_NOTIFICATION_ID = 0x454D55
+        val queriedUnlockUids: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+        val unlockMemoryCache = java.util.concurrent.ConcurrentHashMap<String, Map<String, Long>>()
     }
+}
+
+/** Persisted form of the unlocked-id cache: "id=ms;id=ms". Ids never contain '=' or ';'. */
+internal fun encodeUnlockedCache(unlocks: Map<String, Long>): String =
+    unlocks.entries.filter { it.key.isNotBlank() }.joinToString(";") { "${it.key}=${it.value}" }
+
+internal fun parseUnlockedCache(raw: String?): Map<String, Long> {
+    if (raw.isNullOrBlank()) return emptyMap()
+    return raw.split(';').mapNotNull { part ->
+        val index = part.indexOf('=')
+        if (index <= 0) return@mapNotNull null
+        val ms = part.substring(index + 1).toLongOrNull() ?: return@mapNotNull null
+        part.substring(0, index) to ms
+    }.toMap()
 }

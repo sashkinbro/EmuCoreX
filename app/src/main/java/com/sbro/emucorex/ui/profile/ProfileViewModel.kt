@@ -111,6 +111,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
     private var profileJob: Job? = null
+    private var lastDerivedRefreshAtMs = 0L
     private var viewedProfileJob: Job? = null
     private var topGamesJob: Job? = null
     private var searchJob: Job? = null
@@ -181,9 +182,14 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 }
                 if (account != null) {
                     viewModelScope.launch {
+                        // Profile bootstrap and device registration run at most once per app process per uid;
+                        // each step is independent so one failure does not block the others.
+                        if (bootstrappedUids.add(account.uid)) {
+                            val profileOk = runCatching { repository.ensureCurrentUserProfile() }.isSuccess
+                            val deviceOk = runCatching { deviceRepository.registerCurrentDevice() }.isSuccess
+                            if (!profileOk || !deviceOk) bootstrappedUids.remove(account.uid)
+                        }
                         runCatching {
-                            repository.ensureCurrentUserProfile()
-                            deviceRepository.registerCurrentDevice()
                             val proState = proPurchaseManager.state.value
                             if (proState.isProUnlocked || proState.isPurchaseStatusVerified) {
                                 repository.updateProMembership(proState.isProUnlocked)
@@ -713,7 +719,9 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                         isProfileLoading = false
                     )
                 }
-                if (profile != null && profile.totalPlayTimeMs != previousTotal) {
+                val now = System.currentTimeMillis()
+                if (profile != null && shouldRefreshProfileDerived(previousTotal, profile.totalPlayTimeMs, lastDerivedRefreshAtMs, now)) {
+                    lastDerivedRefreshAtMs = now
                     loadRankInsights(profile.totalPlayTimeMs)
                     refreshAchievements()
                 }
@@ -802,3 +810,26 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 }
+
+/** Uids whose profile/device bootstrap already ran in this process (ViewModels are recreated often). */
+private val bootstrappedUids: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+/**
+ * Rank insights and achievement evaluation are expensive; own-profile snapshots arrive on every
+ * play-time flush. Refresh on the first snapshot, otherwise only when playtime grew by at least
+ * [MIN_DERIVED_REFRESH_DELTA_MS] and [MIN_DERIVED_REFRESH_INTERVAL_MS] has elapsed.
+ */
+internal fun shouldRefreshProfileDerived(
+    previousTotalMs: Long?,
+    newTotalMs: Long,
+    lastRefreshAtMs: Long,
+    nowMs: Long
+): Boolean {
+    if (previousTotalMs == null) return true
+    if (newTotalMs == previousTotalMs) return false
+    if (kotlin.math.abs(newTotalMs - previousTotalMs) < MIN_DERIVED_REFRESH_DELTA_MS) return false
+    return nowMs - lastRefreshAtMs >= MIN_DERIVED_REFRESH_INTERVAL_MS
+}
+
+internal const val MIN_DERIVED_REFRESH_DELTA_MS = 60_000L
+internal const val MIN_DERIVED_REFRESH_INTERVAL_MS = 30_000L

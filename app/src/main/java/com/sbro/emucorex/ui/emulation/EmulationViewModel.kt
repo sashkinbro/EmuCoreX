@@ -1679,16 +1679,28 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         if (!playerProfileRepository.hasSignedInUser()) {
             return
         }
-        val entries = playTimeSyncCacheRepository.drain()
-        if (entries.isEmpty()) return
-        val synced = runCatching {
-            playerProfileRepository.recordPlayTimeBatch(entries)
-        }.isSuccess
-        if (synced) {
+        // After failures, wait out the persisted exponential backoff (1, 2, 4 ... 60 min); an explicit
+        // forced flush (game exit / sign-in) still tries once.
+        if (!force && nowMs < playTimeSyncCacheRepository.getNextCloudAttemptAtMs()) {
+            return
+        }
+        // At most the in-flight batch plus one fresh batch per call. Entries stay persisted until the
+        // cloud commit succeeds, so a failure or process kill cannot lose play time.
+        repeat(2) {
+            val flight = playTimeSyncCacheRepository.beginFlush() ?: return
+            val synced = runCatching {
+                playerProfileRepository.recordPlayTimeBatch(flight.entries, flight.id)
+            }.onFailure { error ->
+                if (error is kotlinx.coroutines.CancellationException) throw error
+            }.isSuccess
+            if (!synced) {
+                playTimeSyncCacheRepository.recordFlushFailure(nowMs)
+                return
+            }
+            playTimeSyncCacheRepository.completeFlush(flight.id)
+            playTimeSyncCacheRepository.clearFlushBackoff()
             lastCloudPlayTimeSyncAtMs = nowMs
             playTimeSyncCacheRepository.setLastCloudSyncAtMs(nowMs)
-        } else {
-            playTimeSyncCacheRepository.restore(entries)
         }
     }
 

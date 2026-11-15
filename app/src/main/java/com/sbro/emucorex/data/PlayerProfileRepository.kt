@@ -135,6 +135,7 @@ class PlayerProfileRepository(context: Context) {
     private val firestore = FirebaseFirestore.getInstance()
     private val coverArtRepository = CoverArtRepository(appContext)
     private val gameStatsRepository = GameStatsRepository(appContext)
+    private val profileSyncPrefs = appContext.getSharedPreferences("player_profile_sync", Context.MODE_PRIVATE)
 
     fun observeAuthState(): Flow<PlayerAccount?> = callbackFlow {
         val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
@@ -149,6 +150,8 @@ class PlayerProfileRepository(context: Context) {
 
     suspend fun ensureCurrentUserProfile() {
         auth.currentUser?.let { user ->
+            // Once per app process per uid: the profile screen is opened many times per session.
+            if (user.uid in ensuredProfileUids) return
             runCatching { removeLegacyAutotestProfileEntries(user.uid) }
                 .onFailure { error -> Log.e(TAG, "Legacy autotest profile cleanup failed", error) }
             ensureUserProfile(
@@ -157,6 +160,7 @@ class PlayerProfileRepository(context: Context) {
                 displayName = user.displayName.cleanDisplayName(user.email),
                 photoURL = user.bestPhotoUrl()
             )
+            ensuredProfileUids += user.uid
         }
     }
 
@@ -342,6 +346,7 @@ class PlayerProfileRepository(context: Context) {
 
     suspend fun updateProMembership(enabled: Boolean) {
         val uid = auth.currentUser?.uid ?: return
+        if (proMembershipSynced[uid] == enabled) return
         val patch = mapOf(
             FIELD_PROFILE_SCHEMA_VERSION to PROFILE_SCHEMA_VERSION,
             FIELD_PRO_MEMBER to enabled,
@@ -351,6 +356,7 @@ class PlayerProfileRepository(context: Context) {
             batch.set(firestore.collection(PUBLIC_PROFILES_COLLECTION).document(uid), patch, SetOptions.merge())
             batch.set(firestore.collection(LEADERBOARD_COLLECTION).document(uid), patch, SetOptions.merge())
         }.await()
+        proMembershipSynced[uid] = enabled
     }
 
     suspend fun signIn(email: String, password: String) {
@@ -437,7 +443,13 @@ class PlayerProfileRepository(context: Context) {
         auth.signOut()
     }
 
-    suspend fun recordPlayTimeBatch(entries: List<PlayerPlayTimeDelta>) {
+    /**
+     * [flushId] makes the commit idempotent across a lost acknowledgement: the id is stored in the
+     * user document (recentFlushIds, last [MAX_RECENT_FLUSH_IDS]) and a retry carrying an id that is
+     * already stored is skipped. Limitation: global game stats for such a skipped retry are not
+     * re-sent (they were queued by the original attempt or lost with it).
+     */
+    suspend fun recordPlayTimeBatch(entries: List<PlayerPlayTimeDelta>, flushId: String? = null) {
         val user = auth.currentUser ?: return
         val validEntries = entries
             .filter { entry ->
@@ -459,7 +471,7 @@ class PlayerProfileRepository(context: Context) {
         val latestEntry = validEntries.maxBy { it.second.lastPlayedAtMs }.second
         val latestTitle = latestEntry.title.ifBlank { latestEntry.gamePath.orEmpty().substringAfterLast('/').substringBeforeLast('.') }
         val cleanName = user.displayName.cleanDisplayName(user.email)
-        val photoURL = user.bestPhotoUrl().orEmpty()
+        val photoURL = user.bestPhotoUrl().orEmpty().take(MAX_PHOTO_URL_LENGTH)
         val searchName = normalizeSearchName(cleanName)
         val playerTag = buildPlayerTag(user.uid)
         val userRef = firestore.collection(USERS_COLLECTION).document(user.uid)
@@ -474,6 +486,11 @@ class PlayerProfileRepository(context: Context) {
         firestore.runTransaction { transaction ->
             pendingStats.clear()
             val snapshot = transaction.get(userRef)
+            val previousFlushIds = snapshot.stringList(FIELD_RECENT_FLUSH_IDS)
+            if (flushId != null && flushId in previousFlushIds) {
+                Log.i(TAG, "Play-time flush $flushId already applied; skipping duplicate")
+                return@runTransaction
+            }
             val activitySnapshots = activityRefs.mapValues { (_, reference) -> transaction.get(reference) }
             val existingGames = snapshot.getGamesMap().toMutableMap()
             val changedGames = LinkedHashMap<String, Map<String, Any>>()
@@ -528,7 +545,11 @@ class PlayerProfileRepository(context: Context) {
                 FIELD_FAVORITE_GAME_KEYS to favoriteGameKeys,
                 FIELD_UPDATED_AT to FieldValue.serverTimestamp(),
                 FIELD_CREATED_AT to (snapshot.getTimestamp(FIELD_CREATED_AT) ?: FieldValue.serverTimestamp())
-            )
+            ) + if (flushId != null) {
+                mapOf(FIELD_RECENT_FLUSH_IDS to (previousFlushIds + flushId).takeLast(MAX_RECENT_FLUSH_IDS))
+            } else {
+                emptyMap()
+            }
             val leaderboardData = mapOf(
                 FIELD_PROFILE_SCHEMA_VERSION to PROFILE_SCHEMA_VERSION,
                 FIELD_UID to user.uid,
@@ -701,6 +722,9 @@ class PlayerProfileRepository(context: Context) {
     }
 
     private suspend fun ensureUserProfile(uid: String, email: String?, displayName: String, photoURL: String?) {
+        // The publicProfiles/games backfill (up to PUBLIC_MIGRATION_GAME_LIMIT writes) is needed once per uid.
+        val migrationPrefKey = "public_games_migrated_$uid"
+        val migrateGames = !profileSyncPrefs.getBoolean(migrationPrefKey, false)
         val userRef = firestore.collection(USERS_COLLECTION).document(uid)
         val publicProfileRef = firestore.collection(PUBLIC_PROFILES_COLLECTION).document(uid)
         val leaderboardRef = firestore.collection(LEADERBOARD_COLLECTION).document(uid)
@@ -770,17 +794,20 @@ class PlayerProfileRepository(context: Context) {
             transaction.set(userRef, userData, SetOptions.merge())
             transaction.set(publicProfileRef, publicProfileData, SetOptions.merge())
             transaction.set(leaderboardRef, leaderboardData, SetOptions.merge())
-            existingGames.entries
-                .sortedByDescending { (_, value) -> value.toGameMap().longValue(GAME_TOTAL_MS) }
-                .take(PUBLIC_MIGRATION_GAME_LIMIT)
-                .forEach { (gameKey, gameData) ->
-                    transaction.set(
-                        publicProfileRef.collection(PUBLIC_GAMES_COLLECTION).document(gameKey),
-                        gameData.toGameMap().toPublicGameData(),
-                        SetOptions.merge()
-                    )
-                }
+            if (migrateGames) {
+                existingGames.entries
+                    .sortedByDescending { (_, value) -> value.toGameMap().longValue(GAME_TOTAL_MS) }
+                    .take(PUBLIC_MIGRATION_GAME_LIMIT)
+                    .forEach { (gameKey, gameData) ->
+                        transaction.set(
+                            publicProfileRef.collection(PUBLIC_GAMES_COLLECTION).document(gameKey),
+                            gameData.toGameMap().toPublicGameData(),
+                            SetOptions.merge()
+                        )
+                    }
+            }
         }.await()
+        if (migrateGames) profileSyncPrefs.edit().putBoolean(migrationPrefKey, true).apply()
     }
 
     private fun DocumentSnapshot.toPlayerProfile(): PlayerProfile? {
@@ -1019,6 +1046,12 @@ class PlayerProfileRepository(context: Context) {
         private const val MIN_PLAYER_SEARCH_LENGTH = 2
         private const val PUBLIC_GAMES_PAGE_SIZE = 20L
         private const val PUBLIC_MIGRATION_GAME_LIMIT = 100
+        private const val MAX_PHOTO_URL_LENGTH = 500
+        private const val MAX_RECENT_FLUSH_IDS = 8
+        private const val FIELD_RECENT_FLUSH_IDS = "recentFlushIds"
+        // Process-wide: ViewModels are recreated, repositories are not singletons.
+        private val ensuredProfileUids: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+        private val proMembershipSynced = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
         private const val ACTIVITY_HISTORY_DAYS = 120L
         private const val MAX_FAVORITE_GAMES = 3
         private const val MAX_DAILY_GAMES = 100
