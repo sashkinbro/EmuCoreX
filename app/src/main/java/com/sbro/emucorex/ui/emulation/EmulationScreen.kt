@@ -70,6 +70,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -6374,7 +6376,7 @@ private fun GameMenuLayoutHost(
                         .fillMaxWidth(0.94f)
                         .fillMaxHeight(),
                     shape = neonShape(24.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                    color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
                     shadowElevation = 12.dp
                 ) {
@@ -6416,7 +6418,7 @@ private fun GameMenuLayoutHost(
                         .fillMaxWidth(0.96f)
                         .fillMaxHeight(),
                     shape = neonShapeCorners(topStart = 30.dp, topEnd = 30.dp, bottomStart = 18.dp, bottomEnd = 18.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                    color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
                     shadowElevation = 14.dp
                 ) {
@@ -6456,7 +6458,7 @@ private fun GameMenuLayoutHost(
                         .fillMaxHeight()
                         .widthIn(min = 300.dp, max = 352.dp),
                     shape = neonShape(18.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                    color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
                     shadowElevation = 10.dp
                 ) {
@@ -6500,7 +6502,7 @@ private fun GameMenuContentSurface(
     Surface(
         modifier = modifier,
         shape = shape,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+        color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
     ) {
         GameMenuContentColumn(
@@ -6606,7 +6608,7 @@ private fun GameMenuVerticalNavigation(
         color = if (showLabels) {
             MaterialTheme.colorScheme.surfaceContainerLow
         } else {
-            MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
+            MaterialTheme.colorScheme.surface
         },
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f))
     ) {
@@ -7525,14 +7527,8 @@ private fun LiveSelectionRow(
                 }
             }
         } else if (horizontalScrolling) {
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalViewportBleed(18.dp),
-                contentPadding = PaddingValues(horizontal = 18.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(options, key = { it.value }) { option ->
+            MenuChipStrip {
+                options.forEach { option ->
                     LiveSelectionChip(
                         option = option,
                         selected = option.value == currentValue,
@@ -7862,14 +7858,8 @@ private fun LiveChipsSelectionRow(
                 SettingHelpButton(title = title, description = it)
             }
         }
-        LazyRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalViewportBleed(18.dp),
-            contentPadding = PaddingValues(horizontal = 18.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(options, key = { it.first }) { (value, label) ->
+        MenuChipStrip {
+            options.forEach { (value, label) ->
                 FilterChip(
                     shape = neonChipShape(),
                     selected = currentValue == value,
@@ -7922,14 +7912,8 @@ private fun LiveBitmaskChoiceRow(
                 SettingHelpButton(title = title, description = it)
             }
         }
-        LazyRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalViewportBleed(18.dp),
-            contentPadding = PaddingValues(horizontal = 18.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(options, key = { it.first }) { (metric, label) ->
+        MenuChipStrip {
+            options.forEach { (metric, label) ->
                 FilterChip(
                     shape = neonChipShape(),
                     selected = PerformanceOverlayMetrics.isEnabled(selectedMask, metric),
@@ -7940,6 +7924,23 @@ private fun LiveBitmaskChoiceRow(
             }
         }
     }
+}
+
+/**
+ * Short, fixed chip strips: a plain horizontally scrolling Row is much cheaper to compose than a
+ * nested LazyRow (no subcompose/prefetch per row), which matters while the parent list is flung.
+ */
+@Composable
+private fun MenuChipStrip(content: @Composable RowScope.() -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalViewportBleed(18.dp)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 18.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        content = content
+    )
 }
 
 private fun Modifier.horizontalViewportBleed(inset: Dp): Modifier = layout { measurable, constraints ->
