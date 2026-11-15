@@ -20,6 +20,7 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <functional>
@@ -763,11 +764,18 @@ private:
 	// into the shared one.
 	static constexpr u32 MAX_TFX_COMPILE_THREADS = 3;
 	static constexpr u32 MAX_LEARNED_TFX_SELECTORS = 4096;
+	static constexpr std::chrono::seconds WARMUP_TIME_BUDGET{60};
 
 	void StartAsyncTFXCompilation();
 	void StartAsyncTFXCompilation(std::vector<PipelineSelector> selectors, size_t learned_count);
-	void StopAsyncTFXCompilation();
-	void TFXCompileThreadEntryPoint();
+	void StopAsyncTFXCompilation(bool wait = true);
+	/// Warmup is skipped on blocklisted GPUs (PowerVR) and on a GPU/driver identity whose previous
+	/// warmup died mid-run (crash-loop guard); the identity is keyed like the pipeline cache stamp.
+	bool IsWarmupBlocklisted() const;
+	/// 1 worker on Mali/Immortalis, Tensor and unknown vendors, 2 on Adreno.
+	u32 WarmupWorkerLimit() const;
+	std::string GetWarmupIdentity() const;
+	void TFXCompileThreadEntryPoint(u32 generation, s64 deadline_ns);
 	VkPipeline PublishTFXPipeline(const PipelineSelector& p, VkPipeline pipeline);
 	static void BuildWarmupTFXSelectors(std::vector<PipelineSelector>& out);
 	static void BuildTFXPreparationSelectors(std::vector<PipelineSelector>& out, bool vs_expand_available);
@@ -778,6 +786,13 @@ private:
 	void RecordLearnedTFXSelector(const PipelineSelector& p);
 
 	std::vector<std::thread> m_tfx_compile_threads;
+	// Threads of superseded generations: told to quit and not waited for by the GS thread; joined by
+	// StopAsyncTFXCompilation(true), which Destroy() runs before vkDestroyDevice.
+	std::vector<std::thread> m_tfx_retired_threads;
+	// Bumped under m_tfx_progress_mutex whenever the queue is replaced; a worker of an older
+	// generation claims nothing and reports nothing.
+	u32 m_tfx_generation = 0;
+	std::atomic<u32> m_tfx_live_workers{0};
 	std::vector<PipelineSelector> m_tfx_compile_queue;
 	std::atomic<bool> m_tfx_compile_quit{false};
 	mutable std::mutex m_tfx_progress_mutex;

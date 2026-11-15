@@ -3164,12 +3164,13 @@ bool GSDeviceVK::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 		return false;
 
 #ifdef __ANDROID__
-	if (IsDevicePowerVR())
+	if (IsWarmupBlocklisted())
 	{
 		// PowerVR's Vulkan compiler aborts inside vkCreateGraphicsPipelines while the
-		// background TFX warmup compiles its 168 selectors (Pixel 10 / DXT). Compile
-		// pipelines on demand from the GS thread instead of precompiling them.
-		Console.WriteLn("VK: PowerVR detected, skipping background TFX warmup.");
+		// background TFX warmup compiles its 168 selectors (Pixel 10 / DXT), and a driver
+		// whose previous warmup crashed is not retried. Compile pipelines on demand from
+		// the GS thread instead of precompiling them.
+		Console.WriteLn("VK: background TFX warmup disabled for this GPU/driver.");
 	}
 	else if (!GSConfig.PrecompilePipelines)
 	{
@@ -5969,6 +5970,7 @@ bool GSDeviceVK::CompileConvertPipelines()
 		ScopedGuard ps_guard([this, &ps]() { vkDestroyShaderModule(m_device, ps, nullptr); });
 		gpb.SetFragmentShader(ps);
 
+		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
 		VkPipeline pipe = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
 					
 		if (!pipe)
@@ -5993,6 +5995,7 @@ bool GSDeviceVK::CompileConvertPipelines()
 					gpb.SetRenderPass(GetTFXRenderPass(true, ds != 0, is_setup, false, fbl != 0, false,
 						VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_LOAD_OP_DONT_CARE),
 						0);
+					std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
 					arr[ds][fbl] = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
 					if (!arr[ds][fbl])
 						return false;
@@ -6038,6 +6041,7 @@ bool GSDeviceVK::CompileConvertPipelines()
 		for (u32 ds = 0; ds < 2; ds++)
 		{
 			gpb.SetRenderPass(m_primid_image_setup_render_passes[ds][0], 0);
+			std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
 			m_primid_image_setup_pipelines[ds][datm] =
 				gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
 			if (!m_primid_image_setup_pipelines[ds][datm])
@@ -6096,6 +6100,7 @@ bool GSDeviceVK::CompilePresentPipelines()
 		ScopedGuard ps_guard([this, &ps]() { vkDestroyShaderModule(m_device, ps, nullptr); });
 		gpb.SetFragmentShader(ps);
 
+		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
 		m_present[index] = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
 		if (!m_present[index])
 			return false;
@@ -6147,6 +6152,7 @@ bool GSDeviceVK::CompileInterlacePipelines()
 
 		gpb.SetFragmentShader(ps);
 
+		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
 		m_interlace[i] = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
 		vkDestroyShaderModule(m_device, ps, nullptr);
 		if (!m_interlace[i])
@@ -6199,6 +6205,7 @@ bool GSDeviceVK::CompileMergePipelines()
 		gpb.SetBlendAttachment(0, true, VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD,
 			VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD);
 
+		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
 		m_merge[i] = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
 		vkDestroyShaderModule(m_device, ps, nullptr);
 		if (!m_merge[i])
@@ -6257,6 +6264,7 @@ bool GSDeviceVK::CompilePostProcessingPipelines()
 		gpb.SetVertexShader(vs);
 		gpb.SetFragmentShader(ps);
 
+		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
 		m_fxaa_pipeline = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
 		if (!m_fxaa_pipeline)
 			return false;
@@ -6285,6 +6293,7 @@ bool GSDeviceVK::CompilePostProcessingPipelines()
 		gpb.SetVertexShader(vs);
 		gpb.SetFragmentShader(ps);
 
+		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
 		m_shadeboost_pipeline = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
 		if (!m_shadeboost_pipeline)
 			return false;
@@ -6331,6 +6340,7 @@ bool GSDeviceVK::CompileCASPipelines()
 		cpb.SetPipelineLayout(m_cas_pipeline_layout);
 		cpb.SetShader(mod, "main");
 		cpb.SetSpecializationBool(0, sharpen_only != 0);
+		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
 		m_cas_pipelines[sharpen_only] = cpb.Create(dev, g_vulkan_shader_cache->GetPipelineCache(true), false);
 		if (!m_cas_pipelines[sharpen_only])
 			return false;
@@ -6384,6 +6394,7 @@ bool GSDeviceVK::CompileImGuiPipeline()
 	gpb.AddDynamicState(VK_DYNAMIC_STATE_BLEND_CONSTANTS);
 	gpb.AddDynamicState(VK_DYNAMIC_STATE_LINE_WIDTH);
 
+	std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
 	m_imgui_pipeline = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(), false);
 	if (!m_imgui_pipeline)
 	{
@@ -8656,11 +8667,12 @@ bool GSDeviceVK::CreateTFXPreparationDevice(std::string tfx_source)
 			if (!CheckFeatures())
 				return false;
 
-			// The preparation job uses the same PowerVR compiler path that aborts during
-			// the automatic warmup. Keep the feature unavailable instead of crashing.
-			if (IsDevicePowerVR())
+			// The preparation job uses the same compiler path that aborts during the automatic
+			// warmup on PowerVR (or crashed a previous warmup/preparation on this driver). Keep
+			// the feature unavailable instead of crashing.
+			if (IsWarmupBlocklisted())
 			{
-				Console.Warning("VK: TFX preparation is disabled on PowerVR.");
+				Console.Warning("VK: TFX preparation is disabled for this GPU/driver.");
 				return false;
 			}
 
@@ -8872,9 +8884,93 @@ bool GSDeviceVK::TestTFXPreparationResources() const
 }
 #endif
 
+// Crash-loop guard for the background warmup and "Prepare shaders". A marker file is written before the
+// first worker can enter the driver and removed when the last one is gone. A marker found at the next
+// start means the process died inside the warmup: that GPU/driver/build identity then has the warmup
+// switched off for good (a flag file, cleared with the shader cache) and pipelines compile on demand.
+namespace
+{
+std::mutex s_warmup_marker_mutex;
+u32 s_warmup_marker_users = 0;
+std::string s_warmup_history_checked_id;
+
+std::string WarmupFlagPath(const char* kind, const std::string& identity)
+{
+	return Path::Combine(EmuFolders::Cache, fmt::format("vk_warmup_{}_{}.flag", kind, identity));
+}
+
+void WarmupMarkerAcquire(const std::string& identity)
+{
+	std::lock_guard lock(s_warmup_marker_mutex);
+	if (s_warmup_marker_users++ == 0)
+	{
+		const char text[] = "TFX warmup in progress\n";
+		FileSystem::WriteBinaryFile(WarmupFlagPath("active", identity).c_str(), text, sizeof(text) - 1);
+	}
+}
+
+void WarmupMarkerRelease(const std::string& identity)
+{
+	std::lock_guard lock(s_warmup_marker_mutex);
+	if (s_warmup_marker_users > 0 && --s_warmup_marker_users == 0)
+		FileSystem::DeleteFilePath(WarmupFlagPath("active", identity).c_str());
+}
+
+void WarmupClearDisabled(const std::string& identity)
+{
+	std::lock_guard lock(s_warmup_marker_mutex);
+	FileSystem::DeleteFilePath(WarmupFlagPath("disabled", identity).c_str());
+}
+
+bool WarmupDisabledByHistory(const std::string& identity)
+{
+	std::lock_guard lock(s_warmup_marker_mutex);
+	// Leftovers of an earlier process are looked at once per process, before this one writes its own.
+	if (s_warmup_history_checked_id != identity && s_warmup_marker_users == 0)
+	{
+		s_warmup_history_checked_id = identity;
+		const std::string active = WarmupFlagPath("active", identity);
+		if (FileSystem::FileExists(active.c_str()))
+		{
+			const char text[] = "TFX warmup crashed the previous run\n";
+			FileSystem::WriteBinaryFile(WarmupFlagPath("disabled", identity).c_str(), text, sizeof(text) - 1);
+			FileSystem::DeleteFilePath(active.c_str());
+			Console.Warning("VK: the previous TFX warmup did not finish cleanly; disabling it for this GPU/driver.");
+		}
+	}
+	return FileSystem::FileExists(WarmupFlagPath("disabled", identity).c_str());
+}
+} // namespace
+
+std::string GSDeviceVK::GetWarmupIdentity() const
+{
+	// Same ingredients as the pipeline cache stamp.
+	const VkPhysicalDeviceProperties& p = m_device_properties;
+	const VkPhysicalDeviceDriverPropertiesKHR& d = m_device_driver_properties;
+	const std::string text = fmt::format("{}|{}|{}|{}|{}|{}|{}|{}", GSCacheFile::GetBuildId(), p.vendorID,
+		p.deviceID, p.driverVersion, p.apiVersion, static_cast<u32>(d.driverID), d.driverName, d.driverInfo);
+	return GSCacheFile::ShortName(GSCacheFile::Hash128(text.data(), text.size()));
+}
+
+bool GSDeviceVK::IsWarmupBlocklisted() const
+{
+	// PowerVR's compiler aborts inside vkCreateGraphicsPipelines during the warmup.
+	if (IsDevicePowerVR())
+		return true;
+	return WarmupDisabledByHistory(GetWarmupIdentity());
+}
+
+u32 GSDeviceVK::WarmupWorkerLimit() const
+{
+	// Adreno compiles two at a time without trouble; Mali/Immortalis (also every Pixel/Tensor part)
+	// and anything unrecognised get a single worker, since their compilers hold most of the memory
+	// and the device is already busy running the game.
+	return (m_device_properties.vendorID == 0x5143) ? 2u : 1u;
+}
+
 void GSDeviceVK::StartAsyncTFXCompilation()
 {
-	StopAsyncTFXCompilation();
+	StopAsyncTFXCompilation(false);
 
 	LoadLearnedTFXSelectors();
 	std::vector<PipelineSelector> generic_selectors;
@@ -8886,12 +8982,14 @@ void GSDeviceVK::StartAsyncTFXCompilation()
 
 void GSDeviceVK::StartAsyncTFXCompilation(std::vector<PipelineSelector> selectors, size_t learned_count)
 {
-	m_tfx_compile_queue = std::move(selectors);
 	if (learned_count > 0)
 		Console.WriteLn("VK: Replaying %zu learned TFX pipelines in the background.", learned_count);
 	m_tfx_compile_quit.store(false, std::memory_order_relaxed);
+	u32 generation;
 	{
 		std::lock_guard lock(m_tfx_progress_mutex);
+		generation = ++m_tfx_generation;
+		m_tfx_compile_queue = std::move(selectors);
 		m_tfx_progress.Reset(static_cast<u32>(m_tfx_compile_queue.size()));
 		m_tfx_merge_coordinator.Reset(0);
 	}
@@ -8900,16 +8998,25 @@ void GSDeviceVK::StartAsyncTFXCompilation(std::vector<PipelineSelector> selector
 		m_tfx_compile_start_released = false;
 	}
 
+	// The automatic warmup is a background nicety: bounded in time. A preparation run is not.
+	const s64 deadline_ns = m_tfx_preparation_device ? 0 :
+		std::chrono::duration_cast<std::chrono::nanoseconds>(
+			(std::chrono::steady_clock::now() + WARMUP_TIME_BUDGET).time_since_epoch()).count();
 	const u32 hw_threads = std::max(1u, std::thread::hardware_concurrency());
-	const u32 worker_count = std::min(MAX_TFX_COMPILE_THREADS, std::max(1u, hw_threads / 2));
+	const u32 worker_count = std::min({MAX_TFX_COMPILE_THREADS, WarmupWorkerLimit(), std::max(1u, hw_threads / 2)});
 	for (u32 i = 0; i < worker_count; i++)
 	{
+		// The marker exists before the first worker can reach the driver and goes when the last one is gone.
+		WarmupMarkerAcquire(GetWarmupIdentity());
+		m_tfx_live_workers.fetch_add(1, std::memory_order_relaxed);
 		try
 		{
-			m_tfx_compile_threads.emplace_back(&GSDeviceVK::TFXCompileThreadEntryPoint, this);
+			m_tfx_compile_threads.emplace_back(&GSDeviceVK::TFXCompileThreadEntryPoint, this, generation, deadline_ns);
 		}
 		catch (...)
 		{
+			m_tfx_live_workers.fetch_sub(1, std::memory_order_relaxed);
+			WarmupMarkerRelease(GetWarmupIdentity());
 			break;
 		}
 	}
@@ -8924,6 +9031,15 @@ void GSDeviceVK::StartAsyncTFXCompilation(std::vector<PipelineSelector> selector
 		m_tfx_compile_start_released = true;
 	}
 	m_tfx_compile_start_cv.notify_all();
+
+	if (m_tfx_compile_threads.empty() && !m_tfx_preparation_device)
+	{
+		// Never replay the warmup list on the GS thread; pipelines compile on demand instead.
+		Console.Warning("VK: Failed to start TFX compile threads, skipping background warmup.");
+		std::lock_guard lock(m_tfx_progress_mutex);
+		m_tfx_compile_queue.clear();
+		return;
+	}
 
 	if (m_tfx_compile_threads.empty())
 	{
@@ -8985,10 +9101,39 @@ void GSDeviceVK::StartAsyncTFXCompilation(std::vector<PipelineSelector> selector
 		m_tfx_compile_queue.size(), m_tfx_compile_threads.size());
 }
 
-void GSDeviceVK::StopAsyncTFXCompilation()
+void GSDeviceVK::StopAsyncTFXCompilation(bool wait)
 {
 	RequestTFXPreparationCancel();
+	{
+		// Workers of this generation drop out at their next claim and report nothing.
+		std::lock_guard lock(m_tfx_progress_mutex);
+		++m_tfx_generation;
+		m_tfx_compile_queue.clear();
+	}
 
+	if (!wait)
+	{
+		// The GS thread does not sit through a compile in flight: the workers finish it, merge their
+		// caches and exit by themselves; Destroy() joins them before the device goes.
+		for (std::thread& thread : m_tfx_compile_threads)
+			m_tfx_retired_threads.push_back(std::move(thread));
+		m_tfx_compile_threads.clear();
+		if (m_tfx_live_workers.load(std::memory_order_acquire) == 0)
+		{
+			for (std::thread& thread : m_tfx_retired_threads)
+				if (thread.joinable())
+					thread.join();
+			m_tfx_retired_threads.clear();
+		}
+		return;
+	}
+
+	for (std::thread& thread : m_tfx_retired_threads)
+	{
+		if (thread.joinable())
+			thread.join();
+	}
+	m_tfx_retired_threads.clear();
 	for (std::thread& thread : m_tfx_compile_threads)
 	{
 		if (thread.joinable())
@@ -8996,7 +9141,6 @@ void GSDeviceVK::StopAsyncTFXCompilation()
 	}
 
 	m_tfx_compile_threads.clear();
-	m_tfx_compile_queue.clear();
 	{
 		std::lock_guard lock(m_tfx_progress_mutex);
 		const TFXPreparationProgressSnapshot progress = m_tfx_progress.Snapshot();
@@ -9007,12 +9151,19 @@ void GSDeviceVK::StopAsyncTFXCompilation()
 	SaveLearnedTFXSelectors();
 }
 
-void GSDeviceVK::TFXCompileThreadEntryPoint()
+void GSDeviceVK::TFXCompileThreadEntryPoint(u32 generation, s64 deadline_ns)
 {
+	// Last thing this thread does, after the cache merge below: the live count lets the GS thread
+	// reap retired threads, the marker release says the driver did not take the process down.
+	ScopedGuard exit_guard([this]() {
+		WarmupMarkerRelease(GetWarmupIdentity());
+		m_tfx_live_workers.fetch_sub(1, std::memory_order_release);
+	});
 	{
 		std::unique_lock lock(m_tfx_compile_start_mutex);
 		m_tfx_compile_start_cv.wait(lock, [this]() { return m_tfx_compile_start_released; });
 	}
+	const auto is_current = [this, generation]() { return generation == m_tfx_generation; }; // m_tfx_progress_mutex held
 
 #if defined(__ANDROID__)
 	// Keep the emulation threads ahead of shader compilation.
@@ -9020,11 +9171,14 @@ void GSDeviceVK::TFXCompileThreadEntryPoint()
 #endif
 
 	VkPipelineCache transient_cache = VK_NULL_HANDLE;
-	ScopedGuard worker_cleanup([this, &transient_cache]() {
+	ScopedGuard worker_cleanup([this, &transient_cache, &is_current]() {
 		const bool merge_succeeded = g_vulkan_shader_cache->MergeTransientPipelineCache(transient_cache);
 		bool last_merge = false;
 		{
 			std::lock_guard lock(m_tfx_progress_mutex);
+			// A superseded generation's coordinator and progress are gone: its merge was all it owed.
+			if (!is_current())
+				return;
 			last_merge = m_tfx_merge_coordinator.ReportMerged(merge_succeeded);
 		}
 
@@ -9050,23 +9204,36 @@ void GSDeviceVK::TFXCompileThreadEntryPoint()
 		{
 			if (m_tfx_compile_quit.load(std::memory_order_relaxed))
 				break;
+			if (deadline_ns != 0 &&
+				std::chrono::duration_cast<std::chrono::nanoseconds>(
+					std::chrono::steady_clock::now().time_since_epoch()).count() >= deadline_ns)
+			{
+				Console.WriteLn("VK: TFX warmup time budget spent, stopping.");
+				break;
+			}
 
 			std::optional<u32> index;
+			// The selector is copied under the lock: a newer generation replaces the queue.
+			PipelineSelector p;
 			{
 				std::lock_guard lock(m_tfx_progress_mutex);
+				if (!is_current())
+					break;
 				index = m_tfx_progress.TryClaimNext();
+				if (index.has_value())
+					p = m_tfx_compile_queue[*index];
 			}
 			if (!index.has_value())
 				break;
 			bool claim_finished = false;
-			ScopedGuard claim_cleanup([this, &claim_finished, claim_index = *index]() {
+			ScopedGuard claim_cleanup([this, &claim_finished, &is_current, claim_index = *index]() {
 				if (claim_finished)
 					return;
 				std::lock_guard lock(m_tfx_progress_mutex);
-				claim_finished = m_tfx_progress.FinishClaim(claim_index, TFXPreparationResult::Failed);
+				if (is_current())
+					claim_finished = m_tfx_progress.FinishClaim(claim_index, TFXPreparationResult::Failed);
 			});
 
-			const PipelineSelector& p = m_tfx_compile_queue[*index];
 			bool already_available = false;
 			{
 				std::lock_guard lock(m_tfx_pipelines_mutex);
@@ -9095,7 +9262,8 @@ void GSDeviceVK::TFXCompileThreadEntryPoint()
 			}
 			{
 				std::lock_guard lock(m_tfx_progress_mutex);
-				claim_finished = m_tfx_progress.FinishClaim(*index, result);
+				if (is_current())
+					claim_finished = m_tfx_progress.FinishClaim(*index, result);
 			}
 		}
 	}
@@ -9156,7 +9324,7 @@ void GSDeviceVK::LoadLearnedTFXSelectors()
     m_tfx_learned_set.clear();m_tfx_learned_order.clear();m_tfx_learned_dirty=false;
     if(!m_tfx_key_pack)return;
     std::vector<PipelineSelector> stale;
-    const size_t max_jobs=GetPhysicalMemory()>=6ull*1024*1024*1024?2048:768;
+    const size_t max_jobs=256; // replayed on one background worker within WARMUP_TIME_BUDGET
     m_tfx_key_pack->ForEach(1,[&](const u8* key,u32 size,const std::vector<u8>& value,u32){
         if(size!=sizeof(PipelineSelector)||value.size()!=sizeof(u32))return;
         PipelineSelector p;u32 session;std::memcpy(&p,key,sizeof(p));std::memcpy(&session,value.data(),sizeof(session));
@@ -10446,6 +10614,7 @@ VkPipeline GSDeviceVK::GetStencilCounterResolvePipeline(u32 rgb_mask)
 		gpb.SetDynamicViewportAndScissorState();
 		gpb.SetVertexShader(vs);
 		gpb.SetFragmentShader(fs);
+		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
 		pipeline = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
 		if (pipeline != VK_NULL_HANDLE)
 			Vulkan::SetObjectName(m_device, pipeline, "Stencil counter resolve (mask=%x)", rgb_mask);
@@ -11753,7 +11922,7 @@ std::string GSDeviceVK::GetTFXPipelineKeyFingerprint() const
 
 void GSDeviceVK::SetGameIdentity(const std::string& serial,u32 crc)
 {
-    StopAsyncTFXCompilation();
+    StopAsyncTFXCompilation(false);
     m_tfx_session_seen.clear();m_hot_tfx_pipelines.Clear();
     if (!g_vulkan_shader_cache || m_tfx_preparation_device) return;
     if (m_tfx_key_pack) g_vulkan_shader_cache->ReleasePack(std::exchange(m_tfx_key_pack,{}));
@@ -11769,11 +11938,13 @@ void GSDeviceVK::SetGameIdentity(const std::string& serial,u32 crc)
     std::vector<u8> value;
     if(m_tfx_key_pack->Get(2,nullptr,0,&value)&&value.size()==sizeof(u32)) {std::memcpy(&m_tfx_key_session,value.data(),sizeof(u32));++m_tfx_key_session;}
     m_tfx_key_pack->Put(2,nullptr,0,&m_tfx_key_session,sizeof(m_tfx_key_session));
-    if (GSConfig.PrecompilePipelines && !GSConfig.DisableAsyncTFXCompile && !IsDevicePowerVR()) StartAsyncTFXCompilation();
+    if (GSConfig.PrecompilePipelines && !GSConfig.DisableAsyncTFXCompile && !IsWarmupBlocklisted()) StartAsyncTFXCompilation();
 }
 void GSDeviceVK::PrepareShaderCacheClear()
 {
     StopAsyncTFXCompilation();
+    // Clearing the cache is the user's way back from a crash-loop disable.
+    WarmupClearDisabled(GetWarmupIdentity());
     if(g_vulkan_shader_cache) {
         g_vulkan_shader_cache->ReleasePack(std::exchange(m_tfx_key_pack,{}));
         g_vulkan_shader_cache->ResetPipelineCache();
@@ -11824,6 +11995,7 @@ bool GSDeviceVK::CompileFSR1Pipelines()
 		Vulkan::ComputePipelineBuilder cpb;
 		cpb.SetPipelineLayout(m_fsr1_pipeline_layout);
 		cpb.SetShader(mod, "main");
+		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
 		m_fsr1_pipelines[easu_pass] = cpb.Create(dev, g_vulkan_shader_cache->GetPipelineCache(true), false);
 		if (!m_fsr1_pipelines[easu_pass])
 			return false;
@@ -11874,6 +12046,7 @@ bool GSDeviceVK::CompileSGSRPipeline()
 		Vulkan::ComputePipelineBuilder cpb;
 		cpb.SetPipelineLayout(m_sgsr_pipeline_layout);
 		cpb.SetShader(mod, "main");
+		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex()); // worker merges write the live cache
 		m_sgsr_pipelines[edge] = cpb.Create(dev, g_vulkan_shader_cache->GetPipelineCache(true), false);
 		if (!m_sgsr_pipelines[edge])
 			return false;
