@@ -174,6 +174,7 @@ __fi void mVUsetFlags(mV, microFlagCycles& mFC)
 	bool finalized = false;
 	// PC of a writer whose MAC write exists only because of the finalisation (x86 would not compute it), or -1.
 	int finalizeOnlyMacPC = -1;
+	bool macReaderAfter = false; // a flag reader sits after the writer being examined
 	for (i = mVUcount; i > 0; --i, ++aCount)
 	{
 		if (sFLAG.doFlag)
@@ -181,7 +182,9 @@ __fi void mVUsetFlags(mV, microFlagCycles& mFC)
 
 			if (__Mac || (finalize && !finalized))
 			{
-				if (!__Mac && !mFLAG.doFlag)
+				// Only a block with a flag reader after the writer can observe the slot choice; without one the finalised
+				// value stays in slot 0, where a successor block (which x86 would leave with a stale instance) finds it.
+				if (!__Mac && !mFLAG.doFlag && macReaderAfter)
 					finalizeOnlyMacPC = iPC;
 				mFLAG.doFlag = true;
 				//writeProtect = true;
@@ -200,6 +203,8 @@ __fi void mVUsetFlags(mV, microFlagCycles& mFC)
 				break;
 			}
 		}
+		if (!finalized && mVUlow.readFlags)
+			macReaderAfter = true;
 		incPC2(-2);
 	}
 
