@@ -172,9 +172,6 @@ __fi void mVUsetFlags(mV, microFlagCycles& mFC)
     int i;
 	const bool finalize = mVU.needFlagFinalize;
 	bool finalized = false;
-	// PC of a writer whose MAC write exists only because of the finalisation (x86 would not compute it), or -1.
-	int finalizeOnlyMacPC = -1;
-	bool macReaderAfter = false; // a flag reader sits after the writer being examined
 	for (i = mVUcount; i > 0; --i, ++aCount)
 	{
 		if (sFLAG.doFlag)
@@ -182,10 +179,6 @@ __fi void mVUsetFlags(mV, microFlagCycles& mFC)
 
 			if (__Mac || (finalize && !finalized))
 			{
-				// Only a block with a flag reader after the writer can observe the slot choice; without one the finalised
-				// value stays in slot 0, where a successor block (which x86 would leave with a stale instance) finds it.
-				if (!__Mac && !mFLAG.doFlag && macReaderAfter)
-					finalizeOnlyMacPC = iPC;
 				mFLAG.doFlag = true;
 				//writeProtect = true;
 			}
@@ -203,8 +196,6 @@ __fi void mVUsetFlags(mV, microFlagCycles& mFC)
 				break;
 			}
 		}
-		if (!finalized && mVUlow.readFlags)
-			macReaderAfter = true;
 		incPC2(-2);
 	}
 
@@ -269,13 +260,7 @@ __fi void mVUsetFlags(mV, microFlagCycles& mFC)
 		cFLAG.read = doCFlagInsts ? findFlagInst(mFC.xClip,   mFC.cycles) : 0;
 
 		sFLAG.write = doSFlagInsts ? xS : 0;
-		// A finalisation-only MAC write must not change what x86 microVU's readers see. Taking ring slot 0 would
-		// overwrite the entry instance that findFlagInst falls back to (microVU_Flags.inl:62-70) while the older
-		// writers are still in flight, so x86's early readers (which would read the block-entry MAC) would see this
-		// result instead. It is the block's last MAC writer: park it in slot 1 and continue the ring from 2.
-		// (the backward walk above sits on the pair's upper word, this walk on its lower word: compare the pair index)
-		const bool macParked = doMFlagInsts && (iPC >> 1) == (finalizeOnlyMacPC >> 1) && xM == 0;
-		mFLAG.write = doMFlagInsts ? (macParked ? 1 : xM) : 0;
+		mFLAG.write = doMFlagInsts ? xM : 0;
 		cFLAG.write = doCFlagInsts ? xC : 0;
 
 		sFLAG.lastWrite = doSFlagInsts ? (xS - 1) & 3 : 0;
@@ -306,8 +291,6 @@ __fi void mVUsetFlags(mV, microFlagCycles& mFC)
 
 		if (mFLAG.doFlag)
 		{
-			if (macParked)
-				xM = 1;
 			mFC.xMac[xM] = cyclesAddFour;
 			xM = (xM + 1) & 3;
 		}

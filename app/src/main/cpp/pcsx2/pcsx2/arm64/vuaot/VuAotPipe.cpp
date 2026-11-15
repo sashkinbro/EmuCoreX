@@ -1078,14 +1078,10 @@ namespace vuaot
 
 		const bool finalize = needFlagFinalize_;
 		bool finalized = false;
-		int finalizeOnlyMacPC = -1; // see mVUsetFlags: a finalisation-only MAC write with a flag reader after it
-		bool macReaderAfter = false;
 		for (int i = count_; i > 0; i--, aCount++)
 		{
 			if (info().sFlag.doFlag)
 			{
-				if (!mac && !info().mFlag.doFlag && finalize && !finalized && macReaderAfter)
-					finalizeOnlyMacPC = iPC_;
 				if (mac || (finalize && !finalized))
 					info().mFlag.doFlag = true;
 				if (status || (finalize && !finalized))
@@ -1094,8 +1090,6 @@ namespace vuaot
 				if (aCount >= 3)
 					break;
 			}
-			if (!finalized && info().lOp.readFlags)
-				macReaderAfter = true;
 			incPC2(-2);
 		}
 
@@ -1150,8 +1144,7 @@ namespace vuaot
 			in.cFlag.read = FindFlagInst(mFC.xClip, mFC.cycles);
 
 			in.sFlag.write = xS;
-			const bool macParked = (iPC_ >> 1) == (finalizeOnlyMacPC >> 1) && xM == 0 && finalizeOnlyMacPC >= 0;
-			in.mFlag.write = macParked ? 1 : xM;
+			in.mFlag.write = xM;
 			in.cFlag.write = xC;
 
 			in.sFlag.lastWrite = (xS - 1) & 3;
@@ -1168,8 +1161,6 @@ namespace vuaot
 			}
 			if (in.mFlag.doFlag)
 			{
-				if (macParked)
-					xM = 1;
 				mFC.xMac[xM] = mFC.cycles + 4;
 				xM = (xM + 1) & 3;
 			}
@@ -1283,8 +1274,6 @@ namespace vuaot
 			{
 				eBitPass1(branch);
 				needFlagFinalize_ = true;
-				if (!isVU1())
-					regs_.needExactMatch |= 7; // microVU_Compile.inl:713-717
 			}
 
 			if ((curI() & kMbit) && !isVU1())
