@@ -8913,13 +8913,17 @@ void WarmupMarkerRelease(const std::string& identity)
 {
 	std::lock_guard lock(s_warmup_marker_mutex);
 	if (s_warmup_marker_users > 0 && --s_warmup_marker_users == 0)
+	{
 		FileSystem::DeleteFilePath(WarmupFlagPath("active", identity).c_str());
+		FileSystem::DeleteFilePath(WarmupFlagPath("unclean", identity).c_str()); // clean completion resets the count
+	}
 }
 
 void WarmupClearDisabled(const std::string& identity)
 {
 	std::lock_guard lock(s_warmup_marker_mutex);
 	FileSystem::DeleteFilePath(WarmupFlagPath("disabled", identity).c_str());
+	FileSystem::DeleteFilePath(WarmupFlagPath("unclean", identity).c_str());
 }
 
 bool WarmupDisabledByHistory(const std::string& identity)
@@ -8932,10 +8936,23 @@ bool WarmupDisabledByHistory(const std::string& identity)
 		const std::string active = WarmupFlagPath("active", identity);
 		if (FileSystem::FileExists(active.c_str()))
 		{
-			const char text[] = "TFX warmup crashed the previous run\n";
-			FileSystem::WriteBinaryFile(WarmupFlagPath("disabled", identity).c_str(), text, sizeof(text) - 1);
+			// One unclean exit can be a swipe-away or a background kill; two in a row disable the warmup.
+			const std::string unclean = WarmupFlagPath("unclean", identity);
+			u32 count = 0;
+			if (const auto data = FileSystem::ReadBinaryFile(unclean.c_str()); data.has_value() && !data->empty())
+				count = static_cast<u32>(std::strtoul(std::string(data->begin(), data->end()).c_str(), nullptr, 10));
+			count++;
+			const std::string text = std::to_string(count);
+			FileSystem::WriteBinaryFile(unclean.c_str(), text.data(), text.size());
 			FileSystem::DeleteFilePath(active.c_str());
-			Console.Warning("VK: the previous TFX warmup did not finish cleanly; disabling it for this GPU/driver.");
+			if (count >= 2)
+			{
+				const char flag[] = "TFX warmup did not finish cleanly twice in a row\n";
+				FileSystem::WriteBinaryFile(WarmupFlagPath("disabled", identity).c_str(), flag, sizeof(flag) - 1);
+				Console.Warning("VK: the previous TFX warmup did not finish cleanly; disabling it for this GPU/driver.");
+			}
+			else
+				Console.Warning("VK: the previous TFX warmup did not finish cleanly (%u in a row).", count);
 		}
 	}
 	return FileSystem::FileExists(WarmupFlagPath("disabled", identity).c_str());
