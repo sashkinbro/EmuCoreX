@@ -1068,6 +1068,17 @@ void cdvdNewDiskCB()
 {
 	IOP_SIDE_ASSERT();
 
+	// The backend has changed. Pending controller events still belong to the old
+	// disc and must not consume the new image's buffer or DMA old sectors into RAM.
+	CDVDCancelReadAhead();
+	psxRegs.interrupt &= ~((1 << IopEvt_CdvdRead) | (1 << IopEvt_Cdvd));
+	cdvd.Reading = false;
+	cdvd.WaitingDMA = false;
+	cdvd.SectorCnt = 0;
+	cdvd.ReadErr = 0;
+	cdvd.AbortRequested = false;
+	cdvd.Action = cdvdAction_None;
+
 	DoCDVDresetDiskTypeCache();
 	cdvdDetectDisk();
 

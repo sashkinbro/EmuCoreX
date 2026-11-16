@@ -281,10 +281,15 @@ void CheckBits(bool pass, u32 actual, u32 expected, const char* name)
 #include "jit_oracle_gs_sprite_kernel.inl"
 #include "jit_oracle_gs_sprite_pair_quad.inl"
 #include "jit_oracle_gs_uploads.inl"
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 #include "jit_oracle_gs_restarts.inl"
+#endif
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 #include "jit_oracle_date_stencil.inl"
+#endif
 #include "jit_oracle_gif_copy.inl"
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 void GSPreparationDeviceTests()
 {
     GSAlphaSelectorTests();
@@ -350,7 +355,9 @@ void GSPreparationDeviceTests()
         const bool created = device.CreateTFXPreparationDevice(*source);
         Check(created, "GS preparation creates a real temporary Vulkan device");
         if (!created) return;
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
         Check(device.TestTFXPreparationResources(), "GS preparation owns only TFX layouts and two passes");
+#endif
         const bool started = device.StartTFXPreparationBatch();
         Check(started, "GS preparation accepts a batch only with a valid temporary device");
         if (!started) return;
@@ -386,9 +393,11 @@ void GSPreparationDeviceTests()
         g_gs_device.reset();
     }
 }
+#endif
 
 #include "jit_oracle_block_cache.inl"
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 void GSInitializationFailureTests()
 {
     Check(!g_gs_device && !Vulkan::IsVulkanLibraryLoaded(), "GS initialization failure fixture starts without a graphics owner");
@@ -432,6 +441,7 @@ void GSInitializationFailureTests()
         g_gs_device.reset();
     }
 }
+#endif
 
 void ClassifierTests()
 {
@@ -440,18 +450,30 @@ void ClassifierTests()
     Check(GameDatabaseSchema::GameEntry::TestMobileOverlayPolicy(), "GameDB mobile overlay replaces graphics maps and preserves independent core settings");
     Check(GSSpriteEdgeSnap::TestCoverageMath(), "GS upscale sprite coverage preserves sample limits and abutting edges");
     Check(GameDatabaseSchema::GameEntry::TestUpscaleAlignmentPolicy(), "GS graphics opt-out allows only upscale alignment and respects manual overrides");
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
     Check(GSDeviceVK::TestTFXPreparationPlan(), "GS temporary preparation uses only two compatible baseline passes");
+#endif
     Check(VKShaderCache::TestPipelineCachePersistence("artifacts/tfx-cache-checkpoint.bin"), "GS checkpoint persists same-size changed bytes and rejects failed writes");
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
     Check(GSDeviceVK::TestTFXPreparationProgress(), "GS preparation counts completion and cancellation after worker checkpoint");
+#endif
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
     Check(GSDeviceVK::TestTFXShaderSourceCatalog(), "GS pure catalog maps all baseline pipelines to unique canonical sources");
+#endif
     Check(GSDeviceVK::TestTFXShaderSourceBuilders(), "GS reusable source builders preserve all selector and capability variants");
     Check(GSDeviceVK::TestTFXAlphaFallbackClassifier(), "GS alpha fallback class preserves all other selector and pipeline axes");
     Check(GSDeviceVK::TestMaliSX2Policy(), "GS MaliSX2 policy enables ROAA and push descriptors only for the identified capable driver");
     Check(GSDeviceVK::TestOptionalQueryPoolFallback(), "GS optional query failures preserve rendering and disable dependent timing while keeping fatal errors fatal");
     Check(Vulkan::TestSwapchainPresentModeFallback(), "GS swapchain recovers from rejected present-mode lists without changing unrelated settings or errors");
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
     Check(GSDeviceVK::TestTFXPreparationIdentity(), "GS preparation identity binds source catalog, driver, device, and capability facts");
+#endif
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
     Check(VKShaderCache::TestTFXPreparationReceipt("artifacts/tfx-receipt-cache.bin"), "GS preparation receipt survives valid cache growth and rejects stale or invalid caches");
+#endif
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
     Check(GSDeviceVK::TestTFXWarmupOrdering(), "GS learned pipelines precede generic warmup without duplicates");
+#endif
     Check(GSDeviceVK::TestTFXPipelineCache(), "GS hot pipeline cache preserves alternating selectors, collisions, and resource invalidation");
     Check(JitProfiler::TestSampleRangeSelection(), "profiler nested opcode range selection");
     Check(ir::RunSelfTests(), "IR core self-tests");
@@ -12920,9 +12942,17 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
     else if (std::strcmp(suite, "gs-gl-fetch") == 0)
         GSDeviceOGL::TestFramebufferFetch(Check);
     else if (std::strcmp(suite, "gs-date-stencil") == 0)
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
         GSDateStencilTests();
+#else
+        std::printf("Suite requires EMUCOREX_ENABLE_TFX_PREPARATION\n");
+#endif
     else if (std::strcmp(suite, "gs-restarts") == 0)
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
         GSRestartTests();
+#else
+        std::printf("Suite requires EMUCOREX_ENABLE_TFX_PREPARATION\n");
+#endif
     else if (std::strcmp(suite, "gs-gl-cache-packs") == 0)
         EmuCoreXOracleGLGamePackStorage(Check, "/data/local/tmp/emucorex-hitman-gs/gl-cache-pack-fixture");
     else if (std::strcmp(suite, "gs-framegen-geometry") == 0)
@@ -12968,7 +12998,11 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
     else if (std::strcmp(suite, "gs-channel-shuffle-hazards") == 0)
         EmuCoreXOracleTestChannelShuffleHazards(Check);
     else if (std::strcmp(suite, "gs-uploads") == 0)
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
         GSUploadTests();
+#else
+        std::printf("Suite requires EMUCOREX_ENABLE_TFX_PREPARATION\n");
+#endif
     else if (std::strcmp(suite, "gs-vertices") == 0)
         GSVertexPacketTests();
     else if (std::strcmp(suite, "gs-packed-batch") == 0)
@@ -13002,9 +13036,17 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
     else if (std::strcmp(suite, "gs-masked-fill") == 0)
         GSMaskedFillTests();
     else if (std::strcmp(suite, "gs-init-failure") == 0)
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
         GSInitializationFailureTests();
+#else
+        std::printf("Suite requires EMUCOREX_ENABLE_TFX_PREPARATION\n");
+#endif
     else if (std::strcmp(suite, "gs-prepare") == 0)
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
         GSPreparationDeviceTests();
+#else
+        std::printf("Suite requires EMUCOREX_ENABLE_TFX_PREPARATION\n");
+#endif
     else
         return 2;
     std::printf("RESULT checks=%d failures=%d\n", checks, failures);

@@ -3,6 +3,7 @@ package com.sbro.emucorex.core
 import android.content.Context
 import android.os.Build
 import android.os.SystemClock
+import com.sbro.emucorex.BuildConfig
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
@@ -10,6 +11,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.Assume.assumeTrue
 import org.junit.runner.RunWith
 import java.io.File
 
@@ -19,6 +21,8 @@ class ShaderPreparationNativeTest {
 
     @Test
     fun nativeJobCancelsResumesAndCompletesUsingPackagedShaderSource() {
+        assumeTrue("Requires an explicitly enabled 4 KiB diagnostic core",
+            BuildConfig.TFX_PREPARATION_DIAGNOSTICS && AndroidNativeCoreSelector.runtimePageSizeBytes() == 4096L)
         assertTrue("The native emulator core must load for this device integration test", NativeApp.hasNativeCore)
         assertFalse("The application must be quiescent before the headless test", NativeApp.hasValidVm())
 

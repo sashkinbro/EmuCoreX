@@ -689,6 +689,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     private var shaderPackInstallJob: Job? = null
     private val shaderSelectionMutex = Mutex()
     private val lifecycleMutex = Mutex()
+    private val touchControlsLayoutEdits = TouchControlsLayoutEditCoordinator()
     private val transportMutex = Mutex()
     private val shaderPreparationLifecycleGate = ShaderPreparationLifecycleGate()
     private var shaderPreparationMayBeActive: Boolean
@@ -4839,16 +4840,19 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
      * The read-modify-write runs inside [PerGameSettingsRepository.transaction] so the
      * disk write is off the main thread and ordered after every earlier edit, which is
      * what keeps rapid slider moves from overwriting each other.
+     * The edit coordinator also covers publication back on Main: the repository lock
+     * alone is released before that happens, so a paired visibility edit could still
+     * read the old UI layout and undo the first edit.
      */
-    private suspend fun persistTouchControlsLayout(transform: (EmulationUiState) -> EmulationUiState) {
+    private suspend fun persistTouchControlsLayout(transform: (EmulationUiState) -> EmulationUiState) = touchControlsLayoutEdits.edit {
         val gameKey = activePerGameKey()
         if (gameKey == null) {
             val updatedState = transform(_uiState.value)
             persistGlobalTouchControlsLayout(updatedState)
-            if (activePerGameKey() != gameKey) return
+            if (activePerGameKey() != gameKey) return@edit
             currentTouchControlsLayoutProfile = null
             _uiState.update { current -> current.withTouchControlsLayout(updatedState.toTouchControlsLayoutProfile()) }
-            return
+            return@edit
         }
 
         val layout = perGameSettingsRepository.transaction {
@@ -4871,7 +4875,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    private suspend fun resetTouchControlsLayoutForCurrentScope() {
+    private suspend fun resetTouchControlsLayoutForCurrentScope() = touchControlsLayoutEdits.edit {
         val gameKey = activePerGameKey()
         if (gameKey == null) {
             currentTouchControlsLayoutProfile = null
@@ -4880,7 +4884,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             _uiState.value = _uiState.value
                 .withOverlayLayoutSnapshot(preferences.overlayLayoutSnapshot.first())
                 .copy(customTouchControls = preferences.customTouchControls.first())
-            return
+            return@edit
         }
 
         // Reset to the built-in defaults for this game; dropping the override would

@@ -7,6 +7,7 @@
 #include "GSBlendCarryPixelTests.inl"
 #include "VKAlphaBitPixelTests.inl"
 #include "VKStencilCounterPixelTests.inl"
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 void GSDeviceVK::TestRenderPassRestarts(void (*check)(bool, const char*))
 {
     check(m_tfx_preparation_device && !m_allocator, "GS restart fixture starts on an isolated preparation device");
@@ -310,3 +311,4 @@ void main(){color=texelFetch(source,ivec2(0),0)*params.factor;})");
     TestBlendCarryPixels(check);
     TestAlphaBitPixels(check);
 }
+#endif

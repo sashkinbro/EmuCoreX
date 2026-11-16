@@ -14,6 +14,7 @@ extern "C" void EmuCoreXOracleSWWalkers(void (*check)(bool, const char*));
 extern "C" void EmuCoreXOracleSWWalkerExtended(void (*check)(bool, const char*));
 extern "C" void EmuCoreXOracleSWFilterTrace(void (*check)(bool, const char*));
 extern "C" void EmuCoreXOracleSWPalettedBlockRead(void (*check)(bool, const char*));
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 void GSUploadTests()
 {
     cpuinfo_initialize();
@@ -47,3 +48,4 @@ void GSUploadTests()
     EmuFolders::Cache = savedCache;
     EmuFolders::Resources = savedResources;
 }
+#endif

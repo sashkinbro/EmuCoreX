@@ -20,6 +20,7 @@ static VKAPI_ATTR void VKAPI_CALL Begin(VkCommandBuffer cb,const VkRenderPassBeg
 }
 }
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 void GSDeviceVK::TestDateStencilPixels(void(*check)(bool,const char*))
 {
     using namespace GSDateStencilGPU;
@@ -251,3 +252,4 @@ void GSDeviceVK::TestDateStencilPixels(void(*check)(bool,const char*))
     }
     check(total_draws==30,"GS DATE GPU suite executes exactly thirty explicit small draws across three DATM representations");
 }
+#endif

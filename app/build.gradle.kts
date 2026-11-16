@@ -66,8 +66,8 @@ android {
         applicationId = "com.sbro.emucorex"
         minSdk = 29
         targetSdk = 37
-        versionCode = 246
-        versionName = "0.5.9"
+        versionCode = 249
+        versionName = "0.6.0"
 
         buildConfigField("String", "FEEDBACK_ENDPOINT", buildConfigString(feedbackEndpoint))
         buildConfigField("String", "FEEDBACK_API_KEY", buildConfigString(feedbackApiKey))
@@ -75,6 +75,7 @@ android {
         buildConfigField("String", "MULTIPLAYER_CLIENT_CODE", buildConfigString(multiplayerClientCode))
         buildConfigField("long", "DISCORD_APPLICATION_ID", "${discordApplicationId}L")
         buildConfigField("boolean", "DISCORD_SDK_AVAILABLE", (discordSdkDirectory != null).toString())
+        buildConfigField("boolean", "TFX_PREPARATION_DIAGNOSTICS", "false")
         manifestPlaceholders["discordSdkAvailable"] = (discordSdkDirectory != null).toString()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -110,8 +111,15 @@ android {
 
     buildTypes {
         debug {
+            buildConfigField("boolean", "TFX_PREPARATION_DIAGNOSTICS",
+                (providers.gradleProperty("emucorex.tfxPreparationDiagnostics").orNull == "true").toString())
             externalNativeBuild {
                 cmake {
+                    val tfxDiagnostics = providers.gradleProperty("emucorex.tfxPreparationDiagnostics").orNull == "true"
+                    check(!tfxDiagnostics || providers.gradleProperty("emucorex.releaseNative").orNull != "true") {
+                        "TFX diagnostics require the Debug native core; remove emucorex.releaseNative."
+                    }
+                    arguments("-DEMUCOREX_ENABLE_TFX_PREPARATION=${if (tfxDiagnostics) "ON" else "OFF"}")
                     if (providers.gradleProperty("emucorex.releaseNative").orNull == "true") {
                         // Debug-signed/debuggable APK with a release-identical native core
                         // (-Pemucorex.releaseNative=true); -g1 only adds symbols for simpleperf.
@@ -143,6 +151,7 @@ android {
         release {
             externalNativeBuild {
                 cmake {
+                    arguments("-DEMUCOREX_ENABLE_TFX_PREPARATION=OFF")
                     if (providers.gradleProperty("emucorex.nativeTune").orNull == "true") {
                         arguments("-DEMUCOREX_NATIVE_TUNE=ON")
                     }
@@ -299,6 +308,7 @@ val configureEmucore16k by tasks.registering(Exec::class) {
         "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=${secondary16kObjectDirectory.get().asFile.absolutePath}",
         "-DANDROID=true",
         "-DCMAKE_BUILD_TYPE=Release",
+        "-DEMUCOREX_ENABLE_TFX_PREPARATION=OFF",
         "-DANDROID_STL=c++_static",
         "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY",
         "-DEMUCOREX_ANDROID_HOST_PAGE_SIZE=0x4000",

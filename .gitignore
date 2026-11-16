@@ -4,6 +4,7 @@
 .gradle/
 .kotlin/
 .android/
+/.claude/
 
 # Local machine config
 local.properties

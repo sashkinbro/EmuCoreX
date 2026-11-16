@@ -52,6 +52,7 @@ public:
 	bool GetNativeSurface(void** window, int* width, int* height, float* refresh_rate) const;
 
 	bool StartVm(std::string path, bool boot_elf, int probe_steps, bool boot_irx = false);
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 	bool CheckTFXPreparationReadiness();
 	bool StartTFXPreparation();
 	bool CancelTFXPreparation(uint64_t job_id);
@@ -60,6 +61,8 @@ public:
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	int RunTFXPreparationRuntimeTests();
 #endif
+#endif
+
 	bool ChangeDisc(std::string path);
 	void Pause();
 	void Resume();
@@ -101,11 +104,17 @@ private:
 	AndroidRuntime() = default;
 	~AndroidRuntime();
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 	bool IsTFXPreparationActiveLocked() const;
+#else
+	static constexpr bool IsTFXPreparationActiveLocked() { return false; }
+#endif
 	void ApplyDeferredRuntimeGlobalsLocked();
 	VmLaunchConfig CreateLaunchConfigLocked(std::string path, bool boot_elf, int probe_steps, bool boot_irx) const;
 	void VmThreadMain(VmLaunchConfig config);
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 	void TFXPreparationThreadMain(VmLaunchConfig config, std::shared_ptr<TFXPreparationJob> job);
+#endif
 	void NotifyVmStartup(bool succeeded);
 	void ApplyPauseStateOnCPUThread();
 	static void NotifyVmStartupThunk(void* userdata, bool succeeded);
@@ -132,11 +141,14 @@ private:
 	std::string current_path_;
 	RuntimeSettings settings_;
 	std::thread vm_thread_;
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 	bool tfx_readiness_probe_active_ = false;
 	std::shared_ptr<TFXPreparationJob> tfx_preparation_job_;
 	std::thread tfx_preparation_thread_;
 	VmLaunchConfig tfx_preparation_config_;
 	uint64_t next_tfx_preparation_job_id_ = 0;
+#endif
+
 	bool deferred_settings_layer_init_ = false;
 	bool deferred_data_root_apply_ = false;
 	bool deferred_native_library_environment_ = false;

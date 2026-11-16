@@ -85,6 +85,7 @@ namespace
 	// Real pipeline caches are kilobytes to low megabytes. Anything beyond this
 	// cannot be a valid blob, so reject it before the driver touches it.
 	static constexpr size_t MAX_PIPELINE_CACHE_SIZE = 256 * 1024 * 1024;
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 	static constexpr std::string_view TFX_PREPARATION_RECEIPT_HEADER = "EMUCOREX-TFX-PREP/1\n";
 	static constexpr size_t TFX_PREPARATION_IDENTITY_LENGTH = 64;
 	static constexpr size_t TFX_PREPARATION_RECEIPT_SIZE = TFX_PREPARATION_RECEIPT_HEADER.size() +
@@ -99,6 +100,8 @@ namespace
 			return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f');
 		});
 	}
+#endif
+
 } // namespace
 
 static bool ValidatePipelineCacheHeader(const VK_PIPELINE_CACHE_HEADER& header)
@@ -673,7 +676,9 @@ void VKShaderCache::RequestFlush()
 
 void VKShaderCache::ResetPipelineCache()
 {
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 	InvalidateTFXPreparationReceipt();
+#endif
 	m_pipeline_cache_loaded_from_disk = false;
 	// Nothing else may be using the cache but the writer, which the lock keeps out: the caller has
 	// stopped the precompile workers and runs on the GS thread. Pipelines already built do not refer
@@ -917,6 +922,7 @@ VkShaderModule VKShaderCache::GetComputeShader(std::string_view shader_code)
 	return GetShaderModule(shaderc_glsl_compute_shader, std::move(shader_code));
 }
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 std::string VKShaderCache::GetTFXPreparationReceiptPath() const
 {
 	return m_pipeline_cache_filename.empty() ? std::string() : (m_pipeline_cache_filename + ".tfxprep");
@@ -973,6 +979,8 @@ void VKShaderCache::InvalidateTFXPreparationReceipt() const
 	FileSystem::DeleteFilePath(tmp_path.c_str());
 }
 
+
+#endif
 
 bool VKShaderCache::SavePipelineCacheDataIfChanged(const std::string& filename, const std::vector<u8>& data,
 	bool* written)
@@ -1101,6 +1109,7 @@ bool VKShaderCache::TestPipelineCachePersistence(const char* test_filename)
 	return true;
 }
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 bool VKShaderCache::TestTFXPreparationReceipt(const char* test_filename)
 {
 	if (!test_filename || !*test_filename)
@@ -1178,8 +1187,10 @@ bool VKShaderCache::TestTFXPreparationReceipt(const char* test_filename)
 	return true;
 }
 #endif
+#endif
 
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 VkPipelineCache VKShaderCache::CreateTransientPipelineCache()
 {
 	VkDevice device = m_device;
@@ -1203,7 +1214,9 @@ VkPipelineCache VKShaderCache::CreateTransientPipelineCache()
 
 	return cache;
 }
+#endif
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 bool VKShaderCache::MergeTransientPipelineCache(VkPipelineCache cache)
 {
 	if (cache == VK_NULL_HANDLE)
@@ -1227,6 +1240,7 @@ bool VKShaderCache::MergeTransientPipelineCache(VkPipelineCache cache)
 	vkDestroyPipelineCache(device, cache, nullptr);
 	return merged;
 }
+#endif
 
 std::mutex& VKShaderCache::GetPipelineCacheMutex()
 {

@@ -41,6 +41,7 @@ class RendererLifecycleDeviceTest {
                     setClassName(context.packageName, "${context.packageName}.MainActivity")
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     putExtra("${context.packageName}.extra.GAME_PATH", gamePath)
+                    putExtra("${context.packageName}.extra.AUTOTEST_MODE", true)
                     putExtra("${context.packageName}.extra.RENDERER", renderer)
                     putExtra("${context.packageName}.extra.ENABLE_EE_RECOMPILER", true)
                     putExtra("${context.packageName}.extra.ENABLE_IOP_RECOMPILER", true)

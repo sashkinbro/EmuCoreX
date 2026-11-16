@@ -3009,8 +3009,9 @@ bool VMManager::ChangeDisc(CDVD_SourceType source, std::string path)
 			DoCDVDopen(nullptr);
 		}
 	}
-	cdvd.Tray.cdvdActionSeconds = 1;
-	cdvd.Tray.trayState = CDVD_DISC_OPEN;
+	// Notify the controller before the VM can resume: delaying ejection by a
+	// second leaves old read/DMA events running against the replacement backend.
+	cdvdNewDiskCB();
 	UpdateDiscDetails(false);
 	return result;
 }

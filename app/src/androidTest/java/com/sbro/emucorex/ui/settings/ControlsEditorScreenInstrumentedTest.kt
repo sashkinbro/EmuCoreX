@@ -3,6 +3,7 @@ package com.sbro.emucorex.ui.settings
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sbro.emucorex.data.CustomTouchControl
 import com.sbro.emucorex.data.CustomTouchControlLibrary
@@ -28,6 +29,7 @@ class ControlsEditorScreenInstrumentedTest {
                 ControlsEditorScreen(
                     state = ControlsEditorState(customControls = customControls),
                     onBackClick = {},
+                    manageActivityOrientation = false,
                     onUpdateControlOffset = { _, _ -> },
                     onUpdateControlOffsets = {},
                     onUpdateControlScale = { _, _ -> },
@@ -49,9 +51,9 @@ class ControlsEditorScreenInstrumentedTest {
         showEditor(CustomTouchControlLibrary.Empty, saved::set)
 
         composeRule.onNodeWithTag("controls_editor_add_button").performClick()
-        composeRule.onNodeWithTag("controls_editor_combo_primary_square").performClick()
-        composeRule.onNodeWithTag("controls_editor_combo_secondary_l1").performClick()
-        composeRule.onNodeWithTag("controls_editor_combo_confirm").performClick()
+        composeRule.onNodeWithTag("controls_editor_combo_primary_square").performScrollTo().performClick()
+        composeRule.onNodeWithTag("controls_editor_combo_secondary_l1").performScrollTo().performClick()
+        composeRule.onNodeWithTag("controls_editor_combo_confirm").performScrollTo().performClick()
 
         composeRule.runOnIdle {
             val control = saved.get()?.controls?.single()
@@ -77,7 +79,7 @@ class ControlsEditorScreenInstrumentedTest {
         )
         showEditor(initial, saved::set)
 
-        composeRule.onNodeWithTag("controls_editor_custom_jump").performClick()
+        composeRule.onNodeWithTag("controls_editor_custom_jump", useUnmergedTree = true).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("controls_editor_duplicate").performClick()
 
@@ -102,10 +104,10 @@ class ControlsEditorScreenInstrumentedTest {
         )
         showEditor(initial, saved::set)
 
-        composeRule.onNodeWithTag("controls_editor_custom_jump").performClick()
+        composeRule.onNodeWithTag("controls_editor_custom_jump", useUnmergedTree = true).performClick()
         composeRule.onNodeWithTag("controls_editor_combo").performClick()
-        composeRule.onNodeWithTag("controls_editor_combo_secondary_circle").performClick()
-        composeRule.onNodeWithTag("controls_editor_combo_confirm").performClick()
+        composeRule.onNodeWithTag("controls_editor_combo_secondary_circle").performScrollTo().performClick()
+        composeRule.onNodeWithTag("controls_editor_combo_confirm").performScrollTo().performClick()
 
         composeRule.runOnIdle {
             val control = saved.get()?.controls?.single()

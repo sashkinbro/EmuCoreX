@@ -755,9 +755,12 @@ private:
 	TFXPipelineCache m_hot_tfx_pipelines;
 	u32 m_tfx_pipeline_compile_counter = 0;
 
+	VkPipeline PublishTFXPipeline(const PipelineSelector& p, VkPipeline pipeline);
+
 	std::mutex m_tfx_shaders_mutex;
 	std::mutex m_tfx_pipelines_mutex;
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 	// Background TFX pipeline compilation. Workers drain a fixed list of selectors
 	// (the Android warmup set plus everything learned from previous sessions) so the
 	// GS thread never pays for it, then merge their transient pipeline caches back
@@ -776,7 +779,6 @@ private:
 	u32 WarmupWorkerLimit() const;
 	std::string GetWarmupIdentity() const;
 	void TFXCompileThreadEntryPoint(u32 generation, s64 deadline_ns);
-	VkPipeline PublishTFXPipeline(const PipelineSelector& p, VkPipeline pipeline);
 	static void BuildWarmupTFXSelectors(std::vector<PipelineSelector>& out);
 	static void BuildTFXPreparationSelectors(std::vector<PipelineSelector>& out, bool vs_expand_available);
 	static std::array<TFXPreparationRenderPassPlanEntry, 2> BuildTFXPreparationRenderPassPlan();
@@ -812,6 +814,8 @@ private:
 	TFXPreparationFailureStage m_tfx_preparation_failure_stage = TFXPreparationFailureStage::None;
 #endif
 
+#endif
+
 	VkRenderPass m_utility_color_render_pass_load = VK_NULL_HANDLE;
 	VkRenderPass m_utility_color_render_pass_clear = VK_NULL_HANDLE;
 	VkRenderPass m_utility_color_render_pass_discard = VK_NULL_HANDLE;
@@ -840,9 +844,11 @@ private:
 	GSHWDrawConfig::PSConstantBuffer m_ps_cb_cache;
 
 	std::string m_tfx_source;
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
     std::shared_ptr<GSCacheFile::Pack> m_tfx_key_pack;
     u32 m_tfx_key_session=0;
     std::unordered_set<PipelineSelector, PipelineSelectorHash> m_tfx_session_seen;
+#endif
     std::string GetTFXPipelineKeyFingerprint() const;
 
 	GSTexture* CreateSurface(GSTexture::Usage usage, int width, int height, int levels, GSTexture::Format format) override;
@@ -997,10 +1003,13 @@ public:
 	void TestDepthSamplingPolicy(void (*check)(bool, const char*));
 	void TestRenderPassOrdering(void (*check)(bool, const char*), VkPipeline sampled_pipeline,
 		VkSampler sampler, VkRenderPass sampled_pass);
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 	void SetTFXPreparationFailureStageForTesting(TFXPreparationFailureStage stage)
 	{
 		m_tfx_preparation_failure_stage = stage;
 	}
+#endif
+
 #endif
 
 	bool Create(GSVSyncMode vsync_mode, bool allow_present_throttle) override;

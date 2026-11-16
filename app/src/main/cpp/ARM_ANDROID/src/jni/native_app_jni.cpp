@@ -109,6 +109,7 @@ namespace
 {
 constexpr const char* LOG_TAG = "EmuCoreX";
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 const char* TFXPreparationStateToken(emucorex::android::TFXPreparationState state)
 {
 	using State = emucorex::android::TFXPreparationState;
@@ -126,7 +127,9 @@ const char* TFXPreparationStateToken(emucorex::android::TFXPreparationState stat
 	}
 	return "unknown";
 }
+#endif
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 const char* TFXPreparationErrorToken(emucorex::android::TFXPreparationError error)
 {
 	using Error = emucorex::android::TFXPreparationError;
@@ -144,7 +147,9 @@ const char* TFXPreparationErrorToken(emucorex::android::TFXPreparationError erro
 	}
 	return "unknown";
 }
+#endif
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 std::string EscapeShaderPreparationJsonString(const std::string& value)
 {
 	static constexpr char HEX[] = "0123456789abcdef";
@@ -224,7 +229,9 @@ std::string EscapeShaderPreparationJsonString(const std::string& value)
 	}
 	return escaped;
 }
+#endif
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 std::string ShaderPreparationStatusJson(const emucorex::android::TFXPreparationStatus& status)
 {
 	std::string json;
@@ -253,6 +260,7 @@ std::string ShaderPreparationStatusJson(const emucorex::android::TFXPreparationS
 	json += "\"}";
 	return json;
 }
+#endif
 
 std::mutex s_callback_mutex;
 JavaVM* s_java_vm = nullptr;
@@ -832,6 +840,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_onNative
 	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_DEBUG, "EmuCoreX", "onNativeSurfaceDestroyed: JNI callback");
 	AndroidRuntime::Instance().ClearSurface(static_cast<uint64_t>(generation));
 }
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_checkShaderPreparationReadiness(JNIEnv*, jclass)
 {
 	try { return AndroidRuntime::Instance().CheckTFXPreparationReadiness() ? JNI_TRUE : JNI_FALSE; }
@@ -889,6 +898,19 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_sbro_emucorex_core_NativeApp_getSh
 		return nullptr;
 	}
 }
+#else
+// ABI-compatible responses contain no preparation runtime or Vulkan worker entry.
+extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_checkShaderPreparationReadiness(JNIEnv*, jclass) { return JNI_FALSE; }
+extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_startShaderPreparation(JNIEnv*, jclass) { return JNI_FALSE; }
+extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_cancelShaderPreparation(JNIEnv*, jclass, jlong) { return JNI_FALSE; }
+extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_resumeShaderPreparation(JNIEnv*, jclass, jlong) { return JNI_FALSE; }
+extern "C" JNIEXPORT jstring JNICALL Java_com_sbro_emucorex_core_NativeApp_getShaderPreparationStatusSnapshot(JNIEnv* env, jclass)
+{
+    // No job can be admitted in this build, so report the canonical idle snapshot.
+    return StringToJString(env, R"({"schemaVersion":1,"jobId":"0","attempt":0,"state":"idle","error":"none","total":0,"completed":0,"alreadyAvailable":0,"failed":0,"cancelled":0,"inFlight":0,"finished":false,"checkpointSaved":false,"cancelRequested":false,"adapterName":""})");
+}
+#endif
+
 extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv* env, jclass, jstring path) { return AndroidRuntime::Instance().StartVm(JStringToString(env, path), false, 0) ? JNI_TRUE : JNI_FALSE; }
 extern "C" JNIEXPORT jstring JNICALL Java_com_sbro_emucorex_core_NativeApp_getLastBootError(JNIEnv* env, jclass)
 {
@@ -1156,6 +1178,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setNativ
 }
 
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 extern "C" __attribute__((visibility("default"))) int EmuCoreXRunTFXPreparationSnapshotTests(const char*)
 {
 	using State = emucorex::android::TFXPreparationState;
@@ -1220,6 +1243,7 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunTFXPreparationS
 	std::printf("RESULT checks=%u failures=%u\n", checks, failures);
 	return failures ? 1 : 0;
 }
+#endif
 #endif
 
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_invalidateLosslessDll(JNIEnv*,jclass){GSLsfg::InvalidateDllVerdict();}

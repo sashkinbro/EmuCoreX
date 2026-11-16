@@ -615,6 +615,7 @@ VMBootParameters CreateBootParameters(const VmLaunchConfig& config)
 	return params;
 }
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 using TFXPreparationFolderSnapshot = std::array<std::string, 20>;
 
 TFXPreparationFolderSnapshot CaptureTFXPreparationFolders()
@@ -723,6 +724,8 @@ private:
 	SettingsInterface* m_base_settings_layer = nullptr;
 	SettingsInterface* m_secrets_settings_layer = nullptr;
 };
+#endif
+
 
 }
 
@@ -852,6 +855,7 @@ bool RunUpstreamVm(const VmLaunchConfig& config, VmStartupCallback startup_callb
 	return true;
 }
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 TFXPreparationBridgeResult RunTFXPreparation(const VmLaunchConfig& config, TFXPreparationJob& job, bool validation_only)
 {
 	TFXPreparationBridgeResult result{TFXPreparationState::Idle, TFXPreparationError::None};
@@ -996,6 +1000,8 @@ TFXPreparationBridgeResult RunTFXPreparation(const VmLaunchConfig& config, TFXPr
 	bridge_lock.unlock();
 	return result;
 }
+
+#endif
 
 int QueryMaxUpscaleMultiplier(int renderer)
 {

@@ -143,6 +143,7 @@ Writes Exercise(VKStreamBuffer& ring,Backend& b)
     return result;
 }
 }
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 void GSDeviceVK::TestStreamRingActivation(void (*check)(bool,const char*))
 {
     using namespace GSStreamRingActivationOracle;
@@ -253,3 +254,4 @@ void GSDeviceVK::TestStreamRingActivation(void (*check)(bool,const char*))
     };
     Run(policy,contracts,check);
 }
+#endif

@@ -42,6 +42,7 @@ static VKAPI_ATTR void VKAPI_CALL CaptureBarrier(VkCommandBuffer command,
 }
 }
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 void GSDeviceVK::TestRenderPassOrdering(void (*check)(bool, const char*), VkPipeline sampled_pipeline,
     VkSampler sampler, VkRenderPass sampled_pass)
 {
@@ -469,3 +470,4 @@ void main(){ivec2 p=ivec2(gl_GlobalInvocationID.xy);if(all(lessThan(p,imageSize(
     check(check_color(read(*result), left, right), "GS compute samples old attachment pixels before a subsequent overwrite");
     check(check_color(read(*target), replacement, replacement), "GS subsequent attachment overwrite reaches transfer readback");
 }
+#endif

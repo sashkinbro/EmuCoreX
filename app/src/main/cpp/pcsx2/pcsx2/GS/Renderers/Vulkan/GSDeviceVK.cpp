@@ -3174,26 +3174,10 @@ bool GSDeviceVK::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 		return false;
 
 #ifdef __ANDROID__
-	if (IsWarmupBlocklisted())
-	{
-		// PowerVR's Vulkan compiler aborts inside vkCreateGraphicsPipelines while the
-		// background TFX warmup compiles its 168 selectors (Pixel 10 / DXT), and a driver
-		// whose previous warmup crashed is not retried. Compile pipelines on demand from
-		// the GS thread instead of precompiling them.
-		Console.WriteLn("VK: background TFX warmup disabled for this GPU/driver.");
-	}
-	else if (!GSConfig.PrecompilePipelines)
-	{
-		Console.WriteLn("VK: Pipeline precompilation disabled.");
-	}
-	else if (GSConfig.DisableAsyncTFXCompile)
-	{
-		WarmupCommonTFXPipelines();
-	}
-	else
-	{
-		StartAsyncTFXCompilation();
-	}
+	// Mobile drivers can abort during speculative TFX pipeline compilation. Keep
+	// normal shader/pipeline caching, but compile draw pipelines on the GS thread
+	// only when a game requests them. This also applies after renderer recreation.
+	Console.WriteLn("VK: automatic TFX warmup disabled; compiling pipelines on demand.");
 #endif
 
 	InitializeState();
@@ -3223,11 +3207,13 @@ void GSDeviceVK::Destroy()
 		PassTimingDump();
 #endif
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 	// Workers touch m_device and the shader cache, so they must be gone before teardown.
 	StopAsyncTFXCompilation();
 	if (g_vulkan_shader_cache && m_tfx_key_pack)
 		g_vulkan_shader_cache->ReleasePack(std::exchange(m_tfx_key_pack, {}));
 
+#endif
 	GSDevice::Destroy();
 
 	// Free the filter chain before the device goes away — it owns Vulkan objects created
@@ -3739,8 +3725,10 @@ bool GSDeviceVK::CreateVulkanInstanceAndDevice(bool force_surfaceless, VkSurface
 	}
 	if (force_surfaceless)
 	{
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 		m_tfx_preparation_library_loaded = true;
-#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#endif
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 		if (m_tfx_preparation_failure_stage == TFXPreparationFailureStage::AfterLibraryLoad)
 			return false;
 #endif
@@ -3757,7 +3745,7 @@ bool GSDeviceVK::CreateVulkanInstanceAndDevice(bool force_surfaceless, VkSurface
 	}
 
 	const auto create_instance = [&]() -> VkInstance {
-#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 		if (force_surfaceless && m_tfx_preparation_failure_stage == TFXPreparationFailureStage::InstanceCreation)
 			return VK_NULL_HANDLE;
 #endif
@@ -3784,7 +3772,7 @@ bool GSDeviceVK::CreateVulkanInstanceAndDevice(bool force_surfaceless, VkSurface
 		ERROR_LOG("Failed to load Vulkan instance functions");
 		return false;
 	}
-#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 	if (force_surfaceless && m_tfx_preparation_failure_stage == TFXPreparationFailureStage::AfterInstanceCreate)
 		return false;
 #endif
@@ -5865,6 +5853,7 @@ bool GSDeviceVK::CreateRenderPasses()
 	return true;
 }
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 bool GSDeviceVK::CreateTFXPreparationRenderPasses()
 {
 	const VkFormat color_format = LookupNativeFormat(GSTexture::Format::Color);
@@ -5892,6 +5881,7 @@ bool GSDeviceVK::CreateTFXPreparationRenderPasses()
 
 	return m_render_pass_cache.size() == 2;
 }
+#endif
 
 bool GSDeviceVK::CompileConvertPipelines()
 {
@@ -7219,7 +7209,9 @@ VkPipeline GSDeviceVK::GetTFXPipeline(const PipelineSelector& p)
 		const auto it = m_tfx_pipelines.find(p);
 		if (it != m_tfx_pipelines.end() && it->second != VK_NULL_HANDLE)
 		{
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 			RecordLearnedTFXSelector(p);
+#endif
 			m_hot_tfx_pipelines.Insert(p, it->second);
 			return it->second;
 		}
@@ -7227,7 +7219,9 @@ VkPipeline GSDeviceVK::GetTFXPipeline(const PipelineSelector& p)
 
 	const VkPipeline pipeline =
 		PublishTFXPipeline(p, CreateTFXPipelineWithCache(p, g_vulkan_shader_cache->GetPipelineCache(true), true));
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 	if (pipeline != VK_NULL_HANDLE) RecordLearnedTFXSelector(p);
+#endif
 	m_hot_tfx_pipelines.Insert(p, pipeline);
 
 	// Persist the pipeline cache every N new compiles so an OOM-kill or crash mid-session does
@@ -7244,6 +7238,7 @@ VkPipeline GSDeviceVK::GetTFXPipeline(const PipelineSelector& p)
 	return pipeline;
 }
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 namespace
 {
 size_t BuildTFXWarmupOrder(const std::vector<GSDeviceVK::PipelineSelector>& generic,
@@ -7275,6 +7270,8 @@ size_t BuildTFXWarmupOrder(const std::vector<GSDeviceVK::PipelineSelector>& gene
 	return learned_count;
 }
 } // namespace
+
+#endif
 
 std::string GSDeviceVK::BuildTFXVertexShaderSource(std::string_view tfx_source, GSHWDrawConfig::VSSelector selector,
 	const TFXShaderSourceCapabilities& capabilities)
@@ -7376,6 +7373,7 @@ std::string GSDeviceVK::BuildTFXFragmentShaderSource(std::string_view tfx_source
 	return ss.str();
 }
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 GSDeviceVK::TFXShaderSourceCatalog GSDeviceVK::BuildTFXShaderSourceCatalog(std::string_view tfx_source,
 	const TFXShaderSourceCapabilities& capabilities)
 {
@@ -7473,6 +7471,8 @@ std::string GSDeviceVK::GetTFXPreparationIdentity(std::string_view driver_identi
 		m_features.vs_expand, VKShaderCache::GetTFXPreparationCacheVersion(), driver_identity);
 }
 
+#endif
+
 bool GSDeviceVK::TryGetTFXAlphaFallbackKey(const PipelineSelector& selector, PipelineSelector& key)
 {
 	// Only the five shader alpha-test modes have a dynamic equivalent, and only the
@@ -7533,6 +7533,7 @@ struct TFXSourceHash
 
 } // namespace
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 bool GSDeviceVK::TestTFXWarmupOrdering()
 {
 	const auto make_selector = [](u8 key) {
@@ -7567,6 +7568,7 @@ bool GSDeviceVK::TestTFXWarmupOrdering()
 		return false;
 	return matches(ordered, {make_selector(2), make_selector(3), make_selector(1), make_selector(4), make_selector(5)});
 }
+#endif
 
 bool GSDeviceVK::TestTFXShaderSourceBuilders()
 {
@@ -7670,6 +7672,7 @@ bool GSDeviceVK::TestTFXShaderSourceBuilders()
 		builder_hash.count == EXPECTED_SOURCE_COUNT;
 }
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 bool GSDeviceVK::TestTFXShaderSourceCatalog()
 {
 	static constexpr std::string_view source = "void catalog_fixture() {}\n";
@@ -7771,6 +7774,7 @@ bool GSDeviceVK::TestTFXShaderSourceCatalog()
 	}
 	return original.vertex_sources != changed.vertex_sources && original.fragment_sources != changed.fragment_sources;
 }
+#endif
 
 bool GSDeviceVK::TestOptionalQueryPoolFallback()
 {
@@ -7855,6 +7859,7 @@ bool GSDeviceVK::TestMaliSX2Policy()
 		!ShouldUseMaliSX2PushDescriptors(generic_libmali, true, required_push_descriptors, required_push_descriptors);
 }
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 bool GSDeviceVK::TestTFXPreparationIdentity()
 {
 	TFXShaderSourceCapabilities capabilities{};
@@ -7900,6 +7905,7 @@ bool GSDeviceVK::TestTFXPreparationIdentity()
 	return identity(capabilities, renamed) == base &&
 		BuildTFXPreparationIdentity({}, capabilities, properties, true, 1, "system").empty();
 }
+#endif
 
 bool GSDeviceVK::TestTFXAlphaFallbackClassifier()
 {
@@ -8101,6 +8107,7 @@ bool GSDeviceVK::TestTFXAlphaFallbackClassifier()
 }
 #endif
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 void GSDeviceVK::TFXPreparationProgress::Reset(u32 total)
 {
 	m_snapshot = {};
@@ -9290,6 +9297,8 @@ void GSDeviceVK::TFXCompileThreadEntryPoint(u32 generation, s64 deadline_ns)
 	}
 }
 
+#endif
+
 VkPipeline GSDeviceVK::PublishTFXPipeline(const PipelineSelector& p, VkPipeline pipeline)
 {
 	if (pipeline == VK_NULL_HANDLE)
@@ -9316,6 +9325,7 @@ VkPipeline GSDeviceVK::PublishTFXPipeline(const PipelineSelector& p, VkPipeline 
 	return it->second;
 }
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 namespace
 {
 #pragma pack(push, 4)
@@ -9376,6 +9386,8 @@ void GSDeviceVK::RecordLearnedTFXSelector(const PipelineSelector& p)
 		m_tfx_learned_order.pop_front();
 	}
 }
+
+#endif
 
 bool GSDeviceVK::BindDrawPipeline(const PipelineSelector& p)
 {
@@ -11891,6 +11903,7 @@ void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, 
 #include "VKDateStencilPixelTests.inl"
 #endif
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 namespace {
 	static bool IsLoadableTFXKey(const GSDeviceVK::PipelineSelector& p)
 	{
@@ -11936,6 +11949,9 @@ std::string GSDeviceVK::GetTFXPipelineKeyFingerprint() const
 	return ss.str();
 }
 
+#endif
+
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 void GSDeviceVK::SetGameIdentity(const std::string& serial,u32 crc)
 {
     StopAsyncTFXCompilation(false);
@@ -11943,6 +11959,11 @@ void GSDeviceVK::SetGameIdentity(const std::string& serial,u32 crc)
     if (!g_vulkan_shader_cache || m_tfx_preparation_device) return;
     if (m_tfx_key_pack) g_vulkan_shader_cache->ReleasePack(std::exchange(m_tfx_key_pack,{}));
     g_vulkan_shader_cache->SetGame(serial,crc);
+#ifdef __ANDROID__
+    // Disc changes and game identification must not restart the startup warmup.
+    // The explicit headless preparation API remains separate from gameplay.
+    return;
+#endif
     if (GSConfig.DisableShaderCache || !GSConfig.PrecompilePipelines || serial.empty()) return;
     const std::string fingerprint=GetTFXPipelineKeyFingerprint();
     const std::string& build=GSCacheFile::GetBuildId();
@@ -11967,6 +11988,21 @@ void GSDeviceVK::PrepareShaderCacheClear()
     }
     m_tfx_learned_set.clear();m_tfx_learned_order.clear();m_tfx_learned_dirty=false;m_tfx_session_seen.clear();
 }
+#else
+void GSDeviceVK::SetGameIdentity(const std::string& serial, u32 crc)
+{
+    m_hot_tfx_pipelines.Clear();
+    if (g_vulkan_shader_cache)
+        g_vulkan_shader_cache->SetGame(serial, crc);
+}
+
+void GSDeviceVK::PrepareShaderCacheClear()
+{
+    if (g_vulkan_shader_cache)
+        g_vulkan_shader_cache->ResetPipelineCache();
+}
+#endif
+
 void GSDeviceVK::RequestShaderCacheFlush()
 {
     if(g_vulkan_shader_cache)g_vulkan_shader_cache->RequestFlush();

@@ -7,6 +7,10 @@ set(EMUCOREX_CPP_DIR "${CMAKE_CURRENT_LIST_DIR}/.." CACHE PATH "EmuCoreX native 
 set(PCSX2_UPSTREAM_DIR "${EMUCOREX_CPP_DIR}/PCSX2" CACHE PATH "Clean PCSX2 upstream checkout")
 option(EMUCOREX_LINK_UPSTREAM_PCSX2 "Link the upstream PCSX2 core into libemucore.so" ON)
 option(EMUCOREX_ENABLE_NATIVE_SELF_TESTS "Enable debug-only native core self-tests" OFF)
+option(EMUCOREX_ENABLE_TFX_PREPARATION "Include experimental Vulkan warmup in a diagnostic core" OFF)
+if(EMUCOREX_ENABLE_TFX_PREPARATION AND (NOT CMAKE_BUILD_TYPE STREQUAL "Debug" OR NOT EMUCOREX_ENABLE_NATIVE_SELF_TESTS))
+	message(FATAL_ERROR "TFX preparation is allowed only in a Debug diagnostic core with native self-tests")
+endif()
 option(EMUCOREX_ENABLE_GS_ORACLE "Enable the Debug-only GS differential runner" OFF)
 option(EMUCOREX_ENABLE_EXPERIMENTAL_IR "Opt in to slower shared IR research paths" OFF)
 if(EMUCOREX_ENABLE_GS_ORACLE AND (NOT CMAKE_BUILD_TYPE STREQUAL "Debug" OR NOT EMUCOREX_ENABLE_NATIVE_SELF_TESTS))
@@ -340,9 +344,14 @@ add_library(emucore SHARED
 	src/runtime/android_input_services.cpp
 	src/runtime/android_host_services.cpp
 	src/runtime/android_runtime.cpp
-	src/runtime/tfx_preparation_job.cpp
 	src/runtime/upstream_vm_bridge.cpp
 )
+
+if(EMUCOREX_ENABLE_TFX_PREPARATION)
+	target_sources(emucore PRIVATE src/runtime/tfx_preparation_job.cpp src/debug/tfx_preparation_bridge_oracle.cpp)
+	target_compile_definitions(emucore PRIVATE EMUCOREX_ENABLE_TFX_PREPARATION=1)
+	target_compile_definitions(PCSX2_FLAGS INTERFACE EMUCOREX_ENABLE_TFX_PREPARATION=1)
+endif()
 
 set_target_properties(emucore PROPERTIES OUTPUT_NAME "${EMUCOREX_NATIVE_LIBRARY_NAME}")
 # A 16 KiB ELF alignment is valid on both 4 KiB and 16 KiB Android systems.
@@ -396,7 +405,7 @@ if(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	# `common` gets it PUBLIC so WorkSema has the same layout in every target.
 	target_compile_definitions(PCSX2_FLAGS INTERFACE EMUCOREX_SYNC_PROF_BUILD=1)
 	target_compile_definitions(common PUBLIC EMUCOREX_SYNC_PROF_BUILD=1)
-	target_sources(emucore PRIVATE src/debug/jit_oracle.cpp src/debug/tfx_preparation_bridge_oracle.cpp src/debug/signal_chain_oracle.cpp)
+	target_sources(emucore PRIVATE src/debug/jit_oracle.cpp src/debug/signal_chain_oracle.cpp)
 	if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 		target_sources(emucore PRIVATE "${PCSX2_UPSTREAM_DIR}/pcsx2/arm64/vuaot/VuAotSpanDump.cpp")
 	endif()

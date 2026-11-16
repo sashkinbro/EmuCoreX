@@ -72,7 +72,7 @@ void AndroidConsoleLogCallback(LOGLEVEL level, ConsoleColors, std::string_view m
 	__android_log_print(priority, LOG_TAG, "%.*s", static_cast<int>(message.size()), message.data());
 }
 
-#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 struct TFXPreparationTestBarrier
 {
 	std::mutex mutex;
@@ -446,11 +446,13 @@ AndroidRuntime::~AndroidRuntime()
 	ClearSurface();
 }
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 bool AndroidRuntime::IsTFXPreparationActiveLocked() const
 {
 	return tfx_readiness_probe_active_ ||
 		(tfx_preparation_job_ && TFXPreparationJob::IsActiveState(tfx_preparation_job_->Snapshot().state));
 }
+#endif
 
 void AndroidRuntime::ApplyDeferredRuntimeGlobalsLocked()
 {
@@ -814,7 +816,7 @@ bool AndroidRuntime::GetNativeSurface(void** window, int* width, int* height, fl
 	return true;
 }
 
-#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 int AndroidRuntime::RunTFXPreparationRuntimeTests()
 {
 	unsigned checks = 0;
@@ -1038,6 +1040,7 @@ int AndroidRuntime::RunTFXPreparationRuntimeTests()
 }
 #endif
 
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 bool AndroidRuntime::CheckTFXPreparationReadiness()
 {
 	// A short surfaceless probe runs on the caller's IO thread. Disc admission
@@ -1272,6 +1275,8 @@ void AndroidRuntime::TFXPreparationThreadMain(VmLaunchConfig config, std::shared
 	}
 }
 
+#endif
+
 bool AndroidRuntime::StartVm(std::string path, bool boot_elf, int probe_steps, bool boot_irx)
 {
 	std::lock_guard disc_access_lock(s_disc_access_mutex);
@@ -1458,11 +1463,15 @@ void AndroidRuntime::Shutdown()
 		current_path_.clear();
 		if (vm_thread_.joinable() && vm_thread_.get_id() != std::this_thread::get_id())
 			thread_to_join = std::move(vm_thread_);
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 		if (tfx_preparation_job_ && TFXPreparationJob::IsActiveState(tfx_preparation_job_->Snapshot().state))
 			tfx_preparation_job_->RequestCancel();
 		if (tfx_preparation_thread_.joinable() &&
 			tfx_preparation_thread_.get_id() != std::this_thread::get_id())
 			preparation_thread_to_join = std::move(tfx_preparation_thread_);
+#endif
+
+
 	}
 
 	if (thread_to_join.joinable())
@@ -2116,7 +2125,7 @@ jstring StringToJString(JNIEnv* env, const std::string& value)
 }
 }
 
-#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 extern "C" __attribute__((visibility("default"))) int EmuCoreXRunTFXPreparationRuntimeTests(const char*)
 {
 	return emucorex::android::AndroidRuntime::Instance().RunTFXPreparationRuntimeTests();

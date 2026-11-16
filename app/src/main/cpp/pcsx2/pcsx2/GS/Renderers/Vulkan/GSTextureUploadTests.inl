@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 EmuCoreX Team
 // SPDX-License-Identifier: GPL-3.0+
 // Real Vulkan copies across growth of the device's texture upload ring.
+#if defined(EMUCOREX_ENABLE_TFX_PREPARATION)
 void GSDeviceVK::TestTextureUploadRing(void (*check)(bool, const char*))
 {
     check(m_tfx_preparation_device && !m_allocator && !m_texture_stream_buffer.IsValid(),
@@ -94,3 +95,4 @@ void GSDeviceVK::TestTextureUploadRing(void (*check)(bool, const char*))
     check(compare(*after, second), "GS GPU readback preserves every post-growth scratch upload byte");
     check(ring.GetCurrentSize() == TEXTURE_BUFFER_MAX_SIZE, "GS texture upload ring remains bounded at128MiB");
 }
+#endif
