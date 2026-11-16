@@ -338,8 +338,16 @@ void ApplyOldCoreJitSettings(SettingsInterface& si, const VmLaunchConfig& config
 	EmuFolders::Settings = Path::Combine(data_root, "inis");
 	EmuFolders::Cache = Path::Combine(data_root, "cache");
 
-	VMManager::SetDefaultSettings(si, true, true, true, true, true);
+	// Android handles hotkeys in Kotlin. Keep controller/device defaults, but do
+	// not install desktop hotkeys or the default keyboard mapping for controller 1.
+	VMManager::SetDefaultSettings(si, true, true, true, false, true);
+	for (const auto& [key, value] : si.GetKeyValueList("Pad1"))
+	{
+		if (value.starts_with("Keyboard/"))
+			si.DeleteValue("Pad1", key.c_str());
+	}
 
+	// Apply explicit runtime settings after removing only generated defaults.
 	for (const auto& [key, value] : config.settings)
 		SetStringSetting(si, key, value);
 
