@@ -60,6 +60,7 @@ struct Checkpoint
 {
     u32 frame, packet, width, height;
     std::string name, kind, file;
+    std::string format; // native buffer format read back (CT32/CT24/CT16/CT16S, Z32/Z24/Z16/Z16S); empty if n/a
 };
 struct Profile
 {
@@ -330,14 +331,14 @@ struct Replay
         g_perfmon.Reset();
     }
 
-    void Save(const std::vector<u8>& bytes, u32 width, u32 height, u32 packet, const std::string& name, const char* kind)
+    void Save(const std::vector<u8>& bytes, u32 width, u32 height, u32 packet, const std::string& name, const char* kind, const char* format = "")
     {
         Require(!bytes.empty() && bytes.size() == static_cast<size_t>(width) * height * 4, "Invalid capture size");
         const std::string file = fmt::format("{:06d}-{}.bin", checkpoints.size(), kind);
         std::ofstream stream(output + "/" + file, std::ios::binary);
         stream.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
         Require(stream.good(), "Cannot write capture artifact");
-        checkpoints.push_back({frames, packet, width, height, name, kind, file});
+        checkpoints.push_back({frames, packet, width, height, name, kind, file, format});
     }
 
     void Drain()
@@ -351,24 +352,51 @@ struct Replay
             glFinish();
     }
 
-    void ReadRegion(u32 packet, const std::string& name, const char* kind, u64 bitbltbuf, u32 width, u32 height)
+    // bpp16: read the region in its native 16-bit PSM (bitbltbuf already carries it) and expand to
+    // 32-bit words so both backends are compared in the format the scene actually drew in. Reading a
+    // CT16/Z16 target through a CT32/Z32 view compares format-aliasing, not rendering.
+    void ReadRegion(u32 packet, const std::string& name, const char* kind, u64 bitbltbuf, u32 width, u32 height,
+        const char* format = "", bool bpp16 = false)
     {
         Writes w;
         Write(w, 0x50, bitbltbuf);
         Write(w, 0x51, 0); Write(w, 0x52, width | static_cast<u64>(height) << 32); Write(w, 0x53, 1);
         Send(w);
-        const u32 qwc = width * height / 4;
+        const u32 qwc = width * height / (bpp16 ? 8 : 4);
         if (s_repro) s_repro->ReadFIFO(qwc);
-        std::vector<u8> bytes(static_cast<size_t>(width) * height * 4 + 16, 0xcd);
+        const size_t raw_bytes = static_cast<size_t>(width) * height * (bpp16 ? 2 : 4);
+        std::vector<u8> bytes(raw_bytes + 16, 0xcd);
         GSInitAndReadFIFO(bytes.data(), qwc);
-        bytes.resize(static_cast<size_t>(width) * height * 4);
-        Save(bytes, width, height, packet, name, kind);
+        bytes.resize(raw_bytes);
+        if (bpp16)
+        {
+            std::vector<u8> wide(static_cast<size_t>(width) * height * 4);
+            const bool depth = std::strcmp(kind, "depth") == 0;
+            for (size_t i = 0; i < static_cast<size_t>(width) * height; ++i)
+            {
+                const u32 v = bytes[i * 2] | static_cast<u32>(bytes[i * 2 + 1]) << 8;
+                // Color: RGB5551 -> RGBA8 (5-bit channels left-aligned, A 0x00/0x80 like CT16 alpha). Depth: raw u16.
+                const u32 out = depth ? v : ((v & 31) << 3) | (((v >> 5) & 31) << 3) << 8 |
+                    (((v >> 10) & 31) << 3) << 16 | (v & 0x8000 ? 0x80000000u : 0u);
+                std::memcpy(wide.data() + i * 4, &out, 4);
+            }
+            bytes = std::move(wide);
+        }
+        Save(bytes, width, height, packet, name, kind, format);
     }
 
     void ReadBuffer(u32 packet, const std::string& name, bool depth)
     {
+        // Read in the format the scene actually configured (context 1). 16-bit formats are read natively;
+        // CT24/Z24 and 32-bit formats keep the CT32/Z32 view (verified bit-identical aliasing for CT24/Z24).
+        const auto& ctx = g_gs_renderer->m_env.CTXT[0];
+        const u32 psm = depth ? ctx.ZBUF.PSM : ctx.FRAME.PSM;
+        const bool b16 = psm == 2 || psm == 10;
+        const char* format = depth ? (psm == 0 ? "Z32" : psm == 1 ? "Z24" : psm == 2 ? "Z16" : psm == 10 ? "Z16S" : "Z?")
+                                   : (psm == 0 ? "CT32" : psm == 1 ? "CT24" : psm == 2 ? "CT16" : psm == 10 ? "CT16S" : "CT?");
+        const u64 spsm = b16 ? static_cast<u64>((depth ? 0x30 : 0) | psm) : (depth ? 0x30ull : 0);
         // SBP ZBUF base / 256, SBW 1
-        ReadRegion(packet, name, depth ? "depth" : "rgba", (depth ? 512ull | 0x30ull << 24 : 0) | 1ull << 16, Width, Height);
+        ReadRegion(packet, name, depth ? "depth" : "rgba", (depth ? 512ull : 0) | 1ull << 16 | spsm << 24, Width, Height, format, b16);
     }
 
     void ReadAllMemory(u32 packet)
@@ -711,7 +739,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunGSOracle(int ar
         {
             const auto& p = replay.checkpoints[i];
             if (i) manifest << ',';
-            manifest << fmt::format("{{\"frame\":{},\"packet\":{},\"width\":{},\"height\":{},\"name\":\"{}\",\"kind\":\"{}\",\"file\":\"{}\"}}", p.frame, p.packet, p.width, p.height, p.name, p.kind, p.file);
+            manifest << fmt::format("{{\"frame\":{},\"packet\":{},\"width\":{},\"height\":{},\"name\":\"{}\",\"kind\":\"{}\",\"file\":\"{}\"{}}}", p.frame, p.packet, p.width, p.height, p.name, p.kind, p.file,
+                p.format.empty() ? std::string() : fmt::format(",\"format\":\"{}\"", p.format));
         }
         manifest << "],\"samples_ms\":[";
         for (size_t i = 0; i < samples.size(); ++i)
