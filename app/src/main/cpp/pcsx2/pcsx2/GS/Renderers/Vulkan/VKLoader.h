@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <string>
+
 class Error;
 
 #define VK_NO_PROTOTYPES
@@ -104,4 +106,13 @@ namespace Vulkan
 	/// custom) ICD has actually been loaded by the loader. Reports whether the
 	/// requested custom driver is really in use or the system driver was used.
 	void CheckCustomDriverLoadStatus();
+
+#ifdef __ANDROID__
+	/// True when the most recent LoadVulkanLibrary() requested a custom driver
+	/// but the system driver ended up being used instead.
+	bool CustomDriverFellBackToSystem();
+
+	/// Folder name of the custom driver that is really in use; empty for the system driver.
+	std::string GetActiveCustomDriverFolderName();
+#endif
 } // namespace Vulkan

@@ -166,6 +166,8 @@ bool DispatchRetroAchievementsSound(const char* path);
 void SetPerformanceMetricsCallbackEnabled(bool enabled, bool detailed, bool gpu_timing);
 bool IsPerformanceGpuTimingRequested();
 void SetPerformanceGpuState(std::string name, bool timing_active);
+// Label shown on the overlay "Driver:" line; empty hides the line (software renderer).
+void SetPerformanceDriverLabel(std::string label);
 std::string GetPerformanceMetricsSnapshot();
 std::string GetGameplayProfilingSample();
 void RequestCurrentVmStop();

@@ -64,6 +64,18 @@ bool GSopen(const Pcsx2Config::GSOptions& config, GSRendererType renderer, u8* b
 	GSVSyncMode vsync_mode, bool allow_present_throttle);
 bool GSreopen(bool recreate_device, bool recreate_renderer, GSRendererType new_renderer,
 	std::optional<const Pcsx2Config::GSOptions*> old_config);
+#ifdef __ANDROID__
+enum GSReloadDriverResult : int
+{
+	GSReloadDriverApplied = 0,
+	GSReloadDriverNotVulkan = 1,
+	GSReloadDriverFellBack = 2,
+	GSReloadDriverFailed = 3,
+};
+/// GS thread only: reopens the Vulkan device (keeping renderer state) so a changed LIBVULKAN_PATH takes effect.
+/// present_after_reopen: the VM is paused, so re-present the frame the paused game was showing.
+int GSReloadGpuDriver(bool present_after_reopen = false);
+#endif
 void GSreset(bool hardware_reset);
 void GSclose();
 void GSDrainBackQueue();

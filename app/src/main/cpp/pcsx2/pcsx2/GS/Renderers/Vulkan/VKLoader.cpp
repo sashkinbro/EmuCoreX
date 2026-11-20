@@ -59,6 +59,21 @@ static DynamicLibrary s_vulkan_library;
 // outcome can only be checked after vkCreateInstance (CheckCustomDriverLoadStatus).
 static bool s_custom_driver_requested = false;
 static std::string s_custom_driver_name;
+static bool s_custom_driver_fell_back = false;
+// Name of the installed driver's folder (its human-readable identity), e.g. "malisx2-0.5.1-308fe121c7".
+static std::string s_custom_driver_folder;
+
+bool Vulkan::CustomDriverFellBackToSystem()
+{
+	return s_custom_driver_fell_back;
+}
+
+std::string Vulkan::GetActiveCustomDriverFolderName()
+{
+	if (!s_custom_driver_requested || s_custom_driver_fell_back)
+		return {};
+	return s_custom_driver_folder;
+}
 
 static const char* BasenameForLog(const std::string& path)
 {
@@ -178,6 +193,7 @@ void Vulkan::CheckCustomDriverLoadStatus()
 	// fails (e.g. a missing dependency). Rendering still works on the system
 	// driver, but the player must be told the selection had no effect.
 	unsetenv("VK_LAYER_PATH");
+	s_custom_driver_fell_back = true;
 	__android_log_print(ANDROID_LOG_ERROR, "EmuCoreX",
 		"Vulkan custom driver: fell back to system driver, driver=%s", s_custom_driver_name.c_str());
 	Console.Error("Vulkan: Custom driver '%s' could not be loaded; using the system driver",
@@ -209,7 +225,14 @@ bool Vulkan::LoadVulkanLibrary(Error* error)
 		custom_driver_path.empty() ? "<none>" : BasenameForLog(custom_driver_path));
 
 	s_custom_driver_requested = !custom_driver_path.empty();
+	s_custom_driver_fell_back = false;
 	s_custom_driver_name = custom_driver_path.empty() ? std::string() : BasenameForLog(custom_driver_path);
+	s_custom_driver_folder.clear();
+	if (!custom_driver_path.empty())
+	{
+		const std::string parent = std::filesystem::path(custom_driver_path).parent_path().filename().string();
+		s_custom_driver_folder = parent.empty() ? s_custom_driver_name : parent;
+	}
 
 	// A stale layer path from a previous pack must not leak into the system
 	// driver or into a different driver. LoadVulkanLibraryWithAdrenoTools
@@ -221,7 +244,10 @@ bool Vulkan::LoadVulkanLibrary(Error* error)
 		Console.WriteLn(Color_StrongGreen, "Vulkan: Attempting to load custom driver with adrenotools: %s",
 			custom_driver_path.c_str());
 		if (!LoadVulkanLibraryWithAdrenoTools(custom_driver_path, error))
+		{
+			s_custom_driver_fell_back = true;
 			Console.Warning("Vulkan: Failed to load custom driver, falling back to system driver");
+		}
 	}
 
 	if (!s_vulkan_library.IsOpen())

@@ -85,6 +85,7 @@ internal fun buildPerformanceOverlayLayout(
             line.startsWith("SW-") -> PerformanceOverlayMetrics.SOFTWARE_THREADS
             line.startsWith("CPU:") -> PerformanceOverlayMetrics.HOST_CPU
             line.startsWith("GPU:") -> PerformanceOverlayMetrics.HOST_GPU
+            line.startsWith("Driver:") -> PerformanceOverlayMetrics.DRIVER
             line.startsWith("Audio:") -> PerformanceOverlayMetrics.AUDIO
             else -> 0
         }
@@ -126,7 +127,7 @@ internal fun buildPerformanceOverlayLayout(
         line.startsWith("EE:") || line.startsWith("GS:") || line.startsWith("VU:") || line.startsWith("IOP:")
     }
     val hardwareLines = displayLines.filter { line ->
-        line.startsWith("CPU:") || line.startsWith("GPU:")
+        line.startsWith("CPU:") || line.startsWith("GPU:") || line.startsWith("Driver:")
     }
     val audioLines = displayLines.filter { line -> line.startsWith("Audio:") }
     val softwareThreadLines = displayLines.filter { line -> line.startsWith("SW-") }

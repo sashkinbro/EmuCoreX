@@ -85,6 +85,7 @@ import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.Gradient
+import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Mouse
 import androidx.compose.material.icons.rounded.LockOpen
@@ -244,6 +245,7 @@ import com.sbro.emucorex.ui.common.premiumFilterChipColors
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.common.tvFocusGroup
 import com.sbro.emucorex.ui.settings.ControlsEditorScreen
+import com.sbro.emucorex.ui.settings.customGpuDriversSupported
 import com.sbro.emucorex.ui.settings.KeyboardMouseSettingsDialog
 import com.sbro.emucorex.ui.settings.toControlsEditorState
 import com.sbro.emucorex.ui.theme.GradientEnd
@@ -321,6 +323,7 @@ private enum class EmulationMenuTab {
     Emulation,
     Cheats,
     Shaders,
+    Drivers,
     Graphics,
     Fixes,
     Achievements
@@ -544,6 +547,7 @@ private fun fpsOverlayMetricLiveOptions(): List<Pair<Int, String>> = listOf(
     PerformanceOverlayMetrics.RESOLUTION to stringResource(R.string.settings_fps_metric_resolution),
     PerformanceOverlayMetrics.HOST_CPU to stringResource(R.string.settings_fps_metric_host_cpu),
     PerformanceOverlayMetrics.HOST_GPU to stringResource(R.string.settings_fps_metric_host_gpu),
+    PerformanceOverlayMetrics.DRIVER to stringResource(R.string.settings_fps_metric_driver),
     PerformanceOverlayMetrics.EE to stringResource(R.string.settings_fps_metric_ee),
     PerformanceOverlayMetrics.GS to stringResource(R.string.settings_fps_metric_gs),
     PerformanceOverlayMetrics.VU to stringResource(R.string.settings_fps_metric_vu),
@@ -733,6 +737,7 @@ fun EmulationScreen(
     val uiState by viewModel.uiState.collectAsState()
     val cheatPackBrowserState by viewModel.cheatPackBrowser.collectAsState()
     val shaderBrowserState by viewModel.shaderBrowser.collectAsState()
+    val driverBrowserState by viewModel.gpuDriverBrowser.collectAsState()
     val saveSlotMetadataState = viewModel.saveSlotMetadata.collectAsState()
     val shaderPreparationState by viewModel.shaderPreparationUiState.collectAsState()
     val activePatchNotice by viewModel.activePatchNotice.collectAsState()
@@ -2218,6 +2223,15 @@ fun EmulationScreen(
                     onSelectShaderPreset = { viewModel.selectShaderPreset(it) },
                     onUseGlobalShader = { viewModel.useGlobalShaderSettings() },
                     onSetInGameShadersEnabled = { viewModel.setInGameShadersEnabled(it) },
+                    driverBrowserState = driverBrowserState,
+                    onRefreshDrivers = { viewModel.refreshGpuDriverBrowser() },
+                    onSetDriverScope = { viewModel.setGpuDriverScope(it) },
+                    onSelectDriver = { viewModel.selectGpuDriver(it) },
+                    onUseGlobalDriver = { viewModel.useGlobalGpuDriverForGame() },
+                    onDownloadDriver = { viewModel.downloadGpuDriver(it) },
+                    onImportDriver = { viewModel.importGpuDriver(it) },
+                    onRefreshDriverCatalog = { viewModel.refreshGpuDriverBrowser(forceCatalog = true) },
+                    onDriverMessageShown = { viewModel.clearGpuDriverMessage() },
                     onSetHwDownloadMode = { viewModel.setHwDownloadMode(it) },
                     onSetEeCycleRate = { viewModel.setEeCycleRate(it) },
                     onSetEeCycleSkip = { viewModel.setEeCycleSkip(it) },
@@ -2644,6 +2658,7 @@ private fun GameMenuTabId.toEmulationMenuTab(): EmulationMenuTab = when (this) {
     GameMenuTabId.EMULATION -> EmulationMenuTab.Emulation
     GameMenuTabId.CHEATS -> EmulationMenuTab.Cheats
     GameMenuTabId.SHADERS -> EmulationMenuTab.Shaders
+    GameMenuTabId.DRIVERS -> EmulationMenuTab.Drivers
     GameMenuTabId.GRAPHICS -> EmulationMenuTab.Graphics
     GameMenuTabId.FIXES -> EmulationMenuTab.Fixes
     GameMenuTabId.ACHIEVEMENTS -> EmulationMenuTab.Achievements
@@ -3974,6 +3989,15 @@ private fun EmulationSidebarMenu(
     onSelectShaderPreset: (String) -> Unit,
     onUseGlobalShader: () -> Unit,
     onSetInGameShadersEnabled: (Boolean) -> Unit,
+    driverBrowserState: GpuDriverBrowserState,
+    onRefreshDrivers: () -> Unit,
+    onSetDriverScope: (GpuDriverScope) -> Unit,
+    onSelectDriver: (String?) -> Unit,
+    onUseGlobalDriver: () -> Unit,
+    onDownloadDriver: (com.sbro.emucorex.core.RemoteGpuDriver) -> Unit,
+    onImportDriver: (android.net.Uri) -> Unit,
+    onRefreshDriverCatalog: () -> Unit,
+    onDriverMessageShown: () -> Unit,
     onSetHwDownloadMode: (Int) -> Unit,
     onSetEeCycleRate: (Int) -> Unit,
     onSetEeCycleSkip: (Int) -> Unit,
@@ -4068,6 +4092,7 @@ private fun EmulationSidebarMenu(
     val emulationListState = rememberLazyListState()
     val cheatsListState = rememberLazyListState()
     val shadersListState = rememberLazyListState()
+    val driversListState = rememberLazyListState()
     val graphicsListState = rememberLazyListState()
     val fixesListState = rememberLazyListState()
     val achievementsListState = rememberLazyListState()
@@ -4077,6 +4102,7 @@ private fun EmulationSidebarMenu(
         EmulationMenuTab.Emulation -> emulationListState
         EmulationMenuTab.Cheats -> cheatsListState
         EmulationMenuTab.Shaders -> shadersListState
+        EmulationMenuTab.Drivers -> driversListState
         EmulationMenuTab.Graphics -> graphicsListState
         EmulationMenuTab.Fixes -> fixesListState
         EmulationMenuTab.Achievements -> achievementsListState
@@ -4101,9 +4127,21 @@ private fun EmulationSidebarMenu(
             onRefreshShaders()
         }
     }
-    val menuTabs = remember(uiState.gameMenuTabOrder, uiState.hiddenGameMenuTabs) {
+    // Installed drivers and the effective selection can change outside the menu (the driver
+    // manager, a game profile edit), so re-read them whenever the Drivers tab is opened. The
+    // catalog is only fetched until it has loaded once.
+    LaunchedEffect(selectedMenuTab) {
+        if (selectedMenuTab == EmulationMenuTab.Drivers) {
+            onRefreshDrivers()
+        }
+    }
+    DriverMessageEffect(state = driverBrowserState, onMessageShown = onDriverMessageShown)
+    val importDriverClick = rememberDriverImportLauncher(onImportDriver)
+    val customDriversSupported = customGpuDriversSupported()
+    val menuTabs = remember(uiState.gameMenuTabOrder, uiState.hiddenGameMenuTabs, customDriversSupported) {
         uiState.gameMenuTabOrder
             .filterNot(uiState.hiddenGameMenuTabs::contains)
+            .filter { it != GameMenuTabId.DRIVERS || customDriversSupported }
             .map(GameMenuTabId::toEmulationMenuTab)
             .ifEmpty { listOf(EmulationMenuTab.Session) }
     }
@@ -5343,6 +5381,41 @@ private fun EmulationSidebarMenu(
                                     else -> Unit
                                 }
                             }
+                    }
+
+                    EmulationMenuTab.Drivers -> {
+                        val driverSections = gameMenuSectionsForTab(
+                            GameMenuTabId.DRIVERS,
+                            uiState.gameMenuSectionOrder
+                        ).filterNot(uiState.hiddenGameMenuSections::contains)
+                        // Each driver card is its own keyed lazy item (not one big section item), so a
+                        // state update after applying a driver keeps the scroll position.
+                        driverSections.forEach { section ->
+                            when (section) {
+                                GameMenuSectionId.DRIVERS_LIBRARY -> {
+                                    item(key = "drivers:title", contentType = "drivers-header") {
+                                        SidebarSectionTitle(
+                                            text = stringResource(R.string.settings_gpu_driver_manager_title).uppercase(),
+                                            color = sectionTitleColor,
+                                            topPadding = sectionLabelTopPadding,
+                                            horizontalInset = sectionLabelInset
+                                        )
+                                    }
+
+                                    emulationDriversItems(
+                                        state = driverBrowserState,
+                                        onScopeChange = onSetDriverScope,
+                                        onSelect = onSelectDriver,
+                                        onUseGlobal = onUseGlobalDriver,
+                                        onDownload = onDownloadDriver,
+                                        onImportClick = importDriverClick,
+                                        onRefreshCatalog = onRefreshDriverCatalog
+                                    )
+                                }
+
+                                else -> Unit
+                            }
+                        }
                     }
 
                     EmulationMenuTab.Graphics -> {
@@ -6822,6 +6895,7 @@ private fun gameMenuTabIcon(tab: EmulationMenuTab): ImageVector = when (tab) {
     EmulationMenuTab.Emulation -> Icons.Rounded.SettingsSuggest
     EmulationMenuTab.Cheats -> Icons.Rounded.AutoFixHigh
     EmulationMenuTab.Shaders -> Icons.Rounded.Gradient
+    EmulationMenuTab.Drivers -> Icons.Rounded.Memory
     EmulationMenuTab.Graphics -> Icons.Rounded.Fullscreen
     EmulationMenuTab.Fixes -> Icons.Rounded.Star
     EmulationMenuTab.Achievements -> Icons.Rounded.LockOpen
@@ -6834,6 +6908,7 @@ private fun gameMenuTabLabel(tab: EmulationMenuTab): String = when (tab) {
     EmulationMenuTab.Emulation -> stringResource(R.string.settings_emulation_tab)
     EmulationMenuTab.Cheats -> stringResource(R.string.emulation_cheats_title)
     EmulationMenuTab.Shaders -> stringResource(R.string.emulation_shaders_tab)
+    EmulationMenuTab.Drivers -> stringResource(R.string.emulation_drivers_tab)
     EmulationMenuTab.Graphics -> stringResource(R.string.settings_graphics_tab)
     EmulationMenuTab.Fixes -> stringResource(R.string.settings_fixes_tab)
     EmulationMenuTab.Achievements -> stringResource(R.string.emulation_achievements_tab)
@@ -7769,7 +7844,7 @@ private fun buildPerformanceAnnotatedText(text: String, speedPercent: Float): An
             text,
             listOf(
                 "EmuCoreX", "FPS:", "VPS:", "LSFG:", "Speed:", "Target:",
-                "Frame:", "GS Queue:", "Res:", "CPU:", "GPU:",
+                "Frame:", "GS Queue:", "Res:", "CPU:", "GPU:", "Driver:",
                 "Audio:", "EE:", "GS:", "VU:", "IOP:", "SW-", "VRAM:"
             ),
             SpanStyle(color = Color(0xFF9DD7FF))

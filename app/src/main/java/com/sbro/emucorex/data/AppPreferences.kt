@@ -135,6 +135,7 @@ data class SettingsSnapshot(
     val enableFastBoot: Boolean = true,
     val eeCycleRate: Int = PerformanceProfiles.safeConfig.eeCycleRate,
     val eeCycleSkip: Int = PerformanceProfiles.safeConfig.eeCycleSkip,
+    val fpuCorrectAddSub: Boolean = PerformanceProfiles.safeConfig.fpuCorrectAddSub,
     val enableEeRecompiler: Boolean = true,
     val enableIopRecompiler: Boolean = true,
     val enableVu0Recompiler: Boolean = true,
@@ -362,7 +363,7 @@ class AppPreferences(private val context: Context) {
          * custom GPU-driver paths, networking identities/room codes, locale and manager UI.
          */
         internal val EMULATOR_CLOUD_KEYS = setOf(
-            "performanceProfile", "renderer", "mediatekAngleOpenGl", "upscaleMultiplier",
+            "performanceProfile", "fpuCorrectAddSub", "renderer", "mediatekAngleOpenGl", "upscaleMultiplier",
             "shaderChainEnabled", "shaderChainPreset", "aspectRatio", "displayCropLeft",
             "displayCropTop", "displayCropRight", "displayCropBottom", "audioVolume",
             "audioFastForwardVolume", "audioMuted", "audioInterpolation", "audioSyncMode",
@@ -708,6 +709,7 @@ class AppPreferences(private val context: Context) {
         private val FPS_OVERLAY_CORNER = intPreferencesKey("fps_overlay_corner")
         private val FPS_OVERLAY_SCALE = intPreferencesKey("fps_overlay_scale")
         private val FPS_OVERLAY_METRICS = intPreferencesKey("fps_overlay_metrics")
+        private val FPS_OVERLAY_DRIVER_MIGRATED = booleanPreferencesKey("fps_overlay_driver_metric_migrated")
         private val CONFIRM_SAVE_LOAD_ACTIONS = booleanPreferencesKey("confirm_save_load_actions")
         private val BACK_BUTTON_EXITS_GAME = booleanPreferencesKey("back_button_exits_game")
         private val COMPACT_CONTROLS = booleanPreferencesKey("compact_controls")
@@ -737,6 +739,7 @@ class AppPreferences(private val context: Context) {
         private val ENABLE_FAST_BOOT = booleanPreferencesKey("enable_fast_boot")
         private val EE_CYCLE_RATE = intPreferencesKey("ee_cycle_rate")
         private val EE_CYCLE_SKIP = intPreferencesKey("ee_cycle_skip")
+        private val FPU_CORRECT_ADD_SUB = booleanPreferencesKey("fpu_correct_add_sub")
         private val ENABLE_EE_RECOMPILER = booleanPreferencesKey("enable_ee_recompiler")
         private val ENABLE_IOP_RECOMPILER = booleanPreferencesKey("enable_iop_recompiler")
         private val ENABLE_VU0_RECOMPILER = booleanPreferencesKey("enable_vu0_recompiler")
@@ -1504,8 +1507,21 @@ class AppPreferences(private val context: Context) {
         normalizeRendererPreference(prefs[RENDERER])
     }
 
+    /**
+     * The profile the user effectively runs, derived from the current global values
+     * (EE cycle rate/skip, FPU add/sub correction, upscale). [PerformanceProfiles.CUSTOM] when
+     * the values match no preset. The stored id is never trusted for display.
+     */
     val performanceProfile: Flow<Int> = context.dataStore.data.map { prefs ->
-        PerformanceProfiles.normalize(prefs[PERFORMANCE_PROFILE] ?: PerformanceProfiles.SAFE)
+        resolveEffectiveProfile(prefs)
+    }
+
+    val fpuCorrectAddSub: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        readFpuCorrectAddSub(prefs)
+    }
+
+    suspend fun setFpuCorrectAddSub(value: Boolean) {
+        context.dataStore.edit { it[FPU_CORRECT_ADD_SUB] = value }
     }
 
     val gpuDriverType: Flow<Int> = context.dataStore.data.map { prefs ->
@@ -1534,10 +1550,16 @@ class AppPreferences(private val context: Context) {
         val config = PerformanceProfiles.configFor(normalized)
         context.dataStore.edit {
             it[PERFORMANCE_PROFILE] = normalized
-            // A profile is a full preset: its speedhacks must win over earlier manual values,
-            // otherwise switching to Fast would keep the old EE cycle settings.
+            // A profile is a full preset: all of its values must win over earlier manual values,
+            // otherwise switching to Fast would keep the old EE cycle settings. Everything is
+            // written in this single edit so readers never observe a half-applied preset.
             it[EE_CYCLE_RATE] = config.eeCycleRate
             it[EE_CYCLE_SKIP] = config.eeCycleSkip
+            it[FPU_CORRECT_ADD_SUB] = config.fpuCorrectAddSub
+            // Only ULTRA owns the upscale multiplier. SAFE/FAST deliberately leave it untouched,
+            // so switching ULTRA -> SAFE/FAST keeps the user's 1x instead of guessing a new value.
+            // Per-game overrides live elsewhere and are never touched by presets.
+            config.forcedUpscale?.let { forced -> it[UPSCALE] = normalizeUpscale(forced) }
         }
     }
 
@@ -1551,6 +1573,20 @@ class AppPreferences(private val context: Context) {
 
     private fun resolvePerformanceProfileConfig(prefs: Preferences) =
         PerformanceProfiles.configFor(resolvePerformanceProfile(prefs))
+
+    /** Stored value, else derived from the stored profile id (migration for existing installs). */
+    private fun readFpuCorrectAddSub(prefs: Preferences): Boolean =
+        prefs[FPU_CORRECT_ADD_SUB] ?: resolvePerformanceProfileConfig(prefs).fpuCorrectAddSub
+
+    private fun resolveEffectiveProfile(prefs: Preferences): Int {
+        val config = resolvePerformanceProfileConfig(prefs)
+        return PerformanceProfiles.detect(
+            eeCycleRate = prefs[EE_CYCLE_RATE] ?: config.eeCycleRate,
+            eeCycleSkip = prefs[EE_CYCLE_SKIP] ?: config.eeCycleSkip,
+            fpuCorrectAddSub = readFpuCorrectAddSub(prefs),
+            upscaleMultiplier = readUpscale(prefs)
+        )
+    }
 
     private fun resolveGpuHardwareProfile(): Int {
         return GpuHardwareProfiles.detectHardwareProfile()
@@ -1743,6 +1779,17 @@ class AppPreferences(private val context: Context) {
     }
 
     suspend fun cleanupLegacyClampingPreferencesIfNeeded() {
+        context.dataStore.edit { prefs ->
+            // One-time: stored overlay masks predate the Driver line; show it wherever GPU is shown.
+            if (prefs[FPS_OVERLAY_DRIVER_MIGRATED] != true) {
+                prefs[FPS_OVERLAY_METRICS]?.let { stored ->
+                    if (stored and PerformanceOverlayMetrics.HOST_GPU != 0) {
+                        prefs[FPS_OVERLAY_METRICS] = stored or PerformanceOverlayMetrics.DRIVER
+                    }
+                }
+                prefs[FPS_OVERLAY_DRIVER_MIGRATED] = true
+            }
+        }
         context.dataStore.edit { prefs ->
             val legacyMappings = listOf(
                 booleanPreferencesKey("enable_ee_clamping") to EE_FPU_CLAMPING_MODE,
@@ -1964,7 +2011,7 @@ class AppPreferences(private val context: Context) {
     val settingsSnapshot: Flow<SettingsSnapshot> = context.dataStore.data
         .map { prefs ->
             val biosPath = prefs[BIOS_PATH]
-            val performanceProfile = resolvePerformanceProfile(prefs)
+            val performanceProfile = resolveEffectiveProfile(prefs)
             val profileConfig = resolvePerformanceProfileConfig(prefs)
             val gpuHardwareProfile = resolveGpuHardwareProfile()
             SettingsSnapshot(
@@ -2085,6 +2132,7 @@ class AppPreferences(private val context: Context) {
                 enableFastBoot = prefs[ENABLE_FAST_BOOT] ?: true,
                 eeCycleRate = prefs[EE_CYCLE_RATE] ?: profileConfig.eeCycleRate,
                 eeCycleSkip = prefs[EE_CYCLE_SKIP] ?: profileConfig.eeCycleSkip,
+                fpuCorrectAddSub = readFpuCorrectAddSub(prefs),
                 enableEeRecompiler = prefs[ENABLE_EE_RECOMPILER] ?: true,
                 enableIopRecompiler = prefs[ENABLE_IOP_RECOMPILER] ?: true,
                 enableVu0Recompiler = prefs[ENABLE_VU0_RECOMPILER] ?: true,
@@ -4778,6 +4826,7 @@ class AppPreferences(private val context: Context) {
             put("gameMenuSectionOrder", prefs[GAME_MENU_SECTION_ORDER] ?: DefaultGameMenuSectionOrder.joinToString(",") { it.name })
             put("hiddenGameMenuSections", prefs[HIDDEN_GAME_MENU_SECTIONS] ?: "")
             put("performanceProfile", resolvePerformanceProfile(prefs))
+            put("fpuCorrectAddSub", readFpuCorrectAddSub(prefs))
             put("gpuHardwareProfile", gpuHardwareProfile)
             put("renderer", normalizeRendererPreference(prefs[RENDERER]))
             put("mediatekAngleOpenGl", prefs[MEDIATEK_ANGLE_OPENGL] ?: false)
@@ -5222,6 +5271,14 @@ class AppPreferences(private val context: Context) {
             prefs[PERFORMANCE_PROFILE] = PerformanceProfiles.normalize(
                 json.optInt("performanceProfile", PerformanceProfiles.SAFE)
             )
+            // Old backups have no fpuCorrectAddSub: derive it from the imported profile id.
+            prefs[FPU_CORRECT_ADD_SUB] = if (json.has("fpuCorrectAddSub")) {
+                json.optBoolean("fpuCorrectAddSub", true)
+            } else {
+                PerformanceProfiles.configFor(
+                    json.optInt("performanceProfile", PerformanceProfiles.SAFE)
+                ).fpuCorrectAddSub
+            }
             val gpuHardwareProfile = GpuHardwareProfiles.normalize(
                 json.optInt("gpuHardwareProfile", GpuHardwareProfiles.ADRENO)
             )

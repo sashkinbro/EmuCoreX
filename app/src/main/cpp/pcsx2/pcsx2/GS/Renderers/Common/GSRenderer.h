@@ -93,6 +93,11 @@ public:
 	void QueueSnapshot(const std::string& path, const u32 gsdump_frames);
 	void StopGSDump();
 	void PresentCurrentFrame();
+#ifdef __ANDROID__
+	/// After the GS device was recreated while the VM is paused: rebuilds the display image from the
+	/// restored GS state and presents it, so the paused game does not stay black. GS thread only.
+	void RebuildAndPresentAfterReopen();
+#endif
 	static GSVector4 GetLastDrawRect();
 	bool BeginCapture(std::string filename, const GSVector2i& size = GSVector2i(0, 0));
 	void EndCapture();

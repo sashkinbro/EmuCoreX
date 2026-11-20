@@ -370,6 +370,7 @@ object NativeApp {
     @Suppress("unused") // Exported JNI entry point retained for renderer compatibility.
     @JvmStatic external fun renderGpu(value: Int)
     @JvmStatic external fun setCustomDriverPath(path: String)
+    @JvmStatic external fun reloadGpuDriver(path: String?): Int
     @JvmStatic external fun setNativeLibraryDir(path: String)
     @JvmStatic external fun beginSettingsBatch()
     @JvmStatic external fun endSettingsBatch()

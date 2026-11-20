@@ -21,6 +21,21 @@ struct TFXPreparationBridgeResult
 
 TFXPreparationBridgeResult RunTFXPreparation(const VmLaunchConfig& config, TFXPreparationJob& job, bool validation_only = false);
 void ApplyRuntimeSettingsToUpstream(const VmLaunchConfig& config);
+
+// Status codes returned by ReloadGpuDriver (mirrored in EmulatorBridge.kt).
+enum GpuDriverReloadStatus : int
+{
+	GpuDriverReloadApplied = 0,         // GS device recreated with the requested driver
+	GpuDriverReloadStoredNoVm = 1,      // no VM running; setting stored for the next boot
+	GpuDriverReloadStoredNotVulkan = 2, // active renderer is not Vulkan; applies once Vulkan is used
+	GpuDriverReloadFellBack = 3,        // device recreated, but on the system driver
+	GpuDriverReloadFailed = 4,          // GS reopen failed
+	GpuDriverReloadDeferred = 5,        // still queued/running when the wait timed out
+};
+
+// Stores the custom driver path (empty = system driver) and, when a Vulkan VM is running,
+// recreates the GS device so the change takes effect. Blocks the caller (never call from the UI thread).
+int ReloadGpuDriver(const std::string& path);
 int QueryMaxUpscaleMultiplier(int renderer);
 void InitializeSettingsLayer();
 

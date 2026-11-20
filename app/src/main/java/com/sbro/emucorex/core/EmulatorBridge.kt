@@ -31,6 +31,12 @@ object EmulatorBridge {
     const val AUTO_RENDERER = RendererDefaults.AUTO
     const val OPENGL_RENDERER = RendererDefaults.OPENGL
     const val VULKAN_RENDERER = RendererDefaults.VULKAN
+    const val GPU_DRIVER_RELOAD_APPLIED = 0
+    const val GPU_DRIVER_RELOAD_STORED_NO_VM = 1
+    const val GPU_DRIVER_RELOAD_STORED_NOT_VULKAN = 2
+    const val GPU_DRIVER_RELOAD_FELL_BACK_TO_SYSTEM = 3
+    const val GPU_DRIVER_RELOAD_FAILED = 4
+    const val GPU_DRIVER_RELOAD_DEFERRED = 5
     private const val ANGLE_EGL_LIBRARY_NAME = "libEGL_angle.so"
     private const val ANGLE_GLES_LIBRARY_NAME = "libGLESv2_angle.so"
     private const val BOOT_SMOKE_PROBE_STEPS = 67_108_864
@@ -1318,6 +1324,22 @@ object EmulatorBridge {
         }
         settingsCache["EmuCore/GS:CustomDriverPath"] = resolvedPath
         performRuntimeOps(listOf(customDriverOp(resolvedPath)))
+    }
+
+    /**
+     * Switches the custom Vulkan driver (null/blank = system driver) and, when a Vulkan game is
+     * running, recreates the GS device so it takes effect immediately. Returns one of the
+     * GPU_DRIVER_RELOAD_* codes. Runs off the main thread and may take up to ~15 s.
+     */
+    suspend fun reloadGpuDriver(path: String?): Int {
+        if (!isNativeLoaded) return GPU_DRIVER_RELOAD_STORED_NO_VM
+        val resolvedPath = if (!path.isNullOrBlank() && GpuDriverCompatibility.supportsCustomDrivers()) {
+            prepareCustomDriverLibrary(path)
+        } else {
+            ""
+        }
+        settingsCache["EmuCore/GS:CustomDriverPath"] = resolvedPath
+        return withContext(Dispatchers.IO) { runSerial { NativeApp.reloadGpuDriver(resolvedPath) } }
     }
 
     suspend fun setFrameLimitEnabled(enabled: Boolean) {

@@ -80,6 +80,7 @@ std::atomic_bool s_performance_metrics_detailed{false};
 std::atomic_bool s_performance_gpu_timing_requested{false};
 std::string s_performance_gpu_name;
 bool s_performance_gpu_timing_active = false;
+std::string s_performance_driver_label;
 
 void LogHostMessage(android_LogPriority priority, std::string_view title, std::string_view message)
 {
@@ -285,6 +286,12 @@ void SetPerformanceGpuState(std::string name, bool timing_active)
 	std::lock_guard lock(s_metrics_mutex);
 	s_performance_gpu_name = std::move(name);
 	s_performance_gpu_timing_active = timing_active;
+}
+
+void SetPerformanceDriverLabel(std::string label)
+{
+	std::lock_guard lock(s_metrics_mutex);
+	s_performance_driver_label = std::move(label);
 }
 }
 
@@ -576,11 +583,13 @@ void Host::OnPerformanceMetricsUpdated()
 		AppendLine(overlay, line);
 
 		std::string gpu_name;
+		std::string driver_label;
 		bool gpu_timing_active = false;
 		{
 			std::lock_guard lock(s_metrics_mutex);
 			gpu_name = s_performance_gpu_name;
 			gpu_timing_active = s_performance_gpu_timing_active;
+			driver_label = s_performance_driver_label;
 		}
 		line.clear();
 		line.append("GPU:");
@@ -590,6 +599,14 @@ void Host::OnPerformanceMetricsUpdated()
 		else
 			line.append(" | N/A");
 		AppendLine(overlay, line);
+
+		if (!driver_label.empty())
+		{
+			line.clear();
+			line.append("Driver:");
+			line.append(driver_label);
+			AppendLine(overlay, line);
+		}
 
 		line.clear();
 		AppendProcessorStat(line, "EE: ", PerformanceMetrics::GetCPUThreadUsage(), PerformanceMetrics::GetCPUThreadAverageTime());

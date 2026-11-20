@@ -146,6 +146,238 @@ static RenderAPI GetAPIForRenderer(GSRendererType renderer)
 	}
 }
 
+#ifdef __ANDROID__
+// "malisx2-0.5.1-308fe121c7" -> "MaliSX2 0.5.1" (mirrors friendlyGpuDriverName in the Kotlin Drivers tab).
+static std::string FriendlyCustomDriverName(const std::string& folder)
+{
+	std::vector<std::string> tokens;
+	std::string current;
+	for (const char c : folder)
+	{
+		if (c == '-' || c == '_' || c == ' ')
+		{
+			if (!current.empty())
+				tokens.push_back(std::move(current));
+			current.clear();
+		}
+		else
+			current.push_back(c);
+	}
+	if (!current.empty())
+		tokens.push_back(std::move(current));
+
+	const auto is_version = [](const std::string& t) {
+		size_t i = (!t.empty() && (t[0] == 'v' || t[0] == 'V')) ? 1 : 0;
+		if (i >= t.size() || t[i] < '0' || t[i] > '9')
+			return false;
+		bool dot = false;
+		for (; i < t.size(); i++)
+		{
+			if (t[i] == '.')
+				dot = true;
+			else if (t[i] < '0' || t[i] > '9')
+				return false;
+		}
+		return dot;
+	};
+	const auto is_hash = [](const std::string& t) {
+		if (t.size() < 7)
+			return false;
+		for (const char c : t)
+		{
+			if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
+				return false;
+		}
+		return true;
+	};
+
+	std::string version;
+	std::vector<std::string> words;
+	for (const std::string& token : tokens)
+	{
+		if (version.empty() && is_version(token))
+		{
+			version = (token[0] == 'v' || token[0] == 'V') ? token.substr(1) : token;
+			continue;
+		}
+		if (is_hash(token) || !version.empty())
+			continue;
+		std::string lower_token = token;
+		for (char& c : lower_token)
+			c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+		if (lower_token == "android")
+			continue;
+		words.push_back(token);
+	}
+	// No dotted version ("turnip-axfl3-003-android"): the tail after the name is the version tag.
+	if (version.empty() && words.size() > 1)
+	{
+		for (size_t i = 1; i < words.size(); i++)
+		{
+			if (!version.empty())
+				version.push_back('-');
+			version += words[i];
+		}
+		words.resize(1);
+	}
+
+	std::string name;
+	for (const std::string& token : words)
+	{
+		std::string word = token;
+		std::string lower = word;
+		for (char& c : lower)
+			c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+		if (lower == "malisx2")
+			word = "MaliSX2";
+		else if (lower == "panvk")
+			word = "PanVK";
+		else if (!word.empty())
+			word[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(word[0])));
+		if (!name.empty())
+			name.push_back(' ');
+		name += word;
+	}
+	if (name.empty())
+		name = folder;
+	return version.empty() ? name : (name + " " + version);
+}
+
+// "...v1.r40p0-01eac0.b025..." -> "r40p0"; empty when no Mali release token is present.
+static std::string ExtractMaliRelease(const std::string& text)
+{
+	for (size_t i = 0; i + 3 < text.size(); i++)
+	{
+		if (text[i] != 'r' || (i > 0 && std::isalnum(static_cast<unsigned char>(text[i - 1]))))
+			continue;
+		size_t j = i + 1;
+		while (j < text.size() && std::isdigit(static_cast<unsigned char>(text[j])))
+			j++;
+		if (j == i + 1 || j >= text.size() || text[j] != 'p')
+			continue;
+		size_t k = j + 1;
+		while (k < text.size() && std::isdigit(static_cast<unsigned char>(text[k])))
+			k++;
+		if (k == j + 1)
+			continue;
+		return text.substr(i, k - i);
+	}
+	return {};
+}
+
+// "V@0744.0 (...)" -> "V@0744.0"; empty when absent.
+static std::string ExtractQualcommToken(const std::string& text)
+{
+	const size_t pos = text.find("V@");
+	if (pos == std::string::npos)
+		return {};
+	size_t end = pos;
+	while (end < text.size() && text[end] != ' ' && text[end] != ',' && text[end] != '(' && text[end] != '\n')
+		end++;
+	return text.substr(pos, end - pos);
+}
+
+// Short driver version for the OSD ("r40p0", "V@0744.0", "512.744"); empty when unknown.
+// vendor_id == 0 means OpenGL, where `info` is the GL_VERSION string.
+static std::string ShortSystemDriverVersion(u32 vendor_id, const std::string& info, u32 driver_version, bool has_driver_version)
+{
+	std::string result;
+	if (vendor_id == 0x13B5)
+		result = ExtractMaliRelease(info);
+	else if (vendor_id == 0x5143)
+		result = ExtractQualcommToken(info);
+	if (result.empty() && vendor_id == 0x5143 && has_driver_version)
+		result = fmt::format("{}.{}", VK_VERSION_MAJOR(driver_version), VK_VERSION_MINOR(driver_version));
+	if (result.empty() && vendor_id == 0)
+	{
+		// GL_VERSION: "OpenGL ES 3.2 <driver version token> ..."
+		result = ExtractMaliRelease(info);
+		if (result.empty())
+			result = ExtractQualcommToken(info);
+		if (result.empty())
+		{
+			size_t pos = 0;
+			for (int skipped = 0; skipped < 3 && pos != std::string::npos; skipped++)
+			{
+				pos = info.find(' ', pos);
+				if (pos != std::string::npos)
+					pos++;
+			}
+			if (pos != std::string::npos && pos < info.size())
+				result = info.substr(pos);
+		}
+	}
+	else if (result.empty())
+		result = info;
+
+	if (result.empty() && has_driver_version)
+	{
+		result = fmt::format("{}.{}.{}", VK_VERSION_MAJOR(driver_version), VK_VERSION_MINOR(driver_version),
+			VK_VERSION_PATCH(driver_version));
+		return result;
+	}
+	// Generic: first token up to ' ', '-', ',', '('; drop a leading "v1.".
+	const size_t cut = result.find_first_of(" -,(\n\r");
+	if (cut != std::string::npos)
+		result.resize(cut);
+	if (result.size() > 3 && (result[0] == 'v' || result[0] == 'V') && result[1] == '1' && result[2] == '.')
+		result.erase(0, 3);
+	if (result.size() > 20 - 7)
+		result.resize(20 - 7);
+	return result;
+}
+
+// Overlay "Driver:" text for the device that was just created; empty hides the line.
+static std::string BuildOverlayDriverLabel(GSRendererType renderer)
+{
+	if (!g_gs_device || renderer == GSRendererType::SW || renderer == GSRendererType::Null)
+		return {};
+
+	const auto shorten = [](std::string text) {
+		while (!text.empty() && (text.back() == '\n' || text.back() == '\r' || text.back() == ' '))
+			text.pop_back();
+		if (text.size() > 28)
+			text.resize(28);
+		return text;
+	};
+
+	switch (g_gs_device->GetRenderAPI())
+	{
+#ifdef ENABLE_VULKAN
+		case RenderAPI::Vulkan:
+		{
+			const std::string custom = Vulkan::GetActiveCustomDriverFolderName();
+			if (!custom.empty())
+				return FriendlyCustomDriverName(custom);
+			const GSDeviceVK* vk = static_cast<const GSDeviceVK*>(g_gs_device.get());
+			const std::string info = vk->GetOptionalExtensions().vk_khr_driver_properties ?
+				std::string(vk->GetDeviceDriverProperties().driverInfo) : std::string();
+			const std::string version = ShortSystemDriverVersion(vk->GetDeviceProperties().vendorID, info,
+				vk->GetDeviceProperties().driverVersion, true);
+			return version.empty() ? std::string("System") : "System " + version;
+		}
+#endif
+#ifdef ENABLE_OPENGL
+		case RenderAPI::OpenGL:
+		{
+			std::string info = g_gs_device->GetDriverInfo();
+			const size_t begin = info.find('\n');
+			if (begin != std::string::npos)
+				info.erase(0, begin + 1);
+			const size_t end = info.find('\n');
+			if (end != std::string::npos)
+				info.resize(end);
+			info = shorten(std::move(info));
+			const std::string version = ShortSystemDriverVersion(0, info, 0, false);
+			return version.empty() ? std::string("System") : "System " + version;
+		}
+#endif
+		default:
+			return {};
+	}
+}
+#endif
+
 static bool OpenGSDevice(GSRendererType renderer, bool clear_state_on_fail, bool recreate_window,
 	GSVSyncMode vsync_mode, bool allow_present_throttle)
 {
@@ -216,6 +448,7 @@ static bool OpenGSDevice(GSRendererType renderer, bool clear_state_on_fail, bool
 	GSConfig.OsdShowGPU = emucorex::android::IsPerformanceGpuTimingRequested() &&
 		g_gs_device->SetGPUTimingEnabled(true);
 	emucorex::android::SetPerformanceGpuState(g_gs_device->GetName(), GSConfig.OsdShowGPU);
+	emucorex::android::SetPerformanceDriverLabel(BuildOverlayDriverLabel(renderer));
 #else
 	GSConfig.OsdShowGPU = GSConfig.OsdShowGPU && g_gs_device->SetGPUTimingEnabled(true);
 #endif
@@ -467,6 +700,11 @@ static void CloseGSRenderer()
 	}
 }
 
+#if defined(__ANDROID__) && defined(ENABLE_VULKAN)
+// Set when a device reopen had to drop the selected custom Vulkan driver to get any device at all.
+static bool s_custom_driver_dropped_by_reopen = false;
+#endif
+
 bool GSreopen(bool recreate_device, bool recreate_renderer, GSRendererType new_renderer,
 	std::optional<const Pcsx2Config::GSOptions*> old_config)
 {
@@ -542,6 +780,22 @@ bool GSreopen(bool recreate_device, bool recreate_renderer, GSRendererType new_r
 				Host::OSD_CRITICAL_ERROR_DURATION);
 
 			CloseGSDevice(false);
+
+#if defined(__ANDROID__) && defined(ENABLE_VULKAN)
+			// A device that fails with a custom driver must not be retried with the same driver,
+			// otherwise there is no way back to a working GS. Drop it and use the system driver.
+			if (GetAPIForRenderer(new_renderer) == RenderAPI::Vulkan)
+			{
+				const char* custom_driver = getenv("LIBVULKAN_PATH");
+				if (custom_driver && *custom_driver)
+				{
+					Console.Error("(GSreopen) Vulkan device creation failed with a custom driver, retrying with the system driver");
+					unsetenv("LIBVULKAN_PATH");
+					emucorex::android::AndroidRuntime::Instance().SetSetting("EmuCoreX", "CustomDriverPath", "string", std::string());
+					s_custom_driver_dropped_by_reopen = true;
+				}
+			}
+#endif
 
 			if (old_config.has_value())
 				GSConfig = *old_config.value();
@@ -1077,6 +1331,38 @@ void GSgetTitleStats(std::string& info)
 	const char* video_mode = ReportVideoMode();
 	info = StringUtil::StdStringFromFormat("%s%s | %s | %s | %s", api_name, hw_sw_name, video_mode, interlace_mode, deinterlace_mode);
 }
+
+#if defined(__ANDROID__) && defined(ENABLE_VULKAN)
+void GSRenderer::RebuildAndPresentAfterReopen()
+{
+	// The previous display texture died with the old device and a paused VM produces no VSync that
+	// would build a new one. Merge the restored GS memory once, then present it (two presents, as
+	// MTGS::UpdateDisplayWindow does, so the swapchain actually shows it).
+	if (!GSIsHardwareRenderer() || !Merge(0))
+		return;
+	PresentCurrentFrame();
+	PresentCurrentFrame();
+}
+
+int GSReloadGpuDriver(bool present_after_reopen)
+{
+	// GS thread only. The caller has already stored the new LIBVULKAN_PATH.
+	if (!g_gs_renderer || !g_gs_device || g_gs_device->GetRenderAPI() != RenderAPI::Vulkan)
+		return GSReloadDriverNotVulkan;
+
+	s_custom_driver_dropped_by_reopen = false;
+	const Pcsx2Config::GSOptions old_config(GSConfig);
+	if (!GSreopen(true, true, GSConfig.Renderer, &old_config))
+		return GSReloadDriverFailed;
+
+	if (present_after_reopen && g_gs_renderer)
+		g_gs_renderer->RebuildAndPresentAfterReopen();
+
+	if (s_custom_driver_dropped_by_reopen || Vulkan::CustomDriverFellBackToSystem())
+		return GSReloadDriverFellBack;
+	return GSReloadDriverApplied;
+}
+#endif
 
 void GSUpdateConfig(const Pcsx2Config::GSOptions& new_config)
 {

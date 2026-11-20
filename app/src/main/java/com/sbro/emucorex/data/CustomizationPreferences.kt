@@ -122,6 +122,7 @@ enum class GameMenuTabId {
     EMULATION,
     CHEATS,
     SHADERS,
+    DRIVERS,
     GRAPHICS,
     FIXES,
     ACHIEVEMENTS
@@ -161,6 +162,7 @@ enum class GameMenuSectionId(val tab: GameMenuTabId) {
     EMULATION_SPEED(GameMenuTabId.EMULATION),
     EMULATION_CHEATS(GameMenuTabId.CHEATS),
     SHADERS_LIBRARY(GameMenuTabId.SHADERS),
+    DRIVERS_LIBRARY(GameMenuTabId.DRIVERS),
     GRAPHICS_DISPLAY(GameMenuTabId.GRAPHICS),
     GRAPHICS_RENDERING(GameMenuTabId.GRAPHICS),
     GRAPHICS_SCREEN(GameMenuTabId.GRAPHICS),

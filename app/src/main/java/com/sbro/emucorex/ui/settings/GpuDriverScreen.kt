@@ -955,7 +955,7 @@ private fun DriverBadgeRow(
     }
 }
 
-private fun RemoteGpuDriver.recommendationRank(
+internal fun RemoteGpuDriver.recommendationRank(
     profile: SnapdragonGpuProfile?,
     deviceVendor: GpuDriverVendor? = null
 ): Int =
@@ -996,7 +996,7 @@ private fun DriverBadge(text: String, color: androidx.compose.ui.graphics.Color)
     }
 }
 
-private fun RemoteGpuDriver.installedDriverName(): String {
+internal fun RemoteGpuDriver.installedDriverName(): String {
     val rawName = downloadUrl.substringBefore('?').substringAfterLast('/').ifBlank { "$id.zip" }
     val safeName = rawName.replace(Regex("[^A-Za-z0-9._-]"), "_")
     val archiveName = if (safeName.endsWith(".zip", ignoreCase = true)) safeName else "$safeName.zip"

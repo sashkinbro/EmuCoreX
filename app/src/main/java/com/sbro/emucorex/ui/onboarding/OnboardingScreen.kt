@@ -63,6 +63,8 @@ import androidx.compose.material.icons.rounded.Leaderboard
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.RadioButtonChecked
+import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.SmartDisplay
 import androidx.compose.material.icons.rounded.Star
@@ -117,6 +119,7 @@ import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.LocalTvUiEnvironment
+import com.sbro.emucorex.core.PerformanceProfiles
 import com.sbro.emucorex.core.TvUiMetrics
 import com.sbro.emucorex.core.availableProSupportOffers
 
@@ -476,25 +479,29 @@ fun OnboardingScreen(
                                     showSubtitle = false,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
-                                page == 3 -> OnboardingHeroFeature(
+                                page == 3 -> OnboardingHeroProfile(
+                                    showSubtitle = false,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                                page == 4 -> OnboardingHeroFeature(
                                     icon = Icons.Rounded.Cloud,
                                     title = stringResource(R.string.onboarding_drive_title),
                                     subtitle = stringResource(R.string.onboarding_drive_subtitle),
                                     showSubtitle = false,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
-                                page == 4 -> OnboardingHeroFeature(
+                                page == 5 -> OnboardingHeroFeature(
                                     icon = Icons.Rounded.Person,
                                     title = stringResource(R.string.onboarding_account_title),
                                     subtitle = stringResource(R.string.onboarding_account_subtitle),
                                     showSubtitle = false,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
-                                page == 5 -> OnboardingHeroPro(
+                                page == 6 -> OnboardingHeroPro(
                                     showSubtitle = false,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
-                                page == 6 -> OnboardingHeroArcade(
+                                page == 7 -> OnboardingHeroArcade(
                                     showSubtitle = false,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
@@ -544,7 +551,13 @@ fun OnboardingScreen(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center
                                 ) {
-                                    OnboardingDriveContent(modifier = Modifier.padding(horizontal = 32.dp))
+                                    OnboardingPerformanceProfileContent(
+                                        selectedProfile = uiState.performanceProfile,
+                                        onSelectProfile = viewModel::setPerformanceProfile,
+                                        requestInitialFocus = tvUiEnabled && pagerState.currentPage == page,
+                                        contentFocusRequester = pageContentFocusRequesters[page],
+                                        modifier = Modifier.padding(horizontal = 32.dp)
+                                    )
                                 }
                             } else if (page == 4) {
                                 Column(
@@ -556,9 +569,21 @@ fun OnboardingScreen(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center
                                 ) {
-                                    OnboardingAccountContent(modifier = Modifier.padding(horizontal = 32.dp))
+                                    OnboardingDriveContent(modifier = Modifier.padding(horizontal = 32.dp))
                                 }
                             } else if (page == 5) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState())
+                                        .statusBarsPadding()
+                                        .padding(top = 24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    OnboardingAccountContent(modifier = Modifier.padding(horizontal = 32.dp))
+                                }
+                            } else if (page == 6) {
                                 Column(
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -584,7 +609,7 @@ fun OnboardingScreen(
                                         modifier = Modifier.padding(horizontal = 32.dp)
                                     )
                                 }
-                            } else if (page == 6) {
+                            } else if (page == 7) {
                                 Text(
                                     text = stringResource(R.string.namco_guide_subtitle),
                                     style = MaterialTheme.typography.bodyLarge.copy(
@@ -723,6 +748,16 @@ fun OnboardingScreen(
                         when (page) {
                             0, 1, 2 -> OnboardingHero(page = page)
                             3 -> {
+                                OnboardingHeroProfile()
+                                Spacer(modifier = Modifier.height(32.dp))
+                                OnboardingPerformanceProfileContent(
+                                    selectedProfile = uiState.performanceProfile,
+                                    onSelectProfile = viewModel::setPerformanceProfile,
+                                    requestInitialFocus = tvUiEnabled && pagerState.currentPage == page,
+                                    contentFocusRequester = pageContentFocusRequesters[page]
+                                )
+                            }
+                            4 -> {
                                 OnboardingHeroFeature(
                                     icon = Icons.Rounded.Cloud,
                                     title = stringResource(R.string.onboarding_drive_title),
@@ -731,7 +766,7 @@ fun OnboardingScreen(
                                 Spacer(modifier = Modifier.height(32.dp))
                                 OnboardingDriveContent()
                             }
-                            4 -> {
+                            5 -> {
                                 OnboardingHeroFeature(
                                     icon = Icons.Rounded.Person,
                                     title = stringResource(R.string.onboarding_account_title),
@@ -740,7 +775,7 @@ fun OnboardingScreen(
                                 Spacer(modifier = Modifier.height(32.dp))
                                 OnboardingAccountContent()
                             }
-                            5 -> {
+                            6 -> {
                                 OnboardingHeroPro()
                                 Spacer(modifier = Modifier.height(32.dp))
                                 OnboardingProContent(
@@ -758,8 +793,8 @@ fun OnboardingScreen(
                                     contentFocusRequester = pageContentFocusRequesters[page]
                                 )
                             }
-                            6 -> OnboardingHeroArcade()
-                            7 -> {
+                            7 -> OnboardingHeroArcade()
+                            8 -> {
                                 OnboardingHeroSetup()
                                 Spacer(modifier = Modifier.height(32.dp))
                                 OnboardingSetupContent(
@@ -945,6 +980,37 @@ private fun OnboardingHeroSetup(
 }
 
 
+
+@Composable
+private fun OnboardingHeroProfile(
+    modifier: Modifier = Modifier,
+    showSubtitle: Boolean = true
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.widthIn(max = 480.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.onboarding_profile_title),
+            style = MaterialTheme.typography.displaySmall.copy(
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.5).sp
+            ),
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center
+        )
+        if (showSubtitle) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = stringResource(R.string.onboarding_profile_subtitle),
+                style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 24.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+        }
+    }
+}
 
 @Composable
 private fun OnboardingHeroPro(
@@ -1729,6 +1795,118 @@ private fun OnboardingInfoCard(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
             )
+        }
+    }
+}
+
+/**
+ * [selectedProfile] is derived from the effective settings values, so it is
+ * [PerformanceProfiles.CUSTOM] (no card selected) when they match no preset.
+ */
+@Composable
+private fun OnboardingPerformanceProfileContent(
+    selectedProfile: Int,
+    onSelectProfile: (Int) -> Unit,
+    requestInitialFocus: Boolean = false,
+    contentFocusRequester: FocusRequester? = null,
+    modifier: Modifier = Modifier
+) {
+    val fallbackFocusRequester = remember { FocusRequester() }
+    val firstProfileFocusRequester = contentFocusRequester ?: fallbackFocusRequester
+    LaunchedEffect(requestInitialFocus) {
+        if (requestInitialFocus) {
+            delay(100.milliseconds)
+            runCatching { firstProfileFocusRequester.requestFocus() }
+        }
+    }
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        ProfileCard(
+            title = stringResource(R.string.onboarding_profile_safe_title),
+            description = stringResource(R.string.onboarding_profile_safe_desc),
+            selected = selectedProfile == PerformanceProfiles.SAFE,
+            onClick = { onSelectProfile(PerformanceProfiles.SAFE) },
+            modifier = Modifier.focusRequester(firstProfileFocusRequester)
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        ProfileCard(
+            title = stringResource(R.string.onboarding_profile_fast_title),
+            description = stringResource(R.string.onboarding_profile_fast_desc),
+            selected = selectedProfile == PerformanceProfiles.FAST,
+            onClick = { onSelectProfile(PerformanceProfiles.FAST) }
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        ProfileCard(
+            title = stringResource(R.string.onboarding_profile_ultra_title),
+            description = stringResource(R.string.onboarding_profile_ultra_desc),
+            selected = selectedProfile == PerformanceProfiles.ULTRA,
+            onClick = { onSelectProfile(PerformanceProfiles.ULTRA) }
+        )
+        if (selectedProfile == PerformanceProfiles.CUSTOM) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = stringResource(R.string.settings_performance_preset_custom),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileCard(
+    title: String,
+    description: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .gamepadFocusableCard(
+                shape = neonShape(32.dp),
+                interactionSource = interactionSource,
+                addFocusTarget = false,
+                focusHighlightMode = GamepadFocusHighlightMode.Always
+            ),
+        shape = neonShape(32.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        tonalElevation = if (selected) 6.dp else 2.dp,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        ),
+        interactionSource = interactionSource,
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (selected) Icons.Rounded.RadioButtonChecked else Icons.Rounded.RadioButtonUnchecked,
+                contentDescription = null,
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

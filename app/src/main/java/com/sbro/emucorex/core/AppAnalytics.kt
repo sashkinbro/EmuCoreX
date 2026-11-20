@@ -142,8 +142,10 @@ internal object AnalyticsDimensions {
         else -> "aaudio"
     }
 
-    fun performanceProfile(value: Int): String = when (PerformanceProfiles.normalize(value)) {
+    fun performanceProfile(value: Int): String = when (value) {
         PerformanceProfiles.FAST -> "fast"
+        PerformanceProfiles.ULTRA -> "ultra"
+        PerformanceProfiles.CUSTOM -> "custom"
         else -> "safe"
     }
 

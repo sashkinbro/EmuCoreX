@@ -198,6 +198,7 @@ data class SettingsUiState(
     // Extended settings
     val eeCycleRate: Int = 0,
     val eeCycleSkip: Int = 0,
+    val fpuCorrectAddSub: Boolean = PerformanceProfiles.safeConfig.fpuCorrectAddSub,
     val enableEeRecompiler: Boolean = true,
     val enableIopRecompiler: Boolean = true,
     val enableVu0Recompiler: Boolean = true,
@@ -531,6 +532,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             performanceProfile = snapshot.performanceProfile,
             eeCycleRate = snapshot.eeCycleRate,
             eeCycleSkip = snapshot.eeCycleSkip,
+            fpuCorrectAddSub = snapshot.fpuCorrectAddSub,
             enableEeRecompiler = snapshot.enableEeRecompiler,
             enableIopRecompiler = snapshot.enableIopRecompiler,
             enableVu0Recompiler = snapshot.enableVu0Recompiler,
@@ -2500,8 +2502,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 enableVu0Recompiler = _uiState.value.enableVu0Recompiler,
                 enableVu1Recompiler = _uiState.value.enableVu1Recompiler,
                 enableFastmem = _uiState.value.enableFastmem,
-                fpuCorrectAddSub = PerformanceProfiles.configFor(_uiState.value.performanceProfile)
-                    .fpuCorrectAddSub,
+                fpuCorrectAddSub = _uiState.value.fpuCorrectAddSub,
                 eeFpuRoundMode = _uiState.value.eeFpuRoundMode,
                 vu0RoundMode = _uiState.value.vu0RoundMode,
                 vu1RoundMode = _uiState.value.vu1RoundMode,

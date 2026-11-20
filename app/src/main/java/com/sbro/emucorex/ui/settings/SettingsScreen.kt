@@ -3064,11 +3064,19 @@ private fun SettingsContent(
                     }
                     SettingsSection(title = stringResource(R.string.settings_speed_hacks)) {
                         val mediatekAngleAvailable = EmulatorBridge.isBundledAngleAvailable()
+                        // performanceProfile is derived from the effective values; CUSTOM selects
+                        // no option and is flagged in the title.
+                        val profileTitle = stringResource(R.string.onboarding_profile_title)
                         ChoiceSection(
-                            title = stringResource(R.string.onboarding_profile_title),
+                            title = if (uiState.performanceProfile == PerformanceProfiles.CUSTOM) {
+                                "$profileTitle: ${stringResource(R.string.settings_performance_preset_custom)}"
+                            } else {
+                                profileTitle
+                            },
                             options = listOf(
                                 PerformanceProfiles.SAFE to stringResource(R.string.onboarding_profile_safe_title),
-                                PerformanceProfiles.FAST to stringResource(R.string.onboarding_profile_fast_title)
+                                PerformanceProfiles.FAST to stringResource(R.string.onboarding_profile_fast_title),
+                                PerformanceProfiles.ULTRA to stringResource(R.string.onboarding_profile_ultra_title)
                             ),
                             selectedValue = uiState.performanceProfile,
                             onSelect = viewModel::setPerformanceProfile,
@@ -5044,6 +5052,7 @@ private fun gameMenuTabLabel(tab: GameMenuTabId): String = when (tab) {
     GameMenuTabId.EMULATION -> stringResource(R.string.settings_emulation_tab)
     GameMenuTabId.CHEATS -> stringResource(R.string.emulation_cheats_title)
     GameMenuTabId.SHADERS -> stringResource(R.string.emulation_shaders_tab)
+    GameMenuTabId.DRIVERS -> stringResource(R.string.emulation_drivers_tab)
     GameMenuTabId.GRAPHICS -> stringResource(R.string.settings_graphics_tab)
     GameMenuTabId.FIXES -> stringResource(R.string.settings_fixes_tab)
     GameMenuTabId.ACHIEVEMENTS -> stringResource(R.string.emulation_achievements_tab)
@@ -5055,6 +5064,7 @@ private fun gameMenuTabIcon(tab: GameMenuTabId): ImageVector = when (tab) {
     GameMenuTabId.EMULATION -> Icons.Rounded.SettingsSuggest
     GameMenuTabId.CHEATS -> Icons.Rounded.AutoFixHigh
     GameMenuTabId.SHADERS -> Icons.Rounded.Gradient
+    GameMenuTabId.DRIVERS -> Icons.Rounded.Memory
     GameMenuTabId.GRAPHICS -> Icons.Rounded.Wallpaper
     GameMenuTabId.FIXES -> Icons.Rounded.Star
     GameMenuTabId.ACHIEVEMENTS -> Icons.Rounded.Lock
@@ -5074,6 +5084,7 @@ private fun gameMenuSectionLabel(section: GameMenuSectionId): String = when (sec
     GameMenuSectionId.EMULATION_SPEED -> stringResource(R.string.settings_speed_hacks)
     GameMenuSectionId.EMULATION_CHEATS -> stringResource(R.string.settings_enable_cheats)
     GameMenuSectionId.SHADERS_LIBRARY -> stringResource(R.string.settings_game_menu_section_shaders)
+    GameMenuSectionId.DRIVERS_LIBRARY -> stringResource(R.string.settings_game_menu_section_drivers)
     GameMenuSectionId.GRAPHICS_DISPLAY -> stringResource(R.string.settings_game_menu_section_graphics_display)
     GameMenuSectionId.GRAPHICS_RENDERING -> stringResource(R.string.settings_rendering_section)
     GameMenuSectionId.GRAPHICS_SCREEN -> stringResource(R.string.emulation_screen_tab)
@@ -7669,6 +7680,7 @@ internal fun fpsOverlayMetricOptions(): List<Pair<Int, String>> = listOf(
     PerformanceOverlayMetrics.RESOLUTION to stringResource(R.string.settings_fps_metric_resolution),
     PerformanceOverlayMetrics.HOST_CPU to stringResource(R.string.settings_fps_metric_host_cpu),
     PerformanceOverlayMetrics.HOST_GPU to stringResource(R.string.settings_fps_metric_host_gpu),
+    PerformanceOverlayMetrics.DRIVER to stringResource(R.string.settings_fps_metric_driver),
     PerformanceOverlayMetrics.EE to stringResource(R.string.settings_fps_metric_ee),
     PerformanceOverlayMetrics.GS to stringResource(R.string.settings_fps_metric_gs),
     PerformanceOverlayMetrics.VU to stringResource(R.string.settings_fps_metric_vu),

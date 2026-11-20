@@ -17,6 +17,7 @@
 #include "pcsx2/GS/Renderers/Vulkan/GSDeviceVK.h"
 #include "pcsx2/GS/Renderers/Vulkan/VKLoader.h"
 #include "pcsx2/GS/Renderers/Vulkan/VKShaderCache.h"
+#include "pcsx2/MTGS.h"
 #include "pcsx2/MTVU.h"
 #include "pcsx2/VUmicro.h"
 #include "pcsx2/PerformanceMetrics.h"
@@ -44,7 +45,9 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <condition_variable>
 #include <cstdlib>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string_view>
@@ -1039,6 +1042,66 @@ void ApplyRuntimeSettingsToUpstream(const VmLaunchConfig& config)
 	});
 	InstallHostSettings(config);
 	VMManager::ApplySettings();
+}
+
+int ReloadGpuDriver(const std::string& path)
+{
+	AndroidRuntime::Instance().SetSetting("EmuCoreX", "CustomDriverPath", "string", path);
+
+	struct Shared
+	{
+		std::mutex mutex;
+		std::condition_variable cv;
+		bool done = false;
+		int status = GpuDriverReloadStoredNoVm;
+	};
+	auto shared = std::make_shared<Shared>();
+
+	Host::RunOnCPUThread([shared, path]() {
+		int status = GpuDriverReloadStoredNoVm;
+		if (VMManager::GetState() != VMState::Shutdown && MTGS::IsOpen())
+		{
+			// Same discipline as a renderer switch: keep the VM paused while the GS device is rebuilt.
+			const bool was_running = VMManager::GetState() == VMState::Running;
+			if (was_running)
+				VMManager::SetPaused(true);
+			const ScopedGuard resume_vm([was_running]() {
+				if (was_running && VMManager::GetState() == VMState::Paused)
+					VMManager::SetPaused(false);
+			});
+
+			if (path.empty())
+				unsetenv("LIBVULKAN_PATH");
+			else
+				setenv("LIBVULKAN_PATH", path.c_str(), 1);
+
+			int gs_result = GSReloadDriverNotVulkan;
+			// A menu-paused game would stay black until resume: re-present its frame after the reopen.
+			const bool present_after_reopen = !was_running;
+			MTGS::RunOnGSThread([&gs_result, present_after_reopen]() { gs_result = GSReloadGpuDriver(present_after_reopen); });
+			MTGS::WaitGS(false, false, false);
+
+			switch (gs_result)
+			{
+				case GSReloadDriverApplied: status = GpuDriverReloadApplied; break;
+				case GSReloadDriverFellBack: status = GpuDriverReloadFellBack; break;
+				case GSReloadDriverFailed: status = GpuDriverReloadFailed; break;
+				default: status = GpuDriverReloadStoredNotVulkan; break;
+			}
+		}
+
+		{
+			std::lock_guard lock(shared->mutex);
+			shared->status = status;
+			shared->done = true;
+		}
+		shared->cv.notify_all();
+	}, false);
+
+	std::unique_lock lock(shared->mutex);
+	if (!shared->cv.wait_for(lock, std::chrono::seconds(15), [&shared]() { return shared->done; }))
+		return GpuDriverReloadDeferred;
+	return shared->status;
 }
 
 void SetLastBootError(const std::string& message)
