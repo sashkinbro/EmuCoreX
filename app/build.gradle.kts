@@ -374,6 +374,7 @@ dependencies {
     implementation(libs.google.play.billing)
     implementation(libs.google.play.review)
     implementation(libs.google.play.review.ktx)
+    implementation(libs.google.play.age.signals)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

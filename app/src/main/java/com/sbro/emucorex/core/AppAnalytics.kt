@@ -50,6 +50,23 @@ object AppAnalytics {
         }
     }
 
+    /**
+     * Minors (Play Age Signals) get analytics storage denied; ads consent is already denied.
+     * Crashlytics, Remote Config and billing are unaffected by Analytics consent.
+     */
+    fun applyAgeSignals(snapshot: AgeSignalsSnapshot) {
+        if (!snapshot.isMinor) return
+        val analytics = firebaseAnalytics ?: return
+        runCatching {
+            analytics.setConsent(
+                mapOf(
+                    FirebaseAnalytics.ConsentType.ANALYTICS_STORAGE to
+                        FirebaseAnalytics.ConsentStatus.DENIED
+                )
+            )
+        }.onFailure { Log.w(TAG, "Failed to apply minor analytics consent", it) }
+    }
+
     fun logOnboardingCompleted(performanceProfile: Int) {
         logEvent("onboarding_complete") {
             putString("performance_profile", AnalyticsDimensions.performanceProfile(performanceProfile))
