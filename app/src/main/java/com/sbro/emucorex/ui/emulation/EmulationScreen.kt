@@ -1338,8 +1338,11 @@ fun EmulationScreen(
         }
     }
 
-    LaunchedEffect(retroAchievementsNotification?.id) {
+    LaunchedEffect(retroAchievementsNotification?.id, uiState.showMenu, showControlsEditor) {
         val notification = retroAchievementsNotification ?: return@LaunchedEffect
+        // The toast is hidden while the menu / controls editor is open: its time starts once it is visible,
+        // otherwise queued notifications (e.g. the game summary) would expire unseen.
+        if (uiState.showMenu || showControlsEditor) return@LaunchedEffect
         // One notification at a time: dismissing advances the FIFO queue to the next one.
         val durationMs = when {
             notification.durationMs > 0L -> notification.durationMs
@@ -1593,8 +1596,11 @@ fun EmulationScreen(
             ) {
                 // Connected input indicators
                 AnimatedVisibility(
+                    // Hidden while an achievement toast is up: both sit in the top overlay band and the
+                    // semi-transparent badge would be drawn across the toast card.
                     visible = (gamepadConnected || keyboardConnected || mouseConnected) &&
                         !uiState.showMenu &&
+                        retroAchievementsNotification == null &&
                         showGamepadIndicator,
                     enter = fadeIn(tween(300)),
                     exit = fadeOut(tween(300))
@@ -7242,16 +7248,34 @@ private fun OverlayAchievementsPane(
                     )
                     .orEmpty()
             }
-            val visibleAchievements = remember(sortedAchievements, showAllAchievements) {
-                if (showAllAchievements) sortedAchievements else sortedAchievements.take(8)
+            // Games with additional sets (subsets) get one section per set, core set first.
+            val subsets = gameData?.subsets.orEmpty()
+            val showSubsetSections = subsets.size > 1
+            val sections = remember(sortedAchievements, subsets, showSubsetSections) {
+                if (showSubsetSections) {
+                    subsets.mapNotNull { subset ->
+                        sortedAchievements.filter { it.subsetId == subset.id }
+                            .takeIf { it.isNotEmpty() }
+                            ?.let { subset to it }
+                    }
+                } else {
+                    listOf<Pair<com.sbro.emucorex.data.RetroAchievementSubset?, List<RetroAchievementEntry>>>(null to sortedAchievements)
+                }
+            }
+            val visibleAchievements = remember(sections, showAllAchievements) {
+                sections.flatMap { (_, rows) -> if (showAllAchievements) rows else rows.take(8) }
             }
             val headerTitle = liveGame?.title?.ifBlank { null }
                 ?: gameData?.title?.ifBlank { null }
                 ?: currentGameTitle.ifBlank { stringResource(R.string.emulation_achievements_tab) }
-            val earnedCount = liveGame?.earnedAchievements ?: gameData?.earnedCount ?: 0
-            val totalCount = liveGame?.totalAchievements ?: gameData?.totalCount ?: 0
-            val earnedPoints = liveGame?.earnedPoints ?: gameData?.earnedPoints ?: 0
-            val totalPoints = liveGame?.totalPoints ?: gameData?.totalPoints ?: 0
+            val earnedCount = if (showSubsetSections) subsets.sumOf { it.earnedAchievements }
+                else liveGame?.earnedAchievements ?: gameData?.earnedCount ?: 0
+            val totalCount = if (showSubsetSections) subsets.sumOf { it.totalAchievements }
+                else liveGame?.totalAchievements ?: gameData?.totalCount ?: 0
+            val earnedPoints = if (showSubsetSections) subsets.sumOf { it.earnedPoints }
+                else liveGame?.earnedPoints ?: gameData?.earnedPoints ?: 0
+            val totalPoints = if (showSubsetSections) subsets.sumOf { it.totalPoints }
+                else liveGame?.totalPoints ?: gameData?.totalPoints ?: 0
 
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -7294,8 +7318,13 @@ private fun OverlayAchievementsPane(
                     if (visibleAchievements.isEmpty()) {
                         OverlayAchievementsNotice(stringResource(R.string.achievements_game_empty))
                     } else {
-                        visibleAchievements.forEach { achievement ->
-                            OverlayAchievementRow(achievement = achievement)
+                        sections.forEach { (subset, rows) ->
+                            if (subset != null) {
+                                OverlayAchievementSubsetHeader(subset = subset, fallbackTitle = headerTitle)
+                            }
+                            (if (showAllAchievements) rows else rows.take(8)).forEach { achievement ->
+                                OverlayAchievementRow(achievement = achievement)
+                            }
                         }
                         val hiddenCount = sortedAchievements.size - visibleAchievements.size
                         if (hiddenCount > 0) {
@@ -7314,7 +7343,7 @@ private fun OverlayAchievementsPane(
                                     Text(text = stringResource(R.string.emulation_achievements_show_all))
                                 }
                             }
-                        } else if (showAllAchievements && sortedAchievements.size > 8) {
+                        } else if (showAllAchievements && sections.any { it.second.size > 8 }) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.End
@@ -7569,6 +7598,63 @@ private fun OverlayAchievementsNotice(text: String) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+@Composable
+private fun OverlayAchievementSubsetHeader(
+    subset: com.sbro.emucorex.data.RetroAchievementSubset,
+    fallbackTitle: String
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp),
+        shape = neonShape(16.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BitmapPathImage(
+                imagePath = subset.badgeUrl,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(neonShape(10.dp)),
+                fallback = {
+                    Icon(
+                        imageVector = Icons.Rounded.EmojiEvents,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = subset.title.ifBlank { fallbackTitle },
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = stringResource(
+                        R.string.achievement_summary_format,
+                        subset.earnedAchievements,
+                        subset.totalAchievements,
+                        subset.totalPoints
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 
@@ -8794,7 +8880,7 @@ private fun QuickIconActionButton(
                 addFocusTarget = false
             ),
         shape = shape,
-        color = containerColor,
+        color = if (enabled || showProgress) containerColor else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
     ) {
         Box(
@@ -8813,7 +8899,7 @@ private fun QuickIconActionButton(
                 Icon(
                     imageVector = icon,
                     contentDescription = contentDescription,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -8933,7 +9019,7 @@ private fun FloatingQuickActionButton(
                 )
             },
         shape = shape,
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+        color = if (enabled || showProgress) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
         shadowElevation = 6.dp
     ) {
@@ -8948,7 +9034,7 @@ private fun FloatingQuickActionButton(
                 Icon(
                     imageVector = icon,
                     contentDescription = contentDescription,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
                     modifier = Modifier.size(24.dp)
                 )
             }

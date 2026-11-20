@@ -566,7 +566,7 @@
     <string name="achievements_unlocked_empty">Belum ada pencapaian yang terbuka ditemukan di pustaka yang dipindai.</string>
     <string name="achievements_open_all_unlocked">Semua Terbuka</string>
     <string name="achievements_account_unlocked_title">Terbuka Menurut Game</string>
-    <string name="achievements_account_unlocked_subtitle">Unlocks tersinkronisasi Anda dikelompokkan menurut game.</string>
+    <string name="achievements_account_unlocked_subtitle">Pencapaian terbuka Anda yang tersinkronisasi dikelompokkan menurut game.</string>
     <string name="achievements_account_group_summary">%1$d pencapaian terbuka</string>
     <string name="achievements_open_game">Buka game</string>
     <string name="achievements_game_title">Pencapaian Game</string>

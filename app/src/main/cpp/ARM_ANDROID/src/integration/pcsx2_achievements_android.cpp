@@ -2206,11 +2206,54 @@ std::string Achievements::GetActiveGameDataJSON()
 				AppendJSONString(out, badge_path.empty() ? (achievement->badge_url ? achievement->badge_url : "") : badge_path);
 				out.append(",\"badgeLockedUrl\":");
 				AppendJSONString(out, locked_badge_path.empty() ? (achievement->badge_locked_url ? achievement->badge_locked_url : "") : locked_badge_path);
+				// The local badge files are downloaded asynchronously and may not exist yet when this JSON is
+				// built; the remote URLs let Kotlin fall back to a direct download instead of a placeholder.
+				out.append(",\"badgeRemoteUrl\":");
+				AppendJSONString(out, achievement->badge_url ? achievement->badge_url : "");
+				out.append(",\"badgeLockedRemoteUrl\":");
+				AppendJSONString(out, achievement->badge_locked_url ? achievement->badge_locked_url : "");
+				out.append(",\"subsetId\":");
+				out.append(std::to_string(bucket.subset_id));
 				out.push_back('}');
 			}
 		}
 
 		rc_client_destroy_achievement_list(list);
+	}
+
+	out.append("],\"subsets\":[");
+	if (rc_client_subset_list_t* subset_list = rc_client_create_subset_list(s_client))
+	{
+		bool first_subset = true;
+		for (u32 subset_index = 0; subset_index < subset_list->num_subsets; subset_index++)
+		{
+			const rc_client_subset_t* subset = subset_list->subsets[subset_index];
+			if (!subset)
+				continue;
+
+			rc_client_user_game_summary_t subset_summary = {};
+			rc_client_get_user_subset_summary(s_client, subset->id, &subset_summary);
+
+			if (!first_subset)
+				out.push_back(',');
+			first_subset = false;
+			out.append("{\"id\":");
+			out.append(std::to_string(subset->id));
+			out.append(",\"title\":");
+			AppendJSONString(out, subset->title);
+			out.append(",\"badgeUrl\":");
+			AppendJSONString(out, subset->badge_url ? subset->badge_url : "");
+			out.append(",\"totalAchievements\":");
+			out.append(std::to_string(subset_summary.num_core_achievements));
+			out.append(",\"earnedAchievements\":");
+			out.append(std::to_string(subset_summary.num_unlocked_achievements));
+			out.append(",\"totalPoints\":");
+			out.append(std::to_string(subset_summary.points_core));
+			out.append(",\"earnedPoints\":");
+			out.append(std::to_string(subset_summary.points_unlocked));
+			out.push_back('}');
+		}
+		rc_client_destroy_subset_list(subset_list);
 	}
 
 	out.append("]}");

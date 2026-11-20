@@ -1,6 +1,7 @@
 package com.sbro.emucorex.core.utils
 
 import com.sbro.emucorex.R
+import com.sbro.emucorex.core.AppLocaleManager
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.data.AchievementsProfileCache
 import com.sbro.emucorex.data.AchievementsStoredSnapshot
@@ -115,10 +116,11 @@ object RetroAchievementsStateManager {
     }
 
     private fun str(resId: Int, fallback: String): String =
-        EmulatorBridge.getContext()?.let { runCatching { it.getString(resId) }.getOrNull() } ?: fallback
+        AppLocaleManager.localized(EmulatorBridge.getContext())
+            ?.let { runCatching { it.getString(resId) }.getOrNull() } ?: fallback
 
     private fun nativeError(error: String?): String =
-        RetroAchievementsErrorMessages.resolve(EmulatorBridge.getContext(), error, error)
+        RetroAchievementsErrorMessages.resolve(AppLocaleManager.localized(EmulatorBridge.getContext()), error, error)
 
     /** A native callback that never arrives must not leave the UI loading forever. */
     private fun armLoadingTimeout() {

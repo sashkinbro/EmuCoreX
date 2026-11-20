@@ -34,7 +34,9 @@ data class RetroAchievementEntry(
     val earnedSoftcore: Boolean,
     val earnedHardcore: Boolean,
     val badgeUrl: String?,
-    val badgeLockedUrl: String?
+    val badgeLockedUrl: String?,
+    /** 0 = unknown / single-set game; otherwise the rc_client subset id (see [RetroAchievementSubset]). */
+    val subsetId: Long = 0L
 ) {
     val isEarned: Boolean
         get() = earnedSoftcore || earnedHardcore
@@ -48,6 +50,17 @@ data class RetroAchievementEntry(
 
 private const val RETRO_ACHIEVEMENT_BUCKET_ACTIVE_CHALLENGE = 6
 
+/** One achievement set of a game (the core set or an additional subset), in rc_client order. */
+data class RetroAchievementSubset(
+    val id: Long,
+    val title: String,
+    val badgeUrl: String?,
+    val totalAchievements: Int,
+    val earnedAchievements: Int,
+    val totalPoints: Int,
+    val earnedPoints: Int
+)
+
 data class RetroAchievementGameData(
     val gameId: Long,
     val title: String,
@@ -58,7 +71,8 @@ data class RetroAchievementGameData(
     val totalCountOverride: Int? = null,
     val earnedHardcoreCountOverride: Int? = null,
     val earnedPointsOverride: Int? = null,
-    val totalPointsOverride: Int? = null
+    val totalPointsOverride: Int? = null,
+    val subsets: List<RetroAchievementSubset> = emptyList()
 ) {
     val earnedCount: Int
         get() = earnedCountOverride ?: achievements.count { it.isEarned }
@@ -277,6 +291,26 @@ class RetroAchievementsRepository(private val context: Context) {
                     gameData = progress.toSummaryGameData()
                 )
             }
+
+        // The account progress feed has no point values, so the hub would show "0/0 pts". Resolve the
+        // totals from the game's patch data (cached per game) for the library games that matched.
+        withContext(Dispatchers.IO) {
+            var lookups = 0
+            for ((key, game) in resultByKey.entries.toList()) {
+                val summary = game.gameData
+                if (summary.totalPoints > 0 || summary.totalCount <= 0) continue
+                if (lookups >= MAX_POINT_LOOKUPS_PER_SYNC) break
+                lookups++
+                val full = runCatching { fetchRemoteGameDataById(summary) }.getOrNull() ?: continue
+                if (full.totalPoints <= 0) continue
+                resultByKey[key] = game.copy(
+                    gameData = summary.copy(
+                        earnedPointsOverride = full.earnedPoints,
+                        totalPointsOverride = full.totalPoints
+                    )
+                )
+            }
+        }
 
         if (activeData != null && resolvedActiveTitle.isNotBlank()) {
             val activeTitleKey = resolvedActiveTitle.toAchievementTitleKey()
@@ -628,6 +662,7 @@ class RetroAchievementsRepository(private val context: Context) {
         private val unlockedAchievementsCache = mutableMapOf<String, List<LibraryUnlockedAchievement>>()
         private val achievementGamesCache = mutableMapOf<String, List<LibraryAchievementGame>>()
         private val nativeLoadMutex = Mutex()
+        private const val MAX_POINT_LOOKUPS_PER_SYNC = 40
         private var lastActiveGameData: RetroAchievementGameData? = null
         private var lastAccountProgress: List<RetroAchievementAccountProgress> = emptyList()
         private var lastAccountProgressUsername: String? = null
@@ -715,7 +750,8 @@ private fun String.toRetroAchievementGameData(): RetroAchievementGameData? {
             title = root.optString("title"),
             gameImageUrl = normalizeRetroAchievementsImageUrl(root.optString("gameImageUrl")),
             achievements = achievements,
-            resolvedOnly = root.optBoolean("resolvedOnly")
+            resolvedOnly = root.optBoolean("resolvedOnly"),
+            subsets = root.optJSONArray("subsets").toRetroAchievementSubsets()
         )
     }.getOrNull()
 }
@@ -917,6 +953,41 @@ private fun RetroAchievementAccountProgress.toSummaryGameData(): RetroAchievemen
     )
 }
 
+private fun JSONArray?.toRetroAchievementSubsets(): List<RetroAchievementSubset> {
+    if (this == null) return emptyList()
+    return buildList {
+        for (index in 0 until length()) {
+            val item = optJSONObject(index) ?: continue
+            val id = item.optLong("id")
+            if (id <= 0L) continue
+            add(
+                RetroAchievementSubset(
+                    id = id,
+                    title = item.optString("title"),
+                    badgeUrl = normalizeRetroAchievementsImageUrl(item.optString("badgeUrl")),
+                    totalAchievements = item.optInt("totalAchievements"),
+                    earnedAchievements = item.optInt("earnedAchievements"),
+                    totalPoints = item.optInt("totalPoints"),
+                    earnedPoints = item.optInt("earnedPoints")
+                )
+            )
+        }
+    }
+}
+
+/**
+ * Native badge files are downloaded asynchronously, so the local path may not exist yet when the
+ * list is built. Prefer the local file when it is usable, else the remote RetroAchievements URL.
+ */
+internal fun resolveBadgeSource(localPath: String?, remoteUrl: String?): String? {
+    val local = normalizeRetroAchievementsImageUrl(localPath)
+    val remote = normalizeRetroAchievementsImageUrl(remoteUrl)
+    if (local == null) return remote
+    if (local.startsWith("http", ignoreCase = true) || local.startsWith("content://", ignoreCase = true)) return local
+    val file = File(local)
+    return if (file.isFile && file.length() > 0L) local else remote ?: local
+}
+
 private fun JSONArray?.toRetroAchievementEntries(): List<RetroAchievementEntry> {
     if (this == null) return emptyList()
     return buildList {
@@ -943,8 +1014,9 @@ private fun JSONArray?.toRetroAchievementEntries(): List<RetroAchievementEntry> 
                     rarityHardcore = item.optDouble("rarityHardcore").toFloat(),
                     earnedSoftcore = item.optBoolean("earnedSoftcore"),
                     earnedHardcore = item.optBoolean("earnedHardcore"),
-                    badgeUrl = normalizeRetroAchievementsImageUrl(item.optString("badgeUrl")),
-                    badgeLockedUrl = normalizeRetroAchievementsImageUrl(item.optString("badgeLockedUrl"))
+                    badgeUrl = resolveBadgeSource(item.optString("badgeUrl"), item.optString("badgeRemoteUrl")),
+                    badgeLockedUrl = resolveBadgeSource(item.optString("badgeLockedUrl"), item.optString("badgeLockedRemoteUrl")),
+                    subsetId = item.optLong("subsetId")
                 )
             )
         }

@@ -2,11 +2,13 @@ package com.sbro.emucorex.core.utils
 
 import android.content.Context
 import com.sbro.emucorex.R
+import com.sbro.emucorex.core.AppLocaleManager
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.data.AppPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -98,6 +100,17 @@ object RetroAchievementsLiveStateManager {
     @Volatile
     private var seeded = false
 
+    // RetroAchievements rule: the player is always told when achievements become active. The native
+    // summary notification can be lost (sent before the callback path is ready, or filtered), so the
+    // Kotlin side checks that one arrived for the game and posts it from the live state otherwise.
+    @Volatile
+    private var lastSummaryTitle: String? = null
+
+    @Volatile
+    private var lastSummaryAtMs = 0L
+    private const val SUMMARY_FALLBACK_DELAY_MS = 2500L
+    private const val SUMMARY_RECENT_WINDOW_MS = 30_000L
+
     /**
      * Cold start: until the first native state callback arrives the hardcore flag must already
      * reflect the stored preference, otherwise restricted actions are allowed for the first frames.
@@ -182,6 +195,7 @@ object RetroAchievementsLiveStateManager {
         richPresenceEnabled: Boolean
     ) {
         seeded = true
+        val previousGameId = _state.value.game?.gameId
         _state.update { current ->
             val newGameId = if (haveGame && !gameTitle.isNullOrBlank()) gameId else null
             if (newGameId != current.game?.gameId || !haveUser) clearIndicators()
@@ -221,6 +235,33 @@ object RetroAchievementsLiveStateManager {
                 } else {
                     null
                 }
+            )
+        }
+        if (haveUser && haveGame && !gameTitle.isNullOrBlank() && gameId != previousGameId && numAchievements > 0) {
+            scheduleSummaryFallback(gameId, gameTitle)
+        }
+    }
+
+    private fun summaryReceivedFor(title: String): Boolean =
+        lastSummaryTitle == title && System.currentTimeMillis() - lastSummaryAtMs < SUMMARY_RECENT_WINDOW_MS
+
+    private fun scheduleSummaryFallback(gameId: Int, gameTitle: String) {
+        if (summaryReceivedFor(gameTitle)) return
+        scope.launch {
+            delay(SUMMARY_FALLBACK_DELAY_MS)
+            val game = _state.value.game ?: return@launch
+            if (game.gameId != gameId || summaryReceivedFor(game.title)) return@launch
+            if (!RetroAchievementsStateManager.state.value.notifications) return@launch
+            if (game.totalAchievements <= 0) return@launch
+            lastSummaryTitle = game.title
+            lastSummaryAtMs = System.currentTimeMillis()
+            val extra = "hardcore=${if (game.hardcoreMode) 1 else 0}\nunlocked=${game.earnedAchievements}" +
+                "\ntotal=${game.totalAchievements}\npoints_unlocked=${game.earnedPoints}\npoints_total=${game.totalPoints}"
+            enqueue(
+                buildNotification(
+                    RetroAchievementsNotificationKind.GAME_SUMMARY, game.title, "", game.earnedPoints, extra,
+                    game.iconPath.orEmpty(), 5000L
+                )
             )
         }
     }
@@ -280,6 +321,10 @@ object RetroAchievementsLiveStateManager {
         iconPath: String,
         durationMs: Long
     ) {
+        if (kind == RetroAchievementsNotificationKind.GAME_SUMMARY) {
+            lastSummaryTitle = title.trim()
+            lastSummaryAtMs = System.currentTimeMillis()
+        }
         enqueue(buildNotification(kind, title.trim(), description.trim(), points, extra.trim(), iconPath, durationMs))
     }
 
@@ -387,7 +432,7 @@ object RetroAchievementsLiveStateManager {
                 kindName = "error"
                 resolvedTitle = text(R.string.ra_notif_error_title, "RetroAchievements error")
                 resolvedMessage = RetroAchievementsErrorMessages.resolve(
-                    EmulatorBridge.getContext(), extra, description.ifBlank { title }
+                    AppLocaleManager.localized(EmulatorBridge.getContext()), extra, description.ifBlank { title }
                 )
             }
             RetroAchievementsNotificationKind.SERVER_DISCONNECTED -> {
@@ -424,7 +469,8 @@ object RetroAchievementsLiveStateManager {
         }.toMap()
 
     private fun text(resId: Int, fallback: String, vararg args: Any): String {
-        val context = EmulatorBridge.getContext()
+        // App-selected language, not the system locale of the application context.
+        val context = AppLocaleManager.localized(EmulatorBridge.getContext())
         return runCatching { context?.getString(resId, *args) }.getOrNull()
             ?: if (args.isEmpty()) fallback else String.format(fallback, *args)
     }

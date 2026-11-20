@@ -20,6 +20,15 @@ object AppLocaleManager {
         return base.createConfigurationContext(configuration)
     }
 
+    /**
+     * Context whose resources use the app-selected language. The application context carries the
+     * system locale, so text built outside the Activity (native callbacks) must go through this.
+     */
+    fun localized(context: Context?): Context? {
+        if (context == null) return null
+        return runCatching { wrap(context.applicationContext ?: context) }.getOrDefault(context)
+    }
+
     private fun normalizeLanguageTag(tag: String?): String? {
         return when (tag?.trim()) {
             "zh-TW", "zh_HK", "zh-HK", "zh-Hant", "zh-Hant-TW" -> "zh"

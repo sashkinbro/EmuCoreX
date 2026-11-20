@@ -746,7 +746,7 @@ private fun AchievementToggleCard(retroState: RetroAchievementsUiState) {
                     }
                 }
             )
-            if (retroState.hardcoreSessionPreference && !retroState.hardcoreActive) {
+            if (retroState.game != null && retroState.hardcoreSessionPreference && !retroState.hardcoreActive) {
                 NoticeCard(
                     text = androidx.compose.ui.res.stringResource(R.string.settings_ra_hardcore_pending_desc),
                     isError = false
@@ -1200,7 +1200,7 @@ private fun AchievementAccountCard(
                     isError = false
                 )
             }
-            if (retroState.user != null && hardcorePending) {
+            if (retroState.user != null && retroState.game != null && hardcorePending) {
                 NoticeCard(
                     text = androidx.compose.ui.res.stringResource(R.string.settings_ra_hardcore_pending_desc),
                     isError = false
@@ -1791,7 +1791,10 @@ private fun LibraryAchievementGameCard(item: LibraryAchievementGame, onClick: ()
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     MiniBadge(text = "${item.gameData.earnedCount}/${item.gameData.totalCount}")
-                    MiniBadge(text = "${item.gameData.earnedPoints}/${item.gameData.totalPoints} pts")
+                    // Point totals are unknown until resolved; never show a misleading "0/0 pts".
+                    if (item.gameData.totalPoints > 0) {
+                        MiniBadge(text = "${item.gameData.earnedPoints}/${item.gameData.totalPoints} pts")
+                    }
                 }
             }
             Icon(

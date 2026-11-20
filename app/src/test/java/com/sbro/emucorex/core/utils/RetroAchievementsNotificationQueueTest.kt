@@ -19,6 +19,23 @@ class RetroAchievementsNotificationQueueTest {
     }
 
     @Test
+    fun loginThenGameSummaryAreBothShownInOrder() {
+        var queue = emptyList<RetroAchievementsNotification>()
+        queue = RetroAchievementsNotificationQueue.enqueue(
+            queue, n(1, "Signed in to RetroAchievements", "Welcome, X\n6 points", kind = "login")
+        )
+        queue = RetroAchievementsNotificationQueue.enqueue(
+            queue, n(2, "God of War II", "0 of 53 achievements\nSoftcore", kind = "summary")
+        )
+        assertEquals(listOf("login", "summary"), queue.map { it.kind })
+        // The login toast is on screen first; dismissing it advances to the summary.
+        assertEquals(1L, queue.first().id)
+        queue = RetroAchievementsNotificationQueue.dismiss(queue, 1L)
+        assertEquals("summary", queue.first().kind)
+        assertEquals(listOf(2L), queue.map { it.id })
+    }
+
+    @Test
     fun duplicatesAreCoalesced() {
         val first = RetroAchievementsNotificationQueue.enqueue(emptyList(), n(1, "A", "same"))
         val second = RetroAchievementsNotificationQueue.enqueue(first, n(2, "A", "same"))
