@@ -65,11 +65,63 @@ class GameRepository {
         cachedGamesByPath: Map<String, GameItem>,
         shouldAbort: () -> Boolean = { false }
     ): List<GameItem> {
-        val dir = File(path)
-        if (!dir.exists() || !dir.isDirectory) return emptyList()
-        val serialOverrides = AppPreferences(context).getGameSerialOverridesSync()
-        return scanLocalDirectory(dir, context, cachedGamesByPath, serialOverrides, shouldAbort)
-            .sortedBy { it.title.lowercase() }
+        return scanRoot(path, context, cachedGamesByPath, shouldAbort = shouldAbort).games
+    }
+
+    /**
+     * Scans one library root (plain folder or SAF tree URI) and reports whether the enumeration was
+     * complete. [reuseBlankSerial] lets unchanged cached entries with no serial skip the native
+     * metadata read (used by quick refreshes; full scans retry them).
+     */
+    fun scanRoot(
+        root: String,
+        context: Context,
+        cachedGamesByPath: Map<String, GameItem>,
+        reuseBlankSerial: Boolean = false,
+        shouldAbort: () -> Boolean = { false }
+    ): LibraryRootScan {
+        val state = ScanState()
+        val games = try {
+            if (root.startsWith("content://")) {
+                scanTreeRoot(root.toUri(), context, cachedGamesByPath, reuseBlankSerial, shouldAbort, state)
+            } else {
+                val dir = File(root)
+                if (!dir.exists() || !dir.isDirectory || dir.listFiles() == null) {
+                    state.complete = false
+                    emptyList()
+                } else {
+                    val serialOverrides = AppPreferences(context).getGameSerialOverridesSync()
+                    scanLocalDirectory(dir, context, cachedGamesByPath, serialOverrides, reuseBlankSerial, shouldAbort, state)
+                }
+            }
+        } catch (error: Exception) {
+            Log.w(TAG, "Library root scan failed: $root", error)
+            state.complete = false
+            emptyList()
+        }
+        return LibraryRootScan(root, games.sortedBy { it.title.lowercase() }, state.complete)
+    }
+
+    private class ScanState {
+        @Volatile var complete = true
+    }
+
+    private fun canReuseCached(
+        cached: GameItem?,
+        size: Long,
+        modified: Long,
+        name: String,
+        serialOverride: String?,
+        reuseBlankSerial: Boolean
+    ): Boolean {
+        if (cached == null || cached.fileSize != size || cached.lastModified != modified || cached.fileName != name) {
+            return false
+        }
+        if (cached.serial.isNullOrBlank()) {
+            // Already attempted once; an override still forces a re-read.
+            return reuseBlankSerial && serialOverride == null
+        }
+        return serialOverride == null || cached.serial.equals(serialOverride, ignoreCase = true)
     }
 
     fun scanDirectoryFromUri(uri: Uri, context: Context): List<GameItem> {
@@ -82,25 +134,34 @@ class GameRepository {
         cachedGamesByPath: Map<String, GameItem>,
         shouldAbort: () -> Boolean = { false }
     ): List<GameItem> {
+        return scanRoot(uri.toString(), context, cachedGamesByPath, shouldAbort = shouldAbort).games
+    }
+
+    private fun scanTreeRoot(
+        uri: Uri,
+        context: Context,
+        cachedGamesByPath: Map<String, GameItem>,
+        reuseBlankSerial: Boolean,
+        shouldAbort: () -> Boolean,
+        state: ScanState
+    ): List<GameItem> {
         if (!DocumentsContract.isTreeUri(uri)) {
+            state.complete = false
+            return emptyList()
+        }
+        val rootId = runCatching {
+            if (DocumentsContract.isDocumentUri(context, uri)) DocumentsContract.getDocumentId(uri)
+            else DocumentsContract.getTreeDocumentId(uri)
+        }.getOrNull()
+        if (rootId == null) {
+            state.complete = false
             return emptyList()
         }
         val serialOverrides = AppPreferences(context).getGameSerialOverridesSync()
-        return runCatching {
-            val docFile = DocumentFile.fromTreeUri(context, uri) ?: return@runCatching emptyList()
-            scanDocumentFile(
-                docFile,
-                context,
-                cachedGamesByPath,
-                serialOverrides,
-                shouldAbort,
-                depth = 0,
-                budget = DocumentScanBudget()
-            )
-                .sortedBy { it.title.lowercase() }
-        }.onFailure { error ->
-            Log.w(TAG, "Unable to scan document tree: $uri", error)
-        }.getOrDefault(emptyList())
+        return scanDocumentDirectory(
+            uri, rootId, context, cachedGamesByPath, serialOverrides, reuseBlankSerial,
+            shouldAbort, 0, DocumentScanBudget(), state
+        )
     }
 
     fun findCoverForGame(
@@ -136,10 +197,15 @@ class GameRepository {
         context: Context,
         cachedGamesByPath: Map<String, GameItem>,
         serialOverrides: Map<String, String>,
-        shouldAbort: () -> Boolean
+        reuseBlankSerial: Boolean,
+        shouldAbort: () -> Boolean,
+        state: ScanState
     ): List<GameItem> {
         val items = mutableListOf<GameItem>()
-        val children = dir.listFiles().orEmpty()
+        val children = dir.listFiles() ?: run {
+            state.complete = false
+            return items
+        }
         val coverCandidates = buildLocalCoverCandidates(children)
         val coverRepository = CoverArtRepository(context)
         val customCoverRepository = CustomGameCoverRepository(context)
@@ -153,7 +219,7 @@ class GameRepository {
             when {
                 file.isDirectory && normalizeBaseName(file.name) !in COVER_DIRECTORY_NAMES -> {
                     items.addAll(
-                        scanLocalDirectory(file, context, cachedGamesByPath, serialOverrides, shouldAbort)
+                        scanLocalDirectory(file, context, cachedGamesByPath, serialOverrides, reuseBlankSerial, shouldAbort, state)
                     )
                 }
 
@@ -165,13 +231,10 @@ class GameRepository {
                     }
                     val cachedGame = cachedGamesByPath[file.absolutePath]
                     val serialOverride = serialOverrides[file.absolutePath]
-                    val canReuseCachedMetadata = cachedGame != null &&
-                        cachedGame.fileSize == file.length() &&
-                        cachedGame.lastModified == file.lastModified() &&
-                        cachedGame.fileName == file.name &&
-                        !cachedGame.serial.isNullOrBlank() &&
-                        (serialOverride == null || cachedGame.serial.equals(serialOverride, ignoreCase = true))
-                    val metadata = if (canReuseCachedMetadata) {
+                    val canReuseCachedMetadata = canReuseCached(
+                        cachedGame, file.length(), file.lastModified(), file.name, serialOverride, reuseBlankSerial
+                    )
+                    val metadata = if (canReuseCachedMetadata && cachedGame != null) {
                         com.sbro.emucorex.core.GameMetadata(cachedGame.title, cachedGame.serial)
                     } else {
                         EmulatorBridge.getGameMetadata(file.absolutePath)
@@ -206,46 +269,106 @@ class GameRepository {
         return items
     }
 
-    private fun scanDocumentFile(
-        docFile: DocumentFile,
+    /** One child row from a single ContentResolver query on a SAF directory. */
+    private class DocChild(
+        val documentId: String,
+        val uri: Uri,
+        val name: String,
+        val mimeType: String?,
+        val size: Long,
+        val lastModified: Long
+    )
+
+    /** Lists a SAF directory with one query; null when the directory is unreadable. */
+    private fun queryDocumentChildren(context: Context, treeUri: Uri, parentDocumentId: String): List<DocChild>? {
+        return try {
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocumentId)
+            val projection = arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_MIME_TYPE,
+                DocumentsContract.Document.COLUMN_SIZE,
+                DocumentsContract.Document.COLUMN_LAST_MODIFIED
+            )
+            context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                val result = ArrayList<DocChild>(cursor.count.coerceAtLeast(0))
+                while (cursor.moveToNext()) {
+                    val id = cursor.getString(0) ?: continue
+                    val rawName = cursor.getString(1).orEmpty()
+                    result += DocChild(
+                        documentId = id,
+                        uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, id),
+                        name = if (rawName.isBlank()) "" else DocumentPathResolver.normalizeDisplayName(rawName),
+                        mimeType = cursor.getString(2),
+                        size = if (cursor.isNull(3)) 0L else cursor.getLong(3),
+                        lastModified = if (cursor.isNull(4)) 0L else cursor.getLong(4)
+                    )
+                }
+                result
+            }
+        } catch (error: Exception) {
+            Log.w(TAG, "Unable to list document directory: $parentDocumentId", error)
+            null
+        }
+    }
+
+    private fun scanDocumentDirectory(
+        treeUri: Uri,
+        directoryId: String,
         context: Context,
         cachedGamesByPath: Map<String, GameItem>,
         serialOverrides: Map<String, String>,
+        reuseBlankSerial: Boolean,
         shouldAbort: () -> Boolean,
         depth: Int,
-        budget: DocumentScanBudget
+        budget: DocumentScanBudget,
+        state: ScanState,
+        isUnknownKind: Boolean = false
     ): List<GameItem> {
-        if (depth > MAX_DOCUMENT_SCAN_DEPTH || !budget.tryEnterDirectory(docFile.uri.toString())) {
+        if (depth > MAX_DOCUMENT_SCAN_DEPTH) {
+            state.complete = false
             return emptyList()
         }
+        if (!budget.tryEnterDirectory(directoryId)) return emptyList()
         val items = mutableListOf<GameItem>()
-        val children = runCatching { docFile.listFiles() }.getOrDefault(emptyArray())
-        val coverCandidates = buildDocumentCoverCandidates(children)
+        val children = queryDocumentChildren(context, treeUri, directoryId) ?: run {
+            // An entry of unknown type may just be a file; only real directories count as failure.
+            if (!isUnknownKind) state.complete = false
+            return items
+        }
+        val coverCandidates = buildDocumentCoverCandidates(context, treeUri, children)
         val coverRepository = CoverArtRepository(context)
         val customCoverRepository = CustomGameCoverRepository(context)
         val compatibilityRepository = Pcsx2CompatibilityRepository(context)
         val containsArcadeManifest = children.any { child ->
-            val childName = documentDisplayName(context, child)
-            childName.substringAfterLast('.', "").equals("acgame", ignoreCase = true)
+            child.name.substringAfterLast('.', "").equals("acgame", ignoreCase = true)
         }
 
         for (file in children) {
-            if (shouldAbort() || !budget.tryVisitEntry()) return items
-            val mimeType = runCatching { file.type }.getOrNull()
-            val name = documentDisplayName(context, file)
-            when (SetupValidator.classifyDocumentEntry(mimeType, name)) {
+            if (shouldAbort()) return items
+            if (!budget.tryVisitEntry()) {
+                state.complete = false
+                return items
+            }
+            val mimeType = file.mimeType
+            val name = file.name
+            when (val kind = SetupValidator.classifyDocumentEntry(mimeType, name)) {
                 SetupValidator.DocumentEntryKind.DIRECTORY,
                 SetupValidator.DocumentEntryKind.UNKNOWN -> {
                     if (normalizeBaseName(name) !in COVER_DIRECTORY_NAMES) {
                         items.addAll(
-                            scanDocumentFile(
-                                file,
+                            scanDocumentDirectory(
+                                treeUri,
+                                file.documentId,
                                 context,
                                 cachedGamesByPath,
                                 serialOverrides,
+                                reuseBlankSerial,
                                 shouldAbort,
                                 depth + 1,
-                                budget
+                                budget,
+                                state,
+                                isUnknownKind = kind == SetupValidator.DocumentEntryKind.UNKNOWN
                             )
                         )
                     }
@@ -255,18 +378,15 @@ class GameRepository {
                         continue
                     }
                     val uriPath = file.uri.toString()
-                    val fileSize = runCatching { file.length() }.getOrDefault(0L)
-                    val lastModified = runCatching { file.lastModified() }.getOrDefault(0L)
+                    val fileSize = file.size
+                    val lastModified = file.lastModified
 
                     val cachedGame = cachedGamesByPath[uriPath]
                     val serialOverride = serialOverrides[uriPath]
-                    val canReuseCachedMetadata = cachedGame != null &&
-                        cachedGame.fileSize == fileSize &&
-                        cachedGame.lastModified == lastModified &&
-                        cachedGame.fileName == name &&
-                        !cachedGame.serial.isNullOrBlank() &&
-                        (serialOverride == null || cachedGame.serial.equals(serialOverride, ignoreCase = true))
-                    val metadata = if (canReuseCachedMetadata) {
+                    val canReuseCachedMetadata = canReuseCached(
+                        cachedGame, fileSize, lastModified, name, serialOverride, reuseBlankSerial
+                    )
+                    val metadata = if (canReuseCachedMetadata && cachedGame != null) {
                         com.sbro.emucorex.core.GameMetadata(cachedGame.title, cachedGame.serial)
                     } else {
                         EmulatorBridge.getGameMetadata(uriPath)
@@ -388,6 +508,27 @@ class GameRepository {
             .filter { it.isFile && it.extension.lowercase() in COVER_EXTENSIONS }
 
         return (directFiles + nestedCoverFiles).associateBy { normalizeBaseName(cleanGameName(it.nameWithoutExtension)) }
+    }
+
+    private fun buildDocumentCoverCandidates(
+        context: Context,
+        treeUri: Uri,
+        children: List<DocChild>
+    ): Map<String, DocChild> {
+        fun isCoverImage(child: DocChild) =
+            child.mimeType != DocumentsContract.Document.MIME_TYPE_DIR &&
+                child.name.substringAfterLast('.', "").lowercase() in COVER_EXTENSIONS
+        val directFiles = children.filter(::isCoverImage)
+        val nestedCoverFiles = children
+            .filter {
+                (it.mimeType == DocumentsContract.Document.MIME_TYPE_DIR || it.mimeType == null) &&
+                    normalizeBaseName(it.name) in COVER_DIRECTORY_NAMES
+            }
+            .flatMap { queryDocumentChildren(context, treeUri, it.documentId).orEmpty() }
+            .filter(::isCoverImage)
+        return (directFiles + nestedCoverFiles).associateBy {
+            normalizeBaseName(cleanGameName(it.name.substringBeforeLast('.')))
+        }
     }
 
     private fun buildDocumentCoverCandidates(

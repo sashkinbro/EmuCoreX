@@ -3,6 +3,7 @@ package com.sbro.emucorex.ui.home
 import android.app.Activity
 import android.app.Application
 import android.net.Uri
+import android.os.SystemClock
 import com.sbro.emucorex.R
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -27,6 +28,7 @@ import com.sbro.emucorex.data.CustomGameCoverRepository
 import com.sbro.emucorex.data.GameItem
 import com.sbro.emucorex.data.GameLibraryCacheRepository
 import com.sbro.emucorex.data.GameLibraryCacheSnapshot
+import com.sbro.emucorex.data.GameLibraryMerge
 import com.sbro.emucorex.data.GameRepository
 import com.sbro.emucorex.data.GameSerialFormat
 import com.sbro.emucorex.data.RecentGameEntry
@@ -113,6 +115,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         private const val AUTO_REFRESH_INTERVAL_MS = 15 * 60 * 1000L
+        private const val QUICK_REFRESH_MIN_INTERVAL_MS = 3_000L
     }
 
     private val repository = GameRepository()
@@ -121,7 +124,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val preferences = AppPreferences(application)
     private val homeBackgroundRepository = HomeBackgroundRepository(application)
     private val proPurchaseManager = ProPurchaseManager.getInstance(application)
-    private var allGames: List<GameItem> = emptyList()
+    @Volatile private var allGames: List<GameItem> = emptyList()
+    @Volatile private var lastLibraryScanFinishedAt = 0L
     private var hiddenGamePaths: Set<String> = emptySet()
     private var visibilityInitialized = false
     private var recentEntries: List<RecentGameEntry> = emptyList()
@@ -258,6 +262,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val libraryKey = libraryKey(effectivePaths)
                 if (currentLibraryRoot != libraryKey) {
                     allGames = emptyList()
+                    lastLibraryScanFinishedAt = 0L
                 }
                 currentLibraryPaths = effectivePaths
                 currentLibraryRoot = libraryKey
@@ -606,6 +611,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     publishCachedGamesIfAvailable(rootPath, cachedGames)
                     if (shouldSkipAutoRescan(isInitialLoad, cacheSnapshot)) {
                         libraryInitialized = true
+                        lastLibraryScanFinishedAt = SystemClock.elapsedRealtime()
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             isRefreshing = false
@@ -616,19 +622,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     val context = getApplication<Application>()
                     val cachedByPath = cachedGames.associateBy { it.path }
-                    val scannedGames = paths.flatMap { path ->
-                        if (path.startsWith("content://")) {
-                            repository.scanDirectoryFromUri(
-                                path.toUri(), context, cachedByPath,
-                                shouldAbort = { EmulatorBridge.isVmActive() }
-                            )
-                        } else {
-                            repository.scanDirectory(
-                                path, context, cachedByPath,
-                                shouldAbort = { EmulatorBridge.isVmActive() }
-                            )
-                        }
-                    }.distinctBy { it.path }.sortedBy { it.title.lowercase() }
+                    val rootScans = paths.map { path ->
+                        repository.scanRoot(
+                            path, context, cachedByPath,
+                            shouldAbort = { EmulatorBridge.isVmActive() }
+                        )
+                    }
+                    // Roots that failed to enumerate keep their cached games instead of being wiped.
+                    val scannedGames = GameLibraryMerge.merge(cachedGames, rootScans).games
                     if (EmulatorBridge.isVmActive()) {
                         queueDeferredLibraryWork(
                             rootPaths = paths,
@@ -641,10 +642,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         )
                         return@withLock
                     }
-                    allGames = scannedGames
+                    synchronized(this@HomeViewModel) { allGames = scannedGames }
                     currentLibraryRoot = rootPath
                     currentLibraryPaths = paths
                     libraryInitialized = true
+                    lastLibraryScanFinishedAt = SystemClock.elapsedRealtime()
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isRefreshing = false
@@ -656,6 +658,62 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 } catch (_: Exception) {
                     completeLibraryScanWithFallback(rootPath)
                 }
+            }
+        }
+    }
+
+    /**
+     * Called when the app returns to the foreground. Silently diffs the library against storage
+     * (no loading state, list never cleared). Skipped while a scan runs, a game is active, the
+     * library has not finished its initial load, or less than [QUICK_REFRESH_MIN_INTERVAL_MS] has
+     * passed since the previous scan.
+     */
+    fun onAppForeground() {
+        // 0 means the initial-load scan has not finished yet: it owns the first pass.
+        val lastScan = lastLibraryScanFinishedAt
+        if (lastScan == 0L || currentLibraryPaths.isEmpty()) return
+        if (EmulatorBridge.isVmActive() || scanMutex.isLocked) return
+        if (SystemClock.elapsedRealtime() - lastScan < QUICK_REFRESH_MIN_INTERVAL_MS) return
+        viewModelScope.launch(Dispatchers.IO) {
+            if (!scanMutex.tryLock()) return@launch
+            try {
+                if (EmulatorBridge.isVmActive()) return@launch
+                val paths = currentLibraryPaths
+                val rootPath = libraryKey(paths)
+                if (paths.isEmpty() || currentLibraryRoot != rootPath) return@launch
+                val snapshot = synchronized(this@HomeViewModel) { allGames }
+                val context = getApplication<Application>()
+                val cachedByPath = snapshot.associateBy { it.path }
+                val scans = paths.map { path ->
+                    repository.scanRoot(
+                        path, context, cachedByPath, reuseBlankSerial = true,
+                        shouldAbort = { EmulatorBridge.isVmActive() }
+                    )
+                }
+                // An aborted scan is partial: never apply it.
+                if (EmulatorBridge.isVmActive()) return@launch
+                lastLibraryScanFinishedAt = SystemClock.elapsedRealtime()
+                val merged = GameLibraryMerge.merge(snapshot, scans)
+                if (!merged.changed) return@launch
+                val applied = synchronized(this@HomeViewModel) {
+                    // Another writer (serial edit, cover sync) changed the list meanwhile: retry next time.
+                    if (allGames !== snapshot || currentLibraryRoot != rootPath) false
+                    else {
+                        allGames = merged.games
+                        true
+                    }
+                }
+                if (!applied) {
+                    lastLibraryScanFinishedAt = 0L
+                    return@launch
+                }
+                publishVisibleGames()
+                libraryCacheRepository.save(rootPath, merged.games, preferEnglishGameTitles)
+                syncMissingCovers()
+            } catch (_: Exception) {
+                // Keep the current library untouched on any failure.
+            } finally {
+                scanMutex.unlock()
             }
         }
     }
