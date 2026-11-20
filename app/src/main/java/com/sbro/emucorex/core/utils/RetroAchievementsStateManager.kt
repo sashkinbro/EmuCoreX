@@ -371,7 +371,7 @@ object RetroAchievementsStateManager {
         }
     }
 
-    fun setHardcore(enabled: Boolean) {
+    fun setHardcore(enabled: Boolean, resetRunningGame: Boolean = false) {
         val revision = hardcorePreferenceRevision.incrementAndGet()
         updateStored { it.copy(hardcore = enabled) }
         _state.update {
@@ -390,6 +390,8 @@ object RetroAchievementsStateManager {
                     // per-game overrides, or the temporary loopback test host.
                     EmulatorBridge.getContext()?.let { AppPreferences(it).setAchievementsHardcore(enabled) }
                     RetroAchievementsBridge.nativeSetHardcore(effectiveHardcoreForCurrentGame(enabled))
+                    // Mirrors rc_client's RESET event: the reset is what actually activates Hardcore.
+                    if (resetRunningGame && enabled) EmulatorBridge.requestVmReset()
                 }
             }
                 .onFailure { handleNativeFailure(it) }

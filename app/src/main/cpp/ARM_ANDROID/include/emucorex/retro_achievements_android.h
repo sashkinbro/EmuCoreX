@@ -19,6 +19,11 @@ namespace Achievements
 	u32 GetEarnedAchievements();
 	u32 GetGamePoints();
 	u32 GetEarnedPoints();
+
+	// rc_client_can_pause() wrapper. Call it only when the USER asks to pause (menu, pause hotkey):
+	// a successful call records the pause for the compounding rate limit. Returns true when the pause
+	// is allowed (always in softcore); otherwise *frames_remaining is set to the delay in frames.
+	bool CanUserPause(u32* frames_remaining);
 }
 
 // Host callbacks consumed by the upstream PCSX2 achievements implementation.

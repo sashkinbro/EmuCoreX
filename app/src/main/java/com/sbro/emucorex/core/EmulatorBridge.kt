@@ -1012,6 +1012,27 @@ object EmulatorBridge {
         }
     }
 
+    /**
+     * RetroAchievements pause rate limit (rc_client_can_pause). Call only when the USER pauses.
+     * Returns 0 when allowed (always in softcore), otherwise the emulated frames still required.
+     */
+    fun requestAchievementsPause(): Int {
+        if (!isNativeLoaded || !isVmActive) return 0
+        return try {
+            NativeApp.achievementsRequestPause()
+        } catch (_: Throwable) {
+            0
+        }
+    }
+
+    /** Resets the VM so that a pending Hardcore request (and rc_client) is applied by the reset. */
+    fun requestVmReset() {
+        if (!isNativeLoaded || !isVmActive) return
+        try {
+            NativeApp.requestVmReset()
+        } catch (_: Throwable) { }
+    }
+
     suspend fun resume() {
         if (!isNativeLoaded || !isVmActive) return
         runTimedSerial(NativeApp.LatencyEvent.RESUME) {

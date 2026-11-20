@@ -3148,7 +3148,7 @@
     <string name="ra_notif_app_name">RetroAchievements</string>
     <string name="ra_notif_points">%1$d очков</string>
     <string name="ra_notif_achievement_unlocked">Достижение разблокировано</string>
-    <string name="ra_notif_game_mastered">Игра пройдена на 100%</string>
+    <string name="ra_notif_game_mastered">Игра освоена</string>
     <string name="ra_notif_hardcore_title">Хардкорный режим</string>
     <string name="ra_notif_hardcore_on">Хардкорный режим включён. Сохранения состояния и читы отключены.</string>
     <string name="ra_notif_hardcore_off">Хардкорный режим выключен.</string>
@@ -3187,4 +3187,11 @@
     <string name="ra_status_offline_title">RetroAchievements недоступен</string>
     <string name="ra_status_offline_desc">Не удалось подтвердить сессию. Проверьте подключение и повторите попытку.</string>
     <string name="ra_status_retry">Повторить</string>
+    <string name="emulation_hardcore_pause_cooldown">Пока нельзя поставить на паузу. Повторите через %1$d с.</string>
+    <string name="emulation_hardcore_load_disabled">В хардкорном режиме загрузка сохранений отключена. Сохранять по-прежнему можно.</string>
+    <string name="settings_ra_hardcore_reset_title">Включить хардкорный режим?</string>
+    <string name="settings_ra_hardcore_reset_message">Игра будет перезапущена. Несохранённый прогресс будет потерян.</string>
+    <string name="settings_ra_hardcore_reset_confirm">Включить и перезапустить</string>
+    <string name="ra_notif_game_completed">Игра пройдена</string>
+    <string name="ra_notif_hardcore_unrecognized_media">Хардкорный режим отключён. Вставлен нераспознанный носитель.</string>
 </resources>

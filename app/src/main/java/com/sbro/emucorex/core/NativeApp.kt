@@ -427,6 +427,13 @@ object NativeApp {
     @JvmStatic external fun getRetroAchievementsAccountData(): String?
     @JvmStatic external fun setAchievementsHostOverride(host: String): Boolean
     @JvmStatic external fun clearAchievementsHostOverride(hardcoreRestoreMode: Int): Boolean
+    /**
+     * rc_client_can_pause(). Call ONLY when the user asks to pause (menu, pause button/hotkey), never for
+     * a lifecycle pause. Returns 0 when pausing is allowed, otherwise the emulated frames still required.
+     */
+    @JvmStatic external fun achievementsRequestPause(): Int
+    /** Resets the running VM (activates a pending Hardcore request and resets rc_client with it). */
+    @JvmStatic external fun requestVmReset()
     @JvmStatic external fun listMemoryCards(): String?
     @JvmStatic external fun createMemoryCard(name: String, type: Int, fileType: Int): Boolean
     @JvmStatic external fun convertIsoToChd(inputIsoPath: String): Int
@@ -504,10 +511,10 @@ object NativeApp {
      *  0 GENERIC (disconnected/reconnected: title+description are the English fallback text),
      *  1 ACHIEVEMENT_UNLOCKED (title = raw achievement title, description = achievement description,
      *    points = achievement points, extra = "unofficial=0|1\nhardcore=0|1\nid=<achievement id>"),
-     *  2 GAME_MASTERED (title = game or subset title, points = points earned, extra = "achievements=<n>"),
+     *  2 GAME_MASTERED (title = game or subset title, points = points earned, extra = "achievements=<n>\nhardcore=0|1" - hardcore picks "Mastered", softcore "Completed"),
      *  3 GAME_SUMMARY (title = game title, points = points unlocked, description empty,
      *    extra = "hardcore=0|1\nunlocked=<n>\ntotal=<n>\npoints_unlocked=<n>\npoints_total=<n>"),
-     *  4 HARDCORE_INFO (extra = "1" enabled, "0" disabled, "pending" = will enable on reset; description = English fallback),
+     *  4 HARDCORE_INFO (extra = "1" enabled, "0" disabled, "pending" = will enable on reset, "unrecognized" = disabled because unrecognized media was inserted; description = English fallback),
      *  5 LEADERBOARD_STARTED, 6 LEADERBOARD_FAILED (title = leaderboard title),
      *  7 LEADERBOARD_SUBMITTED (title = leaderboard title, extra = formatted value, or "<value> (#rank/entries)"
      *    for the scoreboard follow-up),

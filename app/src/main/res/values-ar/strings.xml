@@ -3181,4 +3181,11 @@
     <string name="ra_status_offline_title">RetroAchievements غير متصل</string>
     <string name="ra_status_offline_desc">تعذر تأكيد جلستك. تحقق من الاتصال وحاول مرة أخرى.</string>
     <string name="ra_status_retry">حاول مرة أخرى</string>
+    <string name="emulation_hardcore_pause_cooldown">لا يمكنك الإيقاف المؤقت بعد. حاول مجددًا بعد %1$d ث.</string>
+    <string name="emulation_hardcore_load_disabled">تحميل الحفظ معطّل في وضع Hardcore. الحفظ ما زال متاحًا.</string>
+    <string name="settings_ra_hardcore_reset_title">تفعيل وضع Hardcore؟</string>
+    <string name="settings_ra_hardcore_reset_message">ستتم إعادة ضبط اللعبة. سيُفقد التقدّم غير المحفوظ.</string>
+    <string name="settings_ra_hardcore_reset_confirm">تفعيل وإعادة الضبط</string>
+    <string name="ra_notif_game_completed">اكتملت اللعبة</string>
+    <string name="ra_notif_hardcore_unrecognized_media">تم تعطيل Hardcore. أُدخلت وسائط غير معروفة.</string>
 </resources>

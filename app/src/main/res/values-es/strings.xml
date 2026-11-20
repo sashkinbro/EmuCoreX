@@ -3140,7 +3140,7 @@
     <string name="ra_notif_app_name">RetroAchievements</string>
     <string name="ra_notif_points">%1$d puntos</string>
     <string name="ra_notif_achievement_unlocked">Logro desbloqueado</string>
-    <string name="ra_notif_game_mastered">Juego completado</string>
+    <string name="ra_notif_game_mastered">Juego dominado</string>
     <string name="ra_notif_hardcore_title">Modo Hardcore</string>
     <string name="ra_notif_hardcore_on">El modo Hardcore está activado. Los estados guardados y los trucos están desactivados.</string>
     <string name="ra_notif_hardcore_off">El modo Hardcore está desactivado.</string>
@@ -3179,4 +3179,11 @@
     <string name="ra_status_offline_title">RetroAchievements sin conexión</string>
     <string name="ra_status_offline_desc">No se pudo confirmar tu sesión. Revisa tu conexión e inténtalo de nuevo.</string>
     <string name="ra_status_retry">Reintentar</string>
+    <string name="emulation_hardcore_pause_cooldown">Todavía no puedes pausar. Inténtalo de nuevo en %1$d s.</string>
+    <string name="emulation_hardcore_load_disabled">La carga de partidas guardadas está desactivada en el modo Hardcore. Guardar sigue disponible.</string>
+    <string name="settings_ra_hardcore_reset_title">¿Activar el modo Hardcore?</string>
+    <string name="settings_ra_hardcore_reset_message">Se reiniciará el juego. Se perderá el progreso no guardado.</string>
+    <string name="settings_ra_hardcore_reset_confirm">Activar y reiniciar</string>
+    <string name="ra_notif_game_completed">Juego completado</string>
+    <string name="ra_notif_hardcore_unrecognized_media">Hardcore desactivado. Se insertó un medio no reconocido.</string>
 </resources>

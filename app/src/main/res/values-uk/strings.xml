@@ -3148,7 +3148,7 @@
     <string name="ra_notif_app_name">RetroAchievements</string>
     <string name="ra_notif_points">%1$d балів</string>
     <string name="ra_notif_achievement_unlocked">Досягнення розблоковано</string>
-    <string name="ra_notif_game_mastered">Гру повністю пройдено</string>
+    <string name="ra_notif_game_mastered">Гру опановано</string>
     <string name="ra_notif_hardcore_title">Хардкорний режим</string>
     <string name="ra_notif_hardcore_on">Хардкорний режим увімкнено. Збереження стану та чити вимкнено.</string>
     <string name="ra_notif_hardcore_off">Хардкорний режим вимкнено.</string>
@@ -3187,4 +3187,11 @@
     <string name="ra_status_offline_title">RetroAchievements недоступний</string>
     <string name="ra_status_offline_desc">Не вдалося підтвердити сеанс. Перевірте з\'єднання та повторіть спробу.</string>
     <string name="ra_status_retry">Спробувати знову</string>
+    <string name="emulation_hardcore_pause_cooldown">Поки що не можна поставити паузу. Спробуйте ще раз за %1$d с.</string>
+    <string name="emulation_hardcore_load_disabled">У хардкорному режимі завантаження збережень вимкнено. Зберігати можна й надалі.</string>
+    <string name="settings_ra_hardcore_reset_title">Увімкнути хардкорний режим?</string>
+    <string name="settings_ra_hardcore_reset_message">Гру буде перезапущено. Незбережений прогрес буде втрачено.</string>
+    <string name="settings_ra_hardcore_reset_confirm">Увімкнути й перезапустити</string>
+    <string name="ra_notif_game_completed">Гру пройдено</string>
+    <string name="ra_notif_hardcore_unrecognized_media">Хардкорний режим вимкнено. Вставлено нерозпізнаний носій.</string>
 </resources>

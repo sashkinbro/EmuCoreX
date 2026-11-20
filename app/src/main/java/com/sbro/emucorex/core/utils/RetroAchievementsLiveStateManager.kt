@@ -304,7 +304,12 @@ object RetroAchievementsLiveStateManager {
             }
             RetroAchievementsNotificationKind.GAME_MASTERED -> {
                 kindName = "mastery"
-                resolvedTitle = text(R.string.ra_notif_game_mastered, "Game mastered")
+                // RetroAchievements wording: only hardcore earns "Mastered"; softcore is "Completed".
+                resolvedTitle = if (parseExtra(extra)["hardcore"] == "1") {
+                    text(R.string.ra_notif_game_mastered, "Game mastered")
+                } else {
+                    text(R.string.ra_notif_game_completed, "Game completed")
+                }
                 resolvedMessage = listOf(title, description).filter { it.isNotBlank() }.joinToString("\n")
             }
             RetroAchievementsNotificationKind.GAME_SUMMARY -> {
@@ -334,10 +339,12 @@ object RetroAchievementsLiveStateManager {
             RetroAchievementsNotificationKind.HARDCORE_INFO -> {
                 kindName = "hardcore"
                 val pending = extra.equals("pending", ignoreCase = true)
+                val unrecognized = extra.equals("unrecognized", ignoreCase = true)
                 val enabled = extra == "1" || extra.equals("true", ignoreCase = true) || extra.equals("on", ignoreCase = true)
                 val disabled = extra == "0" || extra.equals("false", ignoreCase = true) || extra.equals("off", ignoreCase = true)
                 resolvedTitle = text(R.string.ra_notif_hardcore_title, "Hardcore mode")
                 resolvedMessage = when {
+                    unrecognized -> text(R.string.ra_notif_hardcore_unrecognized_media, "Hardcore disabled. Unrecognized media inserted.")
                     pending -> text(R.string.ra_notif_hardcore_pending, "Hardcore mode will be enabled after the game restarts.")
                     enabled -> text(R.string.ra_notif_hardcore_on, "Hardcore mode is on. Save states and cheats are disabled.")
                     disabled -> text(R.string.ra_notif_hardcore_off, "Hardcore mode is off.")

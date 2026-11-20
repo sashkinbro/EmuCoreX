@@ -3176,4 +3176,11 @@
     <string name="ra_status_offline_title">RetroAchievements はオフラインです</string>
     <string name="ra_status_offline_desc">セッションを確認できませんでした。接続を確認して再試行してください。</string>
     <string name="ra_status_retry">再試行</string>
+    <string name="emulation_hardcore_pause_cooldown">まだ一時停止できません。%1$d 秒後にもう一度お試しください。</string>
+    <string name="emulation_hardcore_load_disabled">ハードコアモードではセーブステートのロードは無効です。セーブは引き続き可能です。</string>
+    <string name="settings_ra_hardcore_reset_title">ハードコアモードを有効にしますか？</string>
+    <string name="settings_ra_hardcore_reset_message">ゲームがリセットされます。保存していない進行状況は失われます。</string>
+    <string name="settings_ra_hardcore_reset_confirm">有効にしてリセット</string>
+    <string name="ra_notif_game_completed">ゲームをクリアしました</string>
+    <string name="ra_notif_hardcore_unrecognized_media">ハードコアを無効にしました。認識されないメディアが挿入されました。</string>
 </resources>

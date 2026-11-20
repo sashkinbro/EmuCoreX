@@ -5,9 +5,11 @@
 #include "pcsx2/Achievements.h"
 #include "pcsx2/Config.h"
 #include "pcsx2/Host.h"
+#include "pcsx2/VMManager.h"
 
 #include "fmt/format.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <jni.h>
 #include <mutex>
@@ -485,6 +487,26 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_clea
 	return restarted ? JNI_TRUE : JNI_FALSE;
 }
 
+// Returns 0 when the user may pause now, otherwise the number of emulated frames still required by
+// rc_client_can_pause(). Must only be called when the user actually asks to pause.
+extern "C" JNIEXPORT jint JNICALL Java_com_sbro_emucorex_core_NativeApp_achievementsRequestPause(JNIEnv*, jclass)
+{
+	u32 frames_remaining = 0;
+	if (Achievements::CanUserPause(&frames_remaining))
+		return 0;
+	return static_cast<jint>(std::max<u32>(frames_remaining, 1u));
+}
+
+// Hardcore was just requested with a game running: reset the VM so that VMManager::Reset() activates it
+// (ResetHardcoreMode) together with rc_client_reset, exactly like a RC_CLIENT_EVENT_RESET.
+extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_requestVmReset(JNIEnv*, jclass)
+{
+	Host::RunOnCPUThread([]() {
+		if (VMManager::HasValidVM())
+			VMManager::RequestReset();
+	}, false);
+}
+
 bool emucorex::android::IsRetroAchievementsHardcoreActive()
 {
 	return Achievements::IsHardcoreModeActive();
@@ -514,8 +536,31 @@ bool emucorex::android::IsRetroAchievementsFeatureBlocked(HardcoreRestrictedFeat
 
 std::string emucorex::android::GetRetroAchievementsUserAgent()
 {
-	const char* const app_version = std::getenv("EMUCOREX_APP_VERSION");
-	const char* const resolved_app_version =
-		(app_version && app_version[0] != '\0') ? app_version : "0.0.0";
-	return fmt::format("EmuCoreX/v{} ({}) pcsx2/{}", resolved_app_version, GetOSVersionString(), EMUCOREX_PCSX2_TAG);
+	// RetroAchievements requires "<product>/<numeric semver> (<system info>) <extensions>": the product
+	// token has no spaces and the version is digits and dots only (no "v" prefix, no build suffix).
+	const auto numeric_version = [](const char* text) {
+		std::string result;
+		if (text)
+		{
+			const char* p = text;
+			if (*p == 'v' || *p == 'V')
+				++p;
+			while ((*p >= '0' && *p <= '9') || *p == '.')
+				result.push_back(*p++);
+		}
+		while (!result.empty() && result.back() == '.')
+			result.pop_back();
+		if (result.empty() || result.front() == '.' || result.find("..") != std::string::npos)
+			result = "0";
+		// Pad to major.minor.patch.
+		size_t parts = 1;
+		for (const char c : result)
+			parts += (c == '.') ? 1 : 0;
+		for (; parts < 3; ++parts)
+			result += ".0";
+		return result;
+	};
+
+	const std::string app_version = numeric_version(std::getenv("EMUCOREX_APP_VERSION"));
+	return fmt::format("EmuCoreX/{} ({}) pcsx2/{}", app_version, GetOSVersionString(), numeric_version(EMUCOREX_PCSX2_TAG));
 }

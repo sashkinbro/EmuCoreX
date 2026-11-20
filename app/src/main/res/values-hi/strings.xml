@@ -3177,4 +3177,11 @@
     <string name="ra_status_offline_title">RetroAchievements ऑफ़लाइन है</string>
     <string name="ra_status_offline_desc">आपके सत्र की पुष्टि नहीं हो सकी। कनेक्शन जांचें और पुनः प्रयास करें।</string>
     <string name="ra_status_retry">पुनः प्रयास करें</string>
+    <string name="emulation_hardcore_pause_cooldown">अभी रोका नहीं जा सकता। %1$d सेकंड बाद फिर कोशिश करें।</string>
+    <string name="emulation_hardcore_load_disabled">हार्डकोर मोड में सेव स्टेट लोड करना बंद है। सेव करना अब भी उपलब्ध है।</string>
+    <string name="settings_ra_hardcore_reset_title">हार्डकोर मोड चालू करें?</string>
+    <string name="settings_ra_hardcore_reset_message">गेम रीसेट हो जाएगा। बिना सेव की प्रगति खो जाएगी।</string>
+    <string name="settings_ra_hardcore_reset_confirm">चालू करें और रीसेट करें</string>
+    <string name="ra_notif_game_completed">गेम पूरा हुआ</string>
+    <string name="ra_notif_hardcore_unrecognized_media">हार्डकोर बंद किया गया। अज्ञात मीडिया डाला गया।</string>
 </resources>

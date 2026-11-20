@@ -3179,4 +3179,11 @@
     <string name="ra_status_offline_title">RetroAchievements est hors ligne</string>
     <string name="ra_status_offline_desc">Votre session n\'a pas pu être confirmée. Vérifiez votre connexion et réessayez.</string>
     <string name="ra_status_retry">Réessayer</string>
+    <string name="emulation_hardcore_pause_cooldown">Vous ne pouvez pas encore mettre en pause. Réessayez dans %1$d s.</string>
+    <string name="emulation_hardcore_load_disabled">Le chargement des sauvegardes est désactivé en mode Hardcore. La sauvegarde reste possible.</string>
+    <string name="settings_ra_hardcore_reset_title">Activer le mode Hardcore ?</string>
+    <string name="settings_ra_hardcore_reset_message">Le jeu sera réinitialisé. La progression non sauvegardée sera perdue.</string>
+    <string name="settings_ra_hardcore_reset_confirm">Activer et réinitialiser</string>
+    <string name="ra_notif_game_completed">Jeu terminé</string>
+    <string name="ra_notif_hardcore_unrecognized_media">Mode Hardcore désactivé. Support non reconnu inséré.</string>
 </resources>

@@ -3197,4 +3197,11 @@
     <string name="ra_status_offline_title">RetroAchievements je offline</string>
     <string name="ra_status_offline_desc">Vaši relaci se nepodařilo ověřit. Zkontrolujte připojení a zkuste to znovu.</string>
     <string name="ra_status_retry">Zkusit znovu</string>
+    <string name="emulation_hardcore_pause_cooldown">Zatím nelze pozastavit. Zkuste to znovu za %1$d s.</string>
+    <string name="emulation_hardcore_load_disabled">Načítání uložených stavů je v režimu Hardcore zakázáno. Ukládání zůstává dostupné.</string>
+    <string name="settings_ra_hardcore_reset_title">Zapnout režim Hardcore?</string>
+    <string name="settings_ra_hardcore_reset_message">Hra bude resetována. Neuložený postup bude ztracen.</string>
+    <string name="settings_ra_hardcore_reset_confirm">Zapnout a resetovat</string>
+    <string name="ra_notif_game_completed">Hra dokončena</string>
+    <string name="ra_notif_hardcore_unrecognized_media">Hardcore vypnut. Vložen nerozpoznaný disk.</string>
 </resources>

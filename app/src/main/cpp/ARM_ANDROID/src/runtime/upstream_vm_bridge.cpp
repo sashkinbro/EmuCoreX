@@ -792,7 +792,13 @@ bool RunUpstreamVm(const VmLaunchConfig& config, VmStartupCallback startup_callb
 	// start_unlimited (frame limiter disabled in settings) is applied by VMManager::Initialize() without the
 	// hardcore check that VMManager::SetLimiterMode() performs. Re-run it so Hardcore Mode forces Nominal.
 	if (emucorex::android::IsRetroAchievementsFeatureBlocked(emucorex::android::HardcoreRestrictedFeature::SlowMotion))
+	{
 		VMManager::SetLimiterMode(VMManager::GetLimiterMode());
+		// Hardcore is switched on after the boot-time settings load (Achievements::ResetHardcoreMode(true)),
+		// so the config the VM started with may still hold an EE underclock/cycle skip, cheats or slow
+		// frame rates from the profile. Reload once so EnforceAchievementsChallengeModeSettings() applies.
+		VMManager::ApplySettings();
+	}
 
 	if (startup_callback)
 		startup_callback(startup_userdata, true);

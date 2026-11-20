@@ -207,6 +207,7 @@ import com.sbro.emucorex.core.upscaleKeyToMultiplier
 import com.sbro.emucorex.core.upscaleMultiplierValue
 import com.sbro.emucorex.core.utils.RetroAchievementsLiveStateManager
 import com.sbro.emucorex.core.utils.RetroAchievementsIndicator
+import com.sbro.emucorex.core.utils.RetroAchievementsHardcorePolicy
 import com.sbro.emucorex.core.utils.RetroAchievementsIndicatorKind
 import com.sbro.emucorex.core.utils.RetroAchievementsLoginRequestReason
 import com.sbro.emucorex.core.utils.RetroAchievementsSessionStatus
@@ -1690,8 +1691,11 @@ fun EmulationScreen(
                 "disc_swap_failed" -> stringResource(R.string.emulation_swap_disc_failed)
                 "disc_swap_invalid" -> stringResource(R.string.emulation_swap_disc_invalid)
                 "widescreen_patches_restart_required" -> stringResource(R.string.emulation_widescreen_patches_restart_required)
-                else -> uiState.toastMessage?.takeIf { it.startsWith("launch_error:") }
-                    ?.removePrefix("launch_error:").orEmpty()
+                else -> uiState.toastMessage?.takeIf { it.startsWith("pause_cooldown:") }
+                    ?.removePrefix("pause_cooldown:")?.toIntOrNull()
+                    ?.let { stringResource(R.string.emulation_hardcore_pause_cooldown, it) }
+                    ?: uiState.toastMessage?.takeIf { it.startsWith("launch_error:") }
+                        ?.removePrefix("launch_error:").orEmpty()
             }
             Box(
                 modifier = Modifier
@@ -2097,7 +2101,7 @@ fun EmulationScreen(
                         persistedFloatingQuickLoadPosition.second
                     ),
                 saveEnabled = !uiState.isActionInProgress,
-                loadEnabled = !uiState.isActionInProgress,
+                loadEnabled = !uiState.isActionInProgress && !retroAchievementsState.hardcoreActive,
                 saveInProgress = uiState.actionLabel == "saving",
                 loadInProgress = uiState.actionLabel == "loading",
                 onSavePositionChange = { floatingQuickSavePosition = it },
@@ -2154,6 +2158,16 @@ fun EmulationScreen(
         val gameMenuVisible = uiState.showMenu && !showControlsEditor
         LaunchedEffect(gameMenuVisible) {
             UiSoundManager.setGameMenuOpen(gameMenuVisible)
+        }
+
+        // RetroAchievements Hardcore: a paused (or menu-covered) game must be obscured by at least 70%.
+        // The scrim is not animated so the frozen frame is never visible while the menu slides in.
+        if (retroAchievementsState.hardcoreActive && uiState.isRunning && (uiState.isPaused || uiState.showMenu)) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(Color.Black.copy(alpha = RetroAchievementsHardcorePolicy.HARDCORE_PAUSE_SCRIM_ALPHA))
+            )
         }
 
         // Sidebar Menu
@@ -3457,7 +3471,12 @@ private fun RetroAchievementsIndicatorsOverlay(
                     color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    // RetroAchievements: leaderboard tracker values must use a fixed-width font so the
+                    // digits do not jitter while the value changes every frame.
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    ),
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                 )
             }
@@ -4636,7 +4655,8 @@ private fun EmulationSidebarMenu(
                                         icon = Icons.Rounded.Restore,
                                         contentDescription = stringResource(R.string.emulation_quick_load_desc),
                                         onClick = onLoadAutoSave,
-                                        enabled = !uiState.isActionInProgress && slotMetadata.autoSaveLastModified > 0L,
+                                        enabled = !uiState.isActionInProgress && slotMetadata.autoSaveLastModified > 0L &&
+                                            !retroState.hardcoreActive,
                                         showProgress = uiState.actionLabel == "loading"
                                     )
                                 }
@@ -4665,11 +4685,19 @@ private fun EmulationSidebarMenu(
                                     icon = Icons.Rounded.Restore,
                                     contentDescription = stringResource(R.string.emulation_quick_load_desc),
                                     onClick = onQuickLoad,
-                                    enabled = !uiState.isActionInProgress,
+                                    // RetroAchievements Hardcore: loading states is never allowed (saving is).
+                                    enabled = !uiState.isActionInProgress && !retroState.hardcoreActive,
                                     showProgress = uiState.actionLabel == "loading",
                                     containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
                                 )
                             }
+                        }
+                        if (retroState.hardcoreActive) {
+                            Text(
+                                text = stringResource(R.string.emulation_hardcore_load_disabled),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
 
                         }

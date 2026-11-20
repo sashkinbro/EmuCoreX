@@ -40,6 +40,7 @@ import com.sbro.emucorex.core.NativeApp
 import com.sbro.emucorex.core.PerformanceProfiles
 import com.sbro.emucorex.core.PerformancePresets
 import com.sbro.emucorex.core.resolveAndroidGamePhase
+import com.sbro.emucorex.core.utils.RetroAchievementsHardcorePolicy
 import com.sbro.emucorex.core.utils.RetroAchievementsLiveStateManager
 import com.sbro.emucorex.core.utils.RetroAchievementsStateManager
 import com.sbro.emucorex.core.normalizeUpscale
@@ -2783,6 +2784,41 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    private var userPauseRequestInFlight = false
+
+    /**
+     * RetroAchievements Hardcore pause rate limit. Runs [onAllowed] when the USER may pause now
+     * (rc_client_can_pause; always true in softcore), otherwise shows the "cannot pause yet" message.
+     * Lifecycle pauses (app backgrounded, surface lost) must not go through here.
+     */
+    private fun requestUserPause(onAllowed: () -> Unit) {
+        if (userPauseRequestInFlight) return
+        userPauseRequestInFlight = true
+        viewModelScope.launch {
+            val framesRemaining = try {
+                withContext(Dispatchers.Default) { EmulatorBridge.requestAchievementsPause() }
+            } finally {
+                userPauseRequestInFlight = false
+            }
+            if (framesRemaining > 0) {
+                showPauseCooldownToast(RetroAchievementsHardcorePolicy.pauseCooldownSeconds(framesRemaining))
+            } else {
+                onAllowed()
+            }
+        }
+    }
+
+    private fun showPauseCooldownToast(seconds: Int) {
+        val message = "pause_cooldown:$seconds"
+        _uiState.value = _uiState.value.copy(toastMessage = message)
+        viewModelScope.launch {
+            delay(2000.milliseconds)
+            if (_uiState.value.toastMessage == message) {
+                _uiState.value = _uiState.value.copy(toastMessage = null)
+            }
+        }
+    }
+
     fun togglePause() {
         val state = _uiState.value
         if (state.showMenu) {
@@ -2790,6 +2826,16 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             return
         }
 
+        if (!state.isPaused) {
+            requestUserPause { performTogglePause() }
+        } else {
+            performTogglePause()
+        }
+    }
+
+    private fun performTogglePause() {
+        val state = _uiState.value
+        if (state.showMenu) return
         val isPaused = state.isPaused
         pausedForBackground = false
         _uiState.value = _uiState.value.copy(
@@ -2802,6 +2848,17 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun toggleMenu() {
+        val showMenu = !_uiState.value.showMenu
+        if (showMenu && !_uiState.value.isPaused) {
+            requestUserPause { if (!_uiState.value.showMenu) openMenu() }
+        } else if (showMenu) {
+            openMenu()
+        } else {
+            closeMenu()
+        }
+    }
+
+    private fun openMenu() {
         val showMenu = !_uiState.value.showMenu
         if (showMenu) {
             pausedForBackground = false

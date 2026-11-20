@@ -60,6 +60,7 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -660,6 +661,27 @@ private fun ScrollToTopButton(
 @Composable
 private fun AchievementToggleCard(retroState: RetroAchievementsUiState) {
     var showDisplaySettings by rememberSaveable { mutableStateOf(false) }
+    var showHardcoreResetConfirm by rememberSaveable { mutableStateOf(false) }
+
+    // RetroAchievements: turning Hardcore on with a game loaded must reset the game (rc_client RESET).
+    if (showHardcoreResetConfirm) {
+        AlertDialog(
+            onDismissRequest = { showHardcoreResetConfirm = false },
+            title = { Text(androidx.compose.ui.res.stringResource(R.string.settings_ra_hardcore_reset_title)) },
+            text = { Text(androidx.compose.ui.res.stringResource(R.string.settings_ra_hardcore_reset_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showHardcoreResetConfirm = false
+                    RetroAchievementsStateManager.setHardcore(true, resetRunningGame = true)
+                }) { Text(androidx.compose.ui.res.stringResource(R.string.settings_ra_hardcore_reset_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showHardcoreResetConfirm = false }) {
+                    Text(androidx.compose.ui.res.stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
 
     Surface(
         modifier = Modifier
@@ -716,7 +738,13 @@ private fun AchievementToggleCard(retroState: RetroAchievementsUiState) {
                 title = androidx.compose.ui.res.stringResource(R.string.settings_ra_hardcore),
                 subtitle = androidx.compose.ui.res.stringResource(R.string.settings_ra_hardcore_desc),
                 checked = retroState.hardcorePreference,
-                onCheckedChange = RetroAchievementsStateManager::setHardcore
+                onCheckedChange = { enabled ->
+                    if (enabled && retroState.game != null && !retroState.hardcoreActive) {
+                        showHardcoreResetConfirm = true
+                    } else {
+                        RetroAchievementsStateManager.setHardcore(enabled)
+                    }
+                }
             )
             if (retroState.hardcoreSessionPreference && !retroState.hardcoreActive) {
                 NoticeCard(

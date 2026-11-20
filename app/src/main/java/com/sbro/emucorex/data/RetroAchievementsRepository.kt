@@ -581,7 +581,10 @@ class RetroAchievementsRepository(private val context: Context) {
         val version = runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
         }.getOrNull()?.takeIf { it.isNotBlank() } ?: "0.0.0"
-        return "EmuCoreX/v$version (Android ${android.os.Build.VERSION.RELEASE})"
+        return com.sbro.emucorex.core.utils.RetroAchievementsHardcorePolicy.userAgent(
+            version,
+            android.os.Build.VERSION.RELEASE
+        )
     }
 
     private fun postRetroAchievementsRequest(vararg params: Pair<String, String>): String? {

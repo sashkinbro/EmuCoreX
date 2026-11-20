@@ -3192,4 +3192,11 @@
     <string name="ra_status_offline_title">RetroAchievements آفلاین است</string>
     <string name="ra_status_offline_desc">نشست شما تأیید نشد. اتصال را بررسی کرده و دوباره تلاش کنید.</string>
     <string name="ra_status_retry">تلاش دوباره</string>
+    <string name="emulation_hardcore_pause_cooldown">هنوز نمی‌توانید مکث کنید. %1$d ثانیه دیگر دوباره تلاش کنید.</string>
+    <string name="emulation_hardcore_load_disabled">بارگذاری ذخیره‌ها در حالت هاردکور غیرفعال است. ذخیره‌کردن همچنان ممکن است.</string>
+    <string name="settings_ra_hardcore_reset_title">حالت هاردکور فعال شود؟</string>
+    <string name="settings_ra_hardcore_reset_message">بازی بازنشانی می‌شود. پیشرفت ذخیره‌نشده از بین می‌رود.</string>
+    <string name="settings_ra_hardcore_reset_confirm">فعال‌سازی و بازنشانی</string>
+    <string name="ra_notif_game_completed">بازی به پایان رسید</string>
+    <string name="ra_notif_hardcore_unrecognized_media">هاردکور غیرفعال شد. رسانهٔ ناشناخته وارد شد.</string>
 </resources>

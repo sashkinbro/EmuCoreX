@@ -3178,4 +3178,11 @@
     <string name="ra_status_offline_title">RetroAchievements 处于离线状态</string>
     <string name="ra_status_offline_desc">无法确认您的会话，请检查网络后重试。</string>
     <string name="ra_status_retry">重试</string>
+    <string name="emulation_hardcore_pause_cooldown">暂时无法暂停，请在 %1$d 秒后重试。</string>
+    <string name="emulation_hardcore_load_disabled">硬核模式下已禁用读取存档，仍可保存。</string>
+    <string name="settings_ra_hardcore_reset_title">要启用硬核模式吗？</string>
+    <string name="settings_ra_hardcore_reset_message">游戏将被重置，未保存的进度会丢失。</string>
+    <string name="settings_ra_hardcore_reset_confirm">启用并重置</string>
+    <string name="ra_notif_game_completed">游戏已完成</string>
+    <string name="ra_notif_hardcore_unrecognized_media">已禁用硬核模式：插入了无法识别的介质。</string>
 </resources>

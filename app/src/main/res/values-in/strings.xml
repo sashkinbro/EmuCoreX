@@ -3191,4 +3191,11 @@
     <string name="ra_status_offline_title">RetroAchievements offline</string>
     <string name="ra_status_offline_desc">Sesi Anda tidak dapat dikonfirmasi. Periksa koneksi dan coba lagi.</string>
     <string name="ra_status_retry">Coba lagi</string>
+    <string name="emulation_hardcore_pause_cooldown">Belum bisa menjeda. Coba lagi dalam %1$d dtk.</string>
+    <string name="emulation_hardcore_load_disabled">Memuat status simpanan dinonaktifkan di Mode Hardcore. Menyimpan tetap tersedia.</string>
+    <string name="settings_ra_hardcore_reset_title">Aktifkan Mode Hardcore?</string>
+    <string name="settings_ra_hardcore_reset_message">Game akan direset. Progres yang belum disimpan akan hilang.</string>
+    <string name="settings_ra_hardcore_reset_confirm">Aktifkan dan reset</string>
+    <string name="ra_notif_game_completed">Game selesai</string>
+    <string name="ra_notif_hardcore_unrecognized_media">Hardcore dinonaktifkan. Media tak dikenal dimasukkan.</string>
 </resources>

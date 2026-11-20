@@ -237,6 +237,7 @@ namespace Achievements
 		int result, const char* error_message, rc_client_game_title_list_t* list, rc_client_t* client, void* userdata);
 
 	static void DisplayHardcoreDeferredMessage();
+	static void DisableHardcoreModeForUnrecognizedMedia();
 	static void DisplayAchievementSummary();
 	static void UpdateRichPresence(std::unique_lock<std::recursive_mutex>& lock);
 	static void UpdateNotificationPosition();
@@ -1140,6 +1141,7 @@ void Achievements::BeginLoadGame()
 			Host::AddKeyedOSDMessage("retroachievements_disc_read_failed",
 				TRANSLATE_STR("Achievements", "Failed to read executable from disc. Achievements disabled."),
 				Host::OSD_CRITICAL_ERROR_DURATION);
+			DisableHardcoreModeForUnrecognizedMedia();
 		}
 
 		DisableHardcoreMode();
@@ -1157,7 +1159,7 @@ void Achievements::ClientLoadGameCallback(int result, const char* error_message,
 	{
 		// Unknown game.
 		Console.WriteLn(Color_StrongYellow, "Achievements: Unknown game '%s', disabling achievements.", s_game_hash.c_str());
-		DisableHardcoreMode();
+		DisableHardcoreModeForUnrecognizedMedia();
 		return;
 	}
 	else if (result == RC_LOGIN_REQUIRED)
@@ -1312,6 +1314,26 @@ void Achievements::DisplayAchievementSummary()
 		);
 }
 
+// RetroAchievements: inserting media that rc_client does not recognise must drop Hardcore and say so.
+void Achievements::DisableHardcoreModeForUnrecognizedMedia()
+{
+	if (!s_hardcore_mode)
+		return;
+
+	DisableHardcoreMode();
+
+	const std::string message = TRANSLATE_STR("Achievements", "Hardcore disabled. Unrecognized media inserted.");
+#if defined(__ANDROID__)
+	const AndroidNotificationV2 v2{4, std::string(), message, 0, "unrecognized", 6000};
+	AddAndroidNotification("hardcore", TRANSLATE_STR("Achievements", "Hardcore Mode"), message, std::string(), &v2);
+#else
+	MTGS::RunOnGSThread([message]() {
+		if (ImGuiManager::InitializeFullscreenUI())
+			Host::AddIconOSDMessage("hardcore_unrecognized", ICON_PF_DUMBELL, message, Host::OSD_WARNING_DURATION);
+	});
+#endif
+}
+
 void Achievements::DisplayHardcoreDeferredMessage()
 {
 #if defined(__ANDROID__)
@@ -1394,7 +1416,10 @@ void Achievements::HandleGameCompleteEvent(const rc_client_event_t* event)
 
 	if (EmuConfig.Achievements.Notifications)
 	{
-		std::string title = fmt::format(TRANSLATE_FS("Achievements", "Mastered {}"), s_game_title);
+		// RetroAchievements: "Mastered" only for hardcore, "Completed" for softcore.
+		std::string title = fmt::format(IsHardcoreModeActive() ? TRANSLATE_FS("Achievements", "Mastered {}") :
+																 TRANSLATE_FS("Achievements", "Completed {}"),
+			s_game_title);
 		std::string message = fmt::format(
 			TRANSLATE_FS("Achievements", "{0}, {1}"),
 			TRANSLATE_PLURAL_STR("Achievements", "%n achievements", "Mastery popup",
@@ -1404,7 +1429,7 @@ void Achievements::HandleGameCompleteEvent(const rc_client_event_t* event)
 #if defined(__ANDROID__)
 		{
 			const AndroidNotificationV2 v2{2, s_game_title, std::string(), static_cast<int>(s_game_summary.points_unlocked),
-				fmt::format("achievements={}", s_game_summary.num_unlocked_achievements),
+				fmt::format("achievements={}\nhardcore={}", s_game_summary.num_unlocked_achievements, IsHardcoreModeActive() ? 1 : 0),
 				SecondsToMs(static_cast<u32>(GAME_COMPLETE_NOTIFICATION_TIME))};
 			AddAndroidNotification("mastery", std::move(title), std::move(message), s_game_icon, &v2);
 		}
@@ -1428,7 +1453,9 @@ void Achievements::HandleSubsetCompleteEvent(const rc_client_event_t* event)
 
 	if (EmuConfig.Achievements.Notifications)
 	{
-		std::string title = fmt::format(TRANSLATE_FS("Achievements", "Mastered {}"), subset->title);
+		std::string title = fmt::format(IsHardcoreModeActive() ? TRANSLATE_FS("Achievements", "Mastered {}") :
+																 TRANSLATE_FS("Achievements", "Completed {}"),
+			subset->title);
 		std::string message = fmt::format(
 			TRANSLATE_FS("Achievements", "{0}, {1}"),
 			TRANSLATE_PLURAL_STR("Achievements", "%n achievements", "Mastery popup",
@@ -1440,7 +1467,7 @@ void Achievements::HandleSubsetCompleteEvent(const rc_client_event_t* event)
 #if defined(__ANDROID__)
 		{
 			const AndroidNotificationV2 v2{2, subset->title, std::string(), static_cast<int>(s_game_summary.points_unlocked),
-				fmt::format("achievements={}", s_game_summary.num_unlocked_achievements),
+				fmt::format("achievements={}\nhardcore={}", s_game_summary.num_unlocked_achievements, IsHardcoreModeActive() ? 1 : 0),
 				SecondsToMs(static_cast<u32>(GAME_COMPLETE_NOTIFICATION_TIME))};
 			AddAndroidNotification("mastery", std::move(title), std::move(message), std::move(badge_path), &v2);
 		}
@@ -2656,6 +2683,22 @@ u32 Achievements::GetEarnedPoints()
 {
 	auto lock = GetLock();
 	return s_game_summary.points_unlocked;
+}
+
+bool Achievements::CanUserPause(u32* frames_remaining)
+{
+	if (frames_remaining)
+		*frames_remaining = 0;
+
+	auto lock = GetLock();
+	if (!s_client)
+		return true;
+
+	uint32_t remaining = 0;
+	const bool allowed = rc_client_can_pause(s_client, &remaining) != 0;
+	if (frames_remaining)
+		*frames_remaining = allowed ? 0 : remaining;
+	return allowed;
 }
 
 void Achievements::Logout()
