@@ -51,6 +51,22 @@ data class AchievementsProfileCache(
     val updatedAtMillis: Long
 )
 
+/** In-memory copy of the RetroAchievements preferences that native callbacks read on a hot path. */
+data class AchievementsStoredSnapshot(
+    val enabled: Boolean = false,
+    val hardcore: Boolean = false,
+    val notifications: Boolean = true,
+    val leaderboardNotifications: Boolean = true,
+    val indicators: Boolean = true,
+    val leaderboardTrackers: Boolean = true,
+    val soundEffects: Boolean = true,
+    val unlockSoundPath: String? = null,
+    val unlockSoundName: String? = null,
+    val username: String? = null,
+    val avatarPath: String? = null,
+    val profile: AchievementsProfileCache? = null
+)
+
 data class AchievementsAccountProgressCache(
     val username: String,
     val json: String,
@@ -283,8 +299,7 @@ data class SettingsSnapshot(
     val achievementsSoundEffects: Boolean = true,
     val achievementsUnlockSoundPath: String? = null,
     val achievementsUnlockSoundName: String? = null,
-    val achievementsUsername: String? = null,
-    val achievementsToken: String? = null
+    val achievementsUsername: String? = null
 ) {
     // Compatibility read-only views over the nested [gyro] group.
     val gyroMode: Int get() = gyro.mode
@@ -945,6 +960,8 @@ class AppPreferences(private val context: Context) {
         private val ACHIEVEMENTS_UNLOCK_SOUND_NAME = stringPreferencesKey("achievements_unlock_sound_name")
         private val ACHIEVEMENTS_USERNAME = stringPreferencesKey("achievements_username")
         private val ACHIEVEMENTS_TOKEN = stringPreferencesKey("achievements_token")
+        @Volatile
+        private var achievementsSecretsMigrated = false
         private val ACHIEVEMENTS_LOGIN_TIMESTAMP = stringPreferencesKey("achievements_login_timestamp")
         private val ACHIEVEMENTS_AVATAR_PATH = stringPreferencesKey("achievements_avatar_path")
         private val ACHIEVEMENTS_PROFILE_USERNAME = stringPreferencesKey("achievements_profile_username")
@@ -2354,8 +2371,7 @@ class AppPreferences(private val context: Context) {
                 achievementsSoundEffects = prefs[ACHIEVEMENTS_SOUND_EFFECTS] ?: true,
                 achievementsUnlockSoundPath = prefs[ACHIEVEMENTS_UNLOCK_SOUND_PATH],
                 achievementsUnlockSoundName = prefs[ACHIEVEMENTS_UNLOCK_SOUND_NAME],
-                achievementsUsername = prefs[ACHIEVEMENTS_USERNAME],
-                achievementsToken = prefs[ACHIEVEMENTS_TOKEN]
+                achievementsUsername = prefs[ACHIEVEMENTS_USERNAME]
             )
         }
         .distinctUntilChanged()
@@ -5809,7 +5825,49 @@ class AppPreferences(private val context: Context) {
         }
     }
 
+    private val achievementsSecrets by lazy { RetroAchievementsSecretStore(context) }
+
+    /**
+     * One-time move of the plaintext RetroAchievements token/password out of DataStore into the
+     * Keystore-backed store. Plaintext is only deleted after the secure write succeeded.
+     */
+    private fun migrateAchievementsSecrets() {
+        if (achievementsSecretsMigrated) return
+        synchronized(AppPreferences::class.java) {
+            if (achievementsSecretsMigrated) return
+            val plain = kotlinx.coroutines.runBlocking {
+                context.dataStore.data.map { it[ACHIEVEMENTS_TOKEN] to it[ACHIEVEMENTS_PASSWORD] }.first()
+            }
+            var removeToken = plain.first == null
+            var removePassword = plain.second == null
+            plain.first?.let { legacy ->
+                removeToken = achievementsSecrets.load(RetroAchievementsSecretStore.TOKEN) != null ||
+                    achievementsSecrets.save(RetroAchievementsSecretStore.TOKEN, legacy)
+            }
+            plain.second?.let { legacy ->
+                removePassword = achievementsSecrets.load(RetroAchievementsSecretStore.PASSWORD) != null ||
+                    achievementsSecrets.save(RetroAchievementsSecretStore.PASSWORD, legacy)
+            }
+            if (removeToken || removePassword) {
+                kotlinx.coroutines.runBlocking {
+                    context.dataStore.edit { prefs ->
+                        if (removeToken) prefs.remove(ACHIEVEMENTS_TOKEN)
+                        if (removePassword) prefs.remove(ACHIEVEMENTS_PASSWORD)
+                    }
+                }
+            }
+            // A failed secure write keeps the plaintext as a fallback and retries next launch.
+            achievementsSecretsMigrated = removeToken && removePassword
+        }
+    }
+
     suspend fun setAchievementsToken(token: String?) {
+        migrateAchievementsSecrets()
+        if (!token.isNullOrEmpty() && achievementsSecrets.save(RetroAchievementsSecretStore.TOKEN, token)) {
+            context.dataStore.edit { prefs -> prefs.remove(ACHIEVEMENTS_TOKEN) }
+            return
+        }
+        achievementsSecrets.remove(RetroAchievementsSecretStore.TOKEN)
         context.dataStore.edit { prefs ->
             if (token == null) prefs.remove(ACHIEVEMENTS_TOKEN)
             else prefs[ACHIEVEMENTS_TOKEN] = token
@@ -5854,15 +5912,23 @@ class AppPreferences(private val context: Context) {
     }
 
     suspend fun setAchievementsRememberPassword(remember: Boolean) {
+        migrateAchievementsSecrets()
         context.dataStore.edit { prefs ->
             prefs[ACHIEVEMENTS_REMEMBER_PASSWORD] = remember
             if (!remember) {
                 prefs.remove(ACHIEVEMENTS_PASSWORD)
             }
         }
+        if (!remember) achievementsSecrets.remove(RetroAchievementsSecretStore.PASSWORD)
     }
 
     suspend fun setAchievementsPassword(password: String?) {
+        migrateAchievementsSecrets()
+        if (!password.isNullOrEmpty() && achievementsSecrets.save(RetroAchievementsSecretStore.PASSWORD, password)) {
+            context.dataStore.edit { prefs -> prefs.remove(ACHIEVEMENTS_PASSWORD) }
+            return
+        }
+        achievementsSecrets.remove(RetroAchievementsSecretStore.PASSWORD)
         context.dataStore.edit { prefs ->
             if (password == null) prefs.remove(ACHIEVEMENTS_PASSWORD)
             else prefs[ACHIEVEMENTS_PASSWORD] = password
@@ -5894,6 +5960,34 @@ class AppPreferences(private val context: Context) {
             }
         }
     }
+
+    val achievementsSnapshotFlow: Flow<AchievementsStoredSnapshot> = context.dataStore.data
+        .map { prefs ->
+            val profileUsername = prefs[ACHIEVEMENTS_PROFILE_USERNAME]?.trim().orEmpty()
+            AchievementsStoredSnapshot(
+                enabled = prefs[ACHIEVEMENTS_ENABLED] ?: false,
+                hardcore = prefs[ACHIEVEMENTS_HARDCORE] ?: false,
+                notifications = prefs[ACHIEVEMENTS_NOTIFICATIONS] ?: true,
+                leaderboardNotifications = prefs[ACHIEVEMENTS_LEADERBOARD_NOTIFICATIONS] ?: true,
+                indicators = prefs[ACHIEVEMENTS_INDICATORS] ?: true,
+                leaderboardTrackers = prefs[ACHIEVEMENTS_LEADERBOARD_TRACKERS] ?: true,
+                soundEffects = prefs[ACHIEVEMENTS_SOUND_EFFECTS] ?: true,
+                unlockSoundPath = prefs[ACHIEVEMENTS_UNLOCK_SOUND_PATH],
+                unlockSoundName = prefs[ACHIEVEMENTS_UNLOCK_SOUND_NAME],
+                username = prefs[ACHIEVEMENTS_USERNAME],
+                avatarPath = prefs[ACHIEVEMENTS_AVATAR_PATH],
+                profile = if (profileUsername.isBlank()) null else AchievementsProfileCache(
+                    username = profileUsername,
+                    displayName = prefs[ACHIEVEMENTS_DISPLAY_NAME]?.takeIf { it.isNotBlank() } ?: profileUsername,
+                    avatarPath = prefs[ACHIEVEMENTS_AVATAR_PATH]?.takeIf { it.isNotBlank() },
+                    points = (prefs[ACHIEVEMENTS_POINTS] ?: 0).coerceAtLeast(0),
+                    softcorePoints = (prefs[ACHIEVEMENTS_SOFTCORE_POINTS] ?: 0).coerceAtLeast(0),
+                    unreadMessages = (prefs[ACHIEVEMENTS_UNREAD_MESSAGES] ?: 0).coerceAtLeast(0),
+                    updatedAtMillis = prefs[ACHIEVEMENTS_PROFILE_UPDATED_AT] ?: 0L
+                )
+            )
+        }
+        .distinctUntilChanged()
 
     fun getAchievementsEnabledSync(): Boolean {
         return kotlinx.coroutines.runBlocking {
@@ -5957,6 +6051,9 @@ class AppPreferences(private val context: Context) {
     }
 
     fun getAchievementsTokenSync(): String? {
+        migrateAchievementsSecrets()
+        achievementsSecrets.load(RetroAchievementsSecretStore.TOKEN)?.let { return it }
+        // Fallback when the Keystore write failed during migration.
         return kotlinx.coroutines.runBlocking {
             context.dataStore.data.map { it[ACHIEVEMENTS_TOKEN] }.first()
         }
@@ -5993,6 +6090,8 @@ class AppPreferences(private val context: Context) {
     }
 
     fun getAchievementsPasswordSync(): String? {
+        migrateAchievementsSecrets()
+        achievementsSecrets.load(RetroAchievementsSecretStore.PASSWORD)?.let { return it }
         return kotlinx.coroutines.runBlocking {
             context.dataStore.data.map { it[ACHIEVEMENTS_PASSWORD] }.first()
         }

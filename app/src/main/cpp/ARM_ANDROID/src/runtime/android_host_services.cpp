@@ -873,6 +873,15 @@ void Host::OnAchievementsRefreshed()
 
 void Host::OnAchievementsHardcoreModeChanged(bool enabled)
 {
+	if (enabled)
+	{
+		// Hardcore can switch on at a reset while Turbo/Unlimited is active. VMManager::SetLimiterMode()
+		// clamps those to Nominal when Hardcore is active (the same check upstream applies on hotkeys).
+		Host::RunOnCPUThread([]() {
+			if (VMManager::HasValidVM())
+				VMManager::SetLimiterMode(VMManager::GetLimiterMode());
+		}, false);
+	}
 	NotifyHardcoreModeChanged(enabled);
 	QueryAndNotifyAchievementsState();
 }

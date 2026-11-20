@@ -4,9 +4,15 @@ import com.sbro.emucorex.core.NativeApp
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.data.AppPreferences
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 object RetroAchievementsBridge {
+    // Native callbacks must never block on DataStore; one serial writer keeps the order.
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val credentialWriteScope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
+
     @JvmStatic
     external fun nativeRequestState()
 
@@ -124,6 +130,21 @@ object RetroAchievementsBridge {
     }
 
     @JvmStatic
+    fun notifyNotificationV2(
+        kind: Int, title: String?, description: String?, points: Int,
+        extra: String?, iconPath: String?, durationMs: Int
+    ) {
+        RetroAchievementsLiveStateManager.onNotificationV2(
+            kind, title.orEmpty(), description.orEmpty(), points, extra.orEmpty(), iconPath.orEmpty(), durationMs.toLong()
+        )
+    }
+
+    @JvmStatic
+    fun notifyIndicator(kind: Int, id: Int, active: Boolean, title: String?, text: String?, badgePath: String?) {
+        RetroAchievementsLiveStateManager.onIndicator(kind, id, active, title.orEmpty(), text.orEmpty(), badgePath.orEmpty())
+    }
+
+    @JvmStatic
     fun notifySettingsChanged(section: String, key: String, value: String) {
         // NativeApp's JNI context is not guaranteed to exist in the library hub,
         // before a VM is started. EmulatorBridge owns the application context there.
@@ -136,7 +157,7 @@ object RetroAchievementsBridge {
             // Explicit logout and a verified TOKEN_INVALID response own credential
             // removal; native synchronization only accepts usable values.
             if (!RetroAchievementsCredentialSyncPolicy.shouldPersistNativeValue(value)) return
-            runBlocking(Dispatchers.IO) {
+            credentialWriteScope.launch {
                 when (key) {
                     "Username" -> prefs.setAchievementsUsername(value)
                     "Token" -> prefs.setAchievementsToken(value)

@@ -1,11 +1,15 @@
 package com.sbro.emucorex.core.utils
 
+import com.sbro.emucorex.R
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.data.AchievementsProfileCache
+import com.sbro.emucorex.data.AchievementsStoredSnapshot
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.PerGameSettingsRepository
 import com.sbro.emucorex.data.RetroAchievementsRepository
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -66,8 +70,21 @@ data class RetroAchievementsUiState(
     val game: RetroAchievementsGameState? = null,
     val errorMessage: String? = null,
     val loginRequestReason: RetroAchievementsLoginRequestReason? = null,
-    val sessionRevision: Long = 0L
-)
+    val sessionRevision: Long = 0L,
+    /** True once the native client confirmed the stored session (online login succeeded). */
+    val nativeSessionConfirmed: Boolean = false
+) {
+    /** A cached profile without native confirmation is not a live login: show connecting/offline. */
+    val sessionStatus: RetroAchievementsSessionStatus
+        get() = when {
+            user == null -> RetroAchievementsSessionStatus.SIGNED_OUT
+            nativeSessionConfirmed -> RetroAchievementsSessionStatus.ONLINE
+            isLoading -> RetroAchievementsSessionStatus.CONNECTING
+            else -> RetroAchievementsSessionStatus.OFFLINE
+        }
+}
+
+enum class RetroAchievementsSessionStatus { SIGNED_OUT, CONNECTING, ONLINE, OFFLINE }
 
 object RetroAchievementsStateManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -78,6 +95,43 @@ object RetroAchievementsStateManager {
 
     @Volatile
     private var activeGameKey: String? = null
+
+    // Native callbacks must never block on DataStore: preferences are mirrored in memory.
+    @Volatile
+    private var stored: AchievementsStoredSnapshot? = null
+    private var snapshotJob: Job? = null
+    private var loadingTimeoutJob: Job? = null
+
+    private fun startSnapshotCollector() {
+        if (snapshotJob != null) return
+        val context = EmulatorBridge.getContext() ?: return
+        snapshotJob = scope.launch(Dispatchers.IO) {
+            AppPreferences(context).achievementsSnapshotFlow.collect { stored = it }
+        }
+    }
+
+    private inline fun updateStored(block: (AchievementsStoredSnapshot) -> AchievementsStoredSnapshot) {
+        stored = stored?.let(block)
+    }
+
+    private fun str(resId: Int, fallback: String): String =
+        EmulatorBridge.getContext()?.let { runCatching { it.getString(resId) }.getOrNull() } ?: fallback
+
+    private fun nativeError(error: String?): String =
+        RetroAchievementsErrorMessages.resolve(EmulatorBridge.getContext(), error, error)
+
+    /** A native callback that never arrives must not leave the UI loading forever. */
+    private fun armLoadingTimeout() {
+        loadingTimeoutJob?.cancel()
+        loadingTimeoutJob = scope.launch {
+            delay(LOADING_TIMEOUT_MS)
+            _state.update {
+                if (it.isLoading && !it.isAuthenticating) {
+                    it.copy(isLoading = false, errorMessage = str(R.string.ra_err_timeout, "RetroAchievements did not respond in time."))
+                } else it
+            }
+        }
+    }
 
     fun setActiveGame(gameKey: String?) {
         activeGameKey = gameKey
@@ -107,6 +161,7 @@ object RetroAchievementsStateManager {
     fun initialize() {
         if (initialized) return
         initialized = true
+        RetroAchievementsLiveStateManager.seedFromPreferences(EmulatorBridge.getContext())
         val prefsEnabled = loadStoredEnabled()
         val prefsHardcore = loadStoredHardcore()
         _state.update {
@@ -126,6 +181,7 @@ object RetroAchievementsStateManager {
                 isLoading = true
             )
         }
+        startSnapshotCollector()
         refreshState(invalidateCaches = false)
     }
 
@@ -157,9 +213,11 @@ object RetroAchievementsStateManager {
                 leaderboardTrackers = loadStoredLeaderboardTrackers(),
                 soundEffects = loadStoredSoundEffects(),
                 unlockSoundName = loadStoredUnlockSoundName(),
-                storedUsername = loadStoredUsername() ?: it.storedUsername
+                storedUsername = loadStoredUsername() ?: it.storedUsername,
+                errorMessage = null
             )
         }
+        armLoadingTimeout()
         scope.launch(Dispatchers.IO) {
             runCatching {
                 // A cold-started Android hub has no VM to initialize rcheevos for us.
@@ -178,7 +236,7 @@ object RetroAchievementsStateManager {
         val cleanUsername = username.trim()
         if (cleanUsername.isBlank() || password.isBlank()) {
             _state.update {
-                it.copy(errorMessage = "Username and password are required.")
+                it.copy(errorMessage = str(R.string.ra_err_credentials_required, "Username and password are required."))
             }
             return
         }
@@ -225,7 +283,7 @@ object RetroAchievementsStateManager {
                                 isAuthenticating = false,
                                 isLoading = false,
                                 enabled = wasEnabled,
-                                errorMessage = error
+                                errorMessage = nativeError(error)
                             )
                         }
                     } else {
@@ -258,8 +316,10 @@ object RetroAchievementsStateManager {
 
     fun logout() {
         RetroAchievementsRepository.invalidateUnlockedAchievementsCache(forceAccountRefresh = true)
+        RetroAchievementsLiveStateManager.onLogout()
         _state.update {
             it.copy(
+                nativeSessionConfirmed = false,
                 isLoading = true,
                 isAuthenticating = false,
                 user = null,
@@ -268,12 +328,15 @@ object RetroAchievementsStateManager {
                 loginRequestReason = null
             )
         }
+        armLoadingTimeout()
         scope.launch(Dispatchers.IO) {
             EmulatorBridge.getContext()?.let { context ->
                 AppPreferences(context).run {
                     setAchievementsProfileCache(null)
                     setAchievementsAccountProgressCache(null)
                     setAchievementsToken(null)
+                    // Logout forgets the remembered password as well.
+                    setAchievementsPassword(null)
                     setAchievementsLoginTimestamp(null)
                 }
             }
@@ -285,6 +348,7 @@ object RetroAchievementsStateManager {
     fun setEnabled(enabled: Boolean) {
         val revision = enabledPreferenceRevision.incrementAndGet()
         RetroAchievementsRepository.invalidateUnlockedAchievementsCache()
+        updateStored { it.copy(enabled = enabled) }
         _state.update {
             it.copy(
                 enabled = enabled,
@@ -292,6 +356,7 @@ object RetroAchievementsStateManager {
                 errorMessage = null
             )
         }
+        armLoadingTimeout()
         scope.launch(Dispatchers.IO) {
             runCatching {
                 preferenceSettingsMutex.withLock {
@@ -308,6 +373,7 @@ object RetroAchievementsStateManager {
 
     fun setHardcore(enabled: Boolean) {
         val revision = hardcorePreferenceRevision.incrementAndGet()
+        updateStored { it.copy(hardcore = enabled) }
         _state.update {
             it.copy(
                 hardcorePreference = enabled,
@@ -315,6 +381,7 @@ object RetroAchievementsStateManager {
                 errorMessage = null
             )
         }
+        armLoadingTimeout()
         scope.launch(Dispatchers.IO) {
             runCatching {
                 preferenceSettingsMutex.withLock {
@@ -330,6 +397,10 @@ object RetroAchievementsStateManager {
     }
 
     fun setAchievementIndicators(enabled: Boolean) {
+        updateStored { it.copy(indicators = enabled) }
+        if (!enabled) RetroAchievementsLiveStateManager.clearIndicatorKinds(
+            RetroAchievementsIndicatorKind.CHALLENGE, RetroAchievementsIndicatorKind.PROGRESS
+        )
         _state.update { it.copy(achievementIndicators = enabled, errorMessage = null) }
         scope.launch(Dispatchers.IO) {
             runCatching {
@@ -342,6 +413,7 @@ object RetroAchievementsStateManager {
     }
 
     fun setNotifications(enabled: Boolean) {
+        updateStored { it.copy(notifications = enabled) }
         _state.update { it.copy(notifications = enabled, errorMessage = null) }
         scope.launch(Dispatchers.IO) {
             runCatching {
@@ -354,6 +426,7 @@ object RetroAchievementsStateManager {
     }
 
     fun setLeaderboardNotifications(enabled: Boolean) {
+        updateStored { it.copy(leaderboardNotifications = enabled) }
         _state.update { it.copy(leaderboardNotifications = enabled, errorMessage = null) }
         scope.launch(Dispatchers.IO) {
             runCatching {
@@ -366,6 +439,8 @@ object RetroAchievementsStateManager {
     }
 
     fun setLeaderboardTrackers(enabled: Boolean) {
+        updateStored { it.copy(leaderboardTrackers = enabled) }
+        if (!enabled) RetroAchievementsLiveStateManager.clearIndicatorKinds(RetroAchievementsIndicatorKind.LEADERBOARD_TRACKER)
         _state.update { it.copy(leaderboardTrackers = enabled, errorMessage = null) }
         scope.launch(Dispatchers.IO) {
             runCatching {
@@ -378,6 +453,7 @@ object RetroAchievementsStateManager {
     }
 
     fun setSoundEffects(enabled: Boolean) {
+        updateStored { it.copy(soundEffects = enabled) }
         _state.update { it.copy(soundEffects = enabled, errorMessage = null) }
         scope.launch(Dispatchers.IO) {
             runCatching {
@@ -392,6 +468,7 @@ object RetroAchievementsStateManager {
     fun setUnlockSound(path: String?, displayName: String?) {
         val resolvedPath = path?.takeIf { it.isNotBlank() }
         val resolvedName = displayName?.takeIf { it.isNotBlank() }
+        updateStored { it.copy(unlockSoundPath = resolvedPath, unlockSoundName = if (resolvedPath != null) resolvedName else null) }
         _state.update { it.copy(unlockSoundName = if (resolvedPath != null) resolvedName else null, errorMessage = null) }
         scope.launch(Dispatchers.IO) {
             runCatching {
@@ -422,6 +499,7 @@ object RetroAchievementsStateManager {
         }
         if (resolvedReason == RetroAchievementsLoginRequestReason.TOKEN_INVALID) {
             RetroAchievementsRepository.invalidateUnlockedAchievementsCache(forceAccountRefresh = true)
+            RetroAchievementsLiveStateManager.onLogout()
             EmulatorBridge.getContext()?.let { context ->
                 scope.launch(Dispatchers.IO) {
                     AppPreferences(context).run {
@@ -438,6 +516,7 @@ object RetroAchievementsStateManager {
                 isAuthenticating = false,
                 isLoading = false,
                 user = if (resolvedReason == RetroAchievementsLoginRequestReason.TOKEN_INVALID) null else it.user,
+                nativeSessionConfirmed = if (resolvedReason == RetroAchievementsLoginRequestReason.TOKEN_INVALID) false else it.nativeSessionConfirmed,
                 loginRequestReason = resolvedReason
             )
         }
@@ -445,15 +524,15 @@ object RetroAchievementsStateManager {
 
     internal fun onLoginSuccess(username: String?, points: Int, scPoints: Int, unreadMessages: Int) {
         RetroAchievementsRepository.invalidateUnlockedAchievementsCache(forceAccountRefresh = true)
-        val storedAvatar = loadStoredAvatarPath()
         var verifiedUser: RetroAchievementsUserState? = null
         _state.update { current ->
             val resolvedUsername = username?.takeIf { it.isNotBlank() }
                 ?: current.user?.username
                 ?: current.storedUsername
                 ?: loadStoredUsername()
+            val storedAvatar = loadStoredAvatarPath(resolvedUsername)
             verifiedUser = if (!resolvedUsername.isNullOrBlank()) {
-                current.user?.copy(
+                current.user?.takeIf { it.username.equals(resolvedUsername, ignoreCase = true) }?.copy(
                     username = resolvedUsername,
                     displayName = username?.takeIf { it.isNotBlank() } ?: current.user.displayName,
                     points = points,
@@ -477,6 +556,7 @@ object RetroAchievementsStateManager {
             current.copy(
                 isAuthenticating = false,
                 isLoading = false,
+                nativeSessionConfirmed = verifiedUser != null,
                 errorMessage = null,
                 loginRequestReason = null,
                 sessionRevision = current.sessionRevision + 1L,
@@ -513,7 +593,7 @@ object RetroAchievementsStateManager {
         val resolvedStoredUsername = username ?: _state.value.storedUsername ?: loadStoredUsername()
         val storedEnabled = loadStoredEnabled()
         val storedHardcore = loadStoredHardcore()
-        val storedAvatar = loadStoredAvatarPath()
+        val storedAvatar = loadStoredAvatarPath(username ?: resolvedStoredUsername)
         val resolvedAvatar = avatar?.takeIf { it.isNotBlank() } ?: storedAvatar
         if (!avatar.isNullOrBlank()) {
             persistStoredAvatarPath(avatar)
@@ -539,6 +619,7 @@ object RetroAchievementsStateManager {
             current.copy(
                 isSupported = true,
                 isLoading = false,
+                nativeSessionConfirmed = haveUser && !username.isNullOrBlank(),
                 // State notifications also occur while login is preparing the
                 // persistent client; only the login callback may finish that flow.
                 isAuthenticating = current.isAuthenticating,
@@ -589,55 +670,72 @@ object RetroAchievementsStateManager {
     }
 
     private fun loadStoredUsername(): String? {
+        stored?.let { return it.username }
         val context = EmulatorBridge.getContext() ?: return null
         return AppPreferences(context).getAchievementsUsernameSync()
     }
 
     private fun loadStoredEnabled(): Boolean {
+        stored?.let { return it.enabled }
         val context = EmulatorBridge.getContext() ?: return _state.value.enabled
         return AppPreferences(context).getAchievementsEnabledSync()
     }
 
     private fun loadStoredHardcore(): Boolean {
+        stored?.let { return it.hardcore }
         val context = EmulatorBridge.getContext() ?: return _state.value.hardcorePreference
         return AppPreferences(context).getAchievementsHardcoreSync()
     }
 
     private fun loadStoredNotifications(): Boolean {
+        stored?.let { return it.notifications }
         val context = EmulatorBridge.getContext() ?: return _state.value.notifications
         return AppPreferences(context).getAchievementsNotificationsSync()
     }
 
     private fun loadStoredLeaderboardNotifications(): Boolean {
+        stored?.let { return it.leaderboardNotifications }
         val context = EmulatorBridge.getContext() ?: return _state.value.leaderboardNotifications
         return AppPreferences(context).getAchievementsLeaderboardNotificationsSync()
     }
 
     private fun loadStoredAchievementIndicators(): Boolean {
+        stored?.let { return it.indicators }
         val context = EmulatorBridge.getContext() ?: return _state.value.achievementIndicators
         return AppPreferences(context).getAchievementsIndicatorsSync()
     }
 
     private fun loadStoredLeaderboardTrackers(): Boolean {
+        stored?.let { return it.leaderboardTrackers }
         val context = EmulatorBridge.getContext() ?: return _state.value.leaderboardTrackers
         return AppPreferences(context).getAchievementsLeaderboardTrackersSync()
     }
 
     private fun loadStoredSoundEffects(): Boolean {
+        stored?.let { return it.soundEffects }
         val context = EmulatorBridge.getContext() ?: return _state.value.soundEffects
         return AppPreferences(context).getAchievementsSoundEffectsSync()
     }
 
     private fun loadStoredUnlockSoundName(): String? {
+        stored?.let { snap ->
+            val path = snap.unlockSoundPath ?: return null
+            return snap.unlockSoundName?.takeIf { File(path).isFile }
+        }
         val context = EmulatorBridge.getContext() ?: return _state.value.unlockSoundName
         val preferences = AppPreferences(context)
         val path = preferences.getAchievementsUnlockSoundPathSync() ?: return null
         return preferences.getAchievementsUnlockSoundNameSync()?.takeIf { File(path).isFile }
     }
 
-    private fun loadStoredAvatarPath(): String? {
-        val context = EmulatorBridge.getContext() ?: return null
-        return AppPreferences(context).getAchievementsAvatarPathSync()
+    /** The stored avatar belongs to the cached profile; never reuse it for another account. */
+    private fun loadStoredAvatarPath(username: String?): String? {
+        if (username.isNullOrBlank()) return null
+        val profile = stored?.profile
+            ?: EmulatorBridge.getContext()?.let { AppPreferences(it).getAchievementsProfileCacheSync() }
+        if (profile == null || !profile.username.equals(username.trim(), ignoreCase = true)) return null
+        return stored?.avatarPath
+            ?: EmulatorBridge.getContext()?.let { AppPreferences(it).getAchievementsAvatarPathSync() }
     }
 
     private fun loadStoredProfile(username: String? = loadStoredUsername()): RetroAchievementsUserState? {
@@ -652,7 +750,7 @@ object RetroAchievementsStateManager {
                 preferences.getAchievementsTokenSync()
             )
         ) return null
-        val cached = preferences.getAchievementsProfileCacheSync() ?: return null
+        val cached = stored?.profile ?: preferences.getAchievementsProfileCacheSync() ?: return null
         if (!cached.username.equals(expectedUsername, ignoreCase = true)) return null
         return RetroAchievementsUserState(
             username = cached.username,
@@ -694,11 +792,14 @@ object RetroAchievementsStateManager {
             it.copy(
                 isLoading = false,
                 isAuthenticating = false,
-                errorMessage = error.message ?: "RetroAchievements is unavailable right now."
+                errorMessage = error.message?.takeIf { it.isNotBlank() }?.let(::nativeError)
+                    ?: str(R.string.ra_err_unavailable, "RetroAchievements is unavailable right now.")
             )
         }
     }
 }
+
+private const val LOADING_TIMEOUT_MS = 10_000L
 
 internal object RetroAchievementsSessionPolicy {
     fun hasStoredSession(username: String?, token: String?): Boolean =

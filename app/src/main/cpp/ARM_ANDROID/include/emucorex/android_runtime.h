@@ -162,6 +162,12 @@ void ConfigureNativeAppCallbacks(JNIEnv* env, jclass native_app_class);
 JavaVM* GetJavaVM();
 void DispatchPadVibration(int pad_index, float large_motor, float small_motor);
 void DispatchRetroAchievementsNotification(const char* kind, const char* title, const char* message, const char* image_path);
+// Structured notification (see NativeApp.onRetroAchievementsNotificationV2). Returns false when the Kotlin
+// side does not implement it, so the caller can fall back to DispatchRetroAchievementsNotification().
+bool DispatchRetroAchievementsNotificationV2(int kind, const char* title, const char* description, int points,
+	const char* extra, const char* image_path, int duration_ms);
+// kind: 0 challenge indicator, 1 progress indicator, 2 leaderboard tracker.
+void DispatchRetroAchievementsIndicator(int kind, int id, bool active, const char* title, const char* text, const char* badge_path);
 bool DispatchRetroAchievementsSound(const char* path);
 void SetPerformanceMetricsCallbackEnabled(bool enabled, bool detailed, bool gpu_timing);
 bool IsPerformanceGpuTimingRequested();

@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.core.net.toUri
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.NativeApp
+import com.sbro.emucorex.core.utils.RetroAchievementsStateManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -150,8 +151,10 @@ class RetroAchievementsRepository(private val context: Context) {
             return cached.takeIf { it.gameId == gameId.toLong() }
 
         val requestedTitleKey = gameTitle.orEmpty().toAchievementTitleKey()
+        // Without an id or title the cache cannot be attributed to the current game and may
+        // belong to a previously played one.
         if (requestedTitleKey.isBlank())
-            return cached
+            return null
 
         return cached.takeIf { it.title.toAchievementTitleKey() == requestedTitleKey }
     }
@@ -574,6 +577,13 @@ class RetroAchievementsRepository(private val context: Context) {
         }
     }
 
+    private fun userAgent(): String {
+        val version = runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: "0.0.0"
+        return "EmuCoreX/v$version (Android ${android.os.Build.VERSION.RELEASE})"
+    }
+
     private fun postRetroAchievementsRequest(vararg params: Pair<String, String>): String? {
         var connection: HttpURLConnection? = null
         val route = params.firstOrNull { it.first == "r" }?.second ?: "unknown"
@@ -589,12 +599,17 @@ class RetroAchievementsRepository(private val context: Context) {
                 instanceFollowRedirects = true
                 doOutput = true
                 setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-                setRequestProperty("User-Agent", "EmuCoreX/1.0")
+                setRequestProperty("User-Agent", userAgent())
             }
             connection.outputStream.use { output ->
                 output.write(body.toByteArray(Charsets.UTF_8))
             }
             val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED && params.any { it.first == "t" }) {
+                // The stored token was rejected: run the same re-login flow as the native client.
+                Log.w(LOG_TAG, "request route=$route unauthorized, requesting re-login")
+                RetroAchievementsStateManager.onLoginRequested(1)
+            }
             val stream = if (responseCode in 200..299) connection.inputStream else connection.errorStream
             stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
                 ?.takeIf { responseCode in 200..299 && it.isNotBlank() }

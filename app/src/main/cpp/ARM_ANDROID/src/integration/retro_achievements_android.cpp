@@ -34,6 +34,16 @@ void InitializeJniIfNeeded(JNIEnv* env, jclass clazz)
 	}
 }
 
+// The JNI mutex only guards the cached VM/class pointers. It is never held across a call into Java,
+// so it cannot participate in a lock-order inversion with the achievements lock.
+bool GetJniTargets(JavaVM*& vm, jclass& bridge_class)
+{
+	std::lock_guard lock(s_achievements_mutex);
+	vm = s_java_vm;
+	bridge_class = s_achievements_bridge_class;
+	return vm && bridge_class;
+}
+
 void NotifyStateChanged(
 	bool enabled, bool have_user, const char* username, const char* display_name,
 	const char* avatar, u32 points, u32 sc_points, u32 unread_messages,
@@ -42,16 +52,17 @@ void NotifyStateChanged(
 	u32 game_id, u32 num_achievements, u32 earned_achievements, u32 score, u32 sc_score,
 	bool hardcore_mode, bool leaderboard_enabled, bool rich_presence_enabled
 ) {
-	std::lock_guard lock(s_achievements_mutex);
-	if (!s_java_vm || !s_achievements_bridge_class) return;
+	JavaVM* java_vm = nullptr;
+	jclass bridge_class = nullptr;
+	if (!GetJniTargets(java_vm, bridge_class)) return;
 	JNIEnv* env = nullptr;
 	bool attached = false;
-	if (s_java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK)
+	if (java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK)
 	{
-		if (s_java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK || !env) return;
+		if (java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK || !env) return;
 		attached = true;
 	}
-	jmethodID method = env->GetStaticMethodID(s_achievements_bridge_class, "notifyStateChanged",
+	jmethodID method = env->GetStaticMethodID(bridge_class, "notifyStateChanged",
 		"(ZZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIZZZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIIIZZZ)V");
 	if (method)
 	{
@@ -62,7 +73,7 @@ void NotifyStateChanged(
 		jstring j_rich_presence = rich_presence ? env->NewStringUTF(rich_presence) : nullptr;
 		jstring j_icon_path = icon_path ? env->NewStringUTF(icon_path) : nullptr;
 
-		env->CallStaticVoidMethod(s_achievements_bridge_class, method,
+		env->CallStaticVoidMethod(bridge_class, method,
 			static_cast<jboolean>(enabled), static_cast<jboolean>(have_user), j_username, j_display_name, j_avatar,
 			static_cast<jint>(points), static_cast<jint>(sc_points), static_cast<jint>(unread_messages),
 			static_cast<jboolean>(hardcore_pref), static_cast<jboolean>(hardcore_active), static_cast<jboolean>(have_game),
@@ -80,114 +91,120 @@ void NotifyStateChanged(
 		if (j_icon_path) env->DeleteLocalRef(j_icon_path);
 	}
 	if (env->ExceptionCheck()) env->ExceptionClear();
-	if (attached) s_java_vm->DetachCurrentThread();
+	if (attached) java_vm->DetachCurrentThread();
 }
 } // namespace
 
 void NotifyLoginRequested(int reason)
 {
-	std::lock_guard lock(s_achievements_mutex);
-	if (!s_java_vm || !s_achievements_bridge_class) return;
+	JavaVM* java_vm = nullptr;
+	jclass bridge_class = nullptr;
+	if (!GetJniTargets(java_vm, bridge_class)) return;
 	JNIEnv* env = nullptr;
 	bool attached = false;
-	if (s_java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK)
+	if (java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK)
 	{
-		if (s_java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK || !env) return;
+		if (java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK || !env) return;
 		attached = true;
 	}
-	jmethodID method = env->GetStaticMethodID(s_achievements_bridge_class, "notifyLoginRequested", "(I)V");
+	jmethodID method = env->GetStaticMethodID(bridge_class, "notifyLoginRequested", "(I)V");
 	if (method)
 	{
-		env->CallStaticVoidMethod(s_achievements_bridge_class, method, static_cast<jint>(reason));
+		env->CallStaticVoidMethod(bridge_class, method, static_cast<jint>(reason));
 	}
 	if (env->ExceptionCheck()) env->ExceptionClear();
-	if (attached) s_java_vm->DetachCurrentThread();
+	if (attached) java_vm->DetachCurrentThread();
 }
 
 void NotifyLoginSuccess(const char* username, u32 points, u32 sc_points, u32 unread_messages)
 {
-	std::lock_guard lock(s_achievements_mutex);
-	if (!s_java_vm || !s_achievements_bridge_class) return;
+	JavaVM* java_vm = nullptr;
+	jclass bridge_class = nullptr;
+	if (!GetJniTargets(java_vm, bridge_class)) return;
 	JNIEnv* env = nullptr;
 	bool attached = false;
-	if (s_java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK)
+	if (java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK)
 	{
-		if (s_java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK || !env) return;
+		if (java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK || !env) return;
 		attached = true;
 	}
-	jmethodID method = env->GetStaticMethodID(s_achievements_bridge_class, "notifyLoginSuccess", "(Ljava/lang/String;III)V");
+	jmethodID method = env->GetStaticMethodID(bridge_class, "notifyLoginSuccess", "(Ljava/lang/String;III)V");
 	if (method)
 	{
 		jstring j_username = username ? env->NewStringUTF(username) : nullptr;
-		env->CallStaticVoidMethod(s_achievements_bridge_class, method, j_username, static_cast<jint>(points), static_cast<jint>(sc_points), static_cast<jint>(unread_messages));
+		env->CallStaticVoidMethod(bridge_class, method, j_username, static_cast<jint>(points), static_cast<jint>(sc_points), static_cast<jint>(unread_messages));
 		if (j_username) env->DeleteLocalRef(j_username);
 	}
 	if (env->ExceptionCheck()) env->ExceptionClear();
-	if (attached) s_java_vm->DetachCurrentThread();
+	if (attached) java_vm->DetachCurrentThread();
 }
 
 void NotifyHardcoreModeChanged(bool enabled)
 {
-	std::lock_guard lock(s_achievements_mutex);
-	if (!s_java_vm || !s_achievements_bridge_class) return;
+	JavaVM* java_vm = nullptr;
+	jclass bridge_class = nullptr;
+	if (!GetJniTargets(java_vm, bridge_class)) return;
 	JNIEnv* env = nullptr;
 	bool attached = false;
-	if (s_java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK)
+	if (java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK)
 	{
-		if (s_java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK || !env) return;
+		if (java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK || !env) return;
 		attached = true;
 	}
-	jmethodID method = env->GetStaticMethodID(s_achievements_bridge_class, "notifyHardcoreModeChanged", "(Z)V");
+	jmethodID method = env->GetStaticMethodID(bridge_class, "notifyHardcoreModeChanged", "(Z)V");
 	if (method)
 	{
-		env->CallStaticVoidMethod(s_achievements_bridge_class, method, static_cast<jboolean>(enabled));
+		env->CallStaticVoidMethod(bridge_class, method, static_cast<jboolean>(enabled));
 	}
 	if (env->ExceptionCheck()) env->ExceptionClear();
-	if (attached) s_java_vm->DetachCurrentThread();
+	if (attached) java_vm->DetachCurrentThread();
 }
 
 void NotifySettingsChanged(const char* section, const char* key, const char* value)
 {
-	std::lock_guard lock(s_achievements_mutex);
-	if (!s_java_vm || !s_achievements_bridge_class) return;
+	JavaVM* java_vm = nullptr;
+	jclass bridge_class = nullptr;
+	if (!GetJniTargets(java_vm, bridge_class)) return;
 	JNIEnv* env = nullptr;
 	bool attached = false;
-	if (s_java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK)
+	if (java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK)
 	{
-		if (s_java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK || !env) return;
+		if (java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK || !env) return;
 		attached = true;
 	}
-	jmethodID method = env->GetStaticMethodID(s_achievements_bridge_class, "notifySettingsChanged", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
+	jmethodID method = env->GetStaticMethodID(bridge_class, "notifySettingsChanged", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
 	if (method)
 	{
 		jstring j_section = section ? env->NewStringUTF(section) : nullptr;
 		jstring j_key = key ? env->NewStringUTF(key) : nullptr;
 		jstring j_value = value ? env->NewStringUTF(value) : nullptr;
-		env->CallStaticVoidMethod(s_achievements_bridge_class, method, j_section, j_key, j_value);
+		env->CallStaticVoidMethod(bridge_class, method, j_section, j_key, j_value);
 		if (j_section) env->DeleteLocalRef(j_section);
 		if (j_key) env->DeleteLocalRef(j_key);
 		if (j_value) env->DeleteLocalRef(j_value);
 	}
 	if (env->ExceptionCheck()) env->ExceptionClear();
-	if (attached) s_java_vm->DetachCurrentThread();
+	if (attached) java_vm->DetachCurrentThread();
 }
 
 void QueryAndNotifyAchievementsState()
 {
+	// Settings are read before the achievements lock is taken: settings -> achievements is the
+	// only order that exists elsewhere (callbacks hold the achievements lock and then write settings).
 	bool enabled = EmuConfig.Achievements.Enabled;
 	if (Host::Internal::GetBaseSettingsLayer() != nullptr)
 		enabled = Host::GetBaseBoolSettingValue("Achievements", "Enabled", enabled);
-	const char* username = Achievements::GetLoggedInUserName();
-	bool have_user = username != nullptr;
-	const char* display_name = Achievements::GetLoggedInUserDisplayName();
-	std::string avatar = Achievements::GetLoggedInUserBadgePath();
-	u32 points = Achievements::GetLoggedInUserPoints();
-	u32 sc_points = Achievements::GetLoggedInUserSoftcorePoints();
-	u32 unread_messages = Achievements::GetLoggedInUserUnreadMessages();
+	const bool hardcore_pref = EmuConfig.Achievements.HardcoreMode;
 
-	bool hardcore_pref = EmuConfig.Achievements.HardcoreMode;
-	bool hardcore_active = Achievements::IsHardcoreModeActive();
-	bool have_game = Achievements::HasActiveGame();
+	std::string username;
+	std::string display_name;
+	std::string avatar;
+	bool have_user = false;
+	bool hardcore_active = false;
+	bool have_game = false;
+	u32 points = 0;
+	u32 sc_points = 0;
+	u32 unread_messages = 0;
 
 	std::string game_title;
 	std::string rich_presence;
@@ -200,22 +217,44 @@ void QueryAndNotifyAchievementsState()
 	bool has_leaderboards = false;
 	bool has_rich_presence = false;
 
-	if (have_game)
 	{
-		game_title = Achievements::GetGameTitle();
-		rich_presence = Achievements::GetRichPresenceString();
-		icon_path = Achievements::GetGameIconURL();
-		game_id = Achievements::GetGameID();
-		num_achievements = Achievements::GetNumAchievements();
-		earned_achievements = Achievements::GetEarnedAchievements();
-		score = Achievements::GetEarnedPoints();
-		sc_score = Achievements::GetGamePoints();
-		has_leaderboards = Achievements::HasLeaderboards();
-		has_rich_presence = Achievements::HasRichPresence();
+		// rc_client, s_game_title, rich presence, icon URL and the badge downloader are all owned by
+		// the achievements lock (recursive). JNI IO threads must hold it for the whole snapshot, and it
+		// is released before calling into Java so no lock is ever held across the upcall.
+		const auto lock = Achievements::GetLock();
+
+		const char* const raw_username = Achievements::GetLoggedInUserName();
+		have_user = raw_username != nullptr;
+		if (raw_username)
+			username = raw_username;
+		const char* const raw_display_name = Achievements::GetLoggedInUserDisplayName();
+		if (raw_display_name)
+			display_name = raw_display_name;
+		avatar = Achievements::GetLoggedInUserBadgePath();
+		points = Achievements::GetLoggedInUserPoints();
+		sc_points = Achievements::GetLoggedInUserSoftcorePoints();
+		unread_messages = Achievements::GetLoggedInUserUnreadMessages();
+
+		hardcore_active = Achievements::IsHardcoreModeActive();
+		have_game = Achievements::HasActiveGame();
+
+		if (have_game)
+		{
+			game_title = Achievements::GetGameTitle();
+			rich_presence = Achievements::GetRichPresenceString();
+			icon_path = Achievements::GetGameIconURL();
+			game_id = Achievements::GetGameID();
+			num_achievements = Achievements::GetNumAchievements();
+			earned_achievements = Achievements::GetEarnedAchievements();
+			score = Achievements::GetEarnedPoints();
+			sc_score = Achievements::GetGamePoints();
+			has_leaderboards = Achievements::HasLeaderboards();
+			has_rich_presence = Achievements::HasRichPresence();
+		}
 	}
 
 	NotifyStateChanged(
-		enabled, have_user, username, display_name,
+		enabled, have_user, have_user ? username.c_str() : nullptr, display_name.empty() ? nullptr : display_name.c_str(),
 		avatar.empty() ? nullptr : avatar.c_str(), points, sc_points, unread_messages,
 		hardcore_pref, hardcore_active, have_game,
 		game_title.empty() ? nullptr : game_title.c_str(),

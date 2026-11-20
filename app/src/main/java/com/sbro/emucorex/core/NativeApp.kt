@@ -495,6 +495,62 @@ object NativeApp {
         RetroAchievementsBridge.notifyNotification(kind, title, message, imagePath)
     }
 
+    /**
+     * Structured RetroAchievements popup so Kotlin can build localized text. When this method exists
+     * the native side delivers ONLY this callback; the legacy [onRetroAchievementsNotification]
+     * (pre-formatted English) is used solely when this method is missing.
+     *
+     * [kind] matches RetroAchievementsNotificationKind:
+     *  0 GENERIC (disconnected/reconnected: title+description are the English fallback text),
+     *  1 ACHIEVEMENT_UNLOCKED (title = raw achievement title, description = achievement description,
+     *    points = achievement points, extra = "unofficial=0|1\nhardcore=0|1\nid=<achievement id>"),
+     *  2 GAME_MASTERED (title = game or subset title, points = points earned, extra = "achievements=<n>"),
+     *  3 GAME_SUMMARY (title = game title, points = points unlocked, description empty,
+     *    extra = "hardcore=0|1\nunlocked=<n>\ntotal=<n>\npoints_unlocked=<n>\npoints_total=<n>"),
+     *  4 HARDCORE_INFO (extra = "1" enabled, "0" disabled, "pending" = will enable on reset; description = English fallback),
+     *  5 LEADERBOARD_STARTED, 6 LEADERBOARD_FAILED (title = leaderboard title),
+     *  7 LEADERBOARD_SUBMITTED (title = leaderboard title, extra = formatted value, or "<value> (#rank/entries)"
+     *    for the scoreboard follow-up),
+     *  8 LOGIN_SUCCESS (title = display name, points = hardcore score, extra = "softcore_points=<n>\nunread=<n>"),
+     *  9 ERROR (description = raw native message, extra = raw error code/message for classification,
+     *    title = API name for server errors, else empty).
+     * [kind] 10/11 are server disconnected/reconnected (English fallback in title/description, extra empty).
+     * [durationMs] is the suggested on-screen time in milliseconds.
+     */
+    @JvmStatic
+    @Suppress("unused") // Called from C++ with GetStaticMethodID; there is no Kotlin call site.
+    fun onRetroAchievementsNotificationV2(
+        kind: Int,
+        title: String?,
+        description: String?,
+        points: Int,
+        extra: String?,
+        iconPath: String?,
+        durationMs: Int
+    ) {
+        RetroAchievementsBridge.notifyNotificationV2(kind, title, description, points, extra, iconPath, durationMs)
+    }
+
+    /**
+     * Persistent in-game indicator (replaces the unused ImGui overlay). [kind] 0 = challenge indicator
+     * (one per achievement [id]), 1 = progress indicator (single slot; [text] = progress string),
+     * 2 = leaderboard tracker (one per tracker [id]; [text] = formatted value). [active] false hides it.
+     * Native honours the Overlays (kinds 0/1) and LBOverlays (kind 2) toggles for show/update events;
+     * hide events are always forwarded and everything is hidden on game change/unload/logout.
+     */
+    @JvmStatic
+    @Suppress("unused") // Called from C++ with GetStaticMethodID; there is no Kotlin call site.
+    fun onRetroAchievementsIndicator(
+        kind: Int,
+        id: Int,
+        active: Boolean,
+        title: String?,
+        text: String?,
+        badgePath: String?
+    ) {
+        RetroAchievementsBridge.notifyIndicator(kind, id, active, title, text, badgePath)
+    }
+
     @JvmStatic
     @Suppress("unused") // Called from C++ with GetStaticMethodID; there is no Kotlin call site.
     fun onRetroAchievementsSound(path: String?) {

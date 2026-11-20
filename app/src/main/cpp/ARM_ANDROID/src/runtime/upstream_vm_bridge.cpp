@@ -789,6 +789,11 @@ bool RunUpstreamVm(const VmLaunchConfig& config, VmStartupCallback startup_callb
 		return false;
 	}
 
+	// start_unlimited (frame limiter disabled in settings) is applied by VMManager::Initialize() without the
+	// hardcore check that VMManager::SetLimiterMode() performs. Re-run it so Hardcore Mode forces Nominal.
+	if (emucorex::android::IsRetroAchievementsFeatureBlocked(emucorex::android::HardcoreRestrictedFeature::SlowMotion))
+		VMManager::SetLimiterMode(VMManager::GetLimiterMode());
+
 	if (startup_callback)
 		startup_callback(startup_userdata, true);
 	VMManager::SetState(VMState::Running);

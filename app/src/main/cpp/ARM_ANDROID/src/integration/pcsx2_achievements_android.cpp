@@ -56,7 +56,9 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <chrono>
 #include <string>
+#include <thread>
 #include <vector>
 
 #ifdef ENABLE_RAINTEGRATION
@@ -96,10 +98,36 @@ namespace Achievements
 	namespace
 	{
 #if defined(__ANDROID__)
-		void AddAndroidNotification(std::string kind, std::string title, std::string message, std::string image_path)
+		// Structured notification for Kotlin-side localization (NativeApp.onRetroAchievementsNotificationV2).
+		// kind values match RetroAchievementsNotificationKind (see NativeApp.kt KDoc): 0 generic/fallback,
+		// 1 achievement unlocked, 2 game/subset mastered, 3 game summary, 4 hardcore info, 5 leaderboard started,
+		// 6 leaderboard failed, 7 leaderboard submitted/scoreboard, 8 login success, 9 error, 10 disconnected,
+		// 11 reconnected. `extra` meaning is per kind (documented in NativeApp.kt).
+		struct AndroidNotificationV2
 		{
+			int kind;
+			std::string title;
+			std::string description;
+			int points;
+			std::string extra;
+			int duration_ms;
+		};
+
+		void AddAndroidNotification(std::string kind, std::string title, std::string message, std::string image_path,
+			const AndroidNotificationV2* v2 = nullptr)
+		{
+			// The pre-formatted English message is only the fallback for a Kotlin side without V2.
+			if (v2 && emucorex::android::DispatchRetroAchievementsNotificationV2(v2->kind, v2->title.c_str(),
+						  v2->description.c_str(), v2->points, v2->extra.c_str(), image_path.c_str(), v2->duration_ms))
+				return;
+
 			emucorex::android::DispatchRetroAchievementsNotification(
 				kind.c_str(), title.c_str(), message.c_str(), image_path.c_str());
+		}
+
+		int SecondsToMs(u32 seconds)
+		{
+			return static_cast<int>(std::min<u32>(seconds, 3600u) * 1000u);
 		}
 #endif
 
@@ -284,6 +312,27 @@ namespace Achievements
 	static std::vector<LeaderboardTrackerIndicator> s_active_leaderboard_trackers;
 	static std::vector<AchievementChallengeIndicator> s_active_challenge_indicators;
 	static std::optional<AchievementProgressIndicator> s_active_progress_indicator;
+
+	// Indicators are forwarded to Kotlin (NativeApp.onRetroAchievementsIndicator) instead of ImGui.
+	// kind: 0 challenge indicator, 1 progress indicator, 2 leaderboard tracker.
+	static void EmitIndicator(int kind, u32 id, bool active, const char* title, const char* text, const std::string& badge_path)
+	{
+#if defined(__ANDROID__)
+		emucorex::android::DispatchRetroAchievementsIndicator(kind, static_cast<int>(id), active, title ? title : "",
+			text ? text : "", badge_path.c_str());
+#endif
+	}
+
+	static void HideAllIndicators()
+	{
+		for (const AchievementChallengeIndicator& it : s_active_challenge_indicators)
+			EmitIndicator(0, it.achievement->id, false, it.achievement->title, "", it.badge_path);
+		if (s_active_progress_indicator.has_value())
+			EmitIndicator(1, s_active_progress_indicator->achievement->id, false, s_active_progress_indicator->achievement->title, "",
+				s_active_progress_indicator->badge_path);
+		for (const LeaderboardTrackerIndicator& it : s_active_leaderboard_trackers)
+			EmitIndicator(2, it.tracker_id, false, "", "", std::string());
+	}
 } // namespace Achievements
 
 
@@ -312,7 +361,10 @@ void Achievements::ReportError(const std::string_view sv)
 	std::string error = fmt::format("Achievements error: {}", sv);
 	Console.Error(error);
 #if defined(__ANDROID__)
-	AddAndroidNotification("error", TRANSLATE_STR("Achievements", "Achievements Error"), std::move(error), s_game_icon);
+	{
+		const AndroidNotificationV2 v2{9, std::string(), std::string(sv), 0, std::string(sv), 8000};
+		AddAndroidNotification("error", TRANSLATE_STR("Achievements", "Achievements Error"), std::move(error), s_game_icon, &v2);
+	}
 #else
 	Host::AddOSDMessage(std::move(error), Host::OSD_CRITICAL_ERROR_DURATION);
 #endif
@@ -1170,6 +1222,9 @@ void Achievements::ClientLoadGameCallback(int result, const char* error_message,
 
 void Achievements::ClearGameInfo()
 {
+	// Must run before rc_client_unload_game(): it dereferences achievement pointers owned by the game.
+	HideAllIndicators();
+
 	if (MTGS::IsOpen())
 		Host::RunOnGSThread(&Achievements::ClearUIState);
 
@@ -1230,7 +1285,14 @@ void Achievements::DisplayAchievementSummary()
 		}
 
 #if defined(__ANDROID__)
-		AddAndroidNotification("summary", std::move(title), std::move(summary), s_game_icon);
+		{
+			const AndroidNotificationV2 v2{3, s_game_title, std::string(), static_cast<int>(s_game_summary.points_unlocked),
+				fmt::format("hardcore={}\nunlocked={}\ntotal={}\npoints_unlocked={}\npoints_total={}", IsHardcoreModeActive() ? 1 : 0,
+					s_game_summary.num_unlocked_achievements, s_game_summary.num_core_achievements, s_game_summary.points_unlocked,
+					s_game_summary.points_core),
+				SecondsToMs(static_cast<u32>(ACHIEVEMENT_SUMMARY_NOTIFICATION_TIME))};
+			AddAndroidNotification("summary", std::move(title), std::move(summary), s_game_icon, &v2);
+		}
 #else
 		MTGS::RunOnGSThread([title = std::move(title), summary = std::move(summary), icon = s_game_icon]() {
 			if (ImGuiManager::InitializeFullscreenUI())
@@ -1255,8 +1317,9 @@ void Achievements::DisplayHardcoreDeferredMessage()
 #if defined(__ANDROID__)
 	if (VMManager::HasValidVM() && EmuConfig.Achievements.HardcoreMode && !s_hardcore_mode)
 	{
+		const AndroidNotificationV2 v2{4, std::string(), std::string("Hardcore mode will be enabled on system reset."), 0, "pending", 5000};
 		AddAndroidNotification("hardcore", TRANSLATE_STR("Achievements", "Hardcore Mode"),
-			TRANSLATE_STR("Achievements", "Hardcore mode will be enabled on system reset."), s_game_icon);
+			TRANSLATE_STR("Achievements", "Hardcore mode will be enabled on system reset."), s_game_icon, &v2);
 	}
 #else
 	MTGS::RunOnGSThread([]() {
@@ -1300,7 +1363,13 @@ void Achievements::HandleUnlockEvent(const rc_client_event_t* event)
 		std::string badge_path = GetAchievementBadgePath(cheevo, cheevo->state);
 
 #if defined(__ANDROID__)
-		AddAndroidNotification("unlock", std::move(title), std::string(cheevo->description), std::move(badge_path));
+		{
+			const AndroidNotificationV2 v2{1, cheevo->title, cheevo->description, static_cast<int>(cheevo->points),
+				fmt::format("unofficial={}\nhardcore={}\nid={}", cheevo->category == RC_CLIENT_ACHIEVEMENT_CATEGORY_UNOFFICIAL ? 1 : 0,
+					IsHardcoreModeActive() ? 1 : 0, cheevo->id),
+				SecondsToMs(EmuConfig.Achievements.NotificationsDuration)};
+			AddAndroidNotification("unlock", std::move(title), std::string(cheevo->description), std::move(badge_path), &v2);
+		}
 #else
 		MTGS::RunOnGSThread(
 			[title = std::move(title), summary = std::string(cheevo->description), badge_path = std::move(badge_path), id = cheevo->id]() {
@@ -1333,7 +1402,12 @@ void Achievements::HandleGameCompleteEvent(const rc_client_event_t* event)
 			TRANSLATE_PLURAL_STR("Achievements", "%n points", "Mastery popup", s_game_summary.points_unlocked));
 
 #if defined(__ANDROID__)
-		AddAndroidNotification("mastery", std::move(title), std::move(message), s_game_icon);
+		{
+			const AndroidNotificationV2 v2{2, s_game_title, std::string(), static_cast<int>(s_game_summary.points_unlocked),
+				fmt::format("achievements={}", s_game_summary.num_unlocked_achievements),
+				SecondsToMs(static_cast<u32>(GAME_COMPLETE_NOTIFICATION_TIME))};
+			AddAndroidNotification("mastery", std::move(title), std::move(message), s_game_icon, &v2);
+		}
 #else
 		MTGS::RunOnGSThread([title = std::move(title), message = std::move(message), icon = s_game_icon]() {
 			if (ImGuiManager::InitializeFullscreenUI())
@@ -1364,7 +1438,12 @@ void Achievements::HandleSubsetCompleteEvent(const rc_client_event_t* event)
 		std::string badge_path = GetSubsetBadgePath(subset);
 
 #if defined(__ANDROID__)
-		AddAndroidNotification("mastery", std::move(title), std::move(message), std::move(badge_path));
+		{
+			const AndroidNotificationV2 v2{2, subset->title, std::string(), static_cast<int>(s_game_summary.points_unlocked),
+				fmt::format("achievements={}", s_game_summary.num_unlocked_achievements),
+				SecondsToMs(static_cast<u32>(GAME_COMPLETE_NOTIFICATION_TIME))};
+			AddAndroidNotification("mastery", std::move(title), std::move(message), std::move(badge_path), &v2);
+		}
 #else
 		MTGS::RunOnGSThread([title = std::move(title), message = std::move(message), badge_path = std::move(badge_path)]() {
 			if (ImGuiManager::InitializeFullscreenUI())
@@ -1387,7 +1466,11 @@ void Achievements::HandleLeaderboardStartedEvent(const rc_client_event_t* event)
 		std::string message = TRANSLATE_STR("Achievements", "Leaderboard attempt started.");
 
 #if defined(__ANDROID__)
-		AddAndroidNotification("leaderboard", std::move(title), std::move(message), s_game_icon);
+		{
+			const AndroidNotificationV2 v2{5, event->leaderboard->title, std::string(), 0, std::string(),
+				SecondsToMs(static_cast<u32>(LEADERBOARD_STARTED_NOTIFICATION_TIME))};
+			AddAndroidNotification("leaderboard", std::move(title), std::move(message), s_game_icon, &v2);
+		}
 #else
 		MTGS::RunOnGSThread([title = std::move(title), message = std::move(message), icon = s_game_icon, id = event->leaderboard->id]() {
 			if (ImGuiManager::InitializeFullscreenUI())
@@ -1410,7 +1493,11 @@ void Achievements::HandleLeaderboardFailedEvent(const rc_client_event_t* event)
 		std::string message = TRANSLATE_STR("Achievements", "Leaderboard attempt failed.");
 
 #if defined(__ANDROID__)
-		AddAndroidNotification("leaderboard", std::move(title), std::move(message), s_game_icon);
+		{
+			const AndroidNotificationV2 v2{6, event->leaderboard->title, std::string(), 0, std::string(),
+				SecondsToMs(static_cast<u32>(LEADERBOARD_FAILED_NOTIFICATION_TIME))};
+			AddAndroidNotification("leaderboard", std::move(title), std::move(message), s_game_icon, &v2);
+		}
 #else
 		MTGS::RunOnGSThread([title = std::move(title), message = std::move(message), icon = s_game_icon, id = event->leaderboard->id]() {
 			if (ImGuiManager::InitializeFullscreenUI())
@@ -1443,7 +1530,13 @@ void Achievements::HandleLeaderboardSubmittedEvent(const rc_client_event_t* even
 				EmuConfig.Achievements.SpectatorMode ? std::string_view() : TRANSLATE_SV("Achievements", " (Submitting)"));
 
 #if defined(__ANDROID__)
-		AddAndroidNotification("leaderboard", std::move(title), std::move(message), s_game_icon);
+		{
+			// extra = the formatted value, language neutral (a time, score or value string).
+			const AndroidNotificationV2 v2{7, event->leaderboard->title, std::string(), 0,
+				event->leaderboard->tracker_value ? event->leaderboard->tracker_value : std::string(),
+				SecondsToMs(EmuConfig.Achievements.LeaderboardsDuration)};
+			AddAndroidNotification("leaderboard", std::move(title), std::move(message), s_game_icon, &v2);
+		}
 #else
 		MTGS::RunOnGSThread([title = std::move(title), message = std::move(message), icon = s_game_icon, id = event->leaderboard->id]() {
 			if (ImGuiManager::InitializeFullscreenUI())
@@ -1484,7 +1577,14 @@ void Achievements::HandleLeaderboardScoreboardEvent(const rc_client_event_t* eve
 			event->leaderboard_scoreboard->new_rank, event->leaderboard_scoreboard->num_entries);
 
 #if defined(__ANDROID__)
-		AddAndroidNotification("leaderboard", std::move(title), std::move(message), s_game_icon);
+		{
+			// extra = "<score> (#<rank>/<entries>)", language neutral.
+			const AndroidNotificationV2 v2{7, event->leaderboard->title, std::string(), 0,
+				fmt::format("{} (#{}/{})", event->leaderboard_scoreboard->submitted_score, event->leaderboard_scoreboard->new_rank,
+					event->leaderboard_scoreboard->num_entries),
+				SecondsToMs(EmuConfig.Achievements.LeaderboardsDuration)};
+			AddAndroidNotification("leaderboard", std::move(title), std::move(message), s_game_icon, &v2);
+		}
 #else
 		MTGS::RunOnGSThread([title = std::move(title), message = std::move(message), icon = s_game_icon, id = event->leaderboard->id]() {
 			if (ImGuiManager::InitializeFullscreenUI())
@@ -1507,6 +1607,9 @@ void Achievements::HandleLeaderboardTrackerShowEvent(const rc_client_event_t* ev
 	indicator.text = event->leaderboard_tracker->display;
 	indicator.active = true;
 	s_active_leaderboard_trackers.push_back(std::move(indicator));
+
+	if (EmuConfig.Achievements.LBOverlays)
+		EmitIndicator(2, event->leaderboard_tracker->id, true, "", event->leaderboard_tracker->display, std::string());
 }
 
 void Achievements::HandleLeaderboardTrackerHideEvent(const rc_client_event_t* event)
@@ -1518,8 +1621,9 @@ void Achievements::HandleLeaderboardTrackerHideEvent(const rc_client_event_t* ev
 		return;
 
 	DevCon.WriteLn("Achievements: Hiding leaderboard tracker: %u", id);
-	it->active = false;
-	it->show_hide_time.Reset();
+	// Hide is always forwarded, even with the tracker setting off, so Kotlin can never keep a stale tracker.
+	EmitIndicator(2, id, false, "", "", std::string());
+	s_active_leaderboard_trackers.erase(it);
 }
 
 void Achievements::HandleLeaderboardTrackerUpdateEvent(const rc_client_event_t* event)
@@ -1534,6 +1638,9 @@ void Achievements::HandleLeaderboardTrackerUpdateEvent(const rc_client_event_t* 
 		"Achievements: Updating leaderboard tracker: %u: %s", event->leaderboard_tracker->id, event->leaderboard_tracker->display);
 
 	it->text = event->leaderboard_tracker->display;
+
+	if (EmuConfig.Achievements.LBOverlays)
+		EmitIndicator(2, id, true, "", event->leaderboard_tracker->display, std::string());
 }
 
 void Achievements::HandleAchievementChallengeIndicatorShowEvent(const rc_client_event_t* event)
@@ -1544,6 +1651,8 @@ void Achievements::HandleAchievementChallengeIndicatorShowEvent(const rc_client_
 	{
 		it->show_hide_time.Reset();
 		it->active = true;
+		if (EmuConfig.Achievements.Overlays)
+			EmitIndicator(0, event->achievement->id, true, event->achievement->title, event->achievement->description, it->badge_path);
 		return;
 	}
 
@@ -1552,6 +1661,10 @@ void Achievements::HandleAchievementChallengeIndicatorShowEvent(const rc_client_
 	indicator.badge_path = GetAchievementBadgePath(event->achievement, RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED);
 	indicator.active = true;
 	s_active_challenge_indicators.push_back(std::move(indicator));
+
+	if (EmuConfig.Achievements.Overlays)
+		EmitIndicator(0, event->achievement->id, true, event->achievement->title, event->achievement->description,
+			s_active_challenge_indicators.back().badge_path);
 
 	DevCon.WriteLn("Achievements: Show challenge indicator for %u (%s)", event->achievement->id, event->achievement->title);
 }
@@ -1564,8 +1677,8 @@ void Achievements::HandleAchievementChallengeIndicatorHideEvent(const rc_client_
 		return;
 
 	DevCon.WriteLn("Achievements: Hide challenge indicator for %u (%s)", event->achievement->id, event->achievement->title);
-	it->show_hide_time.Reset();
-	it->active = false;
+	EmitIndicator(0, event->achievement->id, false, event->achievement->title, "", it->badge_path);
+	s_active_challenge_indicators.erase(it);
 }
 
 void Achievements::HandleAchievementProgressIndicatorShowEvent(const rc_client_event_t* event)
@@ -1581,6 +1694,10 @@ void Achievements::HandleAchievementProgressIndicatorShowEvent(const rc_client_e
 	s_active_progress_indicator->achievement = event->achievement;
 	s_active_progress_indicator->badge_path = GetAchievementBadgePath(event->achievement, RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED);
 	s_active_progress_indicator->active = true;
+
+	if (EmuConfig.Achievements.Overlays)
+		EmitIndicator(1, event->achievement->id, true, event->achievement->title, event->achievement->measured_progress,
+			s_active_progress_indicator->badge_path);
 }
 
 void Achievements::HandleAchievementProgressIndicatorHideEvent(const rc_client_event_t* event)
@@ -1589,16 +1706,26 @@ void Achievements::HandleAchievementProgressIndicatorHideEvent(const rc_client_e
 		return;
 
 	DevCon.WriteLn("Achievements: Hiding progress indicator");
-	s_active_progress_indicator->show_hide_time.Reset();
-	s_active_progress_indicator->active = false;
+	EmitIndicator(1, s_active_progress_indicator->achievement->id, false, s_active_progress_indicator->achievement->title, "",
+		s_active_progress_indicator->badge_path);
+	s_active_progress_indicator.reset();
 }
 
 void Achievements::HandleAchievementProgressIndicatorUpdateEvent(const rc_client_event_t* event)
 {
 	DevCon.WriteLn("Achievements: Updating progress indicator: %u (%s): %s", event->achievement->id, event->achievement->title,
 		event->achievement->measured_progress);
+	if (!s_active_progress_indicator.has_value())
+	{
+		s_active_progress_indicator.emplace();
+		s_active_progress_indicator->badge_path = GetAchievementBadgePath(event->achievement, RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED);
+	}
 	s_active_progress_indicator->achievement = event->achievement;
 	s_active_progress_indicator->active = true;
+
+	if (EmuConfig.Achievements.Overlays)
+		EmitIndicator(1, event->achievement->id, true, event->achievement->title, event->achievement->measured_progress,
+			s_active_progress_indicator->badge_path);
 }
 
 void Achievements::HandleServerErrorEvent(const rc_client_event_t* event)
@@ -1608,7 +1735,12 @@ void Achievements::HandleServerErrorEvent(const rc_client_event_t* event)
 		event->server_error->error_message ? event->server_error->error_message : "UNKNOWN");
 	Console.Error("Achievements: %s", message.c_str());
 #if defined(__ANDROID__)
-	AddAndroidNotification("error", TRANSLATE_STR("Achievements", "Achievements Error"), std::move(message), s_game_icon);
+	{
+		const AndroidNotificationV2 v2{9, event->server_error->api ? event->server_error->api : "UNKNOWN",
+			event->server_error->error_message ? event->server_error->error_message : "UNKNOWN", 0,
+			event->server_error->error_message ? event->server_error->error_message : "", 6000};
+		AddAndroidNotification("error", TRANSLATE_STR("Achievements", "Achievements Error"), std::move(message), s_game_icon, &v2);
+	}
 #else
 	Host::AddOSDMessage(std::move(message), Host::OSD_ERROR_DURATION);
 #endif
@@ -1619,8 +1751,12 @@ void Achievements::HandleServerDisconnectedEvent(const rc_client_event_t* event)
 	Console.Warning("Achievements: Server disconnected.");
 
 #if defined(__ANDROID__)
-	AddAndroidNotification("error", TRANSLATE_STR("Achievements", "Achievements Disconnected"),
-		TRANSLATE_STR("Achievements", "An unlock request could not be completed. We will keep retrying to submit this request."), s_game_icon);
+	{
+		const AndroidNotificationV2 v2{10, std::string("Achievements Disconnected"),
+			std::string("An unlock request could not be completed. We will keep retrying to submit this request."), 0, std::string(), 6000};
+		AddAndroidNotification("error", TRANSLATE_STR("Achievements", "Achievements Disconnected"),
+			TRANSLATE_STR("Achievements", "An unlock request could not be completed. We will keep retrying to submit this request."), s_game_icon, &v2);
+	}
 #else
 	MTGS::RunOnGSThread([]() {
 		if (ImGuiManager::InitializeFullscreenUI())
@@ -1637,8 +1773,12 @@ void Achievements::HandleServerReconnectedEvent(const rc_client_event_t* event)
 	Console.Warning("Achievements: Server reconnected.");
 
 #if defined(__ANDROID__)
-	AddAndroidNotification("info", TRANSLATE_STR("Achievements", "Achievements Reconnected"),
-		TRANSLATE_STR("Achievements", "All pending unlock requests have completed."), s_game_icon);
+	{
+		const AndroidNotificationV2 v2{11, std::string("Achievements Reconnected"),
+		std::string("All pending unlock requests have completed."), 0, std::string(), 4000};
+		AddAndroidNotification("info", TRANSLATE_STR("Achievements", "Achievements Reconnected"),
+			TRANSLATE_STR("Achievements", "All pending unlock requests have completed."), s_game_icon, &v2);
+	}
 #else
 	MTGS::RunOnGSThread([]() {
 		if (ImGuiManager::InitializeFullscreenUI())
@@ -1751,10 +1891,11 @@ void Achievements::SetHardcoreMode(bool enabled, bool force_display_message)
 	))
 	{
 #if defined(__ANDROID__)
+		const AndroidNotificationV2 v2{4, std::string(), std::string(), 0, enabled ? "1" : "0", 4000};
 		AddAndroidNotification("hardcore", TRANSLATE_STR("Achievements", "Hardcore Mode"),
 			enabled ? TRANSLATE_STR("Achievements", "Hardcore mode is now enabled.") :
 					  TRANSLATE_STR("Achievements", "Hardcore mode is now disabled."),
-			s_game_icon);
+			s_game_icon, &v2);
 #else
 		MTGS::RunOnGSThread([enabled]() {
 			if (ImGuiManager::InitializeFullscreenUI())
@@ -2248,8 +2389,39 @@ bool Achievements::Login(const char* username, const char* password, Error* erro
 		return false;
 	}
 
-	// Wait until the login request completes.
-	http->WaitForAllRequests();
+	// Wait until the login request completes without keeping the achievements lock across the wait:
+	// the emulation thread takes it every frame (FrameUpdate/IdleUpdate), so holding it for up to the
+	// HTTP timeout froze the game when logging in from the in-game menu.
+	if (is_temporary_client)
+	{
+		// Nobody else can touch a private client/downloader, and its callbacks do not need the lock.
+		lock.unlock();
+		http->WaitForAllRequests();
+		lock.lock();
+	}
+	else
+	{
+		// The shared client may only be used under the lock, and the HTTP callbacks (which touch
+		// rc_client) run on whichever thread polls. Poll under the lock, sleep outside of it. If the
+		// emulation thread polls first it runs the callback itself, which is equivalent.
+		while (params.request)
+		{
+			if (s_client != client)
+			{
+				// Shutdown() ran while the lock was released; it already drained the requests.
+				if (!params.request)
+					break;
+				Error::SetString(error, "Achievements client was shut down during login.");
+				return false;
+			}
+			http->PollRequests();
+			if (!params.request)
+				break;
+			lock.unlock();
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			lock.lock();
+		}
+	}
 	pxAssert(!params.request);
 
 	// Success? Assume the callback set the error message.
@@ -2257,7 +2429,7 @@ bool Achievements::Login(const char* username, const char* password, Error* erro
 		return false;
 
 	// If we were't a temporary client, get the game loaded.
-	if (VMManager::HasValidVM() && !is_temporary_client)
+	if (VMManager::HasValidVM() && !is_temporary_client && s_client == client)
 		BeginLoadGame();
 
 	return true;
@@ -2366,7 +2538,12 @@ void Achievements::ShowLoginSuccess(const rc_client_t* client)
 			user->score_softcore, user->num_unread_messages);
 
 #if defined(__ANDROID__)
-		AddAndroidNotification("login", std::move(title), std::move(summary), std::move(badge_path));
+		{
+			const AndroidNotificationV2 v2{8, user->display_name ? user->display_name : "", std::string(), static_cast<int>(user->score),
+				fmt::format("softcore_points={}\nunread={}", user->score_softcore, user->num_unread_messages),
+				SecondsToMs(static_cast<u32>(LOGIN_NOTIFICATION_TIME))};
+			AddAndroidNotification("login", std::move(title), std::move(summary), std::move(badge_path), &v2);
+		}
 #else
 		MTGS::RunOnGSThread([title = std::move(title), summary = std::move(summary), badge_path = std::move(badge_path)]() {
 			if (ImGuiManager::InitializeFullscreenUI())
@@ -2381,6 +2558,9 @@ void Achievements::ShowLoginSuccess(const rc_client_t* client)
 
 const char* Achievements::GetLoggedInUserName()
 {
+	const auto lock = GetLock();
+	if (!s_client) [[unlikely]]
+		return nullptr;
 	const rc_client_user_t* user = rc_client_get_user_info(s_client);
 	if (!user) [[unlikely]]
 		return nullptr;
@@ -2392,6 +2572,10 @@ std::string Achievements::GetLoggedInUserBadgePath()
 {
 	std::string badge_path;
 
+	// DownloadImage() uses the shared HTTP downloader, which is owned by the achievements lock.
+	const auto lock = GetLock();
+	if (!s_client) [[unlikely]]
+		return badge_path;
 	const rc_client_user_t* user = rc_client_get_user_info(s_client);
 	if (!user) [[unlikely]]
 		return badge_path;
@@ -4047,7 +4231,10 @@ void Achievements::LeaderboardFetchNearbyCallback(
 	if (result != RC_OK)
 	{
 #if defined(__ANDROID__)
-		AddAndroidNotification("error", TRANSLATE("Achievements", "Leaderboard Download Failed"), error_message ? error_message : "", s_game_icon);
+		{
+			const AndroidNotificationV2 v2{9, std::string(), error_message ? error_message : "", 0, error_message ? error_message : "", 4000};
+			AddAndroidNotification("error", TRANSLATE("Achievements", "Leaderboard Download Failed"), error_message ? error_message : "", s_game_icon, &v2);
+		}
 #else
 		ImGuiFullscreen::AddNotification("leaderboard_dl_fail", Host::OSD_INFO_DURATION,
 			TRANSLATE("Achievements", "Leaderboard Download Failed"), error_message, s_game_icon);
@@ -4071,7 +4258,10 @@ void Achievements::LeaderboardFetchAllCallback(
 	if (result != RC_OK)
 	{
 #if defined(__ANDROID__)
-		AddAndroidNotification("error", TRANSLATE("Achievements", "Leaderboard Download Failed"), error_message ? error_message : "", s_game_icon);
+		{
+			const AndroidNotificationV2 v2{9, std::string(), error_message ? error_message : "", 0, error_message ? error_message : "", 4000};
+			AddAndroidNotification("error", TRANSLATE("Achievements", "Leaderboard Download Failed"), error_message ? error_message : "", s_game_icon, &v2);
+		}
 #else
 		ImGuiFullscreen::AddNotification("leaderboard_dl_fail", Host::OSD_INFO_DURATION,
 			TRANSLATE("Achievements", "Leaderboard Download Failed"), error_message, s_game_icon);

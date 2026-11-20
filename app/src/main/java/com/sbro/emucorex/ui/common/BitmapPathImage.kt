@@ -6,7 +6,11 @@ import android.graphics.BitmapFactory
 import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import android.net.ConnectivityManager
+import android.net.Network
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,6 +24,9 @@ import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -33,6 +40,28 @@ private val imageCache = object : LruCache<String, Bitmap>(IMAGE_CACHE_MAX_BYTES
     override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
 }
 
+/** Bumps whenever a network becomes available so failed remote images (badges) can retry. */
+private object ImageNetworkRetry {
+    val tick = MutableStateFlow(0)
+    private var registered = false
+
+    @Synchronized
+    fun ensureRegistered(context: Context) {
+        if (registered) return
+        registered = true
+        runCatching {
+            val manager = context.applicationContext.getSystemService(ConnectivityManager::class.java)
+            manager?.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    tick.update { it + 1 }
+                }
+            })
+        }
+    }
+}
+
+private val remoteRetryDelaysMs = longArrayOf(4_000L, 12_000L)
+
 @Composable
 fun BitmapPathImage(
     imagePath: String?,
@@ -42,8 +71,19 @@ fun BitmapPathImage(
     fallback: @Composable (() -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val bitmapState = produceState<Bitmap?>(initialValue = null, key1 = imagePath) {
+    val isRemote = imagePath?.trim()?.let { it.startsWith("http://") || it.startsWith("https://") } == true
+    if (isRemote) ImageNetworkRetry.ensureRegistered(context)
+    val networkTick by ImageNetworkRetry.tick.collectAsState()
+    val bitmapState = produceState<Bitmap?>(initialValue = null, key1 = imagePath, key2 = if (isRemote) networkTick else 0) {
         value = loadBitmapSafely(context, imagePath)
+        if (value == null && isRemote) {
+            // A failed download is retried with a short backoff and again when the network returns.
+            for (wait in remoteRetryDelaysMs) {
+                delay(wait)
+                value = loadBitmapSafely(context, imagePath)
+                if (value != null) break
+            }
+        }
     }
 
     val bitmap = bitmapState.value

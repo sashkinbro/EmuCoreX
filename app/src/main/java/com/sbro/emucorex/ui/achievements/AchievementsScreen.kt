@@ -100,6 +100,7 @@ import com.sbro.emucorex.R
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.utils.RetroAchievementsBridge
 import com.sbro.emucorex.core.utils.RetroAchievementsLoginRequestReason
+import com.sbro.emucorex.core.utils.RetroAchievementsSessionStatus
 import com.sbro.emucorex.core.utils.RetroAchievementsStateManager
 import com.sbro.emucorex.core.utils.RetroAchievementsUiState
 import com.sbro.emucorex.data.AppPreferences
@@ -1136,7 +1137,8 @@ private fun AchievementAccountCard(
                 Text(
                     text = androidx.compose.ui.res.stringResource(R.string.settings_ra_profile),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp)
                 )
                 if (retroState.user != null) {
                     Surface(
@@ -1160,6 +1162,16 @@ private fun AchievementAccountCard(
                 )
             }
             retroState.errorMessage?.let { NoticeCard(text = it, isError = true) }
+            if (retroState.user != null && retroState.sessionStatus != RetroAchievementsSessionStatus.ONLINE && retroState.errorMessage == null) {
+                // A cached profile is not a live login until the native client confirms it.
+                NoticeCard(
+                    text = androidx.compose.ui.res.stringResource(
+                        if (retroState.sessionStatus == RetroAchievementsSessionStatus.CONNECTING) R.string.ra_status_connecting_desc
+                        else R.string.ra_status_offline_desc
+                    ),
+                    isError = false
+                )
+            }
             if (retroState.user != null && hardcorePending) {
                 NoticeCard(
                     text = androidx.compose.ui.res.stringResource(R.string.settings_ra_hardcore_pending_desc),
@@ -1422,7 +1434,8 @@ private fun AccountStatCard(
                     text = label,
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     overflow = TextOverflow.Ellipsis
                 )
             }

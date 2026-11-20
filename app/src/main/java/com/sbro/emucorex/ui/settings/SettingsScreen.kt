@@ -57,6 +57,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Bolt
@@ -5067,7 +5068,7 @@ private fun gameMenuTabIcon(tab: GameMenuTabId): ImageVector = when (tab) {
     GameMenuTabId.DRIVERS -> Icons.Rounded.Memory
     GameMenuTabId.GRAPHICS -> Icons.Rounded.Wallpaper
     GameMenuTabId.FIXES -> Icons.Rounded.Star
-    GameMenuTabId.ACHIEVEMENTS -> Icons.Rounded.Lock
+    GameMenuTabId.ACHIEVEMENTS -> Icons.Rounded.EmojiEvents
 }
 
 @Composable

@@ -531,6 +531,117 @@ void DispatchRetroAchievementsNotification(const char* kind, const char* title, 
 		java_vm->DetachCurrentThread();
 }
 
+bool DispatchRetroAchievementsNotificationV2(int kind, const char* title, const char* description, int points,
+	const char* extra, const char* image_path, int duration_ms)
+{
+	JavaVM* java_vm = nullptr;
+	jclass native_app_class = nullptr;
+	{
+		std::lock_guard lock(s_callback_mutex);
+		java_vm = s_java_vm;
+		native_app_class = s_native_app_class;
+	}
+
+	if (!java_vm || !native_app_class)
+		return false;
+
+	JNIEnv* env = nullptr;
+	bool did_attach = false;
+	if (java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK)
+	{
+		if (java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK || !env)
+			return false;
+		did_attach = true;
+	}
+
+	bool delivered = false;
+	// A missing Kotlin implementation yields NoSuchMethodError here: clear it and let the caller fall back
+	// to the legacy pre-formatted callback.
+	jmethodID method = env->GetStaticMethodID(native_app_class, "onRetroAchievementsNotificationV2",
+		"(ILjava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;I)V");
+	if (!method && env->ExceptionCheck())
+		env->ExceptionClear();
+	if (method)
+	{
+		jstring j_title = env->NewStringUTF(title ? title : "");
+		jstring j_description = env->NewStringUTF(description ? description : "");
+		jstring j_extra = env->NewStringUTF(extra ? extra : "");
+		jstring j_image_path = env->NewStringUTF(image_path ? image_path : "");
+		if (j_title && j_description && j_extra && j_image_path)
+		{
+			env->CallStaticVoidMethod(native_app_class, method, static_cast<jint>(kind), j_title, j_description,
+				static_cast<jint>(points), j_extra, j_image_path, static_cast<jint>(duration_ms));
+			delivered = !env->ExceptionCheck();
+		}
+
+		if (j_title)
+			env->DeleteLocalRef(j_title);
+		if (j_description)
+			env->DeleteLocalRef(j_description);
+		if (j_extra)
+			env->DeleteLocalRef(j_extra);
+		if (j_image_path)
+			env->DeleteLocalRef(j_image_path);
+	}
+
+	if (env->ExceptionCheck())
+		env->ExceptionClear();
+
+	if (did_attach)
+		java_vm->DetachCurrentThread();
+	return delivered;
+}
+
+void DispatchRetroAchievementsIndicator(int kind, int id, bool active, const char* title, const char* text, const char* badge_path)
+{
+	JavaVM* java_vm = nullptr;
+	jclass native_app_class = nullptr;
+	{
+		std::lock_guard lock(s_callback_mutex);
+		java_vm = s_java_vm;
+		native_app_class = s_native_app_class;
+	}
+
+	if (!java_vm || !native_app_class)
+		return;
+
+	JNIEnv* env = nullptr;
+	bool did_attach = false;
+	if (java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK)
+	{
+		if (java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK || !env)
+			return;
+		did_attach = true;
+	}
+
+	jmethodID method = env->GetStaticMethodID(native_app_class, "onRetroAchievementsIndicator",
+		"(IIZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
+	if (!method && env->ExceptionCheck())
+		env->ExceptionClear();
+	if (method)
+	{
+		jstring j_title = env->NewStringUTF(title ? title : "");
+		jstring j_text = env->NewStringUTF(text ? text : "");
+		jstring j_badge_path = env->NewStringUTF(badge_path ? badge_path : "");
+		if (j_title && j_text && j_badge_path)
+			env->CallStaticVoidMethod(native_app_class, method, static_cast<jint>(kind), static_cast<jint>(id),
+				static_cast<jboolean>(active ? JNI_TRUE : JNI_FALSE), j_title, j_text, j_badge_path);
+
+		if (j_title)
+			env->DeleteLocalRef(j_title);
+		if (j_text)
+			env->DeleteLocalRef(j_text);
+		if (j_badge_path)
+			env->DeleteLocalRef(j_badge_path);
+	}
+
+	if (env->ExceptionCheck())
+		env->ExceptionClear();
+
+	if (did_attach)
+		java_vm->DetachCurrentThread();
+}
+
 bool DispatchRetroAchievementsSound(const char* path)
 {
 	JavaVM* java_vm = nullptr;

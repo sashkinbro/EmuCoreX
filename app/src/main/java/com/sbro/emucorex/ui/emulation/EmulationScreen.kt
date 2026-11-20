@@ -88,7 +88,10 @@ import androidx.compose.material.icons.rounded.Gradient
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Mouse
+import androidx.compose.material.icons.rounded.EmojiEvents
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -101,6 +104,7 @@ import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -165,6 +169,8 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import com.sbro.emucorex.core.utils.RetroAchievementsStateManager
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -200,6 +206,10 @@ import com.sbro.emucorex.core.buildUpscaleOptions
 import com.sbro.emucorex.core.upscaleKeyToMultiplier
 import com.sbro.emucorex.core.upscaleMultiplierValue
 import com.sbro.emucorex.core.utils.RetroAchievementsLiveStateManager
+import com.sbro.emucorex.core.utils.RetroAchievementsIndicator
+import com.sbro.emucorex.core.utils.RetroAchievementsIndicatorKind
+import com.sbro.emucorex.core.utils.RetroAchievementsLoginRequestReason
+import com.sbro.emucorex.core.utils.RetroAchievementsSessionStatus
 import com.sbro.emucorex.data.ActivePatchNotice
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
@@ -743,6 +753,8 @@ fun EmulationScreen(
     val activePatchNotice by viewModel.activePatchNotice.collectAsState()
     val retroAchievementsState by RetroAchievementsLiveStateManager.state.collectAsState()
     val retroAchievementsNotification = retroAchievementsState.notification
+    val retroAchievementsSettings by RetroAchievementsStateManager.state.collectAsState()
+    val retroAchievementsIndicators by RetroAchievementsLiveStateManager.indicators.collectAsState()
     val context = LocalContext.current
     val activity = context as? android.app.Activity
     val originalRequestedOrientation = remember(activity) {
@@ -1327,7 +1339,13 @@ fun EmulationScreen(
 
     LaunchedEffect(retroAchievementsNotification?.id) {
         val notification = retroAchievementsNotification ?: return@LaunchedEffect
-        delay((if (notification.kind == "mastery") 6500 else 4300).milliseconds)
+        // One notification at a time: dismissing advances the FIFO queue to the next one.
+        val durationMs = when {
+            notification.durationMs > 0L -> notification.durationMs
+            notification.kind == "mastery" -> 6500L
+            else -> 4300L
+        }
+        delay(durationMs.milliseconds)
         RetroAchievementsLiveStateManager.dismissNotification(notification.id)
     }
 
@@ -1790,6 +1808,35 @@ fun EmulationScreen(
                     onDismiss = { RetroAchievementsLiveStateManager.dismissNotification(notification.id) }
                 )
             }
+        }
+
+        val showRaIndicators = retroAchievementsState.enabled &&
+            !uiState.showMenu && !showControlsEditor &&
+            retroAchievementsIndicators.any {
+                when (it.kind) {
+                    RetroAchievementsIndicatorKind.LEADERBOARD_TRACKER -> retroAchievementsSettings.leaderboardTrackers
+                    else -> retroAchievementsSettings.achievementIndicators
+                }
+            }
+        if (showRaIndicators) {
+            // Bottom-right like upstream; step aside when the performance OSD sits there.
+            val osdBottomRight = uiState.showFps &&
+                uiState.fpsOverlayCorner == AppPreferences.FPS_OVERLAY_CORNER_BOTTOM_RIGHT
+            RetroAchievementsIndicatorsOverlay(
+                indicators = retroAchievementsIndicators,
+                showChallenge = retroAchievementsSettings.achievementIndicators,
+                showProgress = retroAchievementsSettings.achievementIndicators,
+                showTrackers = retroAchievementsSettings.leaderboardTrackers,
+                isRight = !osdBottomRight,
+                modifier = Modifier
+                    .align(if (osdBottomRight) Alignment.BottomStart else Alignment.BottomEnd)
+                    .padding(
+                        start = if (osdBottomRight) overlayHorizontalSafeInset + 12.dp else 0.dp,
+                        end = if (osdBottomRight) 0.dp else overlayHorizontalSafeInset + 12.dp,
+                        bottom = overlayBottomSafeInset + 12.dp
+                    )
+                    .zIndex(34f)
+            )
         }
 
         // Full screen loading overlay specifically for loading save state
@@ -3305,7 +3352,7 @@ private fun RetroAchievementsNotificationToast(
     onDismiss: () -> Unit
 ) {
     val accent = when (notification.kind) {
-        "unlock", "mastery" -> Color(0xFFFFD35A)
+        "unlock", "achievement", "mastery", "summary" -> Color(0xFFFFD35A)
         "leaderboard" -> Color(0xFF86D7FF)
         "hardcore" -> Color(0xFFFF7A7A)
         "error" -> Color(0xFFFF6B83)
@@ -3361,10 +3408,106 @@ private fun RetroAchievementsNotificationToast(
                     Text(
                         text = notification.message,
                         color = Color.White.copy(alpha = 0.78f),
-                        maxLines = 2,
+                        maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = if (isRightAligned) TextAlign.End else TextAlign.Start,
                         style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RetroAchievementsIndicatorsOverlay(
+    indicators: List<RetroAchievementsIndicator>,
+    showChallenge: Boolean,
+    showProgress: Boolean,
+    showTrackers: Boolean,
+    isRight: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val configuration = LocalConfiguration.current
+    val minDp = minOf(configuration.screenWidthDp, configuration.screenHeightDp)
+    // Scales with the screen but stays large enough to read and small enough to not cover the game.
+    val badgeSize = (minDp * 0.085f).dp.coerceIn(30.dp, 48.dp)
+    val accent = Color(0xFFFFD35A)
+    val pillColor = Color(0xD914151A)
+    val horizontal = if (isRight) Alignment.End else Alignment.Start
+    val trackers = if (showTrackers) indicators.filter { it.kind == RetroAchievementsIndicatorKind.LEADERBOARD_TRACKER } else emptyList()
+    val progress = if (showProgress) indicators.firstOrNull { it.kind == RetroAchievementsIndicatorKind.PROGRESS } else null
+    val challenges = if (showChallenge) indicators.filter { it.kind == RetroAchievementsIndicatorKind.CHALLENGE } else emptyList()
+    if (trackers.isEmpty() && progress == null && challenges.isEmpty()) return
+
+    Column(
+        modifier = modifier.widthIn(max = (configuration.screenWidthDp * 0.5f).dp),
+        horizontalAlignment = horizontal,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        trackers.forEach { tracker ->
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = pillColor,
+                border = BorderStroke(1.dp, Color(0xFF86D7FF).copy(alpha = 0.5f))
+            ) {
+                Text(
+                    text = tracker.text.ifBlank { tracker.title },
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
+        }
+        progress?.let { item ->
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = pillColor,
+                border = BorderStroke(1.dp, accent.copy(alpha = 0.5f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 4.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    BitmapPathImage(
+                        imagePath = item.badgePath,
+                        contentDescription = item.title,
+                        modifier = Modifier.size(badgeSize * 0.8f).clip(RoundedCornerShape(50)),
+                        fallback = {
+                            Icon(Icons.Rounded.Star, contentDescription = null, tint = accent, modifier = Modifier.size(18.dp))
+                        }
+                    )
+                    Text(
+                        text = item.text.ifBlank { item.title },
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
+            }
+        }
+        if (challenges.isNotEmpty()) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp, if (isRight) Alignment.End else Alignment.Start),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                challenges.forEach { item ->
+                    BitmapPathImage(
+                        imagePath = item.badgePath,
+                        contentDescription = item.title,
+                        modifier = Modifier
+                            .size(badgeSize)
+                            .clip(neonShape(10.dp))
+                            .background(pillColor)
+                            .border(1.dp, accent.copy(alpha = 0.6f), neonShape(10.dp)),
+                        fallback = {
+                            Icon(Icons.Rounded.Star, contentDescription = null, tint = accent, modifier = Modifier.size(badgeSize * 0.55f))
+                        }
                     )
                 }
             }
@@ -5863,25 +6006,9 @@ private fun EmulationSidebarMenu(
                                                 text = stringResource(R.string.emulation_screen_tab).uppercase(),
                                                 color = sectionTitleColor,
                                                 topPadding = sectionLabelTopPadding,
-                                                horizontalInset = sectionLabelInset
+                                                horizontalInset = sectionLabelInset,
+                                                helpText = stringResource(R.string.screen_settings_menu_desc)
                                             )
-                                        }
-
-                                        row("screen_settings_menu_desc", "Surface") {
-                                            Surface(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                shape = neonShape(18.dp),
-                                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
-                                            ) {
-                                                Text(
-                                                    text = stringResource(R.string.screen_settings_menu_desc),
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
                                         }
 
                                         row("settings_shadeboost_brightness", "LiveSliderRow") {
@@ -6898,7 +7025,7 @@ private fun gameMenuTabIcon(tab: EmulationMenuTab): ImageVector = when (tab) {
     EmulationMenuTab.Drivers -> Icons.Rounded.Memory
     EmulationMenuTab.Graphics -> Icons.Rounded.Fullscreen
     EmulationMenuTab.Fixes -> Icons.Rounded.Star
-    EmulationMenuTab.Achievements -> Icons.Rounded.LockOpen
+    EmulationMenuTab.Achievements -> Icons.Rounded.EmojiEvents
 }
 
 @Composable
@@ -6922,6 +7049,7 @@ private fun OverlayAchievementsPane(
 ) {
     val context = LocalContext.current
     val repository = remember(context) { RetroAchievementsRepository(context) }
+    val raManager by RetroAchievementsStateManager.state.collectAsState()
     val cachedActiveGameData = remember(
         gamePath,
         currentGameTitle,
@@ -6944,7 +7072,10 @@ private fun OverlayAchievementsPane(
         currentGameTitle,
         retroState.enabled,
         retroState.user?.username,
-        retroState.game?.gameId
+        retroState.game?.gameId,
+        // Reload when an achievement is unlocked while the menu is open.
+        retroState.game?.earnedAchievements,
+        retroState.game?.earnedPoints
     ) {
         if (gamePath.isNullOrBlank() || !retroState.enabled || retroState.user == null) {
             value = OverlayAchievementsContentState(isLoading = false, gameData = null)
@@ -6980,6 +7111,17 @@ private fun OverlayAchievementsPane(
         }
     }
 
+    var showLoginDialog by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(retroState.user?.username) {
+        if (retroState.user != null) {
+            showLoginDialog = false
+            RetroAchievementsLiveStateManager.refreshFromNative()
+        }
+    }
+    if (showLoginDialog && retroState.user == null) {
+        OverlayAchievementsLoginDialog(onDismiss = { showLoginDialog = false })
+    }
+
     SidebarSectionTitle(
         text = stringResource(R.string.emulation_achievements_tab).uppercase(),
         color = MaterialTheme.colorScheme.primary,
@@ -6997,11 +7139,52 @@ private fun OverlayAchievementsPane(
         }
 
         !retroState.enabled -> {
-            OverlayAchievementsNotice(stringResource(R.string.settings_ra_empty_disabled))
+            OverlayAchievementsEmptyState(
+                icon = Icons.Rounded.EmojiEvents,
+                title = stringResource(R.string.achievements_empty_disabled_title),
+                description = stringResource(R.string.settings_ra_empty_disabled),
+                buttonText = stringResource(R.string.achievements_empty_disabled_button),
+                onButtonClick = { RetroAchievementsStateManager.setEnabled(true) }
+            )
+        }
+
+        retroState.user == null &&
+            raManager.loginRequestReason == RetroAchievementsLoginRequestReason.TOKEN_INVALID -> {
+            OverlayAchievementsEmptyState(
+                icon = Icons.Rounded.Lock,
+                title = stringResource(R.string.ra_session_expired_title),
+                description = stringResource(R.string.ra_err_token_expired),
+                buttonText = stringResource(R.string.achievements_empty_login_button),
+                onButtonClick = { showLoginDialog = true }
+            )
+        }
+
+        retroState.user == null && raManager.user != null &&
+            raManager.sessionStatus != RetroAchievementsSessionStatus.ONLINE -> {
+            // A cached profile is not a live login: show connecting/offline until native confirms.
+            val connecting = raManager.sessionStatus == RetroAchievementsSessionStatus.CONNECTING
+            OverlayAchievementsEmptyState(
+                icon = Icons.Rounded.EmojiEvents,
+                title = stringResource(
+                    if (connecting) R.string.ra_status_connecting_title else R.string.ra_status_offline_title
+                ),
+                description = raManager.errorMessage?.takeIf { !connecting }
+                    ?: stringResource(
+                        if (connecting) R.string.ra_status_connecting_desc else R.string.ra_status_offline_desc
+                    ),
+                buttonText = if (connecting) null else stringResource(R.string.ra_status_retry),
+                onButtonClick = { RetroAchievementsStateManager.refreshState(invalidateCaches = false) }
+            )
         }
 
         retroState.user == null -> {
-            OverlayAchievementsNotice(stringResource(R.string.achievements_login_to_sync))
+            OverlayAchievementsEmptyState(
+                icon = Icons.Rounded.Lock,
+                title = stringResource(R.string.achievements_empty_login_title),
+                description = stringResource(R.string.achievements_empty_login_desc),
+                buttonText = stringResource(R.string.achievements_empty_login_button),
+                onButtonClick = { showLoginDialog = true }
+            )
         }
 
         contentState.isLoading -> {
@@ -7009,7 +7192,11 @@ private fun OverlayAchievementsPane(
         }
 
         contentState.gameData == null && retroState.game == null -> {
-            OverlayAchievementsNotice(stringResource(R.string.emulation_achievements_unavailable))
+            OverlayAchievementsEmptyState(
+                icon = Icons.Rounded.EmojiEvents,
+                title = stringResource(R.string.achievements_empty_none_title),
+                description = stringResource(R.string.emulation_achievements_unavailable)
+            )
         }
 
         else -> {
@@ -7181,6 +7368,167 @@ private fun OverlayAchievementsMetricCard(
 }
 
 @Composable
+private fun OverlayAchievementsEmptyState(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    description: String,
+    buttonText: String? = null,
+    onButtonClick: (() -> Unit)? = null
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = neonShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Surface(
+                    shape = neonShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.padding(8.dp).size(19.dp)
+                    )
+                }
+                Text(
+                    text = title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (buttonText != null && onButtonClick != null) {
+                Button(
+                    onClick = onButtonClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = neonShape(16.dp)
+                ) {
+                    Text(text = buttonText, textAlign = TextAlign.Center)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OverlayAchievementsLoginDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val raState by RetroAchievementsStateManager.state.collectAsState()
+    val preferences = remember(context) { AppPreferences(context) }
+    val initialRememberPassword = remember(preferences) { preferences.getAchievementsRememberPasswordSync() }
+    var username by rememberSaveable {
+        mutableStateOf(raState.storedUsername ?: preferences.getAchievementsUsernameSync().orEmpty())
+    }
+    // The password must never be saved into the instance-state bundle: plain remember only.
+    var password by remember {
+        mutableStateOf(if (initialRememberPassword) preferences.getAchievementsPasswordSync().orEmpty() else "")
+    }
+    var rememberPassword by rememberSaveable { mutableStateOf(initialRememberPassword) }
+    val canSubmit = username.isNotBlank() && password.isNotBlank() && !raState.isAuthenticating
+
+    DisposableEffect(Unit) {
+        onDispose { RetroAchievementsStateManager.clearTransientState() }
+    }
+
+    SettingsStyledDialog(
+        title = stringResource(R.string.settings_ra_login),
+        eyebrow = stringResource(R.string.achievements_empty_login_title),
+        icon = Icons.Rounded.Lock,
+        onDismissRequest = onDismiss
+    ) {
+        Text(
+            text = stringResource(
+                if (raState.loginRequestReason == RetroAchievementsLoginRequestReason.TOKEN_INVALID) R.string.ra_err_token_expired
+                else R.string.achievements_empty_login_desc
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        OutlinedTextField(
+            value = username,
+            onValueChange = {
+                username = it
+                if (raState.errorMessage != null) RetroAchievementsStateManager.clearTransientState()
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape = neonShape(16.dp),
+            singleLine = true,
+            leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            label = { Text(stringResource(R.string.settings_ra_username)) }
+        )
+        OutlinedTextField(
+            value = password,
+            onValueChange = {
+                password = it
+                if (raState.errorMessage != null) RetroAchievementsStateManager.clearTransientState()
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape = neonShape(16.dp),
+            singleLine = true,
+            leadingIcon = { Icon(Icons.Rounded.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            label = { Text(stringResource(R.string.settings_ra_password)) },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.settings_ra_remember_password),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Switch(checked = rememberPassword, onCheckedChange = { rememberPassword = it })
+        }
+        raState.errorMessage?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+        Button(
+            onClick = {
+                RetroAchievementsStateManager.login(username, password, rememberPassword)
+                if (!rememberPassword) password = ""
+            },
+            enabled = canSubmit,
+            modifier = Modifier.fillMaxWidth(),
+            shape = neonShape(16.dp)
+        ) {
+            if (raState.isAuthenticating) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            } else {
+                Text(text = stringResource(R.string.settings_ra_login), textAlign = TextAlign.Center)
+            }
+        }
+        TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+            Text(text = stringResource(R.string.cancel))
+        }
+    }
+}
+
+@Composable
 private fun OverlayAchievementsNotice(text: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -7235,16 +7583,12 @@ private fun OverlayAchievementRow(achievement: RetroAchievementEntry) {
                 Text(
                     text = achievement.title,
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = achievement.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (achievement.hasMeasuredProgress) {
                     Text(
@@ -7532,17 +7876,32 @@ private fun SidebarSectionTitle(
     text: String,
     color: Color,
     topPadding: Dp,
-    horizontalInset: Dp
+    horizontalInset: Dp,
+    helpText: String? = null
 ) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelSmall.copy(
-            fontWeight = FontWeight.ExtraBold,
-            letterSpacing = 1.sp
-        ),
-        color = color,
-        modifier = Modifier.padding(top = topPadding, start = horizontalInset, end = horizontalInset)
-    )
+    val titleText: @Composable (Modifier) -> Unit = { modifier ->
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 1.sp
+            ),
+            color = color,
+            modifier = modifier
+        )
+    }
+    if (helpText == null) {
+        titleText(Modifier.padding(top = topPadding, start = horizontalInset, end = horizontalInset))
+    } else {
+        Row(
+            modifier = Modifier.padding(top = topPadding, start = horizontalInset, end = horizontalInset),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            titleText(Modifier.weight(1f, fill = false))
+            SettingHelpButton(title = text, description = helpText)
+        }
+    }
 }
 
 @Composable
