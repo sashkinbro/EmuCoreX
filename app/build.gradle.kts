@@ -59,15 +59,19 @@ val releaseSigningConfigured = listOf(
 
 android {
     namespace = "com.sbro.emucorex"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 2
+        }
+    }
     ndkVersion = emucorexNdkVersion
 
     defaultConfig {
         applicationId = "com.sbro.emucorex"
         minSdk = 29
         targetSdk = 37
-        versionCode = 249
-        versionName = "0.6.0"
+        versionCode = 254
+        versionName = "0.6.1"
 
         buildConfigField("String", "FEEDBACK_ENDPOINT", buildConfigString(feedbackEndpoint))
         buildConfigField("String", "FEEDBACK_API_KEY", buildConfigString(feedbackApiKey))
