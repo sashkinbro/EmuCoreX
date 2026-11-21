@@ -3979,10 +3979,18 @@ bool GSDeviceVK::CheckFeatures()
 	m_features.alpha_bit_logic_op = GSAlphaBitLogicOp::DeviceQualifies(m_device_features.logicOp != 0,
 		m_features.ordered_read_costs_per_draw, m_broken_colormask_with_depth);
 	m_features.feedback_carry = road.carry;
+	// A device with neither an in-tile read nor a texture barrier reads the destination of a software
+	// blend from a snapshot copy. Over-one blends on overlapping primitives then run one drawlist group
+	// at a time (RenderHW, config.group_copy_blend). The condition is the capability, so a device that
+	// has either read keeps the decisions it took before.
+	m_features.overlap_blend_copy = !framebuffer_fetch && !texture_barrier;
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
 	// Debug experiment knob: 0 None, 1 NonReaders, 2 All.
 	if (const char* carry = std::getenv("EMUCOREX_GS_FEEDBACK_CARRY"); carry && carry[0] >= '0' && carry[0] <= '2')
 		m_features.feedback_carry = static_cast<GSFeedbackCarry>(carry[0] - '0');
+	// Debug A/B knob: leave the per-group snapshot road off to measure what it costs.
+	if (std::getenv("EMUCOREX_GS_NO_OVERLAP_BLEND_COPY"))
+		m_features.overlap_blend_copy = false;
 #endif
 	// In-tile reads cannot serve a sampler read of another pixel.
 	m_features.texture_feedback_requires_copy = !texture_barrier ||
@@ -11418,51 +11426,56 @@ void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 
 	PSSetROVs(draw_rt_rov, draw_ds_rov, config.ps.HasColorOutput(), config.ps.HasDepthROVWrite());
 
-	OMSetRenderTargets(draw_rt, draw_ds, to_draw_size(config.scissor),
-		static_cast<FeedbackLoopFlag>(pipe.feedback_loop_flags), draw_size);
+	// Binds the targets and opens the draw's pass when none is open. The per-group snapshot road
+	// below runs it again after each snapshot, which has to end the pass.
+	const auto begin_hw_pass = [&]() {
+		OMSetRenderTargets(draw_rt, draw_ds, to_draw_size(config.scissor),
+			static_cast<FeedbackLoopFlag>(pipe.feedback_loop_flags), draw_size);
 
-	// Begin render pass if new target or out of the area.
-	if (!InRenderPass())
-	{
-		const VkAttachmentLoadOp rt_op = GetLoadOpForTexture(draw_rt);
-		const VkAttachmentLoadOp ds_op = GetLoadOpForTexture(draw_ds);
-		const VkRenderPass rp = GetTFXRenderPass(pipe.rt, pipe.ds, pipe.ps.colclip_hw,
-			config.destination_alpha == GSHWDrawConfig::DestinationAlphaMode::Stencil, pipe.IsRTFeedbackLoop(),
-			pipe.IsTestingAndSamplingDepth(), rt_op, ds_op);
-		const bool is_clearing_rt = (rt_op == VK_ATTACHMENT_LOAD_OP_CLEAR || ds_op == VK_ATTACHMENT_LOAD_OP_CLEAR);
-
-		// Only draw to the active area of the colclip hw target. Except when depth is cleared, we need to use the full
-		// buffer size, otherwise it'll only clear the draw part of the depth buffer.
-		const GSVector4i render_area = (pipe.ps.colclip_hw && (config.colclip_mode == GSHWDrawConfig::ColClipMode::ConvertAndResolve) && ds_op != VK_ATTACHMENT_LOAD_OP_CLEAR)
-		                             ? to_draw_size(config.drawarea)
-		                             : GSVector4i::loadh(draw_size);
-
-		EMUCOREX_PASS_REASON(is_clearing_rt ? PassReason::MainClear : PassReason::MainDraw);
-		if (is_clearing_rt)
+		// Begin render pass if new target or out of the area.
+		if (!InRenderPass())
 		{
-			// when we're clearing, we set the draw area to the whole fb, otherwise part of it will be undefined
-			alignas(16) VkClearValue cvs[2];
-			u32 cv_count = 0;
-			if (draw_rt)
+			const VkAttachmentLoadOp rt_op = GetLoadOpForTexture(draw_rt);
+			const VkAttachmentLoadOp ds_op = GetLoadOpForTexture(draw_ds);
+			const VkRenderPass rp = GetTFXRenderPass(pipe.rt, pipe.ds, pipe.ps.colclip_hw,
+				config.destination_alpha == GSHWDrawConfig::DestinationAlphaMode::Stencil, pipe.IsRTFeedbackLoop(),
+				pipe.IsTestingAndSamplingDepth(), rt_op, ds_op);
+			const bool is_clearing_rt = (rt_op == VK_ATTACHMENT_LOAD_OP_CLEAR || ds_op == VK_ATTACHMENT_LOAD_OP_CLEAR);
+
+			// Only draw to the active area of the colclip hw target. Except when depth is cleared, we need to use the full
+			// buffer size, otherwise it'll only clear the draw part of the depth buffer.
+			const GSVector4i render_area = (pipe.ps.colclip_hw && (config.colclip_mode == GSHWDrawConfig::ColClipMode::ConvertAndResolve) && ds_op != VK_ATTACHMENT_LOAD_OP_CLEAR)
+			                             ? to_draw_size(config.drawarea)
+			                             : GSVector4i::loadh(draw_size);
+
+			EMUCOREX_PASS_REASON(is_clearing_rt ? PassReason::MainClear : PassReason::MainDraw);
+			if (is_clearing_rt)
 			{
-				GSVector4 clear_color = draw_rt->GetClearForFormat();
-				if (pipe.ps.colclip_hw)
+				// when we're clearing, we set the draw area to the whole fb, otherwise part of it will be undefined
+				alignas(16) VkClearValue cvs[2];
+				u32 cv_count = 0;
+				if (draw_rt)
 				{
-					// Denormalize clear color for hw colclip.
-					clear_color *= GSVector4::cxpr(255.0f / 65535.0f, 255.0f / 65535.0f, 255.0f / 65535.0f, 1.0f);
+					GSVector4 clear_color = draw_rt->GetClearForFormat();
+					if (pipe.ps.colclip_hw)
+					{
+						// Denormalize clear color for hw colclip.
+						clear_color *= GSVector4::cxpr(255.0f / 65535.0f, 255.0f / 65535.0f, 255.0f / 65535.0f, 1.0f);
+					}
+					GSVector4::store<true>(&cvs[cv_count++].color, clear_color);
 				}
-				GSVector4::store<true>(&cvs[cv_count++].color, clear_color);
-			}
-			if (draw_ds)
-				cvs[cv_count++].depthStencil = {draw_ds->GetClearDepth(), 0};
+				if (draw_ds)
+					cvs[cv_count++].depthStencil = {draw_ds->GetClearDepth(), 0};
 
-			BeginClearRenderPass(rp, render_area, cvs, cv_count);
+				BeginClearRenderPass(rp, render_area, cvs, cv_count);
+			}
+			else
+			{
+				BeginRenderPass(rp, render_area);
+			}
 		}
-		else
-		{
-			BeginRenderPass(rp, render_area);
-		}
-	}
+	};
+	begin_hw_pass();
 
 	if ((config.date_copy != GSAlphaBitLogicOp::NoDateCopy || tracks_date_one) &&
 		config.destination_alpha == GSHWDrawConfig::DestinationAlphaMode::Stencil)
@@ -11523,6 +11536,34 @@ void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 				Draw(config, split, m_index.count - split);
 			}
 		}
+	}
+	else if (config.group_copy_blend && draw_rt && draw_rt_clone && !m_features.texture_barrier && config.drawlist &&
+			 config.drawlist_bbox && config.drawlist->size() > 1 && config.drawlist_bbox->size() == config.drawlist->size() &&
+			 !config.blend_multi_pass.enable && !config.alpha_second_pass.enable && !colclip_rt)
+	{
+		// An over-one software blend on overlapping primitives (GSRendererHW::EmulateBlending): the
+		// pre-draw snapshot above serves the first group; every later group needs the target as the
+		// groups before it left it, so end the pass, copy that group's area again and reopen the pass.
+		// The primitives inside a group do not touch, so one snapshot is exact for all of them.
+		const u32 indices_per_prim = config.indices_per_prim;
+		const u32 group_count = static_cast<u32>(config.drawlist->size());
+		GL_PUSH("VK: Split the draw into %u snapshot groups", group_count);
+		for (u32 n = 0, p = 0; n < group_count; n++)
+		{
+			const u32 count = (*config.drawlist)[n] * indices_per_prim;
+			if (n > 0)
+			{
+				const GSVector4i bbox = (*config.drawlist_bbox)[n].rintersect(config.drawarea);
+				EndRenderPass();
+				CopyRect(draw_rt, draw_rt_clone, bbox, bbox.left, bbox.top);
+				PSSetShaderResource(2, draw_rt_clone, true);
+				begin_hw_pass();
+			}
+			if (BindDrawPipeline(pipe))
+				Draw(config, p, count);
+			p += count;
+		}
+		GL_POP();
 	}
 	else if (BindDrawPipeline(pipe))
 	{

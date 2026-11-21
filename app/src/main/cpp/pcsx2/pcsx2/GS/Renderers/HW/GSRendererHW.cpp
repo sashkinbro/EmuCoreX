@@ -52,9 +52,13 @@ __ri static constexpr bool GSNeedsOrderedZbOnlyFeedback(const GSDevice::FeatureS
 		overlap != GSRendererHW::PRIM_OVERLAP_NO && GSHasBarrierFeedbackSupport(features);
 }
 
+// Most drawlist groups a draw may be split into when each group costs a render target snapshot and
+// a render pass restart (GSDevice::FeatureSupport::overlap_blend_copy).
+static constexpr std::size_t GSMaxGroupCopySplits = 64;
+
 __ri static constexpr bool GSNeedsBBoxForMultidrawHazardTracking(const GSDevice::FeatureSupport& features)
 {
-	return !features.texture_barrier && features.multidraw_fb_copy;
+	return (!features.texture_barrier && features.multidraw_fb_copy) || features.overlap_blend_copy;
 }
 
 __ri static constexpr bool GSCanUseTexIsFBWithCurrentOverlap(const GSDevice::FeatureSupport& features,
@@ -7762,9 +7766,36 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, DATEOptio
 		(bmix1_multi_pass1 || bmix1_multi_pass2 || bmix3_multi_pass || (blend_flag & (BLEND_HW3 | BLEND_HW4 | BLEND_HW5 | BLEND_HW6 | BLEND_HW7 | BLEND_HW8 | BLEND_HW9)));
 
 	const bool barriers_supported = features.feedback_loops();
-	const bool blend_requires_barrier =
+
+	// An over-one blend (Cs and Cd combined by a factor above 1.0, which no fixed-function equation
+	// expresses) on primitives that overlap, on a device with neither a texture barrier nor an
+	// in-tile read. A software blend needs the destination as it stands when each primitive runs, and
+	// one snapshot per draw is wrong once primitives overlap (the exclusion in the promotion below),
+	// so the hardware approximation was all that was left, and it clamps the factor to 1.0. The
+	// backend can instead run the draw per drawlist group - primitives that do not touch each other -
+	// with a fresh snapshot for each group. Only the draws that would otherwise be wrong pay for it,
+	// the shapes that are exact today are left alone, and a draw with many groups keeps the
+	// approximation rather than paying a snapshot and a pass restart for each.
+	//
+	// The guards are the ones the two-pass road above uses for its shader and pass side effects: a
+	// draw with a second pass, a destination-alpha test or its own target hazard needs more than a
+	// snapshot per group.
+	const bool group_copy_blend = features.overlap_blend_copy && m_prim_overlap == PRIM_OVERLAP_YES &&
+		is_basic_blend && COLCLAMP.CLAMP && !blend_ad_alpha_masked && !free_blend && !prefer_sw_blend &&
+		!GSConfig.UseDebugBlend &&
+		((blend_flag & BLEND_A_MAX) ||
+			(!(blend_flag & BLEND_HW2) && !blend_multipass_group && (alpha_c2_high_one || alpha_c0_high_max_one)) ||
+			// Ad is 0.5 where the register holds 128, which no fixed-function factor gives.
+			(blend_ad && !blend_multipass_group && !new_rt_alpha_scale)) &&
+		!m_conf.ps.shuffle && !m_channel_shuffle &&
+		(m_conf.alpha_test == GSHWDrawConfig::AlphaTestMode::NONE || m_conf.alpha_test == GSHWDrawConfig::AlphaTestMode::KEEP) &&
+		!date_options.enabled && !m_conf.ps.tex_is_fb && m_conf.tex_hazard == GSHWDrawConfig::TEX_HAZARD_NONE &&
+		(!m_conf.tex || m_conf.tex != m_conf.rt) && !m_conf.ps.IsFeedbackLoopDepth() &&
+		ComputeDrawlistGetSize(rt->m_scale) <= GSMaxGroupCopySplits;
+
+	const bool blend_requires_barrier = group_copy_blend ||
 		// We don't want the cases to be enabled if barriers aren't supported so limit it to no overlap.
-		(no_prim_overlap || barriers_supported)
+		((no_prim_overlap || barriers_supported)
 		// Impossible blending.
 		&& ((blend_flag & BLEND_A_MAX)
 		// Blend can be done in a single draw, and we already need a barrier.
@@ -7773,7 +7804,7 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, DATEOptio
 		// Blending with alpha > 1 will be wrong, except BLEND_HW2.
 		|| (!(blend_flag & BLEND_HW2) && !blend_multipass_group && (alpha_c2_high_one || alpha_c0_high_max_one) && no_prim_overlap)
 		// Ad blends are completely wrong without sw blend (Ad is 0.5 not 1 for 128). We can spare a barrier for it.
-		|| (blend_ad && !blend_multipass_group && no_prim_overlap && !new_rt_alpha_scale));
+		|| (blend_ad && !blend_multipass_group && no_prim_overlap && !new_rt_alpha_scale)));
 
 	// (Cd - Cs)*As and (Cs - Cd)*As with As above 1.0, on a device where reading the destination
 	// means copying the render target and ending the render pass. The promotion in the Basic case
@@ -8332,7 +8363,10 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, DATEOptio
 			else if (features.feedback_loops() && !promoted_safe)
 				m_conf.require_full_barrier |= !blend_non_recursive;
 			else
+			{
 				m_conf.require_one_barrier |= !blend_non_recursive;
+				m_conf.group_copy_blend = group_copy_blend;
+			}
 		}
 	}
 	else
@@ -11427,7 +11461,9 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 	m_conf.scissor = (DATE && !DATE_BARRIER) ? m_conf.drawarea : scissor;
 
 	// ComputeDrawlistGetSize expects the original index layout, so needs to be called before we modify it via HandleProvokingVertexFirst/SetupIA.
-	if (m_conf.require_full_barrier && (g_gs_device->Features().texture_barrier || g_gs_device->Features().multidraw_fb_copy))
+	m_conf.group_copy_blend &= m_conf.require_one_barrier && !m_conf.require_full_barrier;
+	if ((m_conf.require_full_barrier && (g_gs_device->Features().texture_barrier || g_gs_device->Features().multidraw_fb_copy)) ||
+		m_conf.group_copy_blend)
 	{
 		ComputeDrawlistGetSize(GSResolveFeedbackDrawlistTarget(rt, ds)->GetScale());
 		m_conf.drawlist = &m_drawlist;

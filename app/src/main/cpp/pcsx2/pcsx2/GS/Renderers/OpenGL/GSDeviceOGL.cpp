@@ -1133,8 +1133,14 @@ bool GSDeviceOGL::CheckFeatures()
 	const bool has_arm_framebuffer_fetch = GLAD_GL_ARM_shader_framebuffer_fetch;
 	const bool has_ext_framebuffer_fetch = GLAD_GL_EXT_shader_framebuffer_fetch;
 	const bool has_texture_barrier_extension = GLAD_GL_ARB_texture_barrier;
+	bool disable_framebuffer_fetch = GSConfig.DisableFramebufferFetch;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+	// Debug experiment knob: take the copy road even where framebuffer fetch is advertised.
+	if (std::getenv("EMUCOREX_GS_GL_NO_FETCH"))
+		disable_framebuffer_fetch = true;
+#endif
 	const auto fetch = DecideGLFramebufferFetch(has_arm_framebuffer_fetch, has_ext_framebuffer_fetch,
-		false, false, GSConfig.DisableFramebufferFetch, gpu_profile_mobile);
+		false, false, disable_framebuffer_fetch, gpu_profile_mobile);
 	const bool framebuffer_fetch = fetch.enabled;
 	if (fetch.veto == GSFramebufferFetchVeto::UserSetting)
 	{
@@ -4025,8 +4031,18 @@ void GSDeviceOGL::DoRenderHW(GSHWDrawConfig& config)
 		static_cast<const GSTextureOGL*>(fetch_target)->GetGLFormat());
 	const bool fetch_mrt = fetch_target && config.ds_as_rt;
 	const bool fetch_rgba8 = fetch_target && static_cast<const GSTextureOGL*>(fetch_target)->GetGLFormat() == GL_RGBA8;
-	const auto primary_fetch = SelectFetchPlan(config.ps, fetch_unorm, fetch_mrt, fetch_rgba8);
-	const auto alpha_fetch = SelectFetchPlan(config.alpha_second_pass.ps, fetch_unorm, fetch_mrt, fetch_rgba8);
+	// An in-tile read that does not order overlapping primitives (framebuffer_fetch_orders_overlap)
+	// cannot serve a draw split into drawlist groups: the groups only touch each other when they overlap,
+	// and nothing separates their reads and writes. Such a draw reads its colour from a snapshot per group.
+	const auto ordered_fetch = [&](GLFramebufferFetchPlan plan, bool full_barrier) {
+		if (full_barrier && !m_features.texture_barrier && !m_features.framebuffer_fetch_orders_overlap)
+			plan.key &= static_cast<unsigned char>(~3u);
+		return plan;
+	};
+	const auto primary_fetch = ordered_fetch(
+		SelectFetchPlan(config.ps, fetch_unorm, fetch_mrt, fetch_rgba8), config.require_full_barrier);
+	const auto alpha_fetch = ordered_fetch(SelectFetchPlan(config.alpha_second_pass.ps, fetch_unorm, fetch_mrt, fetch_rgba8),
+		config.alpha_second_pass.require_full_barrier);
 	const bool copy_color = !m_features.texture_barrier &&
 		((config.ps.IsFeedbackLoopRT() && primary_fetch.Color() == GSFramebufferFetchBackend::None) ||
 		 (config.alpha_second_pass.enable && config.alpha_second_pass.ps.IsFeedbackLoopRT() &&
@@ -4231,7 +4247,7 @@ void GSDeviceOGL::DoRenderHW(GSHWDrawConfig& config)
 			OMSetBlendState();
 		}
 		config.blend_multi_pass.ApplyTo(psel.ps);
-		psel.fetch = SelectFetchPlan(psel.ps, fetch_unorm, fetch_mrt, fetch_rgba8);
+		psel.fetch = ordered_fetch(SelectFetchPlan(psel.ps, fetch_unorm, fetch_mrt, fetch_rgba8), config.require_full_barrier);
 		SetupPipeline(psel);
 		SendHWDraw(config, draw_rt_clone, draw_rt, draw_ds_clone, depth_copy_source,
 			config.require_one_barrier, config.require_full_barrier, psel.ps, psel.fetch);
@@ -4248,7 +4264,7 @@ void GSDeviceOGL::DoRenderHW(GSHWDrawConfig& config)
 		}
 
 		psel.ps = config.alpha_second_pass.ps;
-		psel.fetch = SelectFetchPlan(psel.ps, fetch_unorm, fetch_mrt, fetch_rgba8);
+		psel.fetch = ordered_fetch(SelectFetchPlan(psel.ps, fetch_unorm, fetch_mrt, fetch_rgba8), config.alpha_second_pass.require_full_barrier);
 		SetupPipeline(psel);
 		OMSetColorMaskState(config.alpha_second_pass.colormask);
 		if (config.blend.IsEffective(config.alpha_second_pass.colormask))
@@ -4357,7 +4373,15 @@ void GSDeviceOGL::SendHWDraw(const GSHWDrawConfig& config, GSTexture* draw_rt_cl
 	const bool attached_alias = config.tex && (config.tex == draw_rt || config.tex == config.rt || config.tex == draw_ds ||
 		config.tex == config.ds || config.tex == config.ds_as_rt);
 	const bool sampler_read = sampler_color || sampler_depth || attached_alias || config.tex_hazard != GSHWDrawConfig::TEX_HAZARD_NONE;
-	if (!m_features.texture_barrier && sampler_read)
+	// A colour-only snapshot read follows the barriers the renderer asked for: one snapshot for the draw, or
+	// one per drawlist group of primitives that do not touch. Depth reads and sampled attachments keep the
+	// snapshot per primitive below.
+	const bool snapshot_per_barrier = m_fetch_caps.preferred == GSFramebufferFetchBackend::EXT && sampler_color &&
+		!sampler_depth && !attached_alias && config.tex_hazard == GSHWDrawConfig::TEX_HAZARD_NONE &&
+		(full_barrier ? (config.drawlist && !config.drawlist->empty() && config.drawlist_bbox &&
+							config.drawlist_bbox->size() == config.drawlist->size()) :
+						one_barrier);
+	if (!m_features.texture_barrier && sampler_read && !snapshot_per_barrier)
 	{
 		// A copied depth/HDR/MRT read must observe prior primitives even if
 		// the HW planner dropped colour-only barriers for ARM coherent fetch.

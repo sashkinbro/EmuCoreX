@@ -1310,6 +1310,7 @@ struct alignas(16) GSHWDrawConfig
 	bool offset_read_hits_write; ///< Filtered offset self-read includes pixels written by this draw.
 	GSDrawRoad road; ///< Renderer-owned self-read and compatible-pass carry decisions.
 	bool raster_order; ///< Request driver ordering for overlapping declared-loop primitives.
+	bool group_copy_blend; ///< Run the draw per drawlist group, each on a fresh render target snapshot (needs drawlist and drawlist_bbox).
 
 	enum : u32
 	{
@@ -1527,6 +1528,7 @@ public:
 		bool framebuffer_fetch_orders_overlap : 1; ///< Actual fetch orders overlapping primitives.
 		bool declared_loop_overlap_needs_raster_order : 1; ///< Declared ordered driver requires a per-pipeline request.
 		bool declared_feedback_loop_orders_overlap : 1; ///< Declared loop orders overlapping primitives.
+		bool overlap_blend_copy : 1; ///< Backend runs an over-one software blend on overlapping primitives one drawlist group at a time, each on a fresh render target snapshot, without texture barriers.
 		GSFeedbackCarry feedback_carry = GSFeedbackCarry::None;
 		bool framebuffer_fetch    : 1; ///< Can sample from the framebuffer without texture barriers.
 		bool native_counter_draws : 1;
