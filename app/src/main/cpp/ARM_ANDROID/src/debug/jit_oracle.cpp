@@ -5,6 +5,7 @@ extern "C" void EmuCoreXOracleCommonComposition(void(*check)(bool,const char*));
 extern "C" void EmuCoreXOracleGSOverlayContent(void(*check)(bool,const char*));
 extern "C" void EmuCoreXOracleGSWrappedMemory(void(*check)(bool,const char*));
 extern "C" void EmuCoreXOracleFrameGenGeometry(void(*check)(bool,const char*));
+extern "C" void EmuCoreXOracleDevicePolicySnapshot(void(*check)(bool,const char*));
 extern "C" void EmuCoreXOraclePresentationGeometry(void(*check)(bool,const char*));
 extern "C" void EmuCoreXOracleVKPresentRotation(void(*check)(bool,const char*));
 extern "C" void EmuCoreXOracleVKSurfaceRotation(void(*check)(bool,const char*));
@@ -12960,6 +12961,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
 #endif
     else if (std::strcmp(suite, "gs-gl-cache-packs") == 0)
         EmuCoreXOracleGLGamePackStorage(Check, "/data/local/tmp/emucorex-hitman-gs/gl-cache-pack-fixture");
+    else if (std::strcmp(suite, "gs-device-policy-snapshot") == 0)
+        EmuCoreXOracleDevicePolicySnapshot(Check);
     else if (std::strcmp(suite, "gs-framegen-geometry") == 0)
         EmuCoreXOracleFrameGenGeometry(Check);
     else if (std::strcmp(suite, "gs-presentation-geometry") == 0)

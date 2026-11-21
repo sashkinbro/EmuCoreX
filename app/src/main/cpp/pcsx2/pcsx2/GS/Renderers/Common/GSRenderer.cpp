@@ -1843,5 +1843,9 @@ void DumpGSPrivRegs(const GSPrivRegSet& r, const std::string& filename)
 #endif
 
 #ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+#include "GSDevicePolicySnapshotTests.inl"
+#endif
+
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
 #include "GSPresentationGeometryTests.inl"
 #endif
