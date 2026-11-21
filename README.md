@@ -56,12 +56,12 @@ This repository contains the Android app, including its UI, settings, bridge cod
 
 ## Current App Scope
 
-EmuCoreX version `0.4.7` currently targets Android with:
+EmuCoreX version `0.6.1` currently targets Android with:
 
 - `minSdk 29`
 - `targetSdk 37`
 - package id `com.sbro.emucorex`
-- version `0.4.7`
+- version `0.6.1`
 
 ## Building Locally
 
