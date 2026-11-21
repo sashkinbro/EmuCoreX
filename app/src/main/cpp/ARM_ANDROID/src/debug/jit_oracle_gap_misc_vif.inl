@@ -418,6 +418,7 @@ void GapVifUnpackRandTests()
         if (IsFill(cfg) && !GapKnob("GAP_VIF_CHUNKFILL", 1)) continue;
         cfg.wrap = false;
         cfg.srcAlign = 0;
+        if (Span(cfg) > VuSize(cfg.idx)) continue; // wrap-only configs overrun the VU image: the reference Model writes unwrapped (heap overflow of Out::mem)
         cfg.addr = std::min(cfg.addr, VuSize(cfg.idx) - Span(cfg));
         auto& vif = cfg.idx ? vif1 : vif0;
         auto& regs = cfg.idx ? vif1Regs : vif0Regs;

@@ -518,3 +518,262 @@ void EEVuMicroSyncTests()
 	EmuCoreXOracleSetVUIR(1, -1);
 	EmuConfig = saved;
 }
+
+// VU0 micro program ending in an E-bit whose last FMAC writes MAC, followed by EE reads of MAC/STATUS/CLIP and a
+// COP2 macro op, optionally with the MAC reader in a successor block. Port-only "MAC flag-finalise parking" once
+// left the final MAC instance in the wrong ring slot (Zone of the Enders 2 robot arm); the interpreter is the reference.
+void EEVuMicroMacTailTests()
+{
+	const auto saved = EmuConfig;
+	EmuCoreXOracleSetEeIrMode(0);
+	EmuCoreXOracleSetVUIR(0, 0);
+	EmuCoreXOracleSetVUIR(1, 0);
+	const auto cop2 = [](u32 rs, u32 rt, u32 fs) { return (0x12u << 26) | (rs << 21) | (rt << 16) | (fs << 11); };
+	const u32 NOP_L = 0x8000033cu, NOP_U = 0x000002ffu, E_BIT = 0x40000000u;
+	const u32 UP_SUB_A = 0x01e00000u | (2u << 16) | (1u << 11) | (3u << 6) | 0x2cu; // SUB vf3 = vf1 - vf2
+	const u32 UP_ADD_B = 0x01e00000u | (2u << 16) | (1u << 11) | (6u << 6) | 0x28u; // ADD vf6 = vf1 + vf2
+	const u32 LO_FMAND = (0x1au << 25) | (3u << 16) | (4u << 11);
+	const u32 LO_FSAND = (0x16u << 25) | (3u << 16) | (1u << 21) | 0x7ffu;
+	const u32 LO_FSSET = (0x15u << 25) | 0x080u;
+	const u32 readers[4] = {NOP_L, LO_FMAND, LO_FSAND, LO_FSSET};
+	const char* const reader_names[4] = {"none", "FMAND", "FSAND", "FSSET"};
+	u32 vf[128]{};
+	const u32 one = 0x3f800000u, mone = 0xbf800000u;
+	vf[4 + 0] = one; vf[4 + 1] = mone; vf[4 + 2] = 0; vf[4 + 3] = 0x7f000000u;
+	vf[8 + 0] = mone; vf[8 + 1] = one; vf[8 + 2] = 0; vf[8 + 3] = 0x7f000000u;
+	struct Slot { u32 lo, up; };
+	u32 cases = 0;
+	const auto run_case = [&](const std::vector<Slot>& slots, bool msr, u32 nops, u32 tail, const char* what) {
+		std::memset(VU0.Micro, 0, 4096);
+		u32 pc = 0;
+		for (const Slot& sl : slots)
+		{
+			std::memcpy(VU0.Micro + pc, &sl.lo, 4);
+			std::memcpy(VU0.Micro + pc + 4, &sl.up, 4);
+			pc += 8;
+		}
+		for (u32 k = 0; k < 2; ++k, pc += 8)
+		{
+			std::memcpy(VU0.Micro + pc, &NOP_L, 4);
+			std::memcpy(VU0.Micro + pc + 4, &NOP_U, 4);
+		}
+		CpuVU0->Clear(0, 4096);
+		GPR_reg gpr[32]{};
+		gpr[10].UD[0] = 0xffff;
+		std::vector<u32> code;
+		code.push_back(cop2(6, 10, 4)); // CTC2 vi4 = 0xffff
+		if (msr)
+		{
+			code.push_back(cop2(6, 0, 27)); // CTC2 CMSAR0 = 0
+			code.push_back((0x12u << 26) | (1u << 25) | 0x39u); // VCALLMSR
+		}
+		else
+			code.push_back((0x12u << 26) | (1u << 25) | 0x38u); // VCALLMS 0
+		for (u32 i = 0; i < nops; ++i)
+			code.push_back(0);
+		const u32 vadd5 = (0x12u << 26) | (1u << 25) | (0xfu << 21) | (2u << 16) | (1u << 11) | (5u << 6) | 0x28u;
+		if (tail == 0)
+		{
+			code.push_back(cop2(2, 20, 17)); code.push_back(cop2(2, 21, 16)); code.push_back(cop2(2, 22, 18));
+		}
+		else if (tail == 1)
+		{
+			code.push_back(vadd5); code.push_back(cop2(2, 20, 17)); code.push_back(cop2(2, 21, 16));
+		}
+		else
+		{
+			code.push_back(cop2(2, 21, 16)); code.push_back(vadd5); code.push_back(cop2(2, 22, 18)); code.push_back(cop2(2, 20, 17));
+		}
+		const EESnapshot ref = RunEEProgram(false, code, false, nullptr, nullptr, gpr, nullptr, nullptr, vf);
+		const EESnapshot jit = RunEEProgram(true, code, false, nullptr, nullptr, gpr, nullptr, nullptr, vf);
+		char name[160];
+		std::snprintf(name, sizeof(name), "VU0 MAC tail %s %s nops %u tail %u JIT == interpreter", what, msr ? "VCALLMSR" : "VCALLMS", nops, tail);
+		CompareEE(ref, jit, name);
+		++cases;
+	};
+	// Inline: last FMAC fm_off slots relative to the E-bit slot (e=4), MAC/STATUS reader rd slots relative to the FMAC.
+	for (int fm_off = -2; fm_off <= 1; ++fm_off)
+	for (u32 rk = 0; rk < 4; ++rk)
+	for (int rd = -1; rd <= 1; ++rd)
+	for (u32 msr = 0; msr < 2; ++msr)
+	for (u32 nops : {0u, 40u})
+	for (u32 tail = 0; tail < 3; ++tail)
+	{
+		const int e = 4, fm = e + fm_off, r = fm + rd;
+		if (r < 1 || r > e + 1 || (rk == 0 && rd != 0))
+			continue;
+		std::vector<Slot> slots(e + 2, Slot{NOP_L, NOP_U});
+		slots[0].up = UP_SUB_A;
+		slots[fm].up = UP_ADD_B;
+		slots[e].up |= E_BIT;
+		slots[r].lo = readers[rk];
+		char what[64];
+		std::snprintf(what, sizeof(what), "inline fm%+d %s@%+d", fm_off, reader_names[rk], rd);
+		run_case(slots, msr != 0, nops, tail, what);
+	}
+	// Successor block: branch (taken IBEQ / not-taken IBNE), last FMAC in the branch slot or its delay slot, reader in the successor.
+	for (u32 taken = 0; taken < 2; ++taken)
+	for (u32 fm = 1; fm <= 2; ++fm)
+	for (u32 rk = 0; rk < 4; ++rk)
+	for (u32 msr = 0; msr < 2; ++msr)
+	for (u32 nops : {0u, 40u})
+	for (u32 tail = 0; tail < 3; ++tail)
+	{
+		std::vector<Slot> slots(7, Slot{NOP_L, NOP_U});
+		slots[0].up = UP_SUB_A;
+		slots[1].lo = ((taken ? 0x28u : 0x29u) << 25) | 2u; // IBEQ / IBNE vi0,vi0 -> slot 4
+		slots[fm].up = UP_ADD_B;
+		slots[3].lo = readers[rk];
+		slots[4].lo = readers[rk];
+		slots[5].up |= E_BIT;
+		char what[64];
+		std::snprintf(what, sizeof(what), "branch %s fm@%u %s", taken ? "taken" : "nottaken", fm, reader_names[rk]);
+		run_case(slots, msr != 0, nops, tail, what);
+	}
+	// Writer block with a flag reader after the last FMAC (so the finalised MAC write is observable inside the block),
+	// then a branch to successor blocks that end the program with the E-bit and may read MAC themselves (CFC2 sees the
+	// MAC the writer block hands over).
+	for (u32 taken = 0; taken < 2; ++taken)
+	for (u32 fm = 1; fm <= 2; ++fm)
+	for (u32 rd = 0; rd <= 1; ++rd)
+	for (u32 rk = 1; rk < 4; ++rk)
+	for (u32 srk = 0; srk < 4; ++srk)
+	for (u32 msr = 0; msr < 2; ++msr)
+	for (u32 nops : {0u, 40u})
+	for (u32 tail = 0; tail < 3; ++tail)
+	{
+		const u32 r = fm + rd, b = fm + 2;
+		std::vector<Slot> slots(b + 6, Slot{NOP_L, NOP_U});
+		slots[0].up = UP_SUB_A;
+		slots[fm].up = UP_ADD_B;
+		slots[r].lo = readers[rk];
+		slots[b].lo = ((taken ? 0x28u : 0x29u) << 25) | 2u; // IBEQ / IBNE vi0,vi0 -> slot b+3
+		slots[b + 2].up |= E_BIT;
+		slots[b + 2].lo = readers[srk];
+		slots[b + 3].up |= E_BIT;
+		slots[b + 3].lo = readers[srk];
+		char what[64];
+		std::snprintf(what, sizeof(what), "reader-block %s fm@%u %s@%+d succ %s", taken ? "taken" : "nottaken", fm, reader_names[rk], static_cast<int>(rd), reader_names[srk]);
+		run_case(slots, msr != 0, nops, tail, what);
+	}
+	// Random VU0 programs (FMAC ops with random dest masks, flag readers, forward branches and short counted loops, E-bit),
+	// one or two run back to back, read back through COP2 CFC2 of MAC/STATUS/CLIP. Diagnostic sweep
+	// (EMUCOREX_MACTAIL_RAND=<count>, EMUCOREX_MACTAIL_DENSE=1 for denser FMAC/readers): used to find end-of-program
+	// hand-off mismatches that appear with one flag-finalise scheme but not another.
+	if (const char* rc = std::getenv("EMUCOREX_MACTAIL_RAND"))
+	{
+		const u32 count = static_cast<u32>(std::atoi(rc));
+		const bool dense = std::getenv("EMUCOREX_MACTAIL_DENSE") != nullptr;
+		const bool mbit = std::getenv("EMUCOREX_MACTAIL_MBIT") != nullptr; // M-bits on some uppers, EE reads MAC while the program may still run
+		u64 rng = 0x9e3779b97f4a7c15ull;
+		const auto rnd = [&](u32 n) { rng = rng * 6364136223846793005ull + 1442695040888963407ull; return static_cast<u32>((rng >> 33) % n); };
+		const u32 fopsU[3] = {0x28u, 0x2cu, 0x2au};
+		const bool loops = std::getenv("EMUCOREX_MACTAIL_LOOP") != nullptr; // counted backward loop (IADDIU/ISUBIU vi1 + IBNE) in every program
+		const auto genProgram = [&](u32 base, u32 n) {
+			const u32 e = n - 1;
+			std::vector<Slot> slots(n + 2, Slot{NOP_L, NOP_U});
+			u32 branchAt = loops ? 0u : 0xffffu; // loop programs have no random forward branches
+			for (u32 s = 0; s < n; ++s)
+			{
+				if (rnd(100) < (dense ? 80u : 55u))
+				{
+					const u32 mask = rnd(4) == 0 ? 15u : 1 + rnd(15);
+					slots[s].up = (1u << 25) | (mask << 21) | ((1 + rnd(2)) << 16) | ((1 + rnd(2)) << 11) | ((3 + rnd(7)) << 6) | fopsU[rnd(3)];
+				}
+				if (mbit && s < e && rnd(100) < 12)
+					slots[s].up |= 0x20000000u;
+				if (s == branchAt + 1)
+					continue;
+				const u32 lr = rnd(100);
+				if (lr < (dense ? 45u : 30u))
+				{
+					const u32 it = 2 + rnd(6), is = 2 + rnd(6);
+					switch (rnd(7))
+					{
+						case 0: slots[s].lo = (0x1au << 25) | (it << 16) | (is << 11); break; // FMAND
+						case 1: slots[s].lo = (0x18u << 25) | (it << 16) | (is << 11); break; // FMEQ
+						case 2: slots[s].lo = (0x1bu << 25) | (it << 16) | (is << 11); break; // FMOR
+						case 3: slots[s].lo = (0x16u << 25) | (it << 16) | (is << 21) | (rnd(0x1000)); break; // FSAND
+						case 4: slots[s].lo = (0x12u << 25) | (rnd(0x1000)); break; // FCAND
+						case 5: slots[s].lo = (0x17u << 25) | (it << 16) | (rnd(0x1000)); break; // FSOR
+						default: slots[s].lo = (0x15u << 25) | (rnd(0x1000)); break; // FSSET
+					}
+				}
+				else if (lr < (dense ? 55u : 38u) && branchAt == 0xffff && s + 3 <= e && s >= 1)
+				{
+					branchAt = s;
+					const u32 target = s + 2 + rnd(e - s - 1); // pairs ahead of the delay slot, never past the E-bit slot
+					slots[s].lo = ((rnd(2) ? 0x28u : 0x29u) << 25) | (target - s - 1);
+				}
+			}
+			slots[e].up |= E_BIT;
+			if (loops)
+			{
+				const u32 m = 1 + rnd(std::max(1u, e - 4)); // loop body is slots 1..m, then ISUBIU, IBNE with its delay slot
+				if (m + 3 <= e)
+				{
+					slots[0].lo = 0x10010002u + (rnd(2) << 0); // IADDIU vi1 = vi0 + 2/3
+					slots[m + 1].lo = (0x09u << 25) | (1u << 16) | (1u << 11) | 1u; // ISUBIU vi1 = vi1 - 1
+					slots[m + 2].lo = (0x29u << 25) | (1u << 16) | ((1u - (m + 2) - 1u) & 0x7ffu); // IBNE vi1, vi0 -> slot 1
+					slots[m + 3].lo = NOP_L;
+				}
+			}
+			for (u32 s = 0; s < n + 2; ++s)
+			{
+				std::memcpy(VU0.Micro + base + s * 8, &slots[s].lo, 4);
+				std::memcpy(VU0.Micro + base + s * 8 + 4, &slots[s].up, 4);
+			}
+		};
+		for (u32 k = 0; k < count; ++k)
+		{
+			const bool two = rnd(2) != 0;
+			std::memset(VU0.Micro, 0, 4096);
+			for (u32 base = 0; base < 0x400; base += 8)
+			{
+				std::memcpy(VU0.Micro + base, &NOP_L, 4);
+				std::memcpy(VU0.Micro + base + 4, &NOP_U, 4);
+			}
+			const u32 n1 = 7 + rnd(dense ? 14 : 6), n2 = 5 + rnd(8);
+			genProgram(0, n1);
+			if (two)
+				genProgram(0x200, n2);
+			CpuVU0->Clear(0, 4096);
+			GPR_reg gpr[32]{};
+			gpr[10].UD[0] = 0xffff;
+			std::vector<u32> code;
+			code.push_back(cop2(6, 10, 4));
+			code.push_back((0x12u << 26) | (1u << 25) | 0x38u);
+			const u32 nops = mbit ? rnd(30) : (rnd(3) == 0 ? 0u : (rnd(2) ? 12u : 40u));
+			for (u32 i = 0; i < nops; ++i)
+				code.push_back(0);
+			if (mbit)
+			{
+				code.push_back(cop2(2, 23, 17)); // CFC2 MAC while the program may be stopped at an M-bit
+				for (u32 i = 0, m = rnd(3) * 20; i < m; ++i)
+					code.push_back(0);
+			}
+			if (two)
+			{
+				code.push_back((0x12u << 26) | (1u << 25) | (0x200u >> 3 << 6) | 0x38u); // VCALLMS 0x200
+				const u32 nops2 = rnd(3) == 0 ? 0u : 40u;
+				for (u32 i = 0; i < nops2; ++i)
+					code.push_back(0);
+			}
+			const u32 tail = rnd(3);
+			if (tail == 0) { code.push_back(cop2(2, 20, 17)); code.push_back(cop2(2, 21, 16)); code.push_back(cop2(2, 22, 18)); }
+			else if (tail == 1) { code.push_back(cop2(2, 22, 18)); code.push_back(cop2(2, 20, 17)); }
+			else { code.push_back(cop2(2, 21, 16)); code.push_back(cop2(2, 20, 17)); }
+			const EESnapshot ref = RunEEProgram(false, code, false, nullptr, nullptr, gpr, nullptr, nullptr, vf);
+			const EESnapshot jit = RunEEProgram(true, code, false, nullptr, nullptr, gpr, nullptr, nullptr, vf);
+			char name[160];
+			std::snprintf(name, sizeof(name), "VU0 MAC tail rand %u two %u n %u/%u nops %u tail %u JIT == interpreter", k, two ? 1u : 0u, n1, n2, nops, tail);
+			CompareEE(ref, jit, name);
+			++cases;
+		}
+	}
+	std::printf("VU0 MAC tail: %u cases\n", cases);
+	EmuCoreXOracleSetEeIrMode(-1);
+	EmuCoreXOracleSetVUIR(0, -1);
+	EmuCoreXOracleSetVUIR(1, -1);
+	EmuConfig = saved;
+}

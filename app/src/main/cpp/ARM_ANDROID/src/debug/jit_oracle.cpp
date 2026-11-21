@@ -10318,6 +10318,11 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
         EEVuMicroSyncTests();
         return;
     }
+    if (direct_suite && std::strcmp(direct_suite, "ee-vu-mac-tail") == 0)
+    {
+        EEVuMicroMacTailTests();
+        return;
+    }
     if (direct_suite && std::strcmp(direct_suite, "ee-vu-fmac-acc") == 0)
     {
         EEVuFmacAccTests();
@@ -12838,7 +12843,7 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         std::strcmp(suite, "ee-unaligned-stores") == 0 || std::strcmp(suite, "ee-unaligned-word-stores") == 0 ||
         std::strcmp(suite, "ee-vu-local") == 0 || std::strcmp(suite, "ee-vu-status") == 0 ||
         std::strcmp(suite, "ee-vu-local-clip") == 0 || std::strcmp(suite, "ee-vu-local-identity") == 0 || std::strcmp(suite, "ee-vu-zero-tail") == 0 || std::strcmp(suite, "ee-vu-lower-zero-tail") == 0 ||
-        std::strcmp(suite, "ee-vu-fmac-acc") == 0 || std::strcmp(suite, "ee-vu-micro-sync") == 0 || std::strncmp(suite, "x86-parity", 10) == 0 ||
+        std::strcmp(suite, "ee-vu-fmac-acc") == 0 || std::strcmp(suite, "ee-vu-micro-sync") == 0 || std::strcmp(suite, "ee-vu-mac-tail") == 0 || std::strncmp(suite, "x86-parity", 10) == 0 ||
         gapee::GapEeIsSuite(suite))
         EETests(false, false, false, false, false, false, false, false, false,
             false, false, false, false, false, false, 0, false, false, false, false, suite);
