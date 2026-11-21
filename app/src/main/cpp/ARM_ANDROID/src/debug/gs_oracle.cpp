@@ -32,6 +32,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace
@@ -118,9 +119,8 @@ void Upload(Writes& w, u32 bp, u32 bw, u32 psm, u32 width, u32 height, const std
 
 // Native GIF/GS work, not shader approximations. Each fixture resets state and
 // initializes both tested buffers, so a previous test cannot hide a missing draw.
-Writes Scene(u32 scene, u32 seed)
+void Prologue(Writes& w)
 {
-    Writes w;
     Write(w, 0x1a, 1); // PRMODECONT
     Write(w, 0x18, 0); // XYOFFSET_1
     Write(w, 0x4c, 1ull << 16); // FRAME_1: base 0, FBW 1, CT32
@@ -133,6 +133,12 @@ Writes Scene(u32 scene, u32 seed)
     Write(w, 0x1b, 0); // PABE
     Write(w, 0x42, 0x44 | (0x40ull << 32)); // (Cs-Cd)*As+Cd
     Sprite(w, 0x80102030, 0, 0, Width, Height, 1);
+}
+
+Writes Scene(u32 scene, u32 seed)
+{
+    Writes w;
+    Prologue(w);
     if (scene >= Names.size())
     {
         const u32 variant = scene - static_cast<u32>(Names.size());
@@ -227,10 +233,13 @@ Writes Scene(u32 scene, u32 seed)
         if (scene == 32 || scene == 33)
         {
             Write(w, 0x4c, 1ull << 16 | static_cast<u64>(scene == 32 ? 2 : 10) << 24);
+            // Re-clear in the 16-bit format: the prologue wrote the background as CT32, which aliases differently.
+            Sprite(w, 0x80102030, 0, 0, Width, Height, 1);
             Write(w, 0x44, 0x7362514073625140ull); Write(w, 0x45, 1);
         }
         if (scene == 36) Write(w, 0x4c, 1ull << 16 | 1ull << 24);
         if (scene == 37 || scene == 38) Write(w, 0x4e, 16 | static_cast<u64>(scene == 37 ? 2 : 1) << 24);
+        if (scene == 37) Sprite(w, 0x80102030, 0, 0, Width, Height, 1); // re-clear depth in Z16 (prologue wrote Z32)
         Sprite(w, 0x403b739b, 5, 7, 58, 59, 0xfffffffe);
     }
     if (scene == 34 || scene == 35)
@@ -301,6 +310,306 @@ Writes Scene(u32 scene, u32 seed)
             Write(w, 3, uv | uv << 16); Write(w, 5, XY(56, 56, 4));
         }
     }
+    return w;
+}
+
+// Extra scenes. They run after the generated matrix (indices Names.size()+cases...) so base-scene and
+// matrix indices, names and the baselines/goldens that key on them stay stable. Each reads back
+// width x height at FBW fbw (Z32 at ZBP zbp); 16-bit scenes are read in their native PSM.
+struct Extra { const char* name; u32 width, height, fbw, zbp; };
+const std::array<Extra, 24> Extras = {{
+    {"mipmap-lod-q", 64, 64, 1, 16}, {"mipmap-fixed-k", 64, 64, 1, 16}, {"mipmap-trilinear", 64, 64, 1, 16},
+    {"tex-from-rt", 64, 64, 1, 16}, {"tex-feedback-same-fbp", 64, 64, 1, 16},
+    {"shuffle-ct16-tex", 64, 64, 1, 16}, {"shuffle-ct16-rt", 64, 64, 1, 16}, {"shuffle-8h", 64, 64, 1, 16},
+    {"shuffle-4hl", 64, 64, 1, 16}, {"shuffle-4hh", 64, 64, 1, 16},
+    {"large-256-multipage", 256, 256, 4, 40}, {"large-640x448-multipage", 640, 448, 10, 160},
+    {"fst-large-uv-repeat", 64, 64, 1, 16}, {"stq-large-uv-repeat", 64, 64, 1, 16},
+    {"fst-large-uv-region-repeat", 64, 64, 1, 16}, {"stq-large-uv-region-repeat", 64, 64, 1, 16},
+    {"clut-reload-cld", 64, 64, 1, 16},
+    {"aa1-lines", 64, 64, 1, 16}, {"aa1-line-strip", 64, 64, 1, 16}, {"aa1-triangle", 64, 64, 1, 16},
+    {"ct16-colclamp-wrap", 64, 64, 1, 16}, {"ct16s-colclamp-wrap", 64, 64, 1, 16},
+    {"ct16-fba", 64, 64, 1, 16}, {"ct16-colclamp-fba", 64, 64, 1, 16}}};
+
+u32 FloatBits(float f) { u32 b; std::memcpy(&b, &f, 4); return b; }
+// TEX0: decal, TCC=1, texture width/height 2^tw x 2^th, TBW 1.
+u64 Tex0(u32 tbp, u32 psm, u32 tw, u32 th, u64 clut = 0)
+{
+    return tbp | 1ull << 14 | static_cast<u64>(psm) << 20 | static_cast<u64>(tw) << 26 | static_cast<u64>(th) << 30 |
+        1ull << 34 | 1ull << 35 | clut;
+}
+u64 Tex1(u32 lcm, u32 mxl, u32 mmag, u32 mmin, u32 k)
+{
+    return lcm | static_cast<u64>(mxl) << 2 | static_cast<u64>(mmag) << 5 | static_cast<u64>(mmin) << 6 |
+        static_cast<u64>(k & 0xfff) << 32;
+}
+// Textured sprite with raw 12.4 UVs (FST).
+void UvSprite(Writes& w, u32 x0, u32 y0, u32 x1, u32 y1, u32 u0, u32 v0, u32 u1, u32 v1)
+{
+    Write(w, 0x00, 6 | 1ull << 4 | 1ull << 8);
+    Write(w, 0x01, 0x3f80000080808080ull);
+    Write(w, 0x03, u0 | static_cast<u64>(v0) << 16); Write(w, 0x05, XY(x0, y0, 4));
+    Write(w, 0x03, u1 | static_cast<u64>(v1) << 16); Write(w, 0x05, XY(x1, y1, 4));
+}
+// STQ vertex: ST, then RGBAQ carrying Q, then XYZ2.
+void StVertex(Writes& w, float s, float t, float q, u32 x, u32 y)
+{
+    Write(w, 0x02, FloatBits(s) | static_cast<u64>(FloatBits(t)) << 32);
+    Write(w, 0x01, 0x80808080ull | static_cast<u64>(FloatBits(q)) << 32);
+    Write(w, 0x05, XY(x, y, 4));
+}
+// Every texel distinct in both axes (the texture-upload pattern only varies per 4-pixel run along x).
+u32 ExtraTexel(u32 i) { return 0x80000000u | ((i * 37) & 255) | (((i * 91 + 13) & 255) << 8) | (((i * 53 + 7) & 255) << 16); }
+std::vector<u8> Pattern32() // 8x8 CT32 texture used by the FST/STQ scenes
+{
+    std::vector<u8> pixels(8 * 8 * 4);
+    for (u32 i = 0; i < 64; ++i)
+    {
+        const u32 c = ExtraTexel(i);
+        std::memcpy(pixels.data() + i * 4, &c, 4);
+    }
+    return pixels;
+}
+u32 PaletteEntry(u32 variant, u32 i)
+{
+    switch (variant)
+    {
+        case 0: return (i & 255) | ((255 - i) << 8) | ((i * 37 & 255) << 16) | 0x80000000;
+        case 1: return (255 - i) | ((i * 5 & 255) << 8) | (i << 16) | 0x80000000;
+        default: return (i * 3 & 255) | (i << 8) | ((255 - i) << 16) | 0x80000000;
+    }
+}
+void UploadPalette(Writes& w, u32 variant)
+{
+    std::vector<u8> palette(256 * 4);
+    for (u32 i = 0; i < 256; ++i) { const u32 c = PaletteEntry(variant, i); std::memcpy(palette.data() + i * 4, &c, 4); }
+    Upload(w, 0x300, 1, 0, 16, 16, palette);
+}
+
+Writes ExtraScene(u32 k)
+{
+    const std::string_view n = Extras[k].name;
+    Writes w;
+    Prologue(w);
+    auto frame = [&](u32 fbp, u32 psm) { Write(w, 0x4c, static_cast<u64>(fbp) | 1ull << 16 | static_cast<u64>(psm) << 24); };
+    auto clear = [&](u32 fbp, u32 psm) { frame(fbp, psm); Sprite(w, 0x80102030, 0, 0, Width, Height, 1); };
+    auto texflush = [&]() { Write(w, 0x3f, 0); };
+    auto triangle = [&](u64 prim, std::array<std::array<u32, 3>, 3> v, std::array<u32, 3> colors)
+    {
+        Write(w, 0x00, prim);
+        for (u32 i = 0; i < 3; ++i) { Write(w, 0x01, colors[i] | 0x3f800000ull << 32); Write(w, 0x05, XY(v[i][0], v[i][1], v[i][2])); }
+    };
+    // Source render target at FBP 4 (TBP 128) with distinct alpha per region, for the shuffle scenes.
+    auto render_source = [&]()
+    {
+        frame(4, 0);
+        Sprite(w, 0x10305070, 0, 0, 64, 64, 1);
+        Sprite(w, 0x60ff4020, 4, 4, 34, 34, 2);
+        Sprite(w, 0xa020ff40, 30, 8, 60, 40, 3);
+        Sprite(w, 0xe04020ff, 10, 30, 50, 60, 4);
+        frame(0, 0);
+        texflush();
+    };
+
+    if (n.substr(0, 6) == "mipmap")
+    {
+        constexpr std::array<u32, 3> level_color{0x800000ff, 0x8000ff00, 0x80ff0000};
+        for (u32 level = 0; level < 3; ++level)
+        {
+            const u32 size = 16 >> level;
+            std::vector<u8> bytes(size * size * 4);
+            for (u32 i = 0; i < size * size; ++i) std::memcpy(bytes.data() + i * 4, &level_color[level], 4);
+            Upload(w, 0x80 + 0x20 * level, 1, 0, size, size, bytes);
+        }
+        texflush();
+        Write(w, 0x06, Tex0(0x80, 0, 4, 4));
+        Write(w, 0x34, 0xa0ull | 1ull << 14 | 0xc0ull << 20 | 1ull << 34); // MIPTBP1: levels 1,2 (3 unused)
+        Write(w, 0x36, 0); // MIPTBP2
+        Write(w, 0x08, 0);
+        auto triangles = [&]()
+        {
+            // Q = 1, 0.5, 0.25, 0.125: LOD = -log2(Q) = 0..3; U/V cover the whole texture at every vertex.
+            Write(w, 0x00, 3 | 1ull << 4);
+            StVertex(w, 0, 0, 1, 4, 4); StVertex(w, 0.5f, 0, 0.5f, 60, 4); StVertex(w, 0, 0.25f, 0.25f, 4, 60);
+            StVertex(w, 0.5f, 0, 0.5f, 60, 4); StVertex(w, 0, 0.25f, 0.25f, 4, 60); StVertex(w, 0.125f, 0.125f, 0.125f, 60, 60);
+        };
+        if (n == "mipmap-lod-q")
+        {
+            Write(w, 0x14, Tex1(0, 2, 0, 2, 0)); // LCM=0 (LOD from Q), MXL=2, nearest-mipmap-nearest
+            triangles();
+        }
+        else if (n == "mipmap-fixed-k")
+        {
+            constexpr std::array<u32, 4> k_value{0, 16, 32, 48}; // 1/16 units: LOD 0,1,2 and 3 (clamped to MXL=2)
+            for (u32 i = 0; i < 4; ++i)
+            {
+                Write(w, 0x14, Tex1(1, 2, 0, 2, k_value[i])); // LCM=1: fixed K
+                UvSprite(w, 2 + 16 * i, 8, 16 + 16 * i, 56, 0, 0, 16 * 16, 16 * 16);
+            }
+        }
+        else
+        {
+            Write(w, 0x14, Tex1(0, 2, 1, 5, 0)); // LCM=0, linear-mipmap-linear (trilinear), MMAG linear
+            triangles();
+            Write(w, 0x14, Tex1(1, 2, 1, 5, 24)); // fixed LOD 1.5: blend of levels 1 and 2
+            UvSprite(w, 20, 20, 44, 44, 0, 0, 16 * 16, 16 * 16);
+        }
+        return w;
+    }
+    if (n == "tex-from-rt")
+    {
+        frame(4, 0);
+        Sprite(w, 0x80305070, 0, 0, 64, 64, 1);
+        Sprite(w, 0x80ff4020, 8, 8, 32, 32, 2);
+        Sprite(w, 0x8020ff40, 24, 24, 56, 56, 3);
+        triangle(3 | 1ull << 3, {{{40, 4, 4}, {60, 24, 4}, {36, 20, 4}}}, {0x800000ff, 0x8000ff00, 0x80ff0000});
+        frame(0, 0);
+        texflush();
+        Write(w, 0x06, Tex0(128, 0, 6, 6)); Write(w, 0x14, 0);
+        UvSprite(w, 4, 4, 36, 36, 0, 0, 64 * 16, 64 * 16); // 2x minify, nearest
+        Write(w, 0x14, 1ull << 5 | 1ull << 6);
+        UvSprite(w, 36, 36, 60, 60, 16 * 16, 16 * 16, 48 * 16, 48 * 16); // 1.33x magnify, bilinear
+        return w;
+    }
+    if (n == "tex-feedback-same-fbp")
+    {
+        // Texture base == frame base. Every draw samples regions written earlier and writes elsewhere.
+        Sprite(w, 0x80ff4020, 2, 2, 18, 30, 2);
+        Sprite(w, 0x8020ff40, 14, 10, 30, 30, 3);
+        texflush();
+        Write(w, 0x06, Tex0(0, 0, 6, 6)); Write(w, 0x14, 0);
+        UvSprite(w, 32, 0, 64, 32, 0, 0, 32 * 16, 32 * 16);
+        texflush();
+        UvSprite(w, 0, 32, 32, 64, 32 * 16, 0, 64 * 16, 32 * 16); // copy of the copy
+        texflush();
+        Write(w, 0x14, 1ull << 5 | 1ull << 6);
+        UvSprite(w, 32, 32, 64, 64, 0, 0, 32 * 16, 32 * 16);
+        return w;
+    }
+    if (n.substr(0, 7) == "shuffle")
+    {
+        const bool indexed = n == "shuffle-8h" || n == "shuffle-4hl" || n == "shuffle-4hh";
+        if (indexed) { UploadPalette(w, 0); Write(w, 0x1c, 1); }
+        render_source();
+        Write(w, 0x3b, 0x40 | 0x80ull << 32); // TEXA
+        Write(w, 0x14, 0);
+        if (n == "shuffle-ct16-tex") // CT32 render target sampled as a CT16 texture
+        {
+            Write(w, 0x06, Tex0(128, 2, 6, 6));
+            UvSprite(w, 0, 0, 64, 64, 0, 0, 64 * 16, 64 * 16);
+        }
+        else if (n == "shuffle-ct16-rt") // CT32 render target sampled as CT32 and written to a CT16 target
+        {
+            clear(0, 2);
+            Write(w, 0x06, Tex0(128, 0, 6, 6));
+            UvSprite(w, 0, 0, 64, 64, 0, 0, 64 * 16, 64 * 16);
+        }
+        else // alpha byte / nibbles of the CT32 target used as a CLUT index
+        {
+            const u32 psm = n == "shuffle-8h" ? 0x1b : n == "shuffle-4hl" ? 0x24 : 0x2c;
+            Write(w, 0x06, Tex0(128, psm, 6, 6, 0x300ull << 37 | 1ull << 61));
+            UvSprite(w, 0, 0, 64, 64, 0, 0, 64 * 16, 64 * 16);
+        }
+        return w;
+    }
+    if (n.substr(0, 5) == "large")
+    {
+        const u32 W = Extras[k].width, H = Extras[k].height, fbw = Extras[k].fbw, zbp = Extras[k].zbp;
+        Write(w, 0x4c, static_cast<u64>(fbw) << 16);
+        Write(w, 0x4e, zbp);
+        Write(w, 0x40, static_cast<u64>(W - 1) << 16 | static_cast<u64>(H - 1) << 48);
+        Sprite(w, 0x80102030, 0, 0, W, H, 1); // fully initializes color and Z at the new size
+        auto fx = [&](u32 num) { return W * num / 100; };
+        auto fy = [&](u32 num) { return H * num / 100; };
+        // Pages are 64x32 pixels: these all straddle several page boundaries in both directions.
+        Sprite(w, 0x40e06020, fx(18), fy(10), fx(55), fy(40), 2, 1ull << 6);
+        Sprite(w, 0x60a020e0, fx(40), fy(5), fx(97), fy(30), 3, 1ull << 6);
+        Sprite(w, 0x80ff8020, fx(5), fy(35), fx(35), fy(75), 4); // opaque
+        triangle(3 | 1ull << 3 | 1ull << 6, {{{fx(4), fy(96), 5}, {fx(96), fy(90), 5}, {fx(50), fy(20), 5}}},
+            {0x40ff2020, 0x6020ff20, 0x802020ff});
+        Write(w, 0x47, 1ull << 16 | 3ull << 17); // ZTE, Z GREATER
+        Sprite(w, 0x80ffffff, fx(20), fy(45), fx(80), fy(80), 1, 0); // lower Z than the earlier draws: rejected there
+        Sprite(w, 0x8000ffff, fx(30), fy(50), fx(70), fy(70), 100, 1ull << 6); // admitted, blended
+        return w;
+    }
+    if (n.substr(0, 3) == "fst" || n.substr(0, 3) == "stq")
+    {
+        Upload(w, 0x80, 1, 0, 8, 8, Pattern32());
+        texflush();
+        Write(w, 0x06, Tex0(0x80, 0, 3, 3)); Write(w, 0x3b, 0x40 | 0x80ull << 32); Write(w, 0x14, 0);
+        const bool region = n.find("region") != std::string_view::npos;
+        // REPEAT, or REGION_REPEAT with (u & 3) | 4 on both axes (a clean power-of-two region: texels 4..7).
+        Write(w, 0x08, region ? 3 | 3ull << 2 | 3ull << 4 | 4ull << 14 | 3ull << 24 | 4ull << 34 : 0);
+        if (n.substr(0, 3) == "fst")
+        {
+            const u32 u0 = 803, v0 = 517; // 1:1 scale at large texel offsets (12.4 limit is 1023.9375)
+            UvSprite(w, 8, 8, 56, 56, u0 * 16, v0 * 16, (u0 + 48) * 16, (v0 + 48) * 16);
+        }
+        else
+        {
+            const float q = region ? 2.0f : 1.0f; // S/T are texel/8*Q: 1:1 scale at large offsets
+            const float u0 = 1403, v0 = 1217;
+            Write(w, 0x00, 6 | 1ull << 4);
+            StVertex(w, u0 / 8 * q, v0 / 8 * q, q, 8, 8);
+            StVertex(w, (u0 + 48) / 8 * q, (v0 + 48) / 8 * q, q, 56, 56);
+        }
+        return w;
+    }
+    if (n == "clut-reload-cld")
+    {
+        std::vector<u8> pixels(64);
+        for (size_t i = 0; i < pixels.size(); ++i) pixels[i] = static_cast<u8>(i * 19 + 7);
+        UploadPalette(w, 0);
+        Upload(w, 0x80, 1, 0x13, 8, 8, pixels);
+        Write(w, 0x1c, 1); Write(w, 0x3b, 0x40 | 0x80ull << 32); Write(w, 0x14, 0); Write(w, 0x08, 0);
+        // CLD 1 loads; 0 keeps the stale CLUT buffer after the palette memory changed; 4/5 load when CBP0/CBP1 differs.
+        constexpr std::array<u32, 7> cld{1, 0, 1, 4, 2, 3, 5};
+        constexpr std::array<u32, 7> palette_before{99, 1, 1, 2, 0, 1, 2}; // variant uploaded before each quadrant (99 = none)
+        for (u32 i = 0; i < 7; ++i)
+        {
+            if (palette_before[i] != 99) UploadPalette(w, palette_before[i]);
+            Write(w, 0x06, Tex0(0x80, 0x13, 3, 3, 0x300ull << 37 | static_cast<u64>(cld[i]) << 61));
+            texflush();
+            const u32 x = 4 + 20 * (i % 3), y = 4 + 20 * (i / 3);
+            UvSprite(w, x, y, x + 16, y + 16, 0, 0, 8 * 16, 8 * 16);
+        }
+        return w;
+    }
+    if (n.substr(0, 3) == "aa1")
+    {
+        constexpr u64 AA1_ABE = 1ull << 6 | 1ull << 7;
+        const u32 color = 0x80e08040;
+        if (n == "aa1-lines")
+        {
+            constexpr std::array<std::array<u32, 4>, 5> lines{{{4, 4, 60, 20}, {4, 10, 60, 58}, {10, 60, 40, 6}, {8, 32, 56, 34}, {30, 4, 32, 60}}};
+            for (const auto& l : lines)
+            {
+                Write(w, 0x00, 1 | AA1_ABE); Write(w, 0x01, color | 0x3f800000ull << 32);
+                Write(w, 0x05, XY(l[0], l[1], 2)); Write(w, 0x05, XY(l[2], l[3], 2));
+            }
+        }
+        else if (n == "aa1-line-strip")
+        {
+            Write(w, 0x00, 2 | AA1_ABE); Write(w, 0x01, color | 0x3f800000ull << 32);
+            constexpr std::array<std::array<u32, 2>, 6> pts{{{4, 6}, {58, 14}, {12, 30}, {54, 44}, {20, 60}, {44, 8}}};
+            for (const auto& p : pts) Write(w, 0x05, XY(p[0], p[1], 2));
+        }
+        else
+            triangle(3 | AA1_ABE, {{{6, 8, 2}, {58, 20, 2}, {24, 58, 2}}}, {0x80ff2020, 0x8020ff20, 0x802020ff});
+        return w;
+    }
+    // 16-bit color: clear in the 16-bit format first, then clamp/wrap and FBA tests.
+    const u32 psm = n == "ct16s-colclamp-wrap" ? 10 : 2;
+    clear(0, psm);
+    if (n == "ct16-fba" || n == "ct16-colclamp-fba") Write(w, 0x4a, 1); // FBA_1 (0x4a; 0x49 is PABE)
+    if (n != "ct16-fba")
+    {
+        Write(w, 0x42, 0x68 | 0xc0ull << 32); // (Cs-0)*FIX+Cd, overflow wraps with COLCLAMP=0
+        Write(w, 0x46, 0);
+    }
+    const u64 flags = n != "ct16-fba" ? 1ull << 6 : 0;
+    Sprite(w, 0x4060a0e0, 4, 6, 44, 42, 2, flags);
+    Sprite(w, 0xc0e04070, 21, 23, 60, 57, 3, flags);
+    Sprite(w, 0x0040c0a0, 8, 40, 30, 60, 4, flags);
     return w;
 }
 
@@ -385,18 +694,18 @@ struct Replay
         Save(bytes, width, height, packet, name, kind, format);
     }
 
-    void ReadBuffer(u32 packet, const std::string& name, bool depth)
+    void ReadBuffer(u32 packet, const std::string& name, bool depth, u32 width = Width, u32 height = Height, u32 fbw = 1, u32 zbp = 16)
     {
         // Read in the format the scene actually configured (context 1). 16-bit formats are read natively;
         // CT24/Z24 and 32-bit formats keep the CT32/Z32 view (verified bit-identical aliasing for CT24/Z24).
         const auto& ctx = g_gs_renderer->m_env.CTXT[0];
-        const u32 psm = depth ? ctx.ZBUF.PSM : ctx.FRAME.PSM;
+        const u32 psm = depth ? ctx.ZBUF.PSM & 0xf : ctx.FRAME.PSM; // ZBUF.PSM carries the 0x30 Z base (0x30,0x31,0x32,0x3a)
         const bool b16 = psm == 2 || psm == 10;
         const char* format = depth ? (psm == 0 ? "Z32" : psm == 1 ? "Z24" : psm == 2 ? "Z16" : psm == 10 ? "Z16S" : "Z?")
                                    : (psm == 0 ? "CT32" : psm == 1 ? "CT24" : psm == 2 ? "CT16" : psm == 10 ? "CT16S" : "CT?");
         const u64 spsm = b16 ? static_cast<u64>((depth ? 0x30 : 0) | psm) : (depth ? 0x30ull : 0);
-        // SBP ZBUF base / 256, SBW 1
-        ReadRegion(packet, name, depth ? "depth" : "rgba", (depth ? 512ull : 0) | 1ull << 16 | spsm << 24, Width, Height, format, b16);
+        // SBP ZBUF base / 256 (ZBP * 32), SBW fbw
+        ReadRegion(packet, name, depth ? "depth" : "rgba", (depth ? zbp * 32ull : 0) | static_cast<u64>(fbw) << 16 | spsm << 24, width, height, format, b16);
     }
 
     void ReadAllMemory(u32 packet)
@@ -409,14 +718,16 @@ struct Replay
     void Synthetic()
     {
         std::vector<u8> corpus;
-        for (u32 i = 0; i < Names.size() + cases; ++i)
+        for (u32 i = 0; i < Names.size() + cases + Extras.size(); ++i)
         {
             const auto start = std::chrono::steady_clock::now();
             const bool reset = !sequence || i == 0;
             if (reset)
                 GSreset(true);
             std::unique_ptr<GSDumpBase> repro;
-            const std::string name = i < Names.size() ? Names[i] : fmt::format("matrix-{:04d}", i - Names.size());
+            const bool extra = i >= Names.size() + cases;
+            const Extra* extra_info = extra ? &Extras[i - Names.size() - cases] : nullptr;
+            const std::string name = extra ? extra_info->name : i < Names.size() ? Names[i] : fmt::format("matrix-{:04d}", i - Names.size());
             if (capture)
             {
                 // Zero-length record denotes a hardware reset / new fixture.
@@ -436,21 +747,29 @@ struct Replay
                     s_repro = repro.get();
                 }
             }
-            Send(Scene(i, seed));
+            Send(extra ? ExtraScene(i - static_cast<u32>(Names.size()) - cases) : Scene(i, seed));
             s_corpus = nullptr;
             GSFlushPendingDraws();
             if (profile) RecordProfile(i, name, start);
             if (capture)
             {
-                ReadBuffer(i, name, false);
-                ReadBuffer(i, name, true);
+                if (extra)
+                {
+                    ReadBuffer(i, name, false, extra_info->width, extra_info->height, extra_info->fbw, extra_info->zbp);
+                    ReadBuffer(i, name, true, extra_info->width, extra_info->height, extra_info->fbw, extra_info->zbp);
+                }
+                else
+                {
+                    ReadBuffer(i, name, false);
+                    ReadBuffer(i, name, true);
+                }
                 if (repro) repro->VSync(0, true, g_gs_renderer->m_regs);
                 s_repro = nullptr;
             }
             ++frames;
         }
         if (capture && sequence)
-            ReadAllMemory(static_cast<u32>(Names.size() + cases));
+            ReadAllMemory(static_cast<u32>(Names.size() + cases + Extras.size()));
         if (capture)
         {
             std::ofstream stream(output + "/corpus.bin", std::ios::binary);
@@ -733,8 +1052,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunGSOracle(int ar
         GSclose(); opened = false;
         if (allocated) { SysMemory::Release(); allocated = false; }
         std::ofstream manifest(output + "/native-" + mode + ".json");
-        manifest << fmt::format("{{\"schema\":1,\"complete\":true,\"mode\":\"{}\",\"backend\":\"{}\",\"settings\":\"{}\",\"frames\":{},\"frames_per_replay\":{},\"batch\":{},\"base_cases\":{},\"cases\":{},\"seed\":{},\"warmup\":{},\"sequence\":{},\"checkpoints\":[", mode, backend, settings,
-            replay.frames * (mode == "benchmark" ? 10 : 1), replay.frames, mode == "benchmark" ? 10 : 1, Names.size(), cases, seed, warmup, sequence ? "true" : "false");
+        manifest << fmt::format("{{\"schema\":1,\"complete\":true,\"mode\":\"{}\",\"backend\":\"{}\",\"settings\":\"{}\",\"frames\":{},\"frames_per_replay\":{},\"batch\":{},\"base_cases\":{},\"extra_cases\":{},\"cases\":{},\"seed\":{},\"warmup\":{},\"sequence\":{},\"checkpoints\":[", mode, backend, settings,
+            replay.frames * (mode == "benchmark" ? 10 : 1), replay.frames, mode == "benchmark" ? 10 : 1, Names.size(), Extras.size(), cases, seed, warmup, sequence ? "true" : "false");
         for (size_t i = 0; i < replay.checkpoints.size(); ++i)
         {
             const auto& p = replay.checkpoints[i];
