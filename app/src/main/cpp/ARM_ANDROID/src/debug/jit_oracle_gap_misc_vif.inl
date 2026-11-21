@@ -412,9 +412,10 @@ void GapVifUnpackRandTests()
     {
         GapRng rng(seed * 104729ull + k);
         Cfg cfg = Generate(rng, false, false);
-        // Fill cycles after the last data word of a chunk write from data that has not arrived yet; the single-shot reference cannot model that
-        // split (every such case mismatches, in S-/V4- formats too). Left to the 2-chunk NUM accounting of non-fill cycles. GAP_VIF_CHUNKFILL=1 includes it.
-        if (IsFill(cfg) && !GapKnob("GAP_VIF_CHUNKFILL", 0)) continue;
+        // Fill cycles read past the last real element (the source does not advance), which is undefined on hardware. The reference sees the packet's
+        // random tail then 0xa7; the production partial-transfer buffer is pre-filled with the same bytes below so the two are comparable.
+        // GAP_VIF_CHUNKFILL=0 skips fill configs again (debugging aid).
+        if (IsFill(cfg) && !GapKnob("GAP_VIF_CHUNKFILL", 1)) continue;
         cfg.wrap = false;
         cfg.srcAlign = 0;
         cfg.addr = std::min(cfg.addr, VuSize(cfg.idx) - Span(cfg));
@@ -438,6 +439,9 @@ void GapVifUnpackRandTests()
         Prepare(cfg);
         regs.code = (cfg.num & 0xff) << 16 | (cfg.usn << 14) | ((cfg.addr >> 4) & 0x3ff) | ((cfg.fmt | (cfg.maskBit ? 0x10u : 0u)) << 24);
         vif.vifpacketsize = split;
+        // Bytes past the packet in the partial-transfer buffer must equal what the single-shot reference reads there (packet tail, then 0xa7).
+        std::memset(nVif[cfg.idx].buffer, 0xa7, sizeof(nVif[cfg.idx].buffer));
+        std::memcpy(nVif[cfg.idx].buffer, packet.data(), std::min<size_t>(packet.size(), sizeof(nVif[cfg.idx].buffer)));
         bool ok = GapCrashGuard::Run([&] {
             if (cfg.idx) vifUnpackSetup<1>(nullptr); else vifUnpackSetup<0>(nullptr);
             Guarded g1(split * 4 + 16);
