@@ -47,12 +47,10 @@ object CrashLogger {
     }
 
     fun logInfo(tag: String, message: String) {
-        if (!BuildConfig.DEBUG) return
         writeEntry("INFO", "[$tag] $message")
     }
 
     fun logContext(key: String, value: Any?) {
-        if (!BuildConfig.DEBUG) return
         writeEntry("CTX", "$key = $value")
     }
 

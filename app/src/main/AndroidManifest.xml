@@ -189,16 +189,6 @@
         </provider>
 
         <receiver
-            android:name=".core.utils.RetroAchievementsHostOverrideReceiver"
-            android:exported="true"
-            tools:ignore="ExportedReceiver">
-            <intent-filter>
-                <action android:name="${applicationId}.action.SET_RETROACHIEVEMENTS_HOST_OVERRIDE" />
-                <action android:name="${applicationId}.action.CLEAR_RETROACHIEVEMENTS_HOST_OVERRIDE" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
             android:name=".data.TextureDownloadActionReceiver"
             android:exported="false" />
 
