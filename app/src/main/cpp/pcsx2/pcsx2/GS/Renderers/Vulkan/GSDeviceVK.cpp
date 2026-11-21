@@ -11539,7 +11539,8 @@ void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 	}
 	else if (config.group_copy_blend && draw_rt && draw_rt_clone && !m_features.texture_barrier && config.drawlist &&
 			 config.drawlist_bbox && config.drawlist->size() > 1 && config.drawlist_bbox->size() == config.drawlist->size() &&
-			 !config.blend_multi_pass.enable && !config.alpha_second_pass.enable && !colclip_rt)
+			 !config.blend_multi_pass.enable && (!config.alpha_second_pass.enable || !config.alpha_second_pass.colormask.wrgba) &&
+			 !colclip_rt)
 	{
 		// An over-one software blend on overlapping primitives (GSRendererHW::EmulateBlending): the
 		// pre-draw snapshot above serves the first group; every later group needs the target as the

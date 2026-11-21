@@ -4376,8 +4376,7 @@ void GSDeviceOGL::SendHWDraw(const GSHWDrawConfig& config, GSTexture* draw_rt_cl
 	// A colour-only snapshot read follows the barriers the renderer asked for: one snapshot for the draw, or
 	// one per drawlist group of primitives that do not touch. Depth reads and sampled attachments keep the
 	// snapshot per primitive below.
-	const bool snapshot_per_barrier = m_fetch_caps.preferred == GSFramebufferFetchBackend::EXT && sampler_color &&
-		!sampler_depth && !attached_alias && config.tex_hazard == GSHWDrawConfig::TEX_HAZARD_NONE &&
+	const bool snapshot_per_barrier = sampler_color && !sampler_depth && !attached_alias && config.tex_hazard == GSHWDrawConfig::TEX_HAZARD_NONE &&
 		(full_barrier ? (config.drawlist && !config.drawlist->empty() && config.drawlist_bbox &&
 							config.drawlist_bbox->size() == config.drawlist->size()) :
 						one_barrier);

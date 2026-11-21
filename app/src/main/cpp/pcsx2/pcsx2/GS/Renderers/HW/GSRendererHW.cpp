@@ -7788,7 +7788,12 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, DATEOptio
 			// Ad is 0.5 where the register holds 128, which no fixed-function factor gives.
 			(blend_ad && !blend_multipass_group && !new_rt_alpha_scale)) &&
 		!m_conf.ps.shuffle && !m_channel_shuffle &&
-		(m_conf.alpha_test == GSHWDrawConfig::AlphaTestMode::NONE || m_conf.alpha_test == GSHWDrawConfig::AlphaTestMode::KEEP) &&
+		// An alpha test whose colour pass is an ordinary blend draw: nothing, discard on fail (KEEP), RGBA
+		// then Z (SIMPLE_FB_ONLY) or discard on fail then Z only for the failures (PASS_THEN_FAIL with ZB_ONLY).
+		// The second pass of the last two writes no colour, so it neither reads nor needs a snapshot.
+		(m_conf.alpha_test == GSHWDrawConfig::AlphaTestMode::NONE || m_conf.alpha_test == GSHWDrawConfig::AlphaTestMode::KEEP ||
+			m_conf.alpha_test == GSHWDrawConfig::AlphaTestMode::SIMPLE_FB_ONLY ||
+			(m_conf.alpha_test == GSHWDrawConfig::AlphaTestMode::PASS_THEN_FAIL && m_cached_ctx.TEST.AFAIL == AFAIL_ZB_ONLY)) &&
 		!date_options.enabled && !m_conf.ps.tex_is_fb && m_conf.tex_hazard == GSHWDrawConfig::TEX_HAZARD_NONE &&
 		(!m_conf.tex || m_conf.tex != m_conf.rt) && !m_conf.ps.IsFeedbackLoopDepth() &&
 		ComputeDrawlistGetSize(rt->m_scale) <= GSMaxGroupCopySplits;
