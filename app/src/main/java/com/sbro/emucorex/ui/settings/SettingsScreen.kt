@@ -1589,9 +1589,7 @@ private fun SettingsContent(
                                 onClick = onOpenFrameGeneration ?: {}
                             )
                         }
-                        // ANGLE also helps on Mali/PowerVR, not just MediaTek SoCs: the bundled
-                        // translation layer avoids the proprietary GLES driver paths entirely.
-                        if (GpuHardwareProfiles.isMediatekProfile(GpuHardwareProfiles.detectHardwareProfile()) &&
+                        if (GpuHardwareProfiles.isMediaTekHardware() &&
                             mediatekAngleAvailable
                         ) {
                             ToggleItem(

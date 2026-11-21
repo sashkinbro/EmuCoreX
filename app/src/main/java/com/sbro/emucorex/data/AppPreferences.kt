@@ -105,7 +105,7 @@ data class SettingsSnapshot(
     val languageTag: String? = null,
     val tvInterfaceMode: TvInterfaceMode = TvInterfaceMode.AUTO,
     val performanceProfile: Int = PerformanceProfiles.SAFE,
-    val gpuHardwareProfile: Int = GpuHardwareProfiles.ADRENO,
+    val gpuHardwareProfile: Int = GpuHardwareProfiles.UNKNOWN,
     val renderer: Int = RendererDefaults.defaultForHardware(),
     val upscaleMultiplier: Float = 1f,
     val aspectRatio: Int = 1,
@@ -5329,15 +5329,12 @@ class AppPreferences(private val context: Context) {
                     json.optInt("performanceProfile", PerformanceProfiles.SAFE)
                 ).fpuCorrectAddSub
             }
-            val gpuHardwareProfile = GpuHardwareProfiles.normalize(
-                json.optInt("gpuHardwareProfile", GpuHardwareProfiles.ADRENO)
-            )
             val importedRenderer = normalizeRendererPreference(
                 if (json.has("renderer")) json.optInt("renderer") else null
             )
             prefs[RENDERER] = importedRenderer
             prefs[MEDIATEK_ANGLE_OPENGL] = json.optBoolean("mediatekAngleOpenGl", false) &&
-                GpuHardwareProfiles.isMediatekProfile(gpuHardwareProfile)
+                GpuHardwareProfiles.isMediaTekHardware()
             prefs[UPSCALE] = json.readUpscaleMultiplier()
             prefs[SHADER_CHAIN_ENABLED] = json.optBoolean("shaderChainEnabled", false)
             json.optString("shaderChainPreset").trim().takeIf(String::isNotEmpty)?.let {

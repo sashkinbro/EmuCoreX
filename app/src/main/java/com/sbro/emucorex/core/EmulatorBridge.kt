@@ -149,12 +149,11 @@ object EmulatorBridge {
 
     private fun shouldUseMediatekAngleOpenGl(
         requested: Boolean,
-        gpuHardwareProfile: Int,
         renderer: Int
     ): Boolean {
         return requested &&
             renderer == OPENGL_RENDERER &&
-            GpuHardwareProfiles.isMediatekProfile(gpuHardwareProfile) &&
+            GpuHardwareProfiles.isMediaTekHardware() &&
             isBundledAngleAvailable()
     }
 
@@ -397,7 +396,7 @@ object EmulatorBridge {
         upscaleMultiplier: Float,
         gpuDriverType: Int = 0,
         customDriverPath: String? = null,
-        gpuHardwareProfile: Int = GpuHardwareProfiles.ADRENO,
+        gpuHardwareProfile: Int = GpuHardwareProfiles.UNKNOWN,
         mediatekAngleOpenGl: Boolean = false,
         aspectRatio: Int = 1,
         localMultiplayerMode: Int = AppPreferences.LOCAL_MULTIPLAYER_OFF,
@@ -570,7 +569,6 @@ object EmulatorBridge {
         val requestedGpuDriverType = if (gpuDriverType == 1 && customDriverSupported) 1 else 0
         val effectiveMediatekAngleOpenGl = shouldUseMediatekAngleOpenGl(
             requested = mediatekAngleOpenGl,
-            gpuHardwareProfile = normalizedGpuHardwareProfile,
             renderer = resolvedRenderer
         )
         val resolvedCustomDriverPath = if (requestedGpuDriverType == 1) {

@@ -3371,7 +3371,7 @@ private fun GpuBackendProfileControls(
     val context = LocalContext.current
     val supportsCustomDrivers = customGpuDriversSupported()
     val angleOpenGlSupported = remember {
-        GpuHardwareProfiles.isMediatekProfile(GpuHardwareProfiles.detectHardwareProfile())
+        GpuHardwareProfiles.isMediaTekHardware()
     }
     val bundledAngleAvailable = remember { EmulatorBridge.isBundledAngleAvailable() }
     val frameGenerationReady = remember(context) { FrameGenerationManager(context).snapshot().isConfigured }

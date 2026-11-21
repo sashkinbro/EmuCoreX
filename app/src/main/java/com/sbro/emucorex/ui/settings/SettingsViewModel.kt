@@ -1921,7 +1921,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setMediatekAngleOpenGl(enabled: Boolean) {
         viewModelScope.launch {
             val effectiveEnabled = enabled &&
-                GpuHardwareProfiles.isMediatekProfile(GpuHardwareProfiles.detectHardwareProfile()) &&
+                GpuHardwareProfiles.isMediaTekHardware() &&
                 EmulatorBridge.isBundledAngleAvailable()
             preferences.setMediatekAngleOpenGl(effectiveEnabled)
             EmulatorBridge.setSetting("EmuCore/GS", "AndroidUseAngleOpenGL", "bool", effectiveEnabled.toString())

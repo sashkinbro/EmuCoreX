@@ -6,6 +6,7 @@ object GpuHardwareProfiles {
     const val ADRENO = 0
     const val MALI = 1
     const val POWERVR = 2
+    const val UNKNOWN = -1
 
     private var cachedDetectedProfile: Int? = null
     private var cachedMediaTekHardware: Boolean? = null
@@ -14,20 +15,19 @@ object GpuHardwareProfiles {
         MALI -> MALI
         POWERVR -> POWERVR
         ADRENO -> ADRENO
-        else -> MALI
-    }
-
-    fun isMediatekProfile(profile: Int): Boolean {
-        return normalize(profile) == MALI || normalize(profile) == POWERVR
+        else -> UNKNOWN
     }
 
     // Telemetry/crash-report label. The native renderer detects the GPU path itself.
     fun familyName(profile: Int): String = when (normalize(profile)) {
         ADRENO -> "adreno"
         POWERVR -> "powervr"
-        else -> "mali"
+        MALI -> "mali"
+        else -> "unknown"
     }
 
+    // Decisions about MediaTek (e.g. the ANGLE OpenGL option) must use the SoC, never the GPU
+    // vendor: Unisoc and Exynos devices also ship Mali GPUs.
     fun isMediaTekHardware(): Boolean {
         cachedMediaTekHardware?.let { return it }
         return hasMediaTekSocHints(buildHardwareHints()).also { cachedMediaTekHardware = it }
@@ -82,7 +82,7 @@ object GpuHardwareProfiles {
             hasMediaTekSocHints(hints) -> MALI
             listOf("samsung", "exynos", "xclipse").any(hints::contains) -> MALI
             listOf("mali", "immortalis", "arm").any(hints::contains) -> MALI
-            else -> MALI
+            else -> UNKNOWN
         }
     }
 

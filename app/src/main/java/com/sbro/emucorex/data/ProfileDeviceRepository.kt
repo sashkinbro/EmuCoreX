@@ -86,7 +86,8 @@ object ProfileDeviceInfoProvider {
         val gpuFamily = when (GpuHardwareProfiles.detectHardwareProfile()) {
             GpuHardwareProfiles.ADRENO -> "Adreno"
             GpuHardwareProfiles.POWERVR -> "PowerVR"
-            else -> "Mali"
+            GpuHardwareProfiles.MALI -> "Mali"
+            else -> "Unknown"
         }
         val gpuModel = DeviceGpuInfoProvider.get(appContext).model?.displayName.orEmpty()
         return PlayerDevice(

@@ -21,7 +21,7 @@ class GpuHardwareProfileTest {
         assertEquals(GpuHardwareProfiles.ADRENO, GpuHardwareProfiles.classifyHardwareProfile("sm7635-ac vulcano"))
         assertEquals(GpuHardwareProfiles.ADRENO, GpuHardwareProfiles.classifyHardwareProfile("SM4450"))
         assertEquals(GpuHardwareProfiles.POWERVR, GpuHardwareProfiles.classifyHardwareProfile("IMGTEC PowerVR"))
-        assertEquals(GpuHardwareProfiles.MALI, GpuHardwareProfiles.classifyHardwareProfile("Comtech generic board"))
+        assertEquals(GpuHardwareProfiles.UNKNOWN, GpuHardwareProfiles.classifyHardwareProfile("Comtech generic board"))
         assertEquals(GpuHardwareProfiles.MALI, GpuHardwareProfiles.classifyHardwareProfile("Samsung Exynos 2200"))
         assertEquals(GpuHardwareProfiles.MALI, GpuHardwareProfiles.classifyHardwareProfile("ARM Mali-G78"))
     }
@@ -35,12 +35,26 @@ class GpuHardwareProfileTest {
     }
 
     @Test
+    fun mediaTekDecisionsFollowTheSocNotTheGpuVendor() {
+        val mediaTekMali = "MediaTek MT6989 ARM Mali-G720"
+        assertTrue(GpuHardwareProfiles.hasMediaTekSocHints(mediaTekMali))
+        assertEquals(GpuHardwareProfiles.MALI, GpuHardwareProfiles.classifyHardwareProfile(mediaTekMali))
+        val unisocMali = "Unisoc T820 ARM Mali-G57"
+        assertFalse(GpuHardwareProfiles.hasMediaTekSocHints(unisocMali))
+        assertEquals(GpuHardwareProfiles.MALI, GpuHardwareProfiles.classifyHardwareProfile(unisocMali))
+        assertFalse(GpuHardwareProfiles.hasMediaTekSocHints("Qualcomm SM8650 Adreno 750"))
+        assertEquals(GpuHardwareProfiles.UNKNOWN, GpuHardwareProfiles.classifyHardwareProfile("generic board"))
+        assertEquals(GpuHardwareProfiles.UNKNOWN, GpuHardwareProfiles.normalize(12345))
+        assertEquals("unknown", GpuHardwareProfiles.familyName(GpuHardwareProfiles.UNKNOWN))
+    }
+
+    @Test
     fun familyNameMatchesHardwareProfile() {
         assertEquals("adreno", GpuHardwareProfiles.familyName(GpuHardwareProfiles.ADRENO))
         assertEquals("powervr", GpuHardwareProfiles.familyName(GpuHardwareProfiles.POWERVR))
         assertEquals("mali", GpuHardwareProfiles.familyName(GpuHardwareProfiles.MALI))
         // Unsupported persisted values normalize to the Mali family.
-        assertEquals("mali", GpuHardwareProfiles.familyName(999))
+        assertEquals("unknown", GpuHardwareProfiles.familyName(999))
     }
 
     @Test
