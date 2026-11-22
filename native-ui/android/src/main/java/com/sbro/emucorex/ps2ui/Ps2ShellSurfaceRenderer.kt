@@ -21,17 +21,24 @@ class Ps2ShellSurfaceRenderer(
             Ps2ShellAudio.initialize(appContext)
             initialized = Ps2ShellNative.nativeInit()
             if (!initialized) {
-                Log.e(TAG, "PS2 native UI failed to initialize")
+                if (BuildConfig.DEBUG) Log.e(TAG, "PS2 native UI failed to initialize")
             } else {
                 onReady?.invoke()
             }
         } catch (error: Throwable) {
-            Log.e(TAG, "PS2 surface initialization failed", error)
+            if (BuildConfig.DEBUG) Log.e(TAG, "PS2 surface initialization failed", error)
         }
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         if (initialized) {
+            val dm = appContext.resources.displayMetrics
+            val xdpi = if (dm.xdpi in 72f..1000f) dm.xdpi else dm.densityDpi.toFloat().coerceIn(120f, 640f)
+            val ydpi = if (dm.ydpi in 72f..1000f) dm.ydpi else dm.densityDpi.toFloat().coerceIn(120f, 640f)
+            val shortInches = minOf(dm.widthPixels / xdpi, dm.heightPixels / ydpi)
+            val t = ((5.2f - shortInches) / (5.2f - 2.6f)).coerceIn(0f, 1f)
+            val uiScale = 1.0f + 0.32f * t
+            Ps2ShellNative.nativeSetUiScale(uiScale)
             Ps2ShellNative.nativeResize(width, height)
         }
     }

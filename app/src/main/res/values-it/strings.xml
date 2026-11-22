@@ -3186,12 +3186,12 @@
     <string name="ra_notif_hardcore_unrecognized_media">Hardcore disattivato. Inserito un supporto non riconosciuto.</string>
 
     <!-- PS2 BIOS Native Shell -->
-    <string name="ps2ui_main_menu">Menu di sistema</string>
+    <string name="ps2ui_main_menu">PlayStation 2</string>
     <string name="ps2ui_menu_games">Giochi</string>
     <string name="ps2ui_menu_browser">Browser</string>
     <string name="ps2ui_menu_settings">Configurazione di sistema</string>
     <string name="ps2ui_menu_settings_sub">Tema, schermo e audio</string>
-    <string name="ps2ui_boot_subtitle">Interfaccia di sistema PlayStation 2</string>
+    <string name="ps2ui_boot_subtitle">PlayStation 2</string>
     <string name="ps2ui_hint_select">Seleziona</string>
     <string name="ps2ui_hint_version">Versione</string>
     <string name="ps2ui_hint_exit">Esci</string>
@@ -3234,8 +3234,8 @@
     <string name="ps2ui_mc_load">Carica</string>
     <string name="ps2ui_mc_delete">Elimina</string>
     <string name="ps2ui_mc_exit">Indietro</string>
-    <string name="ps2ui_theme_ocean">Blu oceano</string>
-    <string name="ps2ui_theme_obsidian">Ossidiana notturna</string>
+    <string name="ps2ui_theme_ocean">PS2 Classico</string>
+    <string name="ps2ui_theme_obsidian">Argento Notturno</string>
     <string name="ps2ui_theme_emerald">Matrice smeraldo</string>
     <string name="ps2ui_theme_crimson">Sakura cremisi</string>
     <string name="ps2ui_theme_amethyst">Nebulosa ametista</string>
@@ -3278,14 +3278,14 @@
     <string name="ps2ui_set_restore">Ripristina predefiniti</string>
     <string name="ps2ui_launching_save">Caricamento salvataggio rapido...</string>
     <string name="ps2ui_launching_disc">Lettura disco PlayStation 2...</string>
-    <string name="ps2ui_exit_title">Esci dal menu sistema</string>
-    <string name="ps2ui_exit_msg">Tornare alla libreria giochi standard?</string>
+    <string name="ps2ui_exit_title">Esci</string>
+    <string name="ps2ui_exit_msg">Tornare alla libreria dei giochi?</string>
     <string name="ps2ui_del_title">Elimina salvataggio</string>
     <string name="ps2ui_del_msg">Eliminare definitivamente questo salvataggio?</string>
     <string name="ps2ui_del_card_title">Elimina Memory Card</string>
     <string name="ps2ui_del_card_msg">Eliminare definitivamente questa Memory Card?</string>
     <string name="ps2ui_restore_title">Ripristina predefiniti</string>
-    <string name="ps2ui_restore_msg">Ripristinare tutte le impostazioni PS2?</string>
+    <string name="ps2ui_restore_msg">Ripristinare le impostazioni predefinite?</string>
     <string name="ps2ui_yes">Sì</string>
     <string name="ps2ui_no">No</string>
     <string name="ps2ui_opt_start">Avvia disco</string>
@@ -3314,4 +3314,6 @@
     <string name="ps2ui_bios_missing">Mancante</string>
     <string name="ps2ui_slot_auto">Salvat. auto</string>
     <string name="ps2ui_slot_fmt">Slot %1$d</string>
+    <string name="ps2ui_mc_open_card">Apri scheda</string>
+    <string name="ps2ui_mc_no_data">Nessun dato presente.</string>
 </resources>

@@ -3200,12 +3200,12 @@
     <string name="ra_notif_hardcore_unrecognized_media">Hardcore dinonaktifkan. Media tak dikenal dimasukkan.</string>
 
     <!-- PS2 BIOS Native Shell -->
-    <string name="ps2ui_main_menu">Menu Sistem</string>
+    <string name="ps2ui_main_menu">PlayStation 2</string>
     <string name="ps2ui_menu_games">Game</string>
     <string name="ps2ui_menu_browser">Peramban</string>
     <string name="ps2ui_menu_settings">Konfigurasi Sistem</string>
     <string name="ps2ui_menu_settings_sub">Tema, Tampilan &amp; Audio</string>
-    <string name="ps2ui_boot_subtitle">Antarmuka Sistem PlayStation 2</string>
+    <string name="ps2ui_boot_subtitle">PlayStation 2</string>
     <string name="ps2ui_hint_select">Pilih</string>
     <string name="ps2ui_hint_version">Versi</string>
     <string name="ps2ui_hint_exit">Keluar</string>
@@ -3248,8 +3248,8 @@
     <string name="ps2ui_mc_load">Muat</string>
     <string name="ps2ui_mc_delete">Hapus</string>
     <string name="ps2ui_mc_exit">Kembali</string>
-    <string name="ps2ui_theme_ocean">Biru Samudra</string>
-    <string name="ps2ui_theme_obsidian">Obsidian Malam</string>
+    <string name="ps2ui_theme_ocean">PS2 Klasik</string>
+    <string name="ps2ui_theme_obsidian">Perak Tengah Malam</string>
     <string name="ps2ui_theme_emerald">Matriks Zamrud</string>
     <string name="ps2ui_theme_crimson">Sakura Merah</string>
     <string name="ps2ui_theme_amethyst">Nebula Kecubung</string>
@@ -3292,14 +3292,14 @@
     <string name="ps2ui_set_restore">Pulihkan Bawaan</string>
     <string name="ps2ui_launching_save">Memuat Simpan Cepat...</string>
     <string name="ps2ui_launching_disc">Membaca Cakram PlayStation 2...</string>
-    <string name="ps2ui_exit_title">Keluar dari Antarmuka</string>
-    <string name="ps2ui_exit_msg">Kembali ke pustaka game standar?</string>
+    <string name="ps2ui_exit_title">Keluar</string>
+    <string name="ps2ui_exit_msg">Kembali ke perpustakaan game?</string>
     <string name="ps2ui_del_title">Hapus Simpan Cepat</string>
     <string name="ps2ui_del_msg">Hapus permanen data simpan ini?</string>
     <string name="ps2ui_del_card_title">Hapus Kartu Memori</string>
     <string name="ps2ui_del_card_msg">Hapus permanen kartu memori ini?</string>
     <string name="ps2ui_restore_title">Pulihkan Bawaan</string>
-    <string name="ps2ui_restore_msg">Reset semua pengaturan antarmuka PS2?</string>
+    <string name="ps2ui_restore_msg">Pulihkan pengaturan default?</string>
     <string name="ps2ui_yes">Ya</string>
     <string name="ps2ui_no">Tidak</string>
     <string name="ps2ui_opt_start">Mulai Cakram</string>
@@ -3328,4 +3328,6 @@
     <string name="ps2ui_bios_missing">Tidak Ada</string>
     <string name="ps2ui_slot_auto">Simpan Oto</string>
     <string name="ps2ui_slot_fmt">Slot %1$d</string>
+    <string name="ps2ui_mc_open_card">Buka Kartu</string>
+    <string name="ps2ui_mc_no_data">Tidak ada data.</string>
 </resources>

@@ -55,6 +55,7 @@ struct GameEntry {
     int saveCount = 0;
     int latestSaveSlot = -1;
     std::string compatStatus;
+    bool isArcade = false;
 };
 
 struct SaveEntry {
@@ -77,8 +78,24 @@ struct MemoryCardEntry {
     bool isDefault = false;
 };
 
+struct McSaveBlockEntry {
+    std::string dirName;
+    std::string title;
+    int sizeKb = 0;
+    std::string dateStr;
+    int colorRgb = 0x48A6FF;
+    std::vector<float> iconMesh; // 9 floats/vertex: x,y,z, nx,ny,nz, r,g,b
+};
+
+struct McSlotContents {
+    std::string cardName;
+    int freeKb = 0;
+    int totalKb = 0;
+    std::vector<McSaveBlockEntry> saves;
+};
+
 struct ShellSettings {
-    int theme = 0;           // 0..5: Ocean Blue, Midnight Obsidian, Emerald Matrix, Crimson Sakura, Amethyst Nebula, Solar Gold
+    int theme = 0;           // 0..5: PS2 Classic, Midnight Silver, Emerald Matrix, Crimson Sakura, Amethyst Nebula, Solar Gold
     int aspectMode = 0;      // 0 = Auto Full Screen, 1 = 16:9, 2 = 4:3
     int orbsMode = 0;        // 0 = Normal, 1 = Calm, 2 = Static
     int towersMode = 0;      // 0 = Dynamic, 1 = Subtle, 2 = Off
@@ -166,7 +183,8 @@ enum TextStyle {
     STYLE_MENU = 1,
     STYLE_BODY = 2,
     STYLE_BODY_BOLD = 3,
-    STYLE_MONO = 4
+    STYLE_MONO = 4,
+    STYLE_PS2_LOGO = 5
 };
 
 struct RgbaColor {
@@ -183,6 +201,7 @@ public:
     bool Init();
     void Shutdown();
     void Resize(int width, int height);
+    void SetUiScale(float scale);
     void Draw();
 
     void OnKey(int key);
@@ -204,6 +223,12 @@ public:
         std::string slot2Meta,
         std::string slot2Status,
         std::vector<MemoryCardEntry> cards);
+    void SetMemoryCardContents(
+        int slot,
+        std::string cardName,
+        int freeKb,
+        int totalKb,
+        std::vector<McSaveBlockEntry> saves);
     void SetSettings(const ShellSettings& settings);
     void SetSystemStatus(const SystemStatus& status);
     void SetTouchMode(bool active, bool showTutorial);
@@ -213,6 +238,7 @@ public:
 
     std::vector<int> GetState() const;
     void SetState(int screen, int mainIndex, int gameIndex, int saveIndex);
+    void SelectGameByPath(const std::string& path);
 
 private:
     struct Vertex {
@@ -226,6 +252,13 @@ private:
         float nx, ny, nz;
         float hNorm;
         float r, g, b, a;
+    };
+
+    struct Mesh3DVertex {
+        float x, y, z;
+        float nx, ny, nz;
+        float r, g, b, a;
+        float spec;
     };
 
     struct TowerDef {
@@ -272,7 +305,13 @@ private:
         HIT_SETTING_RIGHT = 16,
         HIT_OVERLAY_ITEM = 17,
         HIT_OVERLAY_BACKDROP = 18,
-        HIT_BOTTOM_ACTION = 19
+        HIT_BOTTOM_ACTION = 19,
+        HIT_MC_OPEN_SLOT = 20,
+        HIT_MC_INNER_ICON = 21,
+        HIT_MC_INNER_BACK = 22,
+        HIT_MC_INNER_PREV = 23,
+        HIT_MC_INNER_NEXT = 24,
+        HIT_GAME_TAB = 25
     };
 
     struct HitTarget {
@@ -285,12 +324,12 @@ private:
     };
 
     struct LayoutMetrics {
-        float padX = 28.0f;
-        float topBarH = 44.0f;
-        float bottomBarH = 38.0f;
-        float bodyTop = 64.0f;
-        float bodyBot = 492.0f;
-        float bodyH = 428.0f;
+        float padX = 32.0f;
+        float topBarH = 34.0f;
+        float bottomBarH = 36.0f;
+        float bodyTop = 48.0f;
+        float bodyBot = 496.0f;
+        float bodyH = 448.0f;
     };
 
     // GL Setup / Teardown
@@ -331,7 +370,7 @@ private:
         float& outW,
         float& outH);
 
-    // Primitives & 3D Towers
+    // Primitives & 3D Meshes
     void BeginQuadBatch();
     void FlushQuadBatch();
     void PushQuad(
@@ -354,42 +393,64 @@ private:
         const RgbaColor& botCol,
         const RgbaColor& borderCol,
         const RgbaColor& glowCol = {0.0f, 0.0f, 0.0f, 0.0f});
+    void DrawFocusBeam(float x, float y, float w, float h, const RgbaColor& col, float alpha);
     void DrawHeaderBar(const std::string& title, float alpha = 1.0f);
-    void DrawOpticalDisc(float cx, float cy, float radius, float angleRad, int discType, float alpha);
-    void DrawMemoryCard3D(
-        float x, float y, float w, float h,
-        const RgbaColor& bodyCol,
-        const RgbaColor& accentCol,
-        bool focused,
-        bool isEmpty,
-        bool isFolder);
-    void DrawDiamondCursor(float cx, float cy, float size, float alpha);
+    void DrawOpticalDisc3D(
+        float cx, float cy, float radius,
+        float angleRad, float tiltXRad, float tiltYRad,
+        int discType, float alpha);
+
+    // High-Visibility Animated PS2 Focus Cursor & Grid Brackets
+    void SetCursorTarget(float x, float y);
+    void DrawAnimatedCursor(float x, float y, float size, float alpha);
+    void DrawAnimatedGridBrackets(float x, float y, float w, float h, const RgbaColor& acc, float alpha);
     void DrawImageAspectFit(
         const ImageCacheEntry& img,
         float x, float y, float w, float h,
         float alpha,
         bool fillCrop = false);
 
-    // 3D Towers City
+    // 3D Extruded Memory Card & Save Icon Meshes
+    void BuildMemoryCardMeshes();
+    void Draw3DMeshInRect(
+        const std::vector<Mesh3DVertex>& verts,
+        float vx, float vy, float vw, float vh,
+        float rotXDeg, float rotYDeg, float rotZDeg,
+        float camDist,
+        float scale,
+        const RgbaColor& accentCol,
+        float alpha,
+        bool isGhost);
+    void DrawMemoryCard3DViewport(
+        float vx, float vy, float vw, float vh,
+        float rotXDeg, float rotYDeg,
+        bool focused, bool isEmpty, bool isFolder, float alpha);
+    void DrawSaveBlockIcon3D(
+        float vx, float vy, float vw, float vh,
+        const McSaveBlockEntry& save,
+        bool focused, float alpha);
+
+    // 3D Towers City & 3D Orbiting Crystal Orbs w/ Curved Ribbons
     void RebuildTowersLayout();
     void DrawTowers3D(
         const float* mvp,
         float camX, float camY, float camZ,
         float riseScale,
-        float alpha);
+        const RgbaColor& fogCol,
+        float fogDensity,
+        float alpha,
+        float silhouetteMode = 0.0f);
+    void UpdateAndDrawOrbs3D(float dt);
 
     // Screen Drawing
     LayoutMetrics ComputeMetrics() const;
-    void ComputeBackgroundOrbs(
-        float& outCenterX, float& outCenterY,
-        float& outCoreBoost,
-        float* outOrbs28, float* outTrails28) const;
     void DrawBootIntro(float alpha);
     void DrawStatusBar(float alpha);
     void DrawBottomBar(float alpha);
     void DrawMainMenu(float alpha);
     void DrawGamesScreen(float alpha);
     void DrawBrowserScreen(float alpha);
+    void DrawBrowserInsideCard(float alpha, const LayoutMetrics& m);
     void DrawSettingsScreen(float alpha);
     void DrawLaunchStage();
     void DrawOverlay();
@@ -417,15 +478,18 @@ private:
     void ActivateGameLaunch(int gameIdx);
     void CycleSetting(int row, int delta);
     void PushSettingsToHost();
+    std::vector<int> FilteredGameIndices() const;
+    int SelectedMasterGameIndex() const;
     std::vector<int> FilteredSaveIndices() const;
     void ClampSelectionIndices();
+    void SnapGameScrollToSelected();
     std::string FormatClockText() const;
     std::string FormatCurrentDateText() const;
 
     // Theme Palette Helpers
-    RgbaColor PanelTopColor(float alpha = 0.84f) const;
-    RgbaColor PanelBotColor(float alpha = 0.90f) const;
-    RgbaColor PanelBorderColor(float alpha = 0.82f) const;
+    RgbaColor PanelTopColor(float alpha = 0.90f) const;
+    RgbaColor PanelBotColor(float alpha = 0.94f) const;
+    RgbaColor PanelBorderColor(float alpha = 0.65f) const;
     RgbaColor AccentColor(float alpha = 1.0f) const;
     RgbaColor SecondaryAccentColor(float alpha = 1.0f) const;
     RgbaColor PrimaryTextColor(float alpha = 1.0f) const;
@@ -439,6 +503,8 @@ private:
     GLuint fs_vbo_ = 0;
     GLuint tower_vao_ = 0;
     GLuint tower_vbo_ = 0;
+    GLuint mesh3d_vao_ = 0;
+    GLuint mesh3d_vbo_ = 0;
     GLuint white_tex_ = 0;
 
     GLuint prog_quad_ = 0;
@@ -447,18 +513,26 @@ private:
 
     GLuint prog_bg_ = 0;
     GLint bg_u_screen_ = -1;
-    GLint bg_u_orb_center_ = -1;
+    GLint bg_u_mist_center_ = -1;
     GLint bg_u_time_ = -1;
-    GLint bg_u_core_boost_ = -1;
+    GLint bg_u_mist_strength_ = -1;
     GLint bg_u_theme_ = -1;
-    GLint bg_u_orbs_ = -1;
-    GLint bg_u_trails_ = -1;
 
     GLuint prog_tower_ = 0;
     GLint twr_u_mvp_ = -1;
     GLint twr_u_cam_pos_ = -1;
     GLint twr_u_accent_col_ = -1;
+    GLint twr_u_fog_col_ = -1;
+    GLint twr_u_fog_density_ = -1;
     GLint twr_u_alpha_ = -1;
+    GLint twr_u_silhouette_ = -1;
+    GLint twr_u_time_ = -1;
+
+    GLuint prog_ribbon_ = 0;
+    GLint rib_u_screen_ = -1;
+
+    GLuint prog_orb_ = 0;
+    GLint orb_u_screen_ = -1;
 
     GLuint prog_panel_ = 0;
     GLint pan_u_screen_ = -1;
@@ -472,29 +546,40 @@ private:
     GLint pan_u_glow_col_ = -1;
 
     GLuint prog_disc_ = 0;
-    GLint disc_u_screen_ = -1;
-    GLint disc_u_rect_ = -1;
+    GLint disc_u_mvp_ = -1;
+    GLint disc_u_radius_ = -1;
     GLint disc_u_angle_ = -1;
     GLint disc_u_alpha_ = -1;
     GLint disc_u_disc_type_ = -1;
 
-    GLuint prog_card_ = 0;
-    GLint card_u_screen_ = -1;
-    GLint card_u_rect_ = -1;
-    GLint card_u_size_ = -1;
-    GLint card_u_body_col_ = -1;
-    GLint card_u_accent_col_ = -1;
-    GLint card_u_is_empty_ = -1;
-    GLint card_u_is_folder_ = -1;
-    GLint card_u_time_ = -1;
+    GLuint prog_mesh3d_ = 0;
+    GLint m3d_u_mvp_ = -1;
+    GLint m3d_u_model_ = -1;
+    GLint m3d_u_cam_pos_ = -1;
+    GLint m3d_u_accent_col_ = -1;
+    GLint m3d_u_alpha_ = -1;
+    GLint m3d_u_ghost_ = -1;
+
+    GLuint prog_launch_ = 0;
+    GLint lch_u_screen_ = -1;
+    GLint lch_u_progress_ = -1;
+    GLint lch_u_time_ = -1;
+    GLint lch_u_accent_col_ = -1;
 
     GLuint prog_scan_ = 0;
     GLint scan_u_viewport_ = -1;
     GLint scan_u_strength_ = -1;
 
     std::vector<Vertex> batch_verts_;
+    std::vector<Vertex> ribbon_verts_;
+    std::vector<Vertex> orb_sprite_verts_;
     std::vector<TowerVertex> tower_verts_;
     std::vector<TowerDef> towers_;
+    std::vector<Mesh3DVertex> memcard_solid_verts_;
+    std::vector<Mesh3DVertex> memcard_folder_verts_;
+    std::vector<Mesh3DVertex> memcard_ghost_verts_;
+    std::vector<Mesh3DVertex> save_cube_verts_;
+    std::vector<Mesh3DVertex> temp_mesh_verts_;
     GLuint batch_tex_ = 0;
 
     // Viewport & Scaling
@@ -507,21 +592,45 @@ private:
     int view_height_ = 720;
     float raster_scale_ = 2.0f;
     float last_raster_scale_ = 0.0f;
+    float ui_scale_ = 1.0f;
 
-    // Timing & Animations
+    // Timing & Spring Animations
     std::chrono::steady_clock::time_point last_frame_tp_;
     bool has_frame_tp_ = false;
     float time_sec_ = 0.0f;
+    float smooth_dt_ = 0.016f;
     float screen_fade_t_ = 1.0f;
+
+    // Spring-Animated PS2 Cursor
     float cursor_x_ = 0.0f;
     float cursor_y_ = 0.0f;
+    float cursor_target_x_ = 0.0f;
+    float cursor_target_y_ = 0.0f;
+    float cursor_trail_x_ = 0.0f;
+    float cursor_trail_y_ = 0.0f;
+    float cursor_flash_t_ = 0.0f;
     bool cursor_pos_init_ = false;
+
+    // 3D Orbital Vortex & Camera Fly-Through Transitions
     float disc_spin_angle_ = 0.0f;
+    float disc_slide_t_ = 1.0f;
+    int last_disc_game_idx_ = -1;
     float orb_tilt_cur_ = 0.0f;
+    float orb_center_cur_x_ = 280.0f;
+    float orb_center_cur_y_ = 270.0f;
+    float orb_scale_cur_ = 1.0f;
+    float orb_ring_blend_ = 0.0f;
+    float orb_swoop_t_ = 0.0f;
+    int orb_swoop_dir_ = 1;
+    float orb_flash_t_ = 0.0f;
+    double orb_phase_acc_ = 0.0;
+    double orb_rot_time_ = 0.0;
+    float mist_strength_cur_ = 0.16f;
+    bool orb_pos_init_ = false;
 
     bool boot_active_ = false;
     float boot_t_ = 0.0f;
-    float boot_duration_ = 2.65f;
+    float boot_duration_ = 3.8f;
     bool boot_sfx_played_ = false;
 
     bool launching_ = false;
@@ -541,19 +650,28 @@ private:
     int overlay_ = OVERLAY_NONE;
     int main_index_ = 0;
     int game_index_ = 0;
+    int game_tab_ = 0;        // 0 = PlayStation 2, 1 = Namco Arcade
+    bool has_arcade_games_ = false;
     float game_scroll_y_ = 0.0f;
     float game_scroll_target_y_ = 0.0f;
+    int pending_restore_game_index_ = -1;
+    std::string pending_restore_game_path_;
+    std::string selected_game_path_;
 
-    int mc_tab_ = 0;          // 0 = Quick Saves, 1 = Game Saves, 2 = PS2 Memory Cards
+    int mc_tab_ = 0;          // 0 = Quick Saves, 1 = Game Saves, 2 = Memory Cards
     int mc_page_ = 0;
-    int mc_slot_index_ = 0;   // 0..14 within quick-save page
+    int mc_slot_index_ = 0;
     int mc_focus_pane_ = 0;   // 0 = Grid / Cards, 1 = Action Buttons
-    int mc_action_idx_ = 0;   // 0 = Load, 1 = Delete, 2 = Back
+    int mc_action_idx_ = 0;
     int mc_card_slot_idx_ = 0; // 0 = Slot 1, 1 = Slot 2
     int mc_card_pane_ = 0;   // 0 = Top Slots (1 & 2), 1 = Available Card List
     int mc_card_list_idx_ = 0;
     float mc_card_scroll_y_ = 0.0f;
     float mc_card_scroll_target_y_ = 0.0f;
+    int mc_open_slot_ = 0;    // 0 = Slot overview, 1 = inside Slot 1, 2 = inside Slot 2
+    int mc_inner_idx_ = 0;
+    int mc_inner_page_ = 0;
+    float mc_inner_zoom_t_ = 0.0f;
     std::string mc_filter_game_path_;
     std::string mc_filter_game_title_;
 
@@ -561,9 +679,9 @@ private:
     float settings_scroll_y_ = 0.0f;
     float settings_scroll_target_y_ = 0.0f;
 
-    int dialog_btn_ = 1;      // 0 = YES, 1 = NO
+    int dialog_btn_ = 1;
     int options_index_ = 0;
-    int create_card_idx_ = 0; // 0=8MB, 1=16MB, 2=32MB, 3=64MB, 4=Folder
+    int create_card_idx_ = 0;
     int card_action_menu_idx_ = 0;
     int pending_delete_save_idx_ = -1;
     int pending_card_idx_ = -1;
@@ -575,11 +693,12 @@ private:
     float touch_down_vx_ = 0.0f;
     float touch_down_vy_ = 0.0f;
     float touch_last_vy_ = 0.0f;
-    int touch_drag_target_ = 0; // 1 = games list, 2 = settings list, 3 = card list
+    int touch_drag_target_ = 0;
     std::vector<HitTarget> hit_targets_;
 
     // Host Data
     mutable std::mutex data_mutex_;
+    mutable std::mutex strings_mutex_;
     std::unordered_map<std::string, std::string> strings_;
     std::vector<GameEntry> games_;
     std::vector<SaveEntry> saves_;
@@ -589,6 +708,8 @@ private:
     std::string slot2_card_name_;
     std::string slot2_card_meta_;
     std::string slot2_card_status_;
+    McSlotContents slot1_contents_;
+    McSlotContents slot2_contents_;
     std::vector<MemoryCardEntry> memcards_;
     ShellSettings settings_;
     SystemStatus status_;

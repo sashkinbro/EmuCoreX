@@ -3196,12 +3196,12 @@
     <string name="ra_notif_hardcore_unrecognized_media">Хардкорний режим вимкнено. Вставлено нерозпізнаний носій.</string>
 
     <!-- PS2 BIOS Native Shell -->
-    <string name="ps2ui_main_menu">Системне меню</string>
+    <string name="ps2ui_main_menu">PlayStation 2</string>
     <string name="ps2ui_menu_games">Ігри</string>
     <string name="ps2ui_menu_browser">Браузер</string>
     <string name="ps2ui_menu_settings">Конфігурація системи</string>
     <string name="ps2ui_menu_settings_sub">Тема, екран та звук</string>
-    <string name="ps2ui_boot_subtitle">Системна оболонка PlayStation 2</string>
+    <string name="ps2ui_boot_subtitle">PlayStation 2</string>
     <string name="ps2ui_hint_select">Вибрати</string>
     <string name="ps2ui_hint_version">Версія</string>
     <string name="ps2ui_hint_exit">Вихід</string>
@@ -3244,8 +3244,8 @@
     <string name="ps2ui_mc_load">Завантажити</string>
     <string name="ps2ui_mc_delete">Видалити</string>
     <string name="ps2ui_mc_exit">Назад</string>
-    <string name="ps2ui_theme_ocean">Океанський синій</string>
-    <string name="ps2ui_theme_obsidian">Нічний обсидіан</string>
+    <string name="ps2ui_theme_ocean">Класичний PS2</string>
+    <string name="ps2ui_theme_obsidian">Опівнічне срібло</string>
     <string name="ps2ui_theme_emerald">Смарагдова матриця</string>
     <string name="ps2ui_theme_crimson">Багряна сакура</string>
     <string name="ps2ui_theme_amethyst">Аметистова туманність</string>
@@ -3288,14 +3288,14 @@
     <string name="ps2ui_set_restore">Скинути налаштування</string>
     <string name="ps2ui_launching_save">Завантаження збереження...</string>
     <string name="ps2ui_launching_disc">Читання диска PlayStation 2...</string>
-    <string name="ps2ui_exit_title">Вихід з оболонки</string>
-    <string name="ps2ui_exit_msg">Повернутися до стандартної бібліотеки ігор?</string>
+    <string name="ps2ui_exit_title">Вихід</string>
+    <string name="ps2ui_exit_msg">Повернутися до бібліотеки ігор?</string>
     <string name="ps2ui_del_title">Видалити збереження</string>
     <string name="ps2ui_del_msg">Остаточно видалити це швидке збереження?</string>
     <string name="ps2ui_del_card_title">Видалити карту пам\'яті</string>
     <string name="ps2ui_del_card_msg">Остаточно видалити цю карту пам\'яті?</string>
     <string name="ps2ui_restore_title">Скинути налаштування</string>
-    <string name="ps2ui_restore_msg">Скинути всі параметри оболонки PS2 до стандартних?</string>
+    <string name="ps2ui_restore_msg">Скинути налаштування до стандартних?</string>
     <string name="ps2ui_yes">Так</string>
     <string name="ps2ui_no">Ні</string>
     <string name="ps2ui_opt_start">Запустити диск</string>
@@ -3324,4 +3324,6 @@
     <string name="ps2ui_bios_missing">Відсутній</string>
     <string name="ps2ui_slot_auto">Автозбереження</string>
     <string name="ps2ui_slot_fmt">Слот %1$d</string>
+    <string name="ps2ui_mc_open_card">Відкрити карту</string>
+    <string name="ps2ui_mc_no_data">Немає даних.</string>
 </resources>

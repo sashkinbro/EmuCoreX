@@ -3190,12 +3190,12 @@
     <string name="ra_notif_hardcore_unrecognized_media">تم تعطيل Hardcore. أُدخلت وسائط غير معروفة.</string>
 
     <!-- PS2 BIOS Native Shell -->
-    <string name="ps2ui_main_menu">قائمة النظام</string>
+    <string name="ps2ui_main_menu">PlayStation 2</string>
     <string name="ps2ui_menu_games">الألعاب</string>
     <string name="ps2ui_menu_browser">المتصفح</string>
     <string name="ps2ui_menu_settings">تكوين النظام</string>
     <string name="ps2ui_menu_settings_sub">السمة والشاشة والصوت</string>
-    <string name="ps2ui_boot_subtitle">واجهة نظام PlayStation 2</string>
+    <string name="ps2ui_boot_subtitle">PlayStation 2</string>
     <string name="ps2ui_hint_select">تأكيد</string>
     <string name="ps2ui_hint_version">الإصدار</string>
     <string name="ps2ui_hint_exit">خروج</string>
@@ -3238,8 +3238,8 @@
     <string name="ps2ui_mc_load">تحميل</string>
     <string name="ps2ui_mc_delete">حذف</string>
     <string name="ps2ui_mc_exit">رجوع</string>
-    <string name="ps2ui_theme_ocean">أزرق المحيط</string>
-    <string name="ps2ui_theme_obsidian">أوبسيديان ليلي</string>
+    <string name="ps2ui_theme_ocean">PS2 الكلاسيكي</string>
+    <string name="ps2ui_theme_obsidian">فضي ليلي</string>
     <string name="ps2ui_theme_emerald">ماتريكس زمردي</string>
     <string name="ps2ui_theme_crimson">ساكورا قرمزي</string>
     <string name="ps2ui_theme_amethyst">سديم جمشتي</string>
@@ -3282,14 +3282,14 @@
     <string name="ps2ui_set_restore">استعادة الافتراضي</string>
     <string name="ps2ui_launching_save">جارٍ تحميل الحفظ السريع...</string>
     <string name="ps2ui_launching_disc">جارٍ قراءة قرص PlayStation 2...</string>
-    <string name="ps2ui_exit_title">الخروج من واجهة النظام</string>
-    <string name="ps2ui_exit_msg">العودة إلى مكتبة الألعاب القياسية؟</string>
+    <string name="ps2ui_exit_title">خروج</string>
+    <string name="ps2ui_exit_msg">العودة إلى مكتبة الألعاب؟</string>
     <string name="ps2ui_del_title">حذف الحفظ السريع</string>
     <string name="ps2ui_del_msg">حذف حالة الحفظ هذه نهائياً؟</string>
     <string name="ps2ui_del_card_title">حذف بطاقة الذاكرة</string>
     <string name="ps2ui_del_card_msg">حذف بطاقة الذاكرة هذه نهائياً؟</string>
     <string name="ps2ui_restore_title">استعادة الافتراضي</string>
-    <string name="ps2ui_restore_msg">إعادة تعيين جميع إعدادات واجهة PS2؟</string>
+    <string name="ps2ui_restore_msg">استعادة الإعدادات الافتراضية؟</string>
     <string name="ps2ui_yes">نعم</string>
     <string name="ps2ui_no">لا</string>
     <string name="ps2ui_opt_start">تشغيل القرص</string>
@@ -3318,4 +3318,6 @@
     <string name="ps2ui_bios_missing">مفقود</string>
     <string name="ps2ui_slot_auto">حفظ تلقائي</string>
     <string name="ps2ui_slot_fmt">الخانة %1$d</string>
+    <string name="ps2ui_mc_open_card">فتح البطاقة</string>
+    <string name="ps2ui_mc_no_data">لا توجد بيانات.</string>
 </resources>

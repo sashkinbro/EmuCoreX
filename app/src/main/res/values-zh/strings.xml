@@ -3187,12 +3187,12 @@
     <string name="ra_notif_hardcore_unrecognized_media">已禁用硬核模式：插入了无法识别的介质。</string>
 
     <!-- PS2 BIOS Native Shell -->
-    <string name="ps2ui_main_menu">系统菜单</string>
+    <string name="ps2ui_main_menu">PlayStation 2</string>
     <string name="ps2ui_menu_games">游戏</string>
     <string name="ps2ui_menu_browser">浏览器</string>
     <string name="ps2ui_menu_settings">系统配置</string>
     <string name="ps2ui_menu_settings_sub">主题、显示与音频</string>
-    <string name="ps2ui_boot_subtitle">PlayStation 2 系统外壳</string>
+    <string name="ps2ui_boot_subtitle">PlayStation 2</string>
     <string name="ps2ui_hint_select">确认</string>
     <string name="ps2ui_hint_version">版本</string>
     <string name="ps2ui_hint_exit">退出</string>
@@ -3235,8 +3235,8 @@
     <string name="ps2ui_mc_load">读取</string>
     <string name="ps2ui_mc_delete">删除</string>
     <string name="ps2ui_mc_exit">返回</string>
-    <string name="ps2ui_theme_ocean">深海蓝</string>
-    <string name="ps2ui_theme_obsidian">午夜黑曜石</string>
+    <string name="ps2ui_theme_ocean">PS2 经典</string>
+    <string name="ps2ui_theme_obsidian">午夜银</string>
     <string name="ps2ui_theme_emerald">翡翠矩阵</string>
     <string name="ps2ui_theme_crimson">绯红樱花</string>
     <string name="ps2ui_theme_amethyst">紫晶星云</string>
@@ -3279,14 +3279,14 @@
     <string name="ps2ui_set_restore">恢复默认设置</string>
     <string name="ps2ui_launching_save">正在加载快速存档...</string>
     <string name="ps2ui_launching_disc">正在读取 PlayStation 2 光盘...</string>
-    <string name="ps2ui_exit_title">退出系统外壳</string>
-    <string name="ps2ui_exit_msg">返回标准游戏库界面？</string>
+    <string name="ps2ui_exit_title">退出</string>
+    <string name="ps2ui_exit_msg">返回游戏库？</string>
     <string name="ps2ui_del_title">删除快速存档</string>
     <string name="ps2ui_del_msg">确定要永久删除此存档吗？</string>
     <string name="ps2ui_del_card_title">删除记忆卡</string>
     <string name="ps2ui_del_card_msg">确定要永久删除此记忆卡吗？</string>
     <string name="ps2ui_restore_title">恢复默认设置</string>
-    <string name="ps2ui_restore_msg">将所有 PS2 系统外壳设置重置为默认？</string>
+    <string name="ps2ui_restore_msg">恢复默认设置？</string>
     <string name="ps2ui_yes">是</string>
     <string name="ps2ui_no">否</string>
     <string name="ps2ui_opt_start">启动光盘</string>
@@ -3315,4 +3315,6 @@
     <string name="ps2ui_bios_missing">缺失</string>
     <string name="ps2ui_slot_auto">自动存档</string>
     <string name="ps2ui_slot_fmt">插槽 %1$d</string>
+    <string name="ps2ui_mc_open_card">打开记忆卡</string>
+    <string name="ps2ui_mc_no_data">没有数据。</string>
 </resources>

@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ActivityInfo
+import android.graphics.Typeface
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.net.ConnectivityManager
@@ -37,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.res.ResourcesCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -54,10 +56,13 @@ import com.sbro.emucorex.data.MemoryCardRepository
 import com.sbro.emucorex.data.SaveStateEntryInfo
 import com.sbro.emucorex.data.SaveStateRepository
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityStatus
+import com.sbro.emucorex.ps2ui.Ps2McContents
+import com.sbro.emucorex.ps2ui.Ps2MemoryCardParser
 import com.sbro.emucorex.ps2ui.Ps2ShellAudio
 import com.sbro.emucorex.ps2ui.Ps2ShellHost
 import com.sbro.emucorex.ps2ui.Ps2ShellNative
 import com.sbro.emucorex.ps2ui.Ps2ShellSurfaceRenderer
+import com.sbro.emucorex.ps2ui.Ps2TextRasterizer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -106,6 +111,12 @@ private data class Ps2SystemSnapshot(
 
 private object Ps2ShellSessionCache {
     @Volatile
+    var lastResolvedGames: List<Ps2ResolvedGame> = emptyList()
+
+    @Volatile
+    var lastSelectedGamePath: String = ""
+
+    @Volatile
     var lastSaves: List<SaveStateEntryInfo> = emptyList()
 
     @Volatile
@@ -119,6 +130,12 @@ private object Ps2ShellSessionCache {
 
     @Volatile
     var lastSystemSnapshot: Ps2SystemSnapshot = Ps2SystemSnapshot()
+
+    @Volatile
+    var slot1Contents: Ps2McContents? = null
+
+    @Volatile
+    var slot2Contents: Ps2McContents? = null
 }
 
 private val PS2_STRING_BINDINGS: List<Pair<String, Int>> = listOf(
@@ -244,6 +261,10 @@ private val PS2_STRING_BINDINGS: List<Pair<String, Int>> = listOf(
     "ps2ui_touch_tip_3" to R.string.ps2ui_touch_tip_3,
     "ps2ui_touch_tip_4" to R.string.ps2ui_touch_tip_4,
     "ps2ui_got_it" to R.string.ps2ui_got_it,
+    "ps2ui_mc_open_card" to R.string.ps2ui_mc_open_card,
+    "ps2ui_mc_no_data" to R.string.ps2ui_mc_no_data,
+    "ps2ui_games_tab_ps2" to R.string.home_platform_ps2,
+    "ps2ui_games_tab_arcade" to R.string.home_platform_arcade,
 )
 
 private fun normalizeSerialKey(raw: String?): String? {
@@ -438,6 +459,21 @@ private fun pushMemoryCardsToNative(context: Context, bundle: Ps2MemoryCardBundl
     )
 }
 
+private fun pushMemoryCardContentsToNative(slot: Int, contents: Ps2McContents) {
+    Ps2ShellNative.nativeSetMemoryCardContents(
+        slot = slot,
+        cardName = contents.cardName,
+        freeKb = contents.freeKb,
+        totalKb = contents.totalKb,
+        dirNames = Array(contents.saves.size) { i -> contents.saves[i].dirName },
+        titles = Array(contents.saves.size) { i -> contents.saves[i].title },
+        sizesKb = IntArray(contents.saves.size) { i -> contents.saves[i].sizeKb },
+        dates = Array(contents.saves.size) { i -> contents.saves[i].dateStr },
+        colorsRgb = IntArray(contents.saves.size) { i -> contents.saves[i].colorRgb },
+        iconMeshes = Array(contents.saves.size) { i -> contents.saves[i].iconVerts },
+    )
+}
+
 /**
  * Full-screen native GLES 3.0 PlayStation 2 BIOS shell replacing EmuCoreX's 3D carousel shelf.
  */
@@ -519,13 +555,13 @@ fun Ps2ShellScreen(
     val currentSaves = rememberUpdatedState(saveStates)
 
     val resolvedGames by produceState<List<Ps2ResolvedGame>>(
-        initialValue = emptyList(),
+        initialValue = Ps2ShellSessionCache.lastResolvedGames,
         games,
         saveStates,
         isCoverArtDisabled,
         context
     ) {
-        value = withContext(Dispatchers.IO) {
+        val resolved = withContext(Dispatchers.IO) {
             val savesByGamePath = saveStates.groupBy { it.gamePath.orEmpty() }
             val savesBySerial = saveStates.mapNotNull { sv ->
                 normalizeSerialKey(sv.serial)?.let { it to sv }
@@ -563,6 +599,8 @@ fun Ps2ShellScreen(
                 )
             }
         }
+        Ps2ShellSessionCache.lastResolvedGames = resolved
+        value = resolved
     }
     val currentResolvedGames = rememberUpdatedState(resolvedGames)
 
@@ -693,6 +731,19 @@ fun Ps2ShellScreen(
     val mainActivity = context as? MainActivity
     val orientationToken = remember { "ps2shell_${System.identityHashCode(Any())}" }
 
+    remember(context) {
+        runCatching {
+            val base = ResourcesCompat.getFont(context, R.font.exo2_variable)
+            if (base != null) {
+                val light = Typeface.create(base, 350, false)
+                val regular = Typeface.create(base, 450, false)
+                val bold = Typeface.create(base, 650, false)
+                Ps2TextRasterizer.setCustomTypefaces(light, regular, bold)
+            }
+        }
+        true
+    }
+
     val surface = remember(context) {
         var downX = 0f
         var downY = 0f
@@ -721,6 +772,8 @@ fun Ps2ShellScreen(
                     pushGamesToNative(gamesSnap)
                     pushSavesToNative(context, savesSnap)
                     pushMemoryCardsToNative(context, currentCardBundle.value)
+                    Ps2ShellSessionCache.slot1Contents?.let { pushMemoryCardContentsToNative(1, it) }
+                    Ps2ShellSessionCache.slot2Contents?.let { pushMemoryCardContentsToNative(2, it) }
 
                     Ps2ShellNative.nativeSetState(
                         shellPrefs.getInt("screen", 0),
@@ -728,6 +781,11 @@ fun Ps2ShellScreen(
                         shellPrefs.getInt("game_index", 0),
                         shellPrefs.getInt("save_index", 0),
                     )
+                    val restorePath = Ps2ShellSessionCache.lastSelectedGamePath
+                        .ifBlank { shellPrefs.getString("last_game_path", "").orEmpty() }
+                    if (restorePath.isNotBlank()) {
+                        Ps2ShellNative.nativeSelectGameByPath(restorePath)
+                    }
                     if (Ps2ShellSessionCache.returnedFromGame) {
                         Ps2ShellSessionCache.returnedFromGame = false
                         Ps2ShellNative.nativeTriggerTransition(1)
@@ -858,6 +916,10 @@ fun Ps2ShellScreen(
         runCatching { context.registerReceiver(statusReceiver, filter) }
 
         Ps2ShellHost.setGameLaunchListener { gamePath ->
+            if (gamePath.isNotBlank()) {
+                Ps2ShellSessionCache.lastSelectedGamePath = gamePath
+                shellPrefs.edit().putString("last_game_path", gamePath).apply()
+            }
             saveShellNavigationState()
             Ps2ShellSessionCache.returnedFromGame = true
             Ps2ShellAudio.pauseAudio()
@@ -865,6 +927,10 @@ fun Ps2ShellScreen(
         }
 
         Ps2ShellHost.setSaveLaunchListener { gamePath, slot ->
+            if (gamePath.isNotBlank()) {
+                Ps2ShellSessionCache.lastSelectedGamePath = gamePath
+                shellPrefs.edit().putString("last_game_path", gamePath).apply()
+            }
             saveShellNavigationState()
             Ps2ShellSessionCache.returnedFromGame = true
             Ps2ShellAudio.pauseAudio()
@@ -959,6 +1025,10 @@ fun Ps2ShellScreen(
         Ps2ShellHost.setOpenGameSettingsListener { index ->
             val game = currentGames.value.getOrNull(index)
             if (game != null) {
+                if (game.path.isNotBlank()) {
+                    Ps2ShellSessionCache.lastSelectedGamePath = game.path
+                    shellPrefs.edit().putString("last_game_path", game.path).apply()
+                }
                 saveShellNavigationState()
                 Ps2ShellSessionCache.returnedFromGame = true
                 Ps2ShellAudio.pauseAudio()
@@ -1085,6 +1155,31 @@ fun Ps2ShellScreen(
         val bundle = memoryCardBundle
         surface.queueEvent {
             pushMemoryCardsToNative(context, bundle)
+        }
+        val (c1, c2) = withContext(Dispatchers.IO) {
+            val s1Card = bundle.slot1Name.takeIf { it.isNotBlank() }?.let { n ->
+                bundle.cards.find { it.name.equals(n, ignoreCase = true) }
+            }
+            val s2Card = bundle.slot2Name.takeIf { it.isNotBlank() }?.let { n ->
+                bundle.cards.find { it.name.equals(n, ignoreCase = true) }
+            }
+            val res1 = if (s1Card != null) {
+                Ps2MemoryCardParser.parse(s1Card.path, s1Card.name)
+            } else {
+                Ps2McContents(bundle.slot1Name, "", 0, 0, emptyList())
+            }
+            val res2 = if (s2Card != null) {
+                Ps2MemoryCardParser.parse(s2Card.path, s2Card.name)
+            } else {
+                Ps2McContents(bundle.slot2Name, "", 0, 0, emptyList())
+            }
+            res1 to res2
+        }
+        Ps2ShellSessionCache.slot1Contents = c1
+        Ps2ShellSessionCache.slot2Contents = c2
+        surface.queueEvent {
+            pushMemoryCardContentsToNative(1, c1)
+            pushMemoryCardContentsToNative(2, c2)
         }
     }
 

@@ -1,17 +1,24 @@
 #include "ps2_renderer.h"
 #include "ps2_shaders.h"
 
-#include <android/log.h>
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <time.h>
 #include <vector>
 
+#if defined(PS2UI_DISABLE_LOGS) || defined(NDEBUG)
+#define LOGE(...) ((void)0)
+#define LOGI(...) ((void)0)
+#else
+#include <android/log.h>
 #define LOG_TAG "Ps2Renderer"
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#endif
 
 namespace ps2ui {
 
@@ -38,9 +45,25 @@ float EaseOutCubic(float t) {
     return 1.0f - inv * inv * inv;
 }
 
-float EaseInOutSine(float t) {
-    t = Clamp01(t);
-    return 0.5f * (1.0f - std::cos(kPi * t));
+bool IsArcadeEntry(const GameEntry& g) {
+    if (g.path.size() >= 7) {
+        const size_t n = g.path.size();
+        const char* ext = ".acgame";
+        bool match = true;
+        for (size_t i = 0; i < 7; ++i) {
+            if (std::tolower(static_cast<unsigned char>(g.path[n - 7 + i])) != ext[i]) {
+                match = false;
+                break;
+            }
+        }
+        if (match) return true;
+    }
+    if (g.serial.size() >= 2) {
+        const char c0 = static_cast<char>(std::toupper(static_cast<unsigned char>(g.serial[0])));
+        const char c1 = static_cast<char>(std::toupper(static_cast<unsigned char>(g.serial[1])));
+        if (c0 == 'N' && c1 == 'M') return true;
+    }
+    return false;
 }
 
 std::string MakeTextCacheKey(
@@ -63,7 +86,11 @@ std::string MakeTextCacheKey(
     return text + buf;
 }
 
-// Column-major 4x4 matrix multiplication out = a * b
+void Mat4Identity(float* out) {
+    std::memset(out, 0, 16 * sizeof(float));
+    out[0] = out[5] = out[10] = out[15] = 1.0f;
+}
+
 void Mat4Mul(const float* a, const float* b, float* out) {
     float tmp[16];
     for (int col = 0; col < 4; ++col) {
@@ -76,6 +103,34 @@ void Mat4Mul(const float* a, const float* b, float* out) {
         }
     }
     std::memcpy(out, tmp, sizeof(tmp));
+}
+
+void MakeScale(float sx, float sy, float sz, float* out) {
+    Mat4Identity(out);
+    out[0] = sx;
+    out[5] = sy;
+    out[10] = sz;
+}
+
+void MakeRotateX(float rad, float* out) {
+    Mat4Identity(out);
+    float c = std::cos(rad), s = std::sin(rad);
+    out[5] = c;  out[9] = -s;
+    out[6] = s;  out[10] = c;
+}
+
+void MakeRotateY(float rad, float* out) {
+    Mat4Identity(out);
+    float c = std::cos(rad), s = std::sin(rad);
+    out[0] = c;   out[8] = s;
+    out[2] = -s;  out[10] = c;
+}
+
+void MakeRotateZ(float rad, float* out) {
+    Mat4Identity(out);
+    float c = std::cos(rad), s = std::sin(rad);
+    out[0] = c; out[4] = -s;
+    out[1] = s; out[5] = c;
 }
 
 void MakePerspective(float fovRad, float aspect, float zNear, float zFar, float* out) {
@@ -154,12 +209,12 @@ bool Ps2Renderer::Init() {
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
 
-    // Pre-allocate 3D glass towers buffer (up to 48 towers * 30 verts = 1440 verts)
+    // 3D Crystal Towers buffer (64 towers * 30 verts = 1920 verts, reserve 4096)
     glGenVertexArrays(1, &tower_vao_);
     glGenBuffers(1, &tower_vbo_);
     glBindVertexArray(tower_vao_);
     glBindBuffer(GL_ARRAY_BUFFER, tower_vbo_);
-    glBufferData(GL_ARRAY_BUFFER, 2048 * sizeof(TowerVertex), nullptr, GL_STREAM_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, 4096 * sizeof(TowerVertex), nullptr, GL_STREAM_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(TowerVertex), reinterpret_cast<void*>(0));
     glEnableVertexAttribArray(1);
@@ -168,6 +223,21 @@ bool Ps2Renderer::Init() {
     glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(TowerVertex), reinterpret_cast<void*>(6 * sizeof(float)));
     glEnableVertexAttribArray(3);
     glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(TowerVertex), reinterpret_cast<void*>(7 * sizeof(float)));
+
+    // 3D Memory Card & .icn Save Icon Mesh buffer
+    glGenVertexArrays(1, &mesh3d_vao_);
+    glGenBuffers(1, &mesh3d_vbo_);
+    glBindVertexArray(mesh3d_vao_);
+    glBindBuffer(GL_ARRAY_BUFFER, mesh3d_vbo_);
+    glBufferData(GL_ARRAY_BUFFER, 1024 * sizeof(Mesh3DVertex), nullptr, GL_STREAM_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Mesh3DVertex), reinterpret_cast<void*>(0));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Mesh3DVertex), reinterpret_cast<void*>(3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Mesh3DVertex), reinterpret_cast<void*>(6 * sizeof(float)));
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(Mesh3DVertex), reinterpret_cast<void*>(10 * sizeof(float)));
     glBindVertexArray(0);
 
     const uint8_t whitePx[4] = {255, 255, 255, 255};
@@ -180,13 +250,17 @@ bool Ps2Renderer::Init() {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, whitePx);
 
     batch_verts_.reserve(4096);
-    tower_verts_.reserve(1500);
+    ribbon_verts_.reserve(2048);
+    orb_sprite_verts_.reserve(64);
+    tower_verts_.reserve(2048);
     hit_targets_.reserve(64);
+
     RebuildTowersLayout();
+    BuildMemoryCardMeshes();
 
     has_frame_tp_ = false;
     gl_ready_ = true;
-    LOGI("PS2 native UI GLES3 renderer initialized");
+    LOGI("PS2 native UI GLES3 renderer initialized (v2)");
     return true;
 }
 
@@ -203,6 +277,8 @@ void Ps2Renderer::Shutdown() {
     if (fs_vao_) { glDeleteVertexArrays(1, &fs_vao_); fs_vao_ = 0; }
     if (tower_vbo_) { glDeleteBuffers(1, &tower_vbo_); tower_vbo_ = 0; }
     if (tower_vao_) { glDeleteVertexArrays(1, &tower_vao_); tower_vao_ = 0; }
+    if (mesh3d_vbo_) { glDeleteBuffers(1, &mesh3d_vbo_); mesh3d_vbo_ = 0; }
+    if (mesh3d_vao_) { glDeleteVertexArrays(1, &mesh3d_vao_); mesh3d_vao_ = 0; }
 
     auto delProg = [](GLuint& p) {
         if (p) {
@@ -213,9 +289,12 @@ void Ps2Renderer::Shutdown() {
     delProg(prog_quad_);
     delProg(prog_bg_);
     delProg(prog_tower_);
+    delProg(prog_ribbon_);
+    delProg(prog_orb_);
     delProg(prog_panel_);
     delProg(prog_disc_);
-    delProg(prog_card_);
+    delProg(prog_mesh3d_);
+    delProg(prog_launch_);
     delProg(prog_scan_);
     gl_ready_ = false;
 }
@@ -228,9 +307,11 @@ GLuint Ps2Renderer::CompileProgram(const char* vsSrc, const char* fsSrc) {
         GLint ok = 0;
         glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
         if (!ok) {
+#if !defined(PS2UI_DISABLE_LOGS) && !defined(NDEBUG)
             char logBuf[1024] = {};
             glGetShaderInfoLog(s, sizeof(logBuf), nullptr, logBuf);
             LOGE("Shader compile error: %s", logBuf);
+#endif
             glDeleteShader(s);
             return 0;
         }
@@ -254,9 +335,11 @@ GLuint Ps2Renderer::CompileProgram(const char* vsSrc, const char* fsSrc) {
     GLint ok = 0;
     glGetProgramiv(prog, GL_LINK_STATUS, &ok);
     if (!ok) {
+#if !defined(PS2UI_DISABLE_LOGS) && !defined(NDEBUG)
         char logBuf[1024] = {};
         glGetProgramInfoLog(prog, sizeof(logBuf), nullptr, logBuf);
         LOGE("Program link error: %s", logBuf);
+#endif
         glDeleteProgram(prog);
         return 0;
     }
@@ -267,13 +350,17 @@ bool Ps2Renderer::CompileShaders() {
     prog_quad_ = CompileProgram(kQuadVertexShader, kQuadFragmentShader);
     prog_bg_ = CompileProgram(kBgVertexShader, kBgFragmentShader);
     prog_tower_ = CompileProgram(kTowerVertexShader, kTowerFragmentShader);
+    prog_ribbon_ = CompileProgram(kOrbRibbonVertexShader, kOrbRibbonFragmentShader);
+    prog_orb_ = CompileProgram(kOrbRibbonVertexShader, kOrbSpriteFragmentShader);
     prog_panel_ = CompileProgram(kPanelVertexShader, kPanelFragmentShader);
     prog_disc_ = CompileProgram(kDiscVertexShader, kDiscFragmentShader);
-    prog_card_ = CompileProgram(kCardVertexShader, kCardFragmentShader);
+    prog_mesh3d_ = CompileProgram(kMesh3DVertexShader, kMesh3DFragmentShader);
+    prog_launch_ = CompileProgram(kBgVertexShader, kLaunchSplashFragmentShader);
     prog_scan_ = CompileProgram(kBgVertexShader, kScanlineFragmentShader);
 
-    if (!prog_quad_ || !prog_bg_ || !prog_tower_ || !prog_panel_ ||
-        !prog_disc_ || !prog_card_ || !prog_scan_) {
+    if (!prog_quad_ || !prog_bg_ || !prog_tower_ || !prog_ribbon_ ||
+        !prog_orb_ || !prog_panel_ || !prog_disc_ || !prog_mesh3d_ ||
+        !prog_launch_ || !prog_scan_) {
         return false;
     }
 
@@ -281,17 +368,22 @@ bool Ps2Renderer::CompileShaders() {
     quad_u_texture_ = glGetUniformLocation(prog_quad_, "u_texture");
 
     bg_u_screen_ = glGetUniformLocation(prog_bg_, "u_screen");
-    bg_u_orb_center_ = glGetUniformLocation(prog_bg_, "u_orb_center");
+    bg_u_mist_center_ = glGetUniformLocation(prog_bg_, "u_mist_center");
     bg_u_time_ = glGetUniformLocation(prog_bg_, "u_time");
-    bg_u_core_boost_ = glGetUniformLocation(prog_bg_, "u_core_boost");
+    bg_u_mist_strength_ = glGetUniformLocation(prog_bg_, "u_mist_strength");
     bg_u_theme_ = glGetUniformLocation(prog_bg_, "u_theme");
-    bg_u_orbs_ = glGetUniformLocation(prog_bg_, "u_orbs");
-    bg_u_trails_ = glGetUniformLocation(prog_bg_, "u_trails");
 
     twr_u_mvp_ = glGetUniformLocation(prog_tower_, "u_mvp");
     twr_u_cam_pos_ = glGetUniformLocation(prog_tower_, "u_cam_pos");
     twr_u_accent_col_ = glGetUniformLocation(prog_tower_, "u_accent_col");
+    twr_u_fog_col_ = glGetUniformLocation(prog_tower_, "u_fog_col");
+    twr_u_fog_density_ = glGetUniformLocation(prog_tower_, "u_fog_density");
     twr_u_alpha_ = glGetUniformLocation(prog_tower_, "u_alpha");
+    twr_u_silhouette_ = glGetUniformLocation(prog_tower_, "u_silhouette");
+    twr_u_time_ = glGetUniformLocation(prog_tower_, "u_time");
+
+    rib_u_screen_ = glGetUniformLocation(prog_ribbon_, "u_screen");
+    orb_u_screen_ = glGetUniformLocation(prog_orb_, "u_screen");
 
     pan_u_screen_ = glGetUniformLocation(prog_panel_, "u_screen");
     pan_u_rect_ = glGetUniformLocation(prog_panel_, "u_rect");
@@ -303,20 +395,23 @@ bool Ps2Renderer::CompileShaders() {
     pan_u_border_col_ = glGetUniformLocation(prog_panel_, "u_border_col");
     pan_u_glow_col_ = glGetUniformLocation(prog_panel_, "u_glow_col");
 
-    disc_u_screen_ = glGetUniformLocation(prog_disc_, "u_screen");
-    disc_u_rect_ = glGetUniformLocation(prog_disc_, "u_rect");
+    disc_u_mvp_ = glGetUniformLocation(prog_disc_, "u_mvp");
+    disc_u_radius_ = glGetUniformLocation(prog_disc_, "u_radius");
     disc_u_angle_ = glGetUniformLocation(prog_disc_, "u_angle");
     disc_u_alpha_ = glGetUniformLocation(prog_disc_, "u_alpha");
     disc_u_disc_type_ = glGetUniformLocation(prog_disc_, "u_disc_type");
 
-    card_u_screen_ = glGetUniformLocation(prog_card_, "u_screen");
-    card_u_rect_ = glGetUniformLocation(prog_card_, "u_rect");
-    card_u_size_ = glGetUniformLocation(prog_card_, "u_size");
-    card_u_body_col_ = glGetUniformLocation(prog_card_, "u_body_col");
-    card_u_accent_col_ = glGetUniformLocation(prog_card_, "u_accent_col");
-    card_u_is_empty_ = glGetUniformLocation(prog_card_, "u_is_empty");
-    card_u_is_folder_ = glGetUniformLocation(prog_card_, "u_is_folder");
-    card_u_time_ = glGetUniformLocation(prog_card_, "u_time");
+    m3d_u_mvp_ = glGetUniformLocation(prog_mesh3d_, "u_mvp");
+    m3d_u_model_ = glGetUniformLocation(prog_mesh3d_, "u_model");
+    m3d_u_cam_pos_ = glGetUniformLocation(prog_mesh3d_, "u_cam_pos");
+    m3d_u_accent_col_ = glGetUniformLocation(prog_mesh3d_, "u_accent_col");
+    m3d_u_alpha_ = glGetUniformLocation(prog_mesh3d_, "u_alpha");
+    m3d_u_ghost_ = glGetUniformLocation(prog_mesh3d_, "u_ghost");
+
+    lch_u_screen_ = glGetUniformLocation(prog_launch_, "u_screen");
+    lch_u_progress_ = glGetUniformLocation(prog_launch_, "u_progress");
+    lch_u_time_ = glGetUniformLocation(prog_launch_, "u_time");
+    lch_u_accent_col_ = glGetUniformLocation(prog_launch_, "u_accent_col");
 
     scan_u_viewport_ = glGetUniformLocation(prog_scan_, "u_viewport_px");
     scan_u_strength_ = glGetUniformLocation(prog_scan_, "u_strength");
@@ -327,6 +422,10 @@ bool Ps2Renderer::CompileShaders() {
 void Ps2Renderer::Resize(int width, int height) {
     surface_width_ = std::max(1, width);
     surface_height_ = std::max(1, height);
+}
+
+void Ps2Renderer::SetUiScale(float scale) {
+    ui_scale_ = std::clamp(scale, 0.90f, 1.45f);
 }
 
 void Ps2Renderer::ClearTextCache() {
@@ -422,7 +521,7 @@ const Ps2Renderer::ImageCacheEntry& Ps2Renderer::GetOrCreateImage(const std::str
     static const ImageCacheEntry kEmpty{};
     if (path.empty()) return kEmpty;
 
-    const int effMaxDim = std::clamp(maxDim, 64, 320);
+    const int effMaxDim = std::clamp(maxDim, 64, 384);
     const std::string& key = path;
     auto it = image_cache_.find(key);
     if (it != image_cache_.end()) {
@@ -585,59 +684,377 @@ void Ps2Renderer::DrawPanel(
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
-void Ps2Renderer::DrawOpticalDisc(
-    float cx, float cy, float radius, float angleRad, int discType, float alpha) {
-    if (alpha <= 0.005f || radius <= 1.0f) return;
+void Ps2Renderer::DrawFocusBeam(float x, float y, float w, float h, const RgbaColor& col, float alpha) {
+    if (alpha <= 0.01f) return;
+    DrawPanel(x, y, w, h, 0.0f, 0.0f,
+              {0.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 0.0f},
+              {0.0f, 0.0f, 0.0f, 0.0f}, {col.r, col.g, col.b, alpha});
+}
+
+void Ps2Renderer::DrawOpticalDisc3D(
+    float cx, float cy, float radius,
+    float angleRad, float tiltXRad, float tiltYRad,
+    int discType, float alpha) {
+    if (alpha <= 0.005f || radius <= 2.0f) return;
     FlushQuadBatch();
 
+    // Render disc inside a generous square perspective viewport centered on (cx, cy)
+    const float vpHalf = radius * 1.45f;
+    const float vx = cx - vpHalf;
+    const float vy = cy - vpHalf;
+    const float vw = vpHalf * 2.0f;
+    const float vh = vpHalf * 2.0f;
+
+    const float sx = static_cast<float>(view_width_) / screen_width_;
+    const float sy = static_cast<float>(view_height_) / kScreenHeight;
+    const int pxX = view_x_ + static_cast<int>(std::round(vx * sx));
+    const int pxY = view_y_ + static_cast<int>(std::round((kScreenHeight - (vy + vh)) * sy));
+    const int pxW = std::max(1, static_cast<int>(std::round(vw * sx)));
+    const int pxH = std::max(1, static_cast<int>(std::round(vh * sy)));
+
+    glViewport(pxX, pxY, pxW, pxH);
+
+    float proj[16], viewM[16], rx[16], ry[16], rot[16], vp[16], mvp[16];
+    MakePerspective(0.68f, 1.0f, 0.5f, 20.0f, proj);
+    MakeLookAt(0.0f, 0.0f, 4.1f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, viewM);
+    MakeRotateY(tiltYRad, ry);
+    MakeRotateX(tiltXRad, rx);
+    Mat4Mul(ry, rx, rot);
+    Mat4Mul(proj, viewM, vp);
+    Mat4Mul(vp, rot, mvp);
+
     glUseProgram(prog_disc_);
-    glUniform2f(disc_u_screen_, screen_width_, kScreenHeight);
-    glUniform4f(disc_u_rect_, cx - radius, cy - radius, radius * 2.0f, radius * 2.0f);
+    glUniformMatrix4fv(disc_u_mvp_, 1, GL_FALSE, mvp);
+    glUniform1f(disc_u_radius_, 1.02f);
     glUniform1f(disc_u_angle_, angleRad);
     glUniform1f(disc_u_alpha_, alpha);
     glUniform1i(disc_u_disc_type_, discType);
 
     glBindVertexArray(fs_vao_);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+    glViewport(view_x_, view_y_, view_width_, view_height_);
 }
 
-void Ps2Renderer::DrawMemoryCard3D(
-    float x, float y, float w, float h,
-    const RgbaColor& bodyCol,
+void Ps2Renderer::SetCursorTarget(float x, float y) {
+    if (!cursor_pos_init_) {
+        cursor_x_ = cursor_target_x_ = cursor_trail_x_ = x;
+        cursor_y_ = cursor_target_y_ = cursor_trail_y_ = y;
+        cursor_pos_init_ = true;
+        return;
+    }
+    if (std::fabs(cursor_target_x_ - x) > 1.5f || std::fabs(cursor_target_y_ - y) > 1.5f) {
+        cursor_flash_t_ = 1.0f;
+    }
+    cursor_target_x_ = x;
+    cursor_target_y_ = y;
+}
+
+void Ps2Renderer::DrawAnimatedCursor(float x, float y, float size, float alpha) {
+    if (alpha <= 0.01f) return;
+    const float bob = std::sin(time_sec_ * 5.2f) * 3.8f;
+    const float pulse = 1.0f + 0.11f * std::sin(time_sec_ * 4.6f) + 0.22f * cursor_flash_t_;
+    const float px = x + bob;
+    const float py = y;
+    const float r = size * pulse;
+    const RgbaColor acc = AccentColor(alpha);
+    const RgbaColor core{0.97f, 0.99f, 1.00f, alpha};
+
+    // Soft additive halo corona behind cursor
+    FlushQuadBatch();
+    glBlendFunc(GL_ONE, GL_ONE);
+    BeginQuadBatch();
+
+    const float trDx = cursor_trail_x_ - px;
+    const float trDy = cursor_trail_y_ - py;
+    if (trDx * trDx + trDy * trDy > 16.0f) {
+        PushTriangle(cursor_trail_x_ - r * 0.4f, cursor_trail_y_, {acc.r * 0.35f, acc.g * 0.35f, acc.b * 0.35f, 0.0f},
+                     px - r * 0.3f, py - r * 0.65f, {acc.r * 0.45f, acc.g * 0.45f, acc.b * 0.45f, alpha * 0.45f},
+                     px - r * 0.3f, py + r * 0.65f, {acc.r * 0.45f, acc.g * 0.45f, acc.b * 0.45f, alpha * 0.45f});
+    }
+
+    // Glowing electric-blue outer arrowhead aura
+    const float ar = r * 1.48f;
+    PushTriangle(px - ar * 0.58f, py - ar * 0.72f, {acc.r * 0.35f, acc.g * 0.35f, acc.b * 0.35f, alpha * 0.55f},
+                 px + ar * 0.92f, py, {acc.r * 0.75f, acc.g * 0.88f, acc.b, alpha * 0.75f},
+                 px - ar * 0.22f, py, {acc.r * 0.65f, acc.g * 0.80f, acc.b, alpha * 0.65f});
+    PushTriangle(px - ar * 0.58f, py + ar * 0.72f, {acc.r * 0.35f, acc.g * 0.35f, acc.b * 0.35f, alpha * 0.55f},
+                 px - ar * 0.22f, py, {acc.r * 0.65f, acc.g * 0.80f, acc.b, alpha * 0.65f},
+                 px + ar * 0.92f, py, {acc.r * 0.75f, acc.g * 0.88f, acc.b, alpha * 0.75f});
+
+    // Crisp faceted white crystal PS2 arrow core
+    PushTriangle(px - r * 0.45f, py - r * 0.56f, acc,
+                 px + r * 0.82f, py, core,
+                 px - r * 0.14f, py, core);
+    PushTriangle(px - r * 0.45f, py + r * 0.56f, {acc.r * 0.75f, acc.g * 0.82f, acc.b, alpha},
+                 px - r * 0.14f, py, core,
+                 px + r * 0.82f, py, core);
+
+    FlushQuadBatch();
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    BeginQuadBatch();
+}
+
+void Ps2Renderer::DrawAnimatedGridBrackets(float x, float y, float w, float h, const RgbaColor& acc, float alpha) {
+    if (alpha <= 0.01f) return;
+    const float breath = 2.0f + 2.2f * (0.5f + 0.5f * std::sin(time_sec_ * 4.8f));
+    const float gx = x - breath;
+    const float gy = y - breath;
+    const float gw = w + breath * 2.0f;
+    const float gh = h + breath * 2.0f;
+    const float arm = std::min(15.0f, std::min(gw, gh) * 0.25f);
+    const float t = 2.4f;
+    const RgbaColor tipCol{0.94f, 0.98f, 1.0f, alpha};
+    const RgbaColor glow{acc.r, acc.g, acc.b, alpha * 0.85f};
+
+    // 4 Corner Brackets
+    PushQuad(white_tex_, gx, gy, arm, t, tipCol, glow);
+    PushQuad(white_tex_, gx, gy, t, arm, tipCol, glow);
+
+    PushQuad(white_tex_, gx + gw - arm, gy, arm, t, glow, tipCol);
+    PushQuad(white_tex_, gx + gw - t, gy, t, arm, tipCol, glow);
+
+    PushQuad(white_tex_, gx, gy + gh - t, arm, t, tipCol, glow);
+    PushQuad(white_tex_, gx, gy + gh - arm, t, arm, glow, tipCol);
+
+    PushQuad(white_tex_, gx + gw - arm, gy + gh - t, arm, t, glow, tipCol);
+    PushQuad(white_tex_, gx + gw - t, gy + gh - arm, t, arm, glow, tipCol);
+}
+
+void Ps2Renderer::BuildMemoryCardMeshes() {
+    auto pushTri = [](std::vector<Mesh3DVertex>& dst,
+                      float ax, float ay, float az,
+                      float bx, float by, float bz,
+                      float cx, float cy, float cz,
+                      float nx, float ny, float nz,
+                      float r, float g, float b, float a, float spec) {
+        dst.push_back({ax, ay, az, nx, ny, nz, r, g, b, a, spec});
+        dst.push_back({bx, by, bz, nx, ny, nz, r, g, b, a, spec});
+        dst.push_back({cx, cy, cz, nx, ny, nz, r, g, b, a, spec});
+    };
+
+    auto pushBox = [&](std::vector<Mesh3DVertex>& dst,
+                       float x0, float y0, float z0,
+                       float x1, float y1, float z1,
+                       float r, float g, float b, float a, float spec) {
+        // Front (+Z), Back (-Z), Left (-X), Right (+X), Top (+Y), Bottom (-Y)
+        pushTri(dst, x0, y0, z1, x1, y0, z1, x1, y1, z1, 0, 0, 1, r, g, b, a, spec);
+        pushTri(dst, x0, y0, z1, x1, y1, z1, x0, y1, z1, 0, 0, 1, r, g, b, a, spec);
+
+        pushTri(dst, x1, y0, z0, x0, y0, z0, x0, y1, z0, 0, 0, -1, r, g, b, a, spec);
+        pushTri(dst, x1, y0, z0, x0, y1, z0, x1, y1, z0, 0, 0, -1, r, g, b, a, spec);
+
+        pushTri(dst, x0, y0, z0, x0, y0, z1, x0, y1, z1, -1, 0, 0, r, g, b, a, spec);
+        pushTri(dst, x0, y0, z0, x0, y1, z1, x0, y1, z0, -1, 0, 0, r, g, b, a, spec);
+
+        pushTri(dst, x1, y0, z1, x1, y0, z0, x1, y1, z0, 1, 0, 0, r, g, b, a, spec);
+        pushTri(dst, x1, y0, z1, x1, y1, z0, x1, y1, z1, 1, 0, 0, r, g, b, a, spec);
+
+        pushTri(dst, x0, y1, z1, x1, y1, z1, x1, y1, z0, 0, 1, 0, r, g, b, a, spec);
+        pushTri(dst, x0, y1, z1, x1, y1, z0, x0, y1, z0, 0, 1, 0, r, g, b, a, spec);
+
+        pushTri(dst, x0, y0, z0, x1, y0, z0, x1, y0, z1, 0, -1, 0, r, g, b, a, spec);
+        pushTri(dst, x0, y0, z0, x1, y0, z1, x0, y0, z1, 0, -1, 0, r, g, b, a, spec);
+    };
+
+    auto buildCardVariant = [&](std::vector<Mesh3DVertex>& dst,
+                                float br, float bg, float bb, float ba,
+                                float lr, float lg, float lb, float stripR, float stripG, float stripB,
+                                bool withPins) {
+        dst.clear();
+        // Signature chamfered PS2 SCPH-10020 silhouette (CCW loop)
+        const float px[6] = {-0.54f, -0.54f, 0.54f, 0.54f, 0.34f, -0.54f};
+        const float py[6] = { 0.70f, -0.70f, -0.70f, 0.50f, 0.70f,  0.70f};
+        constexpr float zF = 0.085f;
+        constexpr float zB = -0.085f;
+        constexpr float shellSpec = 0.28f;
+
+        // Front & Back fans + Side perimeter walls
+        for (int i = 0; i < 5; ++i) {
+            float x0 = px[i], y0 = py[i];
+            float x1 = px[i + 1], y1 = py[i + 1];
+            pushTri(dst, 0, 0, zF, x0, y0, zF, x1, y1, zF, 0, 0, 1, br, bg, bb, ba, shellSpec);
+            pushTri(dst, 0, 0, zB, x1, y1, zB, x0, y0, zB, 0, 0, -1, br * 0.8f, bg * 0.8f, bb * 0.8f, ba, shellSpec);
+
+            float dx = x1 - x0;
+            float dy = y1 - y0;
+            float len = std::sqrt(dx * dx + dy * dy);
+            float nx = dy / std::max(0.0001f, len);
+            float ny = -dx / std::max(0.0001f, len);
+            pushTri(dst, x0, y0, zB, x0, y0, zF, x1, y1, zF, nx, ny, 0, br * 0.9f, bg * 0.9f, bb * 0.9f, ba, 0.38f);
+            pushTri(dst, x0, y0, zB, x1, y1, zF, x1, y1, zB, nx, ny, 0, br * 0.9f, bg * 0.9f, bb * 0.9f, ba, 0.38f);
+        }
+
+        // Top-right connector / front label pocket frame + glossy plate
+        pushBox(dst, -0.40f, -0.14f, zF, 0.40f, 0.46f, zF + 0.018f, lr, lg, lb, ba, 0.72f);
+        // Glossy MagicGate silver-blue metallic header stripe across sticker
+        pushBox(dst, -0.37f, 0.34f, zF + 0.018f, 0.37f, 0.43f, zF + 0.025f, stripR, stripG, stripB, ba, 0.90f);
+
+        // 4 Sculpted Raised Horizontal Grip Ribs (signature lower-quarter ridges)
+        for (int rIdx = 0; rIdx < 4; ++rIdx) {
+            float ry0 = -0.25f - static_cast<float>(rIdx) * 0.085f;
+            float ry1 = ry0 - 0.042f;
+            pushBox(dst, -0.38f, ry1, zF, 0.38f, ry0, zF + 0.024f,
+                    br * 1.28f, bg * 1.28f, bb * 1.28f, ba, 0.48f);
+        }
+
+        // Top center raised insertion indicator triangle (▲)
+        pushTri(dst, -0.08f, 0.54f, zF + 0.018f,
+                0.08f, 0.54f, zF + 0.018f,
+                0.00f, 0.65f, zF + 0.018f,
+                0, 0, 1, stripR, stripG, stripB, ba, 0.85f);
+
+        // 8 Metallic Gold Edge Connector Teeth at bottom port
+        if (withPins) {
+            for (int p = 0; p < 8; ++p) {
+                float px0 = -0.42f + static_cast<float>(p) * 0.112f;
+                float px1 = px0 + 0.068f;
+                pushBox(dst, px0, -0.735f, -0.055f, px1, -0.66f, 0.055f,
+                        0.90f, 0.72f, 0.24f, 1.0f, 0.95f);
+            }
+        }
+    };
+
+    // Standard SCPH-10020 Matte Charcoal-Obsidian PS2 Memory Card
+    buildCardVariant(memcard_solid_verts_,
+                     0.11f, 0.14f, 0.21f, 1.0f,
+                     0.06f, 0.09f, 0.16f,
+                     0.42f, 0.76f, 1.00f, true);
+
+    // Emerald-Sapphire Translucent Island-Style Folder Memory Card
+    buildCardVariant(memcard_folder_verts_,
+                     0.08f, 0.28f, 0.38f, 0.96f,
+                     0.05f, 0.18f, 0.26f,
+                     0.38f, 0.94f, 0.76f, true);
+
+    // Ghost Empty Slot Blueprint Silhouette
+    buildCardVariant(memcard_ghost_verts_,
+                     0.24f, 0.42f, 0.72f, 0.85f,
+                     0.16f, 0.30f, 0.56f,
+                     0.50f, 0.80f, 1.00f, false);
+
+    // Sculpted 3D Faceted PS2 Crystal Data Cube (fallback when no .icn 3D file is present)
+    save_cube_verts_.clear();
+    pushBox(save_cube_verts_, -0.44f, -0.44f, -0.44f, 0.44f, 0.44f, 0.44f,
+            0.34f, 0.68f, 1.0f, 0.94f, 0.78f);
+    pushBox(save_cube_verts_, -0.50f, -0.16f, -0.50f, 0.50f, 0.16f, 0.50f,
+            0.78f, 0.92f, 1.0f, 0.96f, 0.92f);
+    pushBox(save_cube_verts_, -0.16f, -0.50f, -0.50f, 0.16f, 0.50f, 0.50f,
+            0.78f, 0.92f, 1.0f, 0.96f, 0.92f);
+}
+
+void Ps2Renderer::Draw3DMeshInRect(
+    const std::vector<Mesh3DVertex>& verts,
+    float vx, float vy, float vw, float vh,
+    float rotXDeg, float rotYDeg, float rotZDeg,
+    float camDist,
+    float scale,
     const RgbaColor& accentCol,
-    bool focused,
-    bool isEmpty,
-    bool isFolder) {
-    if (w <= 2.0f || h <= 2.0f || bodyCol.a <= 0.005f) return;
+    float alpha,
+    bool isGhost) {
+    if (verts.empty() || vw <= 4.0f || vh <= 4.0f || alpha <= 0.005f) return;
     FlushQuadBatch();
 
-    glUseProgram(prog_card_);
-    glUniform2f(card_u_screen_, screen_width_, kScreenHeight);
-    glUniform4f(card_u_rect_, x, y, w, h);
-    glUniform2f(card_u_size_, w, h);
-    glUniform4f(card_u_body_col_, bodyCol.r, bodyCol.g, bodyCol.b, bodyCol.a);
-    glUniform4f(card_u_accent_col_, accentCol.r, accentCol.g, accentCol.b, focused ? 1.0f : 0.25f);
-    glUniform1f(card_u_is_empty_, isEmpty ? 1.0f : 0.0f);
-    glUniform1f(card_u_is_folder_, isFolder ? 1.0f : 0.0f);
-    glUniform1f(card_u_time_, time_sec_);
+    const float sx = static_cast<float>(view_width_) / screen_width_;
+    const float sy = static_cast<float>(view_height_) / kScreenHeight;
+    const int pxX = view_x_ + static_cast<int>(std::round(vx * sx));
+    const int pxY = view_y_ + static_cast<int>(std::round((kScreenHeight - (vy + vh)) * sy));
+    const int pxW = std::max(1, static_cast<int>(std::round(vw * sx)));
+    const int pxH = std::max(1, static_cast<int>(std::round(vh * sy)));
 
-    glBindVertexArray(fs_vao_);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glViewport(pxX, pxY, pxW, pxH);
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(pxX, pxY, pxW, pxH);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glDisable(GL_SCISSOR_TEST);
+
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glDepthMask(isGhost ? GL_FALSE : GL_TRUE);
+
+    float proj[16], viewM[16], sc[16], rx[16], ry[16], rz[16], rxy[16], rxyz[16], model[16], vp[16], mvp[16];
+    MakePerspective(0.62f, vw / std::max(1.0f, vh), 0.25f, 30.0f, proj);
+    MakeLookAt(0.0f, 0.15f, camDist, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, viewM);
+    MakeScale(scale, scale, scale, sc);
+    MakeRotateX(rotXDeg * kPi / 180.0f, rx);
+    MakeRotateY(rotYDeg * kPi / 180.0f, ry);
+    MakeRotateZ(rotZDeg * kPi / 180.0f, rz);
+    Mat4Mul(ry, rx, rxy);
+    Mat4Mul(rxy, rz, rxyz);
+    Mat4Mul(rxyz, sc, model);
+    Mat4Mul(proj, viewM, vp);
+    Mat4Mul(vp, model, mvp);
+
+    glUseProgram(prog_mesh3d_);
+    glUniformMatrix4fv(m3d_u_mvp_, 1, GL_FALSE, mvp);
+    glUniformMatrix4fv(m3d_u_model_, 1, GL_FALSE, model);
+    glUniform3f(m3d_u_cam_pos_, 0.0f, 0.15f, camDist);
+    glUniform3f(m3d_u_accent_col_, accentCol.r, accentCol.g, accentCol.b);
+    glUniform1f(m3d_u_alpha_, alpha);
+    glUniform1f(m3d_u_ghost_, isGhost ? 1.0f : 0.0f);
+
+    glBindVertexArray(mesh3d_vao_);
+    glBindBuffer(GL_ARRAY_BUFFER, mesh3d_vbo_);
+    glBufferData(GL_ARRAY_BUFFER,
+                 static_cast<GLsizeiptr>(verts.size() * sizeof(Mesh3DVertex)),
+                 verts.data(),
+                 GL_STREAM_DRAW);
+    glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(verts.size()));
+    glBindVertexArray(0);
+
+    glDepthMask(GL_TRUE);
+    glDisable(GL_DEPTH_TEST);
+    glViewport(view_x_, view_y_, view_width_, view_height_);
 }
 
-void Ps2Renderer::DrawDiamondCursor(float cx, float cy, float size, float alpha) {
-    if (alpha <= 0.01f) return;
-    float pulse = 0.88f + 0.12f * std::sin(time_sec_ * 4.5f);
-    RgbaColor acc = AccentColor(alpha * pulse);
-    RgbaColor core = {0.92f, 0.97f, 1.0f, alpha};
-    const float r = size;
-    // Sleek glowing PS2 horizontal arrow/diamond pointer
-    PushTriangle(cx - r * 0.45f, cy - r * 0.48f, acc,
-                 cx + r * 0.72f, cy, core,
-                 cx - r * 0.45f, cy + r * 0.48f, acc);
-    PushTriangle(cx - r * 0.85f, cy, {acc.r, acc.g, acc.b, alpha * 0.35f},
-                 cx - r * 0.45f, cy - r * 0.48f, acc,
-                 cx - r * 0.45f, cy + r * 0.48f, acc);
+void Ps2Renderer::DrawMemoryCard3DViewport(
+    float vx, float vy, float vw, float vh,
+    float rotXDeg, float rotYDeg,
+    bool focused, bool isEmpty, bool isFolder, float alpha) {
+    const RgbaColor acc = AccentColor(1.0f);
+    const auto& mesh = isEmpty
+        ? memcard_ghost_verts_
+        : (isFolder ? memcard_folder_verts_ : memcard_solid_verts_);
+    Draw3DMeshInRect(
+        mesh, vx, vy, vw, vh,
+        rotXDeg, rotYDeg, 0.0f,
+        3.15f, focused ? 1.06f : 0.96f,
+        acc, alpha * (isEmpty ? 0.65f : 1.0f), isEmpty);
+}
+
+void Ps2Renderer::DrawSaveBlockIcon3D(
+    float vx, float vy, float vw, float vh,
+    const McSaveBlockEntry& save,
+    bool focused, float alpha) {
+    const float tr = static_cast<float>((save.colorRgb >> 16) & 0xFF) / 255.0f;
+    const float tg = static_cast<float>((save.colorRgb >> 8) & 0xFF) / 255.0f;
+    const float tb = static_cast<float>(save.colorRgb & 0xFF) / 255.0f;
+    const RgbaColor tint{
+        std::max(0.25f, tr),
+        std::max(0.35f, tg),
+        std::max(0.45f, tb),
+        1.0f
+    };
+    const float spinSpeed = focused ? 52.0f : 26.0f;
+    const float rotY = std::fmod(time_sec_ * spinSpeed, 360.0f);
+    const float rotX = 16.0f + std::sin(time_sec_ * 1.4f) * 6.0f;
+    const float scale = focused ? 1.08f : 0.90f;
+
+    if (save.iconMesh.size() >= 27) {
+        const size_t vc = save.iconMesh.size() / 9;
+        temp_mesh_verts_.resize(vc);
+        for (size_t i = 0; i < vc; ++i) {
+            const float* src = &save.iconMesh[i * 9];
+            temp_mesh_verts_[i] = {
+                src[0], src[1], src[2],
+                src[3], src[4], src[5],
+                src[6], src[7], src[8], 1.0f, 0.56f
+            };
+        }
+        Draw3DMeshInRect(temp_mesh_verts_, vx, vy, vw, vh, rotX, rotY, 0.0f, 2.35f, scale, tint, alpha, false);
+    } else {
+        Draw3DMeshInRect(save_cube_verts_, vx, vy, vw, vh, rotX, rotY, 12.0f, 2.45f, scale, tint, alpha, false);
+    }
 }
 
 void Ps2Renderer::DrawImageAspectFit(
@@ -676,31 +1093,31 @@ void Ps2Renderer::DrawImageAspectFit(
 
 void Ps2Renderer::RebuildTowersLayout() {
     towers_.clear();
-    // Dynamically vary tower density subtly with game + save library size, like real PS2 BIOS!
-    const int libWeight = static_cast<int>(games_.size()) * 2 + static_cast<int>(saves_.size());
-    const int count = std::clamp(22 + (libWeight % 18), 22, 40);
-
-    // Deterministic pseudo-random layout creating an atmospheric PS2 glass monolith skyline
-    uint32_t seed = 0x50533242u; // "PS2B"
+    // 8x8 Orthogonal PS2 Crystal Monolith City weighted by user library (just like real PS2 BIOS)
+    const int libWeight = static_cast<int>(games_.size()) * 3 + static_cast<int>(saves_.size()) * 2;
+    uint32_t seed = 0x50533242u ^ static_cast<uint32_t>(libWeight * 2654435761u);
     auto nextRand = [&seed]() -> float {
         seed = seed * 1664525u + 1013904223u;
         return static_cast<float>((seed >> 8) & 0xFFFF) / 65535.0f;
     };
 
-    for (int i = 0; i < count; ++i) {
-        TowerDef t;
-        // Arrange in symmetrical/organic clusters flanking a subtle central corridor
-        float side = (i % 2 == 0) ? -1.0f : 1.0f;
-        float lane = 0.9f + nextRand() * 7.8f;
-        t.x = side * lane + (nextRand() - 0.5f) * 1.1f;
-        t.z = -3.0f - (static_cast<float>(i) / static_cast<float>(count)) * 22.0f + (nextRand() - 0.5f) * 1.4f;
-        t.width = 0.48f + nextRand() * 0.72f;
-        t.depth = 0.48f + nextRand() * 0.72f;
-        float extraH = (i < std::min(16, libWeight + 4)) ? (1.2f + nextRand() * 2.2f) : (0.5f + nextRand() * 1.4f);
-        t.height = 1.6f + extraH;
-        t.phase = nextRand() * 6.283f;
-        t.brightness = 0.55f + 0.45f * nextRand();
-        towers_.push_back(t);
+    for (int gz = 0; gz < 8; ++gz) {
+        for (int gx = 0; gx < 8; ++gx) {
+            TowerDef t;
+            const float alleyGap = (gx < 4) ? -0.85f : 0.85f;
+            const float cx = (static_cast<float>(gx) - 3.5f) * 1.42f + alleyGap;
+            const float cz = (static_cast<float>(gz) - 3.5f) * 1.42f - 4.0f;
+            t.x = cx;
+            t.z = cz;
+            t.width = 0.78f;
+            t.depth = 0.78f;
+            const int idx = gz * 8 + gx;
+            const float libBoost = (idx < std::min(54, libWeight + 8)) ? (1.6f + nextRand() * 3.8f) : (0.6f + nextRand() * 1.4f);
+            t.height = 2.0f + libBoost;
+            t.phase = nextRand() * 6.283f;
+            t.brightness = 0.56f + 0.44f * nextRand();
+            towers_.push_back(t);
+        }
     }
 }
 
@@ -708,28 +1125,33 @@ void Ps2Renderer::DrawTowers3D(
     const float* mvp,
     float camX, float camY, float camZ,
     float riseScale,
-    float alpha) {
+    const RgbaColor& fogCol,
+    float fogDensity,
+    float alpha,
+    float silhouetteMode) {
     if (alpha <= 0.005f || towers_.empty()) return;
     FlushQuadBatch();
 
     tower_verts_.clear();
     const RgbaColor baseCol = SecondaryAccentColor(1.0f);
+    int cubeCount = 0;
 
-    for (const auto& t : towers_) {
-        const float sway = 1.0f + 0.04f * std::sin(time_sec_ * 0.85f + t.phase);
-        const float h = std::max(0.25f, t.height * riseScale * sway);
+    for (size_t ti = 0; ti < towers_.size(); ++ti) {
+        const auto& t = towers_[ti];
+        const float sway = 1.0f + 0.03f * std::sin(time_sec_ * 0.85f + t.phase);
+        const float h = std::max(0.35f, t.height * riseScale * sway);
         const float x0 = t.x - t.width * 0.5f;
         const float x1 = t.x + t.width * 0.5f;
         const float z0 = t.z - t.depth * 0.5f;
         const float z1 = t.z + t.depth * 0.5f;
-        const float y0 = -1.6f;
+        const float y0 = -2.0f;
         const float y1 = y0 + h;
 
         const float b = t.brightness;
         const float cr = baseCol.r * b;
         const float cg = baseCol.g * b;
         const float cb = baseCol.b * b;
-        const float ca = 0.92f;
+        const float ca = 0.94f;
 
         auto pushFace = [&](
             float ax, float ay, float az, float ha,
@@ -745,215 +1167,423 @@ void Ps2Renderer::DrawTowers3D(
             tower_verts_.push_back({dx, dy, dz, nx, ny, nz, hd, cr, cg, cb, ca});
         };
 
-        // Front (+Z), Back (-Z), Left (-X), Right (+X), Top (+Y)
         pushFace(x0, y0, z1, 0.0f, x1, y0, z1, 0.0f, x1, y1, z1, 1.0f, x0, y1, z1, 1.0f, 0.0f, 0.0f, 1.0f);
         pushFace(x1, y0, z0, 0.0f, x0, y0, z0, 0.0f, x0, y1, z0, 1.0f, x1, y1, z0, 1.0f, 0.0f, 0.0f, -1.0f);
         pushFace(x0, y0, z0, 0.0f, x0, y0, z1, 0.0f, x0, y1, z1, 1.0f, x0, y1, z0, 1.0f, -1.0f, 0.0f, 0.0f);
         pushFace(x1, y0, z1, 0.0f, x1, y0, z0, 0.0f, x1, y1, z0, 1.0f, x1, y1, z1, 1.0f, 1.0f, 0.0f, 0.0f);
         pushFace(x0, y1, z1, 1.0f, x1, y1, z1, 1.0f, x1, y1, z0, 1.0f, x0, y1, z0, 1.0f, 0.0f, 1.0f, 0.0f);
+
+        // Emit up to 24 hovering translucent crystal cubes above grid columns (iconic PS2 BIOS blocks)
+        if (cubeCount < 24 && ((ti % 5 == 0) || (ti % 3 == 0))) {
+            cubeCount++;
+            constexpr float cubeSize = 0.56f;
+            const float halfC = cubeSize * 0.5f;
+            const float cx0 = t.x - halfC;
+            const float cx1 = t.x + halfC;
+            const float cz0 = t.z - halfC;
+            const float cz1 = t.z + halfC;
+            const float cy0 = y1 + (0.65f + 0.42f * std::sin(time_sec_ * 0.75f + t.phase)) * riseScale;
+            const float cy1 = cy0 + cubeSize;
+
+            pushFace(cx0, cy0, cz1, 0.62f, cx1, cy0, cz1, 0.62f, cx1, cy1, cz1, 1.0f, cx0, cy1, cz1, 1.0f, 0.0f, 0.0f, 1.0f);
+            pushFace(cx1, cy0, cz0, 0.62f, cx0, cy0, cz0, 0.62f, cx0, cy1, cz0, 1.0f, cx1, cy1, cz0, 1.0f, 0.0f, 0.0f, -1.0f);
+            pushFace(cx0, cy0, cz0, 0.62f, cx0, cy0, cz1, 0.62f, cx0, cy1, cz1, 1.0f, cx0, cy1, cz0, 1.0f, -1.0f, 0.0f, 0.0f);
+            pushFace(cx1, cy0, cz1, 0.62f, cx1, cy0, cz0, 0.62f, cx1, cy1, cz0, 1.0f, cx1, cy1, cz1, 1.0f, 1.0f, 0.0f, 0.0f);
+            pushFace(cx0, cy1, cz1, 1.00f, cx1, cy1, cz1, 1.00f, cx1, cy1, cz0, 1.00f, cx0, cy1, cz0, 1.00f, 0.0f, 1.0f, 0.0f);
+            pushFace(cx0, cy0, cz0, 0.50f, cx1, cy0, cz0, 0.50f, cx1, cy0, cz1, 0.50f, cx0, cy0, cz1, 0.50f, 0.0f, -1.0f, 0.0f);
+        }
     }
 
     if (tower_verts_.empty()) return;
+
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
+    glClearDepthf(1.0f);
+    glClear(GL_DEPTH_BUFFER_BIT);
 
     const RgbaColor acc = AccentColor(1.0f);
     glUseProgram(prog_tower_);
     glUniformMatrix4fv(twr_u_mvp_, 1, GL_FALSE, mvp);
     glUniform3f(twr_u_cam_pos_, camX, camY, camZ);
     glUniform3f(twr_u_accent_col_, acc.r, acc.g, acc.b);
+    glUniform3f(twr_u_fog_col_, fogCol.r, fogCol.g, fogCol.b);
+    glUniform1f(twr_u_fog_density_, fogDensity);
     glUniform1f(twr_u_alpha_, alpha);
+    glUniform1f(twr_u_silhouette_, silhouetteMode);
+    glUniform1f(twr_u_time_, time_sec_);
 
     glBindVertexArray(tower_vao_);
     glBindBuffer(GL_ARRAY_BUFFER, tower_vbo_);
-    const size_t maxBytes = 2048 * sizeof(TowerVertex);
+    const size_t maxBytes = 4096 * sizeof(TowerVertex);
     const size_t sendBytes = std::min(maxBytes, tower_verts_.size() * sizeof(TowerVertex));
     const GLsizei drawVerts = static_cast<GLsizei>(sendBytes / sizeof(TowerVertex));
     glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(sendBytes), tower_verts_.data());
     glDrawArrays(GL_TRIANGLES, 0, drawVerts);
     glBindVertexArray(0);
+    glDisable(GL_DEPTH_TEST);
 }
 
-// Theme Palette Helpers (6 Distinct PS2 BIOS Themes)
+// Theme Palette Helpers (6 Curated PS2 Themes, Pure #000000 Background!)
 RgbaColor Ps2Renderer::AccentColor(float alpha) const {
     switch (settings_.theme) {
-        case 1: return {0.72f, 0.88f, 1.00f, alpha}; // Midnight Obsidian
-        case 2: return {0.24f, 0.96f, 0.64f, alpha}; // Emerald Matrix
-        case 3: return {1.00f, 0.40f, 0.62f, alpha}; // Crimson Sakura
-        case 4: return {0.76f, 0.48f, 1.00f, alpha}; // Amethyst Nebula
-        case 5: return {1.00f, 0.80f, 0.34f, alpha}; // Solar Gold
-        default: return {0.36f, 0.78f, 1.00f, alpha}; // Ocean Blue (SCPH Classic)
+        case 1: return {0.80f, 0.88f, 0.98f, alpha}; // Midnight Silver
+        case 2: return {0.26f, 0.96f, 0.66f, alpha}; // Emerald Matrix
+        case 3: return {1.00f, 0.42f, 0.64f, alpha}; // Crimson Sakura
+        case 4: return {0.76f, 0.50f, 1.00f, alpha}; // Amethyst Nebula
+        case 5: return {1.00f, 0.82f, 0.36f, alpha}; // Solar Gold
+        default: return {0.34f, 0.72f, 1.00f, alpha}; // PS2 Classic (Electric Ice-Blue on #000000)
     }
 }
 
 RgbaColor Ps2Renderer::SecondaryAccentColor(float alpha) const {
     switch (settings_.theme) {
-        case 1: return {0.42f, 0.56f, 0.74f, alpha};
-        case 2: return {0.10f, 0.62f, 0.42f, alpha};
-        case 3: return {0.76f, 0.18f, 0.38f, alpha};
-        case 4: return {0.48f, 0.24f, 0.86f, alpha};
-        case 5: return {0.72f, 0.50f, 0.16f, alpha};
-        default: return {0.16f, 0.46f, 0.92f, alpha};
+        case 1: return {0.42f, 0.52f, 0.66f, alpha};
+        case 2: return {0.10f, 0.64f, 0.42f, alpha};
+        case 3: return {0.72f, 0.16f, 0.38f, alpha};
+        case 4: return {0.46f, 0.24f, 0.84f, alpha};
+        case 5: return {0.74f, 0.52f, 0.14f, alpha};
+        default: return {0.14f, 0.42f, 0.90f, alpha};
     }
 }
 
 RgbaColor Ps2Renderer::PanelTopColor(float alpha) const {
-    switch (settings_.theme) {
-        case 1: return {0.04f, 0.05f, 0.08f, alpha};
-        case 2: return {0.02f, 0.07f, 0.05f, alpha};
-        case 3: return {0.09f, 0.02f, 0.05f, alpha};
-        case 4: return {0.06f, 0.03f, 0.12f, alpha};
-        case 5: return {0.08f, 0.06f, 0.02f, alpha};
-        default: return {0.03f, 0.07f, 0.17f, alpha};
-    }
+    return {0.03f, 0.04f, 0.07f, alpha};
 }
 
 RgbaColor Ps2Renderer::PanelBotColor(float alpha) const {
-    switch (settings_.theme) {
-        case 1: return {0.02f, 0.03f, 0.05f, alpha};
-        case 2: return {0.01f, 0.04f, 0.03f, alpha};
-        case 3: return {0.04f, 0.01f, 0.03f, alpha};
-        case 4: return {0.03f, 0.015f, 0.08f, alpha};
-        case 5: return {0.04f, 0.03f, 0.01f, alpha};
-        default: return {0.015f, 0.035f, 0.10f, alpha};
-    }
+    return {0.01f, 0.015f, 0.03f, alpha};
 }
 
 RgbaColor Ps2Renderer::PanelBorderColor(float alpha) const {
     RgbaColor acc = AccentColor(alpha);
-    return {acc.r * 0.88f, acc.g * 0.92f, std::min(1.0f, acc.b * 1.05f), alpha};
+    return {acc.r * 0.80f, acc.g * 0.88f, acc.b, alpha};
 }
 
 RgbaColor Ps2Renderer::PrimaryTextColor(float alpha) const {
-    return {0.95f, 0.98f, 1.00f, alpha};
+    return {0.96f, 0.98f, 1.00f, alpha};
 }
 
 RgbaColor Ps2Renderer::SecondaryTextColor(float alpha) const {
-    switch (settings_.theme) {
-        case 2: return {0.72f, 0.92f, 0.82f, alpha};
-        case 3: return {0.94f, 0.78f, 0.86f, alpha};
-        case 4: return {0.84f, 0.78f, 0.98f, alpha};
-        case 5: return {0.95f, 0.88f, 0.72f, alpha};
-        default: return {0.72f, 0.85f, 0.98f, alpha};
-    }
+    return {0.66f, 0.78f, 0.92f, alpha};
 }
 
 Ps2Renderer::LayoutMetrics Ps2Renderer::ComputeMetrics() const {
     LayoutMetrics m;
-    m.padX = (screen_width_ >= 820.0f) ? 34.0f : 22.0f;
-    m.topBarH = 40.0f;
-    m.bottomBarH = 38.0f;
-    m.bodyTop = 58.0f;
+    const float barScale = 0.55f + 0.45f * ui_scale_;
+    m.padX = (screen_width_ >= 820.0f) ? 38.0f : 26.0f;
+    m.topBarH = 34.0f * barScale;
+    m.bottomBarH = 38.0f * barScale;
+    m.bodyTop = m.topBarH + 10.0f;
     m.bodyBot = kScreenHeight - m.bottomBarH - 8.0f;
     m.bodyH = m.bodyBot - m.bodyTop;
     return m;
 }
 
-void Ps2Renderer::ComputeBackgroundOrbs(
-    float& outCenterX, float& outCenterY,
-    float& outCoreBoost,
-    float* outOrbs28, float* outTrails28) const {
+void Ps2Renderer::UpdateAndDrawOrbs3D(float dt) {
+    const LayoutMetrics m = ComputeMetrics();
+    const float motionScale = (settings_.orbsMode == 2) ? 0.0f : (settings_.orbsMode == 1 ? 0.38f : 1.0f);
 
-    // Base orbital center depending on active state
-    if (boot_active_) {
-        outCenterX = screen_width_ * 0.5f;
-        outCenterY = kScreenHeight * 0.48f;
-    } else if (launching_) {
-        outCenterX = screen_width_ * 0.5f;
-        outCenterY = kScreenHeight * 0.45f;
-    } else if (screen_ == SCREEN_MAIN_MENU) {
-        outCenterX = screen_width_ * 0.285f;
-        outCenterY = kScreenHeight * 0.50f;
-    } else {
-        outCenterX = screen_width_ * 0.66f;
-        outCenterY = kScreenHeight * 0.46f;
+    if (!orb_pos_init_) {
+        orb_center_cur_x_ = screen_width_ * 0.30f;
+        orb_center_cur_y_ = kScreenHeight * 0.50f;
+        orb_pos_init_ = true;
     }
 
-    float motionScale = (settings_.orbsMode == 2) ? 0.0f : (settings_.orbsMode == 1 ? 0.38f : 1.0f);
-    float screenAlpha = (screen_ == SCREEN_MAIN_MENU || boot_active_ || launching_) ? 1.0f : 0.42f;
-
-    // Incorporate actual wall-clock seconds into PS2 clock rotation
-    std::time_t nowSec = std::time(nullptr);
-    std::tm tmNow{};
-    localtime_r(&nowSec, &tmNow);
-    const float clockAngle = (static_cast<float>(tmNow.tm_sec) / 60.0f) * (2.0f * kPi);
-
-    float gather = 1.0f;
-    float spreadMult = 1.0f;
-    float trailWeight = (settings_.orbsMode == 2) ? 0.0f : 1.0f;
-    outCoreBoost = 0.0f;
+    float targetCx = screen_width_ * 0.30f;
+    float targetCy = kScreenHeight * 0.50f;
+    float targetScale = 1.0f;
+    float targetRing = 0.0f;
+    float targetMist = 0.0f;
+    float screenAlpha = 1.0f;
 
     if (boot_active_) {
         float p = Clamp01(boot_t_ / std::max(0.1f, boot_duration_));
-        if (p < 0.42f) {
-            gather = SmoothStep(0.05f, 0.42f, p) * 0.45f;
-            spreadMult = 2.6f - 0.8f * SmoothStep(0.0f, 0.42f, p);
-            outCoreBoost = 0.25f * gather;
-        } else {
-            float k = EaseInOutSine((p - 0.42f) / 0.58f);
-            gather = 0.45f + 0.55f * k;
-            spreadMult = 1.8f - 0.8f * k;
-            outCoreBoost = 0.85f * std::sin(k * kPi);
-        }
+        targetCx = screen_width_ * 0.50f;
+        targetCy = kScreenHeight * 0.50f;
+        targetScale = 1.65f - 0.65f * SmoothStep(0.64f, 1.0f, p);
+        targetMist = (1.0f - SmoothStep(0.68f, 0.98f, p)) * 0.92f;
+        screenAlpha = SmoothStep(0.64f, 0.92f, p);
     } else if (launching_) {
-        float p = EaseOutCubic(Clamp01(launch_t_ / 0.72f));
-        spreadMult = 1.0f - 0.86f * p;
-        outCoreBoost = 1.45f * p;
-        trailWeight = 1.35f;
-    } else if (screen_ != SCREEN_MAIN_MENU) {
-        spreadMult = 1.18f;
-        trailWeight = 0.45f;
+        targetCx = screen_width_ * 0.50f;
+        targetCy = kScreenHeight * 0.50f;
+        screenAlpha = 0.0f;
+        targetMist = 0.0f;
+    } else if (screen_ == SCREEN_MAIN_MENU) {
+        const float driftX = (std::sin(time_sec_ * 0.23f) * 20.0f + std::cos(time_sec_ * 0.11f) * 10.0f) * motionScale;
+        const float driftY = std::sin(time_sec_ * 0.17f) * 16.0f * motionScale;
+        targetCx = screen_width_ * 0.30f + driftX;
+        targetCy = kScreenHeight * 0.50f + driftY;
+        targetScale = 1.0f + 0.06f * std::sin(time_sec_ * 0.31f) * motionScale;
+        targetRing = 0.0f;
+        targetMist = 0.24f;
+        screenAlpha = 1.0f;
+    } else if (screen_ == SCREEN_SETTINGS) {
+        // Iconic PlayStation 2 Clock Screen Ring centered on exact shared geometry in left third
+        const float clockAreaW = screen_width_ * 0.34f;
+        targetCx = m.padX + clockAreaW * 0.50f;
+        targetCy = m.bodyTop + m.bodyH * 0.48f;
+        targetScale = 1.0f;
+        targetRing = 1.0f;
+        targetMist = 0.0f; // Pure #000000 void
+        screenAlpha = 0.95f;
+    } else {
+        // Pure #000000 black for Games & Browser — distant gentle starlight
+        targetCx = screen_width_ * 0.72f + std::sin(time_sec_ * 0.15f) * 24.0f * motionScale;
+        targetCy = kScreenHeight * 0.46f + std::cos(time_sec_ * 0.12f) * 16.0f * motionScale;
+        targetScale = 1.35f;
+        targetRing = 0.0f;
+        targetMist = 0.0f;
+        screenAlpha = 0.18f;
     }
 
-    const float baseOrbitRx = std::min(118.0f, screen_width_ * 0.135f) * spreadMult;
-    const float baseOrbitRy = 88.0f * spreadMult;
-    const float speed = (0.72f + 0.15f * motionScale) * (settings_.orbsMode == 2 ? 0.0f : 1.0f);
-    const float tiltAngle = orb_tilt_cur_;
+    if (!boot_active_ && !launching_ && orb_swoop_t_ > 0.001f) {
+        screenAlpha = std::max(screenAlpha, 0.92f * orb_swoop_t_);
+    }
+
+    const float lerpRate = std::min(1.0f, dt * 5.8f);
+    orb_center_cur_x_ += (targetCx - orb_center_cur_x_) * lerpRate;
+    orb_center_cur_y_ += (targetCy - orb_center_cur_y_) * lerpRate;
+    orb_scale_cur_ += (targetScale - orb_scale_cur_) * lerpRate;
+    orb_ring_blend_ += (targetRing - orb_ring_blend_) * lerpRate;
+    mist_strength_cur_ += (targetMist - mist_strength_cur_) * std::min(1.0f, dt * 4.5f);
+
+    if (screenAlpha <= 0.005f) return;
+
+    const std::time_t nowSec = std::time(nullptr);
+    std::tm tmNow{};
+    localtime_r(&nowSec, &tmNow);
+    struct timespec tsNow{};
+    clock_gettime(CLOCK_REALTIME, &tsNow);
+    const double subSec = static_cast<double>(tmNow.tm_sec) + static_cast<double>(tsNow.tv_nsec) * 1e-9;
+    const float clockAngle = static_cast<float>((subSec / 60.0) * (2.0 * kPi));
+
+    const float sCurve = std::sin(orb_swoop_t_ * kPi);
+    const float zSwoop = (!boot_active_ && orb_swoop_t_ > 0.001f)
+        ? ((orb_swoop_dir_ > 0) ? (220.0f * sCurve) : (-180.0f * sCurve))
+        : 0.0f;
+
+    float gather = 1.0f;
+    float spread = orb_scale_cur_;
+    if (boot_active_) {
+        float p = Clamp01(boot_t_ / std::max(0.1f, boot_duration_));
+        float k = SmoothStep(0.64f, 0.98f, p);
+        gather = k;
+        spread = (2.8f - 1.8f * EaseOutCubic(k));
+    } else if (orb_swoop_t_ > 0.001f) {
+        spread *= (1.0f + ((screen_ == SCREEN_SETTINGS) ? 0.46f : 0.72f) * sCurve);
+    }
+
+    // 3D Projection setup for the 7 orbital crystals centered at orb_center_cur_
+    const RgbaColor acc = AccentColor(1.0f);
+    const RgbaColor trailCol = SecondaryAccentColor(1.0f);
+    struct OrbPaletteEntry {
+        RgbaColor head;
+        RgbaColor tail;
+    };
+    static constexpr OrbPaletteEntry kOrbPalette[7] = {
+        {{0.22f, 0.62f, 1.00f, 1.0f}, {0.12f, 0.34f, 0.96f, 1.0f}}, // Electric Sky Blue
+        {{0.14f, 0.88f, 0.98f, 1.0f}, {0.08f, 0.56f, 0.92f, 1.0f}}, // Bright Cyan-Aqua
+        {{0.20f, 0.94f, 0.68f, 1.0f}, {0.10f, 0.66f, 0.58f, 1.0f}}, // Emerald-Mint Teal
+        {{0.68f, 0.34f, 1.00f, 1.0f}, {0.42f, 0.18f, 0.92f, 1.0f}}, // Amethyst Violet
+        {{0.96f, 0.36f, 0.82f, 1.0f}, {0.72f, 0.18f, 0.68f, 1.0f}}, // Rose-Magenta
+        {{1.00f, 0.74f, 0.30f, 1.0f}, {0.88f, 0.44f, 0.18f, 1.0f}}, // Warm Gold-Amber
+        {{0.48f, 0.78f, 1.00f, 1.0f}, {0.28f, 0.44f, 0.98f, 1.0f}}, // Ice-Sapphire
+    };
+    const auto blendColor = [](const RgbaColor& a, const RgbaColor& b, float t) -> RgbaColor {
+        return {
+            a.r + (b.r - a.r) * t,
+            a.g + (b.g - a.g) * t,
+            a.b + (b.b - a.b) * t,
+            1.0f
+        };
+    };
+    ribbon_verts_.clear();
+    orb_sprite_verts_.clear();
+
+    const float baseOrbitR = std::min(168.0f, screen_width_ * 0.195f) * spread;
+    const float clockRingR = std::min(110.0f, (screen_width_ * 0.34f) * 0.42f);
+    const float speed = 0.82f * motionScale;
+    orb_rot_time_ += static_cast<double>(dt) * static_cast<double>(motionScale);
+    orb_phase_acc_ += static_cast<double>(dt) * static_cast<double>(speed) *
+                      (1.0 + 3.6 * static_cast<double>(orb_swoop_t_) * static_cast<double>(orb_swoop_t_));
 
     for (int i = 0; i < 7; ++i) {
-        float phase = (static_cast<float>(i) / 7.0f) * 2.0f * kPi;
-        float theta = phase + time_sec_ * speed * motionScale + clockAngle * 0.25f;
-        float prevTheta = theta - 0.24f * (settings_.orbsMode == 1 ? 0.5f : 1.0f);
+        RgbaColor orbHead = kOrbPalette[i].head;
+        RgbaColor orbTail = kOrbPalette[i].tail;
+        if (settings_.theme == 1) {
+            // Midnight Silver: keep crisp silver / ice-white with subtle iridescent shimmer
+            const float silverWave = 0.82f + 0.14f * std::sin(static_cast<float>(i) * 1.15f);
+            const RgbaColor silverBase{silverWave * 0.94f, silverWave * 0.97f, std::min(1.0f, silverWave * 1.03f), 1.0f};
+            orbHead = blendColor(silverBase, kOrbPalette[i].head, 0.16f);
+            orbTail = blendColor(trailCol, kOrbPalette[i].tail, 0.18f);
+        } else if (settings_.theme != 0) {
+            // Other chromatic themes: 75% prismatic + 25% theme accent/trail
+            orbHead = blendColor(kOrbPalette[i].head, acc, 0.25f);
+            orbTail = blendColor(kOrbPalette[i].tail, trailCol, 0.25f);
+        }
 
-        auto evalPos = [&](float ang, float& px, float& py, float& depth) {
-            // Slight 3D inclined ellipse per orb like PS2 clock cluster
-            float rx = baseOrbitRx * (0.86f + 0.20f * std::sin(time_sec_ * 0.31f * motionScale + i * 1.1f));
-            float ry = baseOrbitRy * (0.78f + 0.22f * std::cos(time_sec_ * 0.27f * motionScale + i * 0.9f));
-            float lx = std::cos(ang) * rx;
-            float ly = std::sin(ang) * ry;
-            // Apply subtle plane tilt from active menu selection
-            float ct = std::cos(tiltAngle + i * 0.12f);
-            float st = std::sin(tiltAngle + i * 0.12f);
-            px = outCenterX + (lx * ct - ly * st);
-            py = outCenterY + (lx * st + ly * ct) * 0.74f + std::sin(ang * 2.0f + i) * 9.0f * spreadMult;
-            depth = 0.78f + 0.28f * std::sin(ang);
+        const float phase = (static_cast<float>(i) / 7.0f) * 2.0f * kPi;
+        const float thetaClock = phase - kPi * 0.5f + clockAngle;
+
+        auto evalPoint = [&](float tOff, float& px, float& py, float& pz) {
+            const double angV = static_cast<double>(phase) + orb_phase_acc_ - static_cast<double>(tOff);
+            const double tM = orb_rot_time_ - static_cast<double>(tOff) / static_cast<double>(std::max(0.25f, speed));
+            const float angC = thetaClock - tOff * 0.6f;
+
+            // Unified 1:1 PS2 BIOS precessing 3D ring shared by all 7 orbs + inertial ribbon delay
+            float r = baseOrbitR * (0.95f + 0.08f * std::sin(static_cast<float>(angV + tM * 0.35) + static_cast<float>(i) * 0.9f));
+            float lx = std::cos(static_cast<float>(angV)) * r;
+            float ly = std::sin(static_cast<float>(angV)) * r;
+            float lz = baseOrbitR * 0.14f * std::sin(static_cast<float>(angV * 2.0 + tM * 0.48) + static_cast<float>(i) * 1.1f);
+
+            float ax = 0.68f + 0.36f * std::sin(static_cast<float>(tM) * 0.29f);
+            float ay = 0.52f * std::sin(static_cast<float>(tM) * 0.21f) + 0.22f * std::cos(static_cast<float>(tM) * 0.13f);
+            float az = static_cast<float>(tM) * 0.16f;
+
+            float cx = std::cos(ax), sx = std::sin(ax);
+            float y1 = ly * cx - lz * sx;
+            float z1 = ly * sx + lz * cx;
+            float x1 = lx;
+
+            float cy = std::cos(ay), sy = std::sin(ay);
+            float x2 = x1 * cy + z1 * sy;
+            float z2 = -x1 * sy + z1 * cy;
+            float y2 = y1;
+
+            float cz = std::cos(az), sz = std::sin(az);
+            float rvx = x2 * cz - y2 * sz;
+            float rvy = x2 * sz + y2 * cz;
+            float rvz = z2 + zSwoop * (1.0f - orb_ring_blend_ * 0.5f);
+
+            // Exact circular clock-ring formation (zero Z warp for clean symmetry)
+            float cx3 = std::cos(angC) * clockRingR;
+            float cy3 = std::sin(angC) * clockRingR;
+            float cz3 = 0.0f;
+
+            float fx = rvx + (cx3 - rvx) * orb_ring_blend_;
+            float fy = rvy + (cy3 - rvy) * orb_ring_blend_;
+            float fz = rvz + (cz3 - rvz) * orb_ring_blend_;
+
+            float persp = 560.0f / std::max(180.0f, 560.0f - fz);
+            px = orb_center_cur_x_ + fx * persp;
+            py = orb_center_cur_y_ + fy * persp;
+            pz = persp;
         };
 
-        float x = 0.0f, y = 0.0f, depth = 1.0f;
-        float tx = 0.0f, ty = 0.0f, tdepth = 1.0f;
-        evalPos(theta, x, y, depth);
-        evalPos(prevTheta, tx, ty, tdepth);
+        float headX = 0.0f, headY = 0.0f, headPersp = 1.0f;
+        evalPoint(0.0f, headX, headY, headPersp);
 
-        const float orbRad = (8.8f + (i == 0 ? 2.4f : 0.0f)) * depth * (launching_ ? (1.0f + 0.25f * outCoreBoost) : 1.0f);
-        outOrbs28[i * 4 + 0] = x;
-        outOrbs28[i * 4 + 1] = y;
-        outOrbs28[i * 4 + 2] = orbRad;
-        outOrbs28[i * 4 + 3] = screenAlpha * gather * (0.72f + 0.28f * depth);
+        // Curved 32-segment glowing ribbon trail behind every orb
+        if (settings_.orbsMode != 2) {
+            constexpr int kTrailSteps = 32;
+            const float maxArc = ((orb_ring_blend_ > 0.5f) ? 0.72f : 1.95f) + 0.95f * sCurve;
+            float prevPx = headX, prevPy = headY, prevNx = 0.0f, prevNy = 1.0f, prevW = 6.0f * headPersp;
 
-        outTrails28[i * 4 + 0] = tx;
-        outTrails28[i * 4 + 1] = ty;
-        outTrails28[i * 4 + 2] = 0.0f;
-        outTrails28[i * 4 + 3] = trailWeight * screenAlpha * gather;
+            for (int s = 0; s <= kTrailSteps; ++s) {
+                const float frac = static_cast<float>(s) / static_cast<float>(kTrailSteps);
+                float sx = 0.0f, sy = 0.0f, sp = 1.0f;
+                evalPoint(frac * maxArc, sx, sy, sp);
+                float nextX = sx, nextY = sy, nextP = sp;
+                if (s < kTrailSteps) {
+                    evalPoint((frac + 0.04f) * maxArc, nextX, nextY, nextP);
+                }
+                float tx = nextX - sx;
+                float ty = nextY - sy;
+                float tlen = std::sqrt(tx * tx + ty * ty);
+                if (tlen < 0.01f) {
+                    tx = 1.0f; ty = 0.0f;
+                } else {
+                    tx /= tlen; ty /= tlen;
+                }
+                float nx = -ty;
+                float ny = tx;
+                float halfW = (12.5f * sp) * (1.0f - frac * 0.82f);
+
+                if (s > 0) {
+                    float fPrev = static_cast<float>(s - 1) / static_cast<float>(kTrailSteps);
+                    float aPrev = screenAlpha * gather * (1.0f - fPrev);
+                    float aCur = screenAlpha * gather * (1.0f - frac);
+                    const RgbaColor cPrev{
+                        orbTail.r + (orbHead.r - orbTail.r) * (1.0f - fPrev),
+                        orbTail.g + (orbHead.g - orbTail.g) * (1.0f - fPrev),
+                        orbTail.b + (orbHead.b - orbTail.b) * (1.0f - fPrev),
+                        aPrev * 0.76f
+                    };
+                    const RgbaColor cCur{
+                        orbTail.r + (orbHead.r - orbTail.r) * (1.0f - frac),
+                        orbTail.g + (orbHead.g - orbTail.g) * (1.0f - frac),
+                        orbTail.b + (orbHead.b - orbTail.b) * (1.0f - frac),
+                        aCur * 0.76f
+                    };
+
+                    float p0x = prevPx + prevNx * prevW, p0y = prevPy + prevNy * prevW;
+                    float p1x = prevPx - prevNx * prevW, p1y = prevPy - prevNy * prevW;
+                    float q0x = sx + nx * halfW, q0y = sy + ny * halfW;
+                    float q1x = sx - nx * halfW, q1y = sy - ny * halfW;
+
+                    ribbon_verts_.push_back({p0x, p0y, 0.0f, fPrev, cPrev.r, cPrev.g, cPrev.b, cPrev.a});
+                    ribbon_verts_.push_back({p1x, p1y, 1.0f, fPrev, cPrev.r, cPrev.g, cPrev.b, cPrev.a});
+                    ribbon_verts_.push_back({q1x, q1y, 1.0f, frac,  cCur.r,  cCur.g,  cCur.b,  cCur.a});
+                    ribbon_verts_.push_back({p0x, p0y, 0.0f, fPrev, cPrev.r, cPrev.g, cPrev.b, cPrev.a});
+                    ribbon_verts_.push_back({q1x, q1y, 1.0f, frac,  cCur.r,  cCur.g,  cCur.b,  cCur.a});
+                    ribbon_verts_.push_back({q0x, q0y, 0.0f, frac,  cCur.r,  cCur.g,  cCur.b,  cCur.a});
+                }
+                prevPx = sx; prevPy = sy; prevNx = nx; prevNy = ny; prevW = halfW;
+            }
+        }
+
+        // Luminous Star-Core Orb Billboard
+        const float spriteHalf = (25.0f + (i == 0 ? 3.5f : 0.0f)) * headPersp * (1.0f + 0.28f * orb_flash_t_);
+        const float orbA = screenAlpha * gather * std::clamp(0.65f + 0.35f * headPersp, 0.3f, 1.0f);
+        float x0 = headX - spriteHalf, y0 = headY - spriteHalf;
+        float x1 = headX + spriteHalf, y1 = headY + spriteHalf;
+        orb_sprite_verts_.push_back({x0, y0, 0.0f, 0.0f, orbHead.r, orbHead.g, orbHead.b, orbA});
+        orb_sprite_verts_.push_back({x1, y0, 1.0f, 0.0f, orbHead.r, orbHead.g, orbHead.b, orbA});
+        orb_sprite_verts_.push_back({x1, y1, 1.0f, 1.0f, orbHead.r, orbHead.g, orbHead.b, orbA});
+        orb_sprite_verts_.push_back({x0, y0, 0.0f, 0.0f, orbHead.r, orbHead.g, orbHead.b, orbA});
+        orb_sprite_verts_.push_back({x1, y1, 1.0f, 1.0f, orbHead.r, orbHead.g, orbHead.b, orbA});
+        orb_sprite_verts_.push_back({x0, y1, 0.0f, 1.0f, orbHead.r, orbHead.g, orbHead.b, orbA});
     }
+
+    FlushQuadBatch();
+    glBlendFunc(GL_ONE, GL_ONE);
+
+    if (!ribbon_verts_.empty()) {
+        glUseProgram(prog_ribbon_);
+        glUniform2f(rib_u_screen_, screen_width_, kScreenHeight);
+        glBindVertexArray(vao_);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_);
+        glBufferData(GL_ARRAY_BUFFER,
+                     static_cast<GLsizeiptr>(ribbon_verts_.size() * sizeof(Vertex)),
+                     ribbon_verts_.data(), GL_STREAM_DRAW);
+        glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(ribbon_verts_.size()));
+    }
+
+    if (!orb_sprite_verts_.empty()) {
+        glUseProgram(prog_orb_);
+        glUniform2f(orb_u_screen_, screen_width_, kScreenHeight);
+        glBindVertexArray(vao_);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_);
+        glBufferData(GL_ARRAY_BUFFER,
+                     static_cast<GLsizeiptr>(orb_sprite_verts_.size() * sizeof(Vertex)),
+                     orb_sprite_verts_.data(), GL_STREAM_DRAW);
+        glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(orb_sprite_verts_.size()));
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_);
+    glBufferData(GL_ARRAY_BUFFER, 4096 * sizeof(Vertex), nullptr, GL_STREAM_DRAW);
+    glBindVertexArray(0);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 void Ps2Renderer::DrawHeaderBar(const std::string& title, float alpha) {
     const LayoutMetrics m = ComputeMetrics();
-    const RgbaColor acc = AccentColor(alpha * 0.85f);
-    // Sleek PS2 horizontal luminous underline + crisp airy title
-    DrawText(title, m.padX, m.bodyTop - 4.0f, 22.0f, STYLE_HEADER, PrimaryTextColor(alpha));
+    const RgbaColor acc = AccentColor(alpha * 0.72f);
+    DrawText(title, m.padX, m.bodyTop - 7.0f, 24.0f, STYLE_HEADER, PrimaryTextColor(alpha));
     FlushQuadBatch();
     BeginQuadBatch();
-    PushQuad(white_tex_, m.padX, m.bodyTop + 26.0f, screen_width_ - m.padX * 2.0f, 1.5f,
-             {acc.r, acc.g, acc.b, alpha * 0.55f}, {acc.r, acc.g, acc.b, alpha * 0.12f});
+    PushQuad(white_tex_, m.padX, m.bodyTop + 28.0f, screen_width_ - m.padX * 2.0f, 1.2f,
+             {acc.r, acc.g, acc.b, alpha * 0.48f}, {acc.r, acc.g, acc.b, 0.0f});
 }
 
 void Ps2Renderer::DrawStatusBar(float alpha) {
@@ -961,7 +1591,6 @@ void Ps2Renderer::DrawStatusBar(float alpha) {
     const LayoutMetrics m = ComputeMetrics();
 
     std::string statusLine;
-    std::string slotBadge;
     bool biosOk = true;
     {
         std::lock_guard<std::mutex> lock(data_mutex_);
@@ -990,7 +1619,7 @@ void Ps2Renderer::DrawStatusBar(float alpha) {
 
             char timeBuf[24] = {};
             if (settings_.time24h) {
-                std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d", tmNow.tm_hour, tmNow.tm_min, tmNow.tm_sec);
+                std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", tmNow.tm_hour, tmNow.tm_min);
             } else {
                 int h12 = tmNow.tm_hour % 12;
                 if (h12 == 0) h12 = 12;
@@ -1000,51 +1629,34 @@ void Ps2Renderer::DrawStatusBar(float alpha) {
             char batBuf[24] = {};
             std::snprintf(batBuf, sizeof(batBuf), "%s%d%%", status_.batteryCharging ? "⚡" : "", status_.batteryLevel);
 
-            std::string netIcons;
-            if (status_.wifiConnected) netIcons += "Wi-Fi  ";
-            if (status_.bluetoothConnected) netIcons += "BT  ";
-            if (status_.audioMuted) netIcons += "MUTE  ";
-
-            cached_status_line_ = netIcons + std::string(batBuf) + "   " + std::string(dateBuf) + "  " + std::string(timeBuf);
+            std::string icons;
+            if (status_.wifiConnected) icons += "Wi-Fi  ";
+            if (status_.bluetoothConnected) icons += "BT  ";
+            if (status_.audioMuted) icons += "MUTE  ";
+            cached_status_line_ = icons + std::string(batBuf) + "   " + std::string(dateBuf) + "  " + std::string(timeBuf);
         }
         statusLine = cached_status_line_;
         biosOk = status_.biosValid;
-
-        if (!slot1_card_name_.empty() || !slot2_card_name_.empty()) {
-            slotBadge = "MC1:" + (slot1_card_name_.empty() ? "—" : slot1_card_name_) +
-                        "   MC2:" + (slot2_card_name_.empty() ? "—" : slot2_card_name_);
-        }
     }
 
-    // Subtle smoked top bar strip
-    DrawPanel(m.padX, 8.0f, screen_width_ - m.padX * 2.0f, 34.0f, 8.0f, 1.0f,
-              PanelTopColor(0.56f * alpha), PanelBotColor(0.68f * alpha),
-              PanelBorderColor(0.32f * alpha));
-
+    // Pure #000000 borderless header scaled smoothly by physical screen size
+    const float stSize = 14.5f * ui_scale_;
+    const float stY = std::max(5.0f, (m.topBarH - stSize * 1.20f) * 0.5f);
     BeginQuadBatch();
-    const RgbaColor acc = AccentColor(alpha);
-    DrawText("EmuCoreX  PS2", m.padX + 14.0f, 14.0f, 15.0f, STYLE_BODY_BOLD, acc);
-
-    if (!slotBadge.empty() && screen_width_ >= 780.0f) {
-        DrawText(slotBadge, m.padX + 160.0f, 16.0f, 11.5f, STYLE_MONO,
-                 SecondaryTextColor(alpha * 0.78f), screen_width_ * 0.36f, 1);
-    }
-
     if (!biosOk) {
-        DrawText("NO BIOS", screen_width_ * 0.5f - 40.0f, 16.0f, 11.5f, STYLE_BODY_BOLD,
-                 {1.0f, 0.45f, 0.38f, alpha});
+        DrawText("NO BIOS", m.padX, stY, stSize, STYLE_BODY_BOLD, {1.0f, 0.45f, 0.38f, alpha});
     }
-
-    DrawText(statusLine, m.padX, 15.0f, 12.5f, STYLE_MONO,
-             PrimaryTextColor(alpha * 0.92f), screen_width_ - m.padX * 2.0f - 28.0f, 1, 2,
-             screen_width_ - m.padX * 2.0f - 14.0f);
+    DrawText(statusLine, m.padX, stY, stSize, STYLE_MONO,
+             SecondaryTextColor(alpha * 0.88f),
+             screen_width_ - m.padX * 2.0f, 1, 2, screen_width_ - m.padX * 2.0f);
     FlushQuadBatch();
 }
 
 void Ps2Renderer::DrawBottomBar(float alpha) {
     if (alpha <= 0.01f) return;
     const LayoutMetrics m = ComputeMetrics();
-    const float barY = kScreenHeight - m.bottomBarH - 6.0f;
+    const float barTop = kScreenHeight - m.bottomBarH;
+    const float barScale = 0.55f + 0.45f * ui_scale_;
 
     struct BtnHint {
         std::string glyph;
@@ -1055,211 +1667,249 @@ void Ps2Renderer::DrawBottomBar(float alpha) {
     std::vector<BtnHint> btns;
     const std::string confirmSym = settings_.swapConfirm ? "○" : "×";
     const std::string backSym = settings_.swapConfirm ? "×" : "○";
-    const RgbaColor confirmCol = AccentColor(alpha);
-    const RgbaColor backCol = {0.96f, 0.48f, 0.56f, alpha};
+    const RgbaColor confirmCol{0.42f, 0.72f, 1.0f, alpha};
+    const RgbaColor backCol{1.0f, 0.42f, 0.52f, alpha};
 
     if (screen_ == SCREEN_MAIN_MENU) {
-        btns.push_back({confirmSym, TextOr("ps2ui_hint_select", "Select"), KEY_CONFIRM, confirmCol});
-        btns.push_back({"△", TextOr("ps2ui_hint_version", "Version"), KEY_OPTIONS, {0.42f, 0.92f, 0.68f, alpha}});
+        btns.push_back({confirmSym, TextOr("ps2ui_hint_select", "Enter"), KEY_CONFIRM, confirmCol});
+        btns.push_back({"△", TextOr("ps2ui_hint_version", "Version"), KEY_OPTIONS, {0.36f, 0.94f, 0.68f, alpha}});
         btns.push_back({backSym, TextOr("ps2ui_hint_exit", "Exit"), KEY_BACK, backCol});
     } else if (screen_ == SCREEN_GAMES) {
         btns.push_back({confirmSym, TextOr("ps2ui_btn_start", "Start"), KEY_CONFIRM, confirmCol});
-        if (!games_.empty() && game_index_ >= 0 && game_index_ < static_cast<int>(games_.size()) &&
-            games_[game_index_].latestSaveSlot >= 0) {
-            btns.push_back({"□", TextOr("ps2ui_btn_continue", "Continue"), KEY_SECONDARY, {0.82f, 0.62f, 1.0f, alpha}});
+        const int realIdx = SelectedMasterGameIndex();
+        bool hasCont = false;
+        {
+            std::lock_guard<std::mutex> lock(data_mutex_);
+            hasCont = (realIdx >= 0 && realIdx < static_cast<int>(games_.size()) &&
+                       games_[realIdx].latestSaveSlot >= 0);
         }
-        btns.push_back({"△", TextOr("ps2ui_btn_options", "Options"), KEY_OPTIONS, {0.42f, 0.92f, 0.68f, alpha}});
+        if (hasCont) {
+            btns.push_back({"□", TextOr("ps2ui_btn_continue", "Continue"), KEY_SECONDARY, {0.86f, 0.60f, 1.0f, alpha}});
+        }
+        btns.push_back({"△", TextOr("ps2ui_btn_options", "Options"), KEY_OPTIONS, {0.36f, 0.94f, 0.68f, alpha}});
+        if (has_arcade_games_) {
+            btns.push_back({"L1/R1", TextOr("ps2ui_hint_tab", "Tab"), KEY_NEXT_TAB, SecondaryTextColor(alpha)});
+        }
         btns.push_back({backSym, TextOr("ps2ui_hint_back", "Back"), KEY_BACK, backCol});
     } else if (screen_ == SCREEN_BROWSER) {
         if (mc_tab_ == 2) {
-            btns.push_back({confirmSym, mc_card_pane_ == 0
-                ? TextOr("ps2ui_hint_change", "Cycle")
-                : TextOr("ps2ui_mc_actions", "Actions"), KEY_CONFIRM, confirmCol});
-            btns.push_back({"□", TextOr("ps2ui_mc_swap", "Swap 1↔2"), KEY_SECONDARY, {0.84f, 0.58f, 1.0f, alpha}});
-            btns.push_back({"△", TextOr("ps2ui_mc_create_short", "+ Create Card"), KEY_OPTIONS, {0.36f, 0.94f, 0.68f, alpha}});
+            if (mc_open_slot_ > 0) {
+                btns.push_back({backSym, TextOr("ps2ui_hint_back", "Back"), KEY_BACK, backCol});
+            } else {
+                btns.push_back({confirmSym, mc_card_pane_ == 0
+                    ? TextOr("ps2ui_mc_open_card", "Open Card")
+                    : TextOr("ps2ui_mc_actions", "Options"), KEY_CONFIRM, confirmCol});
+                btns.push_back({"□", TextOr("ps2ui_mc_swap", "Swap 1↔2"), KEY_SECONDARY, {0.86f, 0.60f, 1.0f, alpha}});
+                btns.push_back({"△", TextOr("ps2ui_mc_create_short", "+ Create Card"), KEY_OPTIONS, {0.36f, 0.94f, 0.68f, alpha}});
+                btns.push_back({"L1/R1", TextOr("ps2ui_hint_tab", "Tab"), KEY_NEXT_TAB, SecondaryTextColor(alpha)});
+                btns.push_back({backSym, TextOr("ps2ui_hint_back", "Back"), KEY_BACK, backCol});
+            }
         } else {
             btns.push_back({confirmSym, TextOr("ps2ui_mc_load", "Load"), KEY_CONFIRM, confirmCol});
-            btns.push_back({"□", TextOr("ps2ui_mc_delete", "Delete"), KEY_SECONDARY, {0.96f, 0.48f, 0.42f, alpha}});
+            btns.push_back({"□", TextOr("ps2ui_mc_delete", "Delete"), KEY_SECONDARY, {1.0f, 0.50f, 0.54f, alpha}});
+            btns.push_back({"L1/R1", TextOr("ps2ui_hint_tab", "Tab"), KEY_NEXT_TAB, SecondaryTextColor(alpha)});
+            btns.push_back({backSym, TextOr("ps2ui_hint_back", "Back"), KEY_BACK, backCol});
         }
-        btns.push_back({"L1/R1", TextOr("ps2ui_hint_tab", "Tab"), KEY_NEXT_TAB, SecondaryTextColor(alpha)});
-        btns.push_back({backSym, TextOr("ps2ui_hint_back", "Back"), KEY_BACK, backCol});
     } else if (screen_ == SCREEN_SETTINGS) {
         btns.push_back({confirmSym, TextOr("ps2ui_hint_change", "Change"), KEY_CONFIRM, confirmCol});
         btns.push_back({backSym, TextOr("ps2ui_hint_back", "Back"), KEY_BACK, backCol});
     }
 
-    float totalW = 0.0f;
-    std::vector<float> pillWidths(btns.size());
-    for (size_t i = 0; i < btns.size(); ++i) {
-        float gw = 0.0f, gh = 0.0f, lw = 0.0f, lh = 0.0f;
-        MeasureText(btns[i].glyph, 13.5f, STYLE_BODY_BOLD, 0.0f, 1, gw, gh);
-        MeasureText(btns[i].label, 12.5f, STYLE_BODY, 0.0f, 1, lw, lh);
-        pillWidths[i] = gw + lw + 28.0f;
-        totalW += pillWidths[i] + 10.0f;
-    }
-    if (!btns.empty()) totalW -= 10.0f;
+    float glyphSize = 17.0f * ui_scale_;
+    float labelSize = 15.0f * ui_scale_;
+    float itemPad = 14.0f * barScale;
+    float gapW = 22.0f * barScale;
 
-    float curX = std::max(m.padX, (screen_width_ - totalW) * 0.5f);
-    for (size_t i = 0; i < btns.size(); ++i) {
-        const float pw = pillWidths[i];
-        DrawPanel(curX, barY, pw, 30.0f, 10.0f, 1.0f,
-                  PanelTopColor(0.68f * alpha), PanelBotColor(0.78f * alpha),
-                  {btns[i].col.r, btns[i].col.g, btns[i].col.b, 0.42f * alpha});
-        BeginQuadBatch();
-        float gw = 0.0f, gh = 0.0f;
-        MeasureText(btns[i].glyph, 13.5f, STYLE_BODY_BOLD, 0.0f, 1, gw, gh);
-        DrawText(btns[i].glyph, curX + 10.0f, barY + 5.5f, 13.5f, STYLE_BODY_BOLD, btns[i].col);
-        DrawText(btns[i].label, curX + 16.0f + gw, barY + 6.0f, 12.5f, STYLE_BODY, PrimaryTextColor(alpha * 0.94f));
-        FlushQuadBatch();
-
-        if (overlay_ == OVERLAY_NONE) {
-            RegisterHit(curX - 4.0f, barY - 4.0f, pw + 8.0f, 38.0f, HIT_BOTTOM_ACTION, btns[i].key);
+    auto measureRow = [&](std::vector<float>& itemW, std::vector<float>& glyphW) -> float {
+        float tot = 0.0f;
+        itemW.resize(btns.size());
+        glyphW.resize(btns.size());
+        for (size_t i = 0; i < btns.size(); ++i) {
+            float gw = 0.0f, gh = 0.0f, lw = 0.0f, lh = 0.0f;
+            MeasureText(btns[i].glyph, glyphSize, STYLE_BODY_BOLD, 0.0f, 1, gw, gh);
+            MeasureText(btns[i].label, labelSize, STYLE_BODY, 0.0f, 1, lw, lh);
+            glyphW[i] = gw;
+            itemW[i] = gw + 8.0f + lw + itemPad * 0.5f;
+            tot += itemW[i] + gapW;
         }
-        curX += pw + 10.0f;
+        if (!btns.empty()) tot -= gapW;
+        return tot;
+    };
+
+    std::vector<float> itemW;
+    std::vector<float> glyphW;
+    float totalW = measureRow(itemW, glyphW);
+    const float availW = std::max(120.0f, screen_width_ - m.padX * 2.0f);
+    if (totalW > availW) {
+        const float fit = availW / totalW;
+        glyphSize *= fit;
+        labelSize *= fit;
+        itemPad *= fit;
+        gapW *= fit;
+        totalW = measureRow(itemW, glyphW);
     }
+
+    const float glyphY = barTop + (m.bottomBarH - glyphSize * 1.25f) * 0.5f;
+    const float labelY = barTop + (m.bottomBarH - labelSize * 1.25f) * 0.5f;
+
+    // Pure PlayStation floating glyphs directly on #000000 black (ZERO pill borders!)
+    float curX = std::max(m.padX, (screen_width_ - totalW) * 0.5f);
+    BeginQuadBatch();
+    for (size_t i = 0; i < btns.size(); ++i) {
+        DrawText(btns[i].glyph, curX, glyphY, glyphSize, STYLE_BODY_BOLD, btns[i].col);
+        DrawText(btns[i].label, curX + glyphW[i] + 8.0f, labelY, labelSize, STYLE_BODY,
+                 PrimaryTextColor(alpha * 0.92f));
+        if (overlay_ == OVERLAY_NONE) {
+            RegisterHit(curX - 6.0f, barTop, itemW[i] + 12.0f, m.bottomBarH, HIT_BOTTOM_ACTION, btns[i].key);
+        }
+        curX += itemW[i] + gapW;
+    }
+    FlushQuadBatch();
 }
 
 void Ps2Renderer::DrawBootIntro(float alpha) {
     const float dur = std::max(0.1f, boot_duration_);
     const float p = Clamp01(boot_t_ / dur);
+    const RgbaColor acc = AccentColor(1.0f);
 
-    // 3D Camera glide over translucent glowing PS2 monolith towers
+    // High-angle diving camera strictly down the open central alley BETWEEN towers & hovering cubes
     if (settings_.towersMode != 2) {
         const float aspect = screen_width_ / kScreenHeight;
         float proj[16], view[16], mvp[16];
-        MakePerspective(0.88f, aspect, 0.2f, 65.0f, proj);
+        MakePerspective(0.92f, aspect, 0.2f, 70.0f, proj);
 
-        const float camZ = 4.5f - p * 10.5f;
-        const float camY = 5.4f - SmoothStep(0.0f, 0.6f, p) * 2.4f + SmoothStep(0.65f, 1.0f, p) * 1.6f;
-        const float camX = std::sin(p * kPi) * 0.9f;
-        MakeLookAt(camX, camY, camZ, 0.0f, 0.6f, camZ - 11.0f, 0.0f, 1.0f, 0.0f, view);
+        const float dive = SmoothStep(0.0f, 0.92f, p);
+        const float camY = 16.5f - 12.9f * EaseOutCubic(dive);
+        const float camZ = 5.2f - 9.2f * dive;
+        const float camX = std::sin(p * 1.2f) * 0.25f;
+        MakeLookAt(camX, camY, camZ, 0.0f, 0.2f, -4.5f - 3.0f * dive, 0.0f, 1.0f, 0.0f, view);
         Mat4Mul(proj, view, mvp);
 
-        const float towerAlpha = (1.0f - SmoothStep(0.62f, 0.96f, p)) * 0.92f * alpha;
-        const float rise = SmoothStep(0.02f, 0.35f, p) * (1.0f - SmoothStep(0.70f, 1.0f, p) * 0.45f);
-        DrawTowers3D(mvp, camX, camY, camZ, rise, towerAlpha);
+        const float towerAlpha = (1.0f - SmoothStep(0.68f, 0.96f, p)) * 0.94f * alpha;
+        const float rise = SmoothStep(0.0f, 0.28f, p);
+        const RgbaColor fogCol = SecondaryAccentColor(0.32f);
+        DrawTowers3D(mvp, camX, camY, camZ, rise, fogCol, 0.095f, towerAlpha, 0.0f);
     }
 
-    // Center crystal beam + EmuCoreX PS2 wordmark reveal
-    const float wordAlpha = SmoothStep(0.24f, 0.48f, p) * (1.0f - SmoothStep(0.80f, 0.98f, p)) * alpha;
-    if (wordAlpha > 0.01f) {
-        const RgbaColor acc = AccentColor(wordAlpha);
-        const float cx = screen_width_ * 0.5f;
-        const float cy = kScreenHeight * 0.47f;
-        const float beamW = std::min(screen_width_ * 0.72f, 520.0f) * EaseOutCubic(SmoothStep(0.20f, 0.56f, p));
+    // Subtle additive blue refraction light-wave sweep during Act 1-2
+    FlushQuadBatch();
+    glBlendFunc(GL_ONE, GL_ONE);
+    glUseProgram(prog_launch_);
+    glUniform2f(lch_u_screen_, screen_width_, kScreenHeight);
+    glUniform1f(lch_u_progress_, SmoothStep(0.06f, 0.74f, p));
+    glUniform1f(lch_u_time_, time_sec_);
+    glUniform3f(lch_u_accent_col_, acc.r * 0.48f, acc.g * 0.48f, acc.b * 0.48f);
+    glBindVertexArray(fs_vao_);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+    // Act 2 centered hero wordmark reveal finishing cleanly BEFORE Act 3 orbs appear
+    const float wordAlpha = SmoothStep(0.14f, 0.30f, p) * (1.0f - SmoothStep(0.54f, 0.68f, p)) * alpha;
+    if (wordAlpha > 0.01f) {
+        const float cx = screen_width_ * 0.5f;
+        const float lineY = kScreenHeight * 0.48f + 6.0f;
+        const float beamW = std::min(screen_width_ * 0.62f, 480.0f) * EaseOutCubic(SmoothStep(0.14f, 0.40f, p));
+
+        float emW = 0.0f, emH = 0.0f, psW = 0.0f, psH = 0.0f;
+        MeasureText("EmuCoreX", 48.0f, STYLE_PS2_LOGO, 0.0f, 1, emW, emH);
+        MeasureText("PlayStation 2", 18.5f, STYLE_HEADER, 0.0f, 1, psW, psH);
+
+        DrawFocusBeam(cx - beamW * 0.5f, lineY - 12.0f, beamW, 24.0f, AccentColor(wordAlpha), wordAlpha * 0.45f);
         BeginQuadBatch();
-        PushQuad(white_tex_, cx - beamW * 0.5f, cy + 28.0f, beamW, 2.0f,
-                 {acc.r, acc.g, acc.b, wordAlpha * 0.75f});
-        DrawText("EmuCoreX", 0.0f, cy - 30.0f, 44.0f, STYLE_MENU, PrimaryTextColor(wordAlpha),
-                 screen_width_, 1, 1, screen_width_);
-        DrawText(TextOr("ps2ui_boot_subtitle", "PlayStation 2 System Shell"),
-                 0.0f, cy + 40.0f, 15.0f, STYLE_HEADER, SecondaryTextColor(wordAlpha * 0.88f),
-                 screen_width_, 1, 1, screen_width_);
+        DrawText("EmuCoreX", cx - emW * 0.5f, lineY - emH - 4.0f, 48.0f, STYLE_PS2_LOGO,
+                 PrimaryTextColor(wordAlpha));
+        PushQuad(white_tex_, cx - beamW * 0.5f, lineY, beamW, 1.5f,
+                 {0.72f, 0.92f, 1.0f, wordAlpha * 0.88f});
+        DrawText("PlayStation 2", cx - psW * 0.5f, lineY + 12.0f, 18.5f, STYLE_HEADER,
+                 SecondaryTextColor(wordAlpha * 0.92f));
         FlushQuadBatch();
     }
 }
 
 void Ps2Renderer::DrawMainMenu(float alpha) {
     const LayoutMetrics m = ComputeMetrics();
-
-    // Optional subtle background horizon towers rising softly from lower mist
-    if (settings_.towersMode != 2) {
-        const float aspect = screen_width_ / kScreenHeight;
-        float proj[16], view[16], mvp[16];
-        MakePerspective(0.82f, aspect, 0.2f, 65.0f, proj);
-        const float camX = 0.35f * std::sin(time_sec_ * 0.14f);
-        const float camY = 3.2f;
-        const float camZ = 4.2f;
-        MakeLookAt(camX, camY, camZ, -0.8f, 0.3f, -12.0f, 0.0f, 1.0f, 0.0f, view);
-        Mat4Mul(proj, view, mvp);
-        const float tAlpha = (settings_.towersMode == 0 ? 0.34f : 0.16f) * alpha;
-        DrawTowers3D(mvp, camX, camY, camZ, 0.75f, tAlpha);
-    }
-
-    // Subtle rotating luminous clock arc & brand caption under the 7 orbs on the left
-    const float orbCx = screen_width_ * 0.285f;
-    const float orbCy = kScreenHeight * 0.50f;
-    BeginQuadBatch();
-    DrawText(TextOr("ps2ui_main_menu", "System Shell"),
-             orbCx - 140.0f, orbCy + 114.0f, 13.0f, STYLE_HEADER,
-             SecondaryTextColor(alpha * 0.68f), 280.0f, 1, 1, 280.0f);
-    FlushQuadBatch();
-
-    // Right-hand authentic airy PS2 BIOS Menu Stack
-    const float menuX = std::max(screen_width_ * 0.51f, orbCx + 150.0f);
-    const float menuW = screen_width_ - menuX - m.padX - 10.0f;
-    const float rowH = 66.0f;
-    const float rowGap = 16.0f;
-    const float startY = kScreenHeight * 0.50f - (3.0f * rowH + 2.0f * rowGap) * 0.5f - 6.0f;
+    const RgbaColor acc = AccentColor(alpha);
 
     struct MainEntry {
         std::string title;
-        std::string sub;
+        std::string countStr;
     };
-    std::string mcSubtitle;
+    size_t savesCount = 0;
+    size_t cardsCount = 0;
+    size_t gamesCount = 0;
     {
         std::lock_guard<std::mutex> lock(data_mutex_);
-        char buf[128];
-        std::snprintf(buf, sizeof(buf), "%zu %s  •  %zu %s",
-                      saves_.size(), TextOr("ps2ui_saves_word", "Saves").c_str(),
-                      memcards_.size(), TextOr("ps2ui_cards_word", "Cards").c_str());
-        mcSubtitle = buf;
+        savesCount = saves_.size();
+        cardsCount = memcards_.size();
+        gamesCount = games_.size();
     }
-    std::string gamesSub;
-    {
-        std::lock_guard<std::mutex> lock(data_mutex_);
-        char buf[64];
-        std::snprintf(buf, sizeof(buf), "%zu %s",
-                      games_.size(), TextOr("ps2ui_discs", "Discs").c_str());
-        gamesSub = buf;
-    }
+
+    char gmBuf[64];
+    std::snprintf(gmBuf, sizeof(gmBuf), "%zu %s", gamesCount, TextOr("ps2ui_discs", "Discs").c_str());
+    char mcBuf[96];
+    std::snprintf(mcBuf, sizeof(mcBuf), "%zu %s  •  %zu %s",
+                  cardsCount, TextOr("ps2ui_cards_word", "Cards").c_str(),
+                  savesCount, TextOr("ps2ui_saves_word", "Saves").c_str());
 
     MainEntry items[3] = {
-        {TextOr("ps2ui_menu_games", "Games"), gamesSub},
-        {TextOr("ps2ui_menu_browser", "Browser"), mcSubtitle},
-        {TextOr("ps2ui_menu_settings", "System Configuration"), TextOr("ps2ui_menu_settings_sub", "Theme, Display & Audio")},
+        {TextOr("ps2ui_menu_games", "Games"), gmBuf},
+        {TextOr("ps2ui_menu_browser", "Browser"), mcBuf},
+        {TextOr("ps2ui_menu_settings", "System Configuration"), ""},
     };
 
-    const RgbaColor acc = AccentColor(alpha);
+    const float baseTitleSize = 26.5f;
+    const float countSize = 13.5f * (0.60f + 0.40f * ui_scale_);
+    float maxTitleW = 0.0f;
+    float titlesW[3] = {0.0f, 0.0f, 0.0f};
+    for (int i = 0; i < 3; ++i) {
+        float th = 0.0f;
+        MeasureText(items[i].title, baseTitleSize, STYLE_MENU, 0.0f, 1, titlesW[i], th);
+        maxTitleW = std::max(maxTitleW, titlesW[i]);
+    }
+
+    const float rightMargin = m.padX + 14.0f;
+    const float maxAllowedW = screen_width_ * 0.37f;
+    const float menuBlockW = std::min(maxAllowedW, std::max(265.0f, maxTitleW + 26.0f));
+    const float menuX = screen_width_ - rightMargin - menuBlockW;
+    const float menuW = screen_width_ - menuX - m.padX * 0.65f;
+    const float rowH = 62.0f;
+    const float rowGap = 22.0f;
+    const float startY = kScreenHeight * 0.50f - (3.0f * rowH + 2.0f * rowGap) * 0.5f - 8.0f;
+    const float availTitleW = std::max(140.0f, menuBlockW - 14.0f);
+
+    // Pure #000000 right-aligned PS2 Main Menu w/ high-contrast ice-silver labels
     for (int i = 0; i < 3; ++i) {
         const float ry = startY + static_cast<float>(i) * (rowH + rowGap);
         const bool sel = (i == main_index_);
-        const float focusBoost = sel ? 1.0f : 0.0f;
-
         if (sel) {
-            // Sleek horizontal glowing crystal beam instead of heavy box
-            DrawPanel(menuX, ry, menuW, rowH, 12.0f, 1.2f,
-                      PanelTopColor(0.56f * alpha), PanelBotColor(0.72f * alpha),
-                      {acc.r, acc.g, acc.b, 0.72f * alpha},
-                      {acc.r, acc.g, acc.b, 0.52f * alpha});
-            if (!cursor_pos_init_) {
-                cursor_x_ = menuX - 18.0f;
-                cursor_y_ = ry + rowH * 0.5f;
-                cursor_pos_init_ = true;
-            }
-        } else {
-            DrawPanel(menuX, ry, menuW, rowH, 12.0f, 0.8f,
-                      PanelTopColor(0.24f * alpha), PanelBotColor(0.32f * alpha),
-                      {acc.r, acc.g, acc.b, 0.16f * alpha});
+            DrawFocusBeam(menuX - 24.0f, ry - 4.0f, menuW + 24.0f, rowH + 4.0f, acc, alpha * 0.92f);
+            SetCursorTarget(menuX - 18.0f, ry + 20.0f);
         }
+
+        const float tw = titlesW[i];
+        const float fitSize = (tw > availTitleW && tw > 1.0f)
+            ? std::max(18.5f, baseTitleSize * (availTitleW / tw))
+            : baseTitleSize;
+        const float titleX = menuX + 8.0f + (sel ? 5.0f : 0.0f);
 
         BeginQuadBatch();
-        if (sel) {
-            DrawDiamondCursor(menuX - 18.0f, cursor_y_, 10.5f, alpha);
+        DrawText(items[i].title, titleX, ry + 5.0f, fitSize,
+                 STYLE_MENU, sel ? PrimaryTextColor(alpha) : RgbaColor{0.82f, 0.88f, 0.96f, alpha},
+                 availTitleW, 1);
+        if (!items[i].countStr.empty()) {
+            DrawText(items[i].countStr, titleX + 2.0f, ry + 41.0f, countSize,
+                     STYLE_MONO, sel ? RgbaColor{0.90f, 0.95f, 1.00f, alpha} : RgbaColor{0.70f, 0.78f, 0.88f, alpha},
+                     availTitleW, 1);
         }
-        DrawText(items[i].title, menuX + 22.0f, ry + 11.0f, sel ? 26.0f : 23.0f,
-                 STYLE_MENU, sel ? PrimaryTextColor(alpha) : SecondaryTextColor(alpha * 0.82f),
-                 menuW - 44.0f, 1);
-        DrawText(items[i].sub, menuX + 24.0f, ry + 42.0f, 12.0f,
-                 STYLE_BODY, sel ? RgbaColor{acc.r, acc.g, acc.b, alpha} : SecondaryTextColor(alpha * 0.55f),
-                 menuW - 48.0f, 1);
         FlushQuadBatch();
 
         if (overlay_ == OVERLAY_NONE) {
-            RegisterHit(menuX, ry, menuW, rowH, HIT_MAIN_ROW, i);
+            RegisterHit(menuX - 12.0f, ry - 4.0f, menuW + 12.0f, rowH + 8.0f, HIT_MAIN_ROW, i);
         }
-        (void)focusBoost;
+    }
+
+    if (overlay_ == OVERLAY_NONE) {
+        DrawAnimatedCursor(cursor_x_, cursor_y_, 14.0f, alpha);
     }
 }
 
@@ -1269,21 +1919,73 @@ void Ps2Renderer::DrawGamesScreen(float alpha) {
 
     std::vector<GameEntry> gamesCopy;
     bool isLoading = false;
+    bool hasArcade = false;
     {
         std::lock_guard<std::mutex> lock(data_mutex_);
         gamesCopy = games_;
         isLoading = games_loading_;
+        hasArcade = has_arcade_games_;
     }
 
-    const float listTop = m.bodyTop + 40.0f;
+    const RgbaColor acc = AccentColor(alpha);
+    int ps2Count = 0;
+    int arcadeCount = 0;
+    for (const auto& g : gamesCopy) {
+        if (g.isArcade) arcadeCount++;
+        else ps2Count++;
+    }
+
+    float listTop = m.bodyTop + 38.0f;
+    if (hasArcade && !gamesCopy.empty()) {
+        const float tabY = m.bodyTop + 36.0f;
+        const float tabH = 30.0f;
+        const float tabW = 196.0f;
+        const float tabGap = 12.0f;
+
+        char lbl0[96];
+        std::snprintf(lbl0, sizeof(lbl0), "%s (%d)",
+                      TextOr("ps2ui_games_tab_ps2", "PlayStation 2").c_str(), ps2Count);
+        char lbl1[96];
+        std::snprintf(lbl1, sizeof(lbl1), "%s (%d)",
+                      TextOr("ps2ui_games_tab_arcade", "Namco Arcade").c_str(), arcadeCount);
+        const std::string tabLabels[2] = {lbl0, lbl1};
+
+        for (int t = 0; t < 2; ++t) {
+            const float tx = m.padX + static_cast<float>(t) * (tabW + tabGap);
+            const bool active = (game_tab_ == t);
+            if (active) {
+                DrawFocusBeam(tx, tabY, tabW, tabH, acc, alpha * 0.65f);
+            }
+            BeginQuadBatch();
+            DrawText(tabLabels[t], tx + 4.0f, tabY + 5.0f, 14.5f,
+                     active ? STYLE_BODY_BOLD : STYLE_BODY,
+                     active ? PrimaryTextColor(alpha) : SecondaryTextColor(alpha * 0.68f),
+                     tabW - 8.0f, 1, 1, tabW - 8.0f);
+            if (active) {
+                PushQuad(white_tex_, tx + 10.0f, tabY + tabH - 2.5f, tabW - 20.0f, 2.2f, acc);
+            }
+            FlushQuadBatch();
+            if (overlay_ == OVERLAY_NONE) {
+                RegisterHit(tx, tabY, tabW, tabH, HIT_GAME_TAB, t);
+            }
+        }
+        listTop = tabY + tabH + 8.0f;
+    }
+
     const float listH = m.bodyBot - listTop;
-    const float leftW = std::min(screen_width_ * 0.50f, 470.0f);
-    const float rightX = m.padX + leftW + 20.0f;
+    const float leftW = std::min(screen_width_ * 0.44f, 430.0f);
+    const float rightX = m.padX + leftW + 28.0f;
     const float rightW = screen_width_ - rightX - m.padX;
 
-    if (gamesCopy.empty()) {
-        DrawPanel(m.padX, listTop, screen_width_ - m.padX * 2.0f, listH, 12.0f, 1.0f,
-                  PanelTopColor(0.65f * alpha), PanelBotColor(0.75f * alpha), PanelBorderColor(0.42f * alpha));
+    std::vector<int> filtered;
+    filtered.reserve(gamesCopy.size());
+    for (int i = 0; i < static_cast<int>(gamesCopy.size()); ++i) {
+        if (!hasArcade || gamesCopy[i].isArcade == (game_tab_ == 1)) {
+            filtered.push_back(i);
+        }
+    }
+
+    if (gamesCopy.empty() || filtered.empty()) {
         BeginQuadBatch();
         DrawText(isLoading ? TextOr("ps2ui_loading_games", "Scanning library...")
                            : TextOr("ps2ui_no_games", "No PS2 games found in library"),
@@ -1293,150 +1995,286 @@ void Ps2Renderer::DrawGamesScreen(float alpha) {
         return;
     }
 
-    game_index_ = std::clamp(game_index_, 0, static_cast<int>(gamesCopy.size()) - 1);
-
-    // Left panel: smoked PS2 glass list
-    DrawPanel(m.padX, listTop, leftW, listH, 12.0f, 1.0f,
-              PanelTopColor(0.62f * alpha), PanelBotColor(0.76f * alpha), PanelBorderColor(0.38f * alpha));
+    game_index_ = std::clamp(game_index_, 0, static_cast<int>(filtered.size()) - 1);
+    const int selRealIdx = filtered[game_index_];
+    if (selRealIdx != last_disc_game_idx_) {
+        last_disc_game_idx_ = selRealIdx;
+        disc_slide_t_ = 0.0f;
+    }
 
     const float rowH = 54.0f;
-    const float rowStep = 59.0f;
-    const float maxScroll = std::max(0.0f, static_cast<float>(gamesCopy.size()) * rowStep - (listH - 16.0f));
+    const float rowStep = 60.0f;
+    const float maxScroll = std::max(0.0f, static_cast<float>(filtered.size()) * rowStep - (listH - 12.0f));
     game_scroll_target_y_ = std::clamp(game_scroll_target_y_, 0.0f, maxScroll);
     game_scroll_y_ = std::clamp(game_scroll_y_, 0.0f, maxScroll);
 
-    // Scissor clip inside left panel
     glEnable(GL_SCISSOR_TEST);
     const float sxScale = static_cast<float>(view_width_) / screen_width_;
     const float syScale = static_cast<float>(view_height_) / kScreenHeight;
-    const int scX = view_x_ + static_cast<int>(m.padX * sxScale);
-    const int scY = view_y_ + static_cast<int>((kScreenHeight - (listTop + listH - 6.0f)) * syScale);
-    const int scW = static_cast<int>(leftW * sxScale);
-    const int scH = static_cast<int>((listH - 12.0f) * syScale);
-    glScissor(scX, scY, std::max(1, scW), std::max(1, scH));
+    glScissor(
+        view_x_ + static_cast<int>((m.padX - 24.0f) * sxScale),
+        view_y_ + static_cast<int>((kScreenHeight - (listTop + listH)) * syScale),
+        std::max(1, static_cast<int>((leftW + 28.0f) * sxScale)),
+        std::max(1, static_cast<int>(listH * syScale)));
 
-    const RgbaColor acc = AccentColor(alpha);
-    for (int i = 0; i < static_cast<int>(gamesCopy.size()); ++i) {
-        const float ry = listTop + 8.0f + static_cast<float>(i) * rowStep - game_scroll_y_;
+    for (int i = 0; i < static_cast<int>(filtered.size()); ++i) {
+        const float ry = listTop + 4.0f + static_cast<float>(i) * rowStep - game_scroll_y_;
         if (ry + rowH < listTop || ry > listTop + listH) continue;
 
         const bool sel = (i == game_index_);
-        const GameEntry& g = gamesCopy[i];
-        const bool isBlueCd = (g.fileSizeBytes > 0 && g.fileSizeBytes < 750LL * 1024LL * 1024LL);
+        const GameEntry& g = gamesCopy[filtered[i]];
+        const bool isBlueCd = (!g.isArcade && g.fileSizeBytes > 0 && g.fileSizeBytes < 750LL * 1024LL * 1024LL);
 
-        DrawPanel(m.padX + 8.0f, ry, leftW - 16.0f, rowH, 9.0f, sel ? 1.3f : 0.7f,
-                  sel ? PanelTopColor(0.84f * alpha) : PanelTopColor(0.32f * alpha),
-                  sel ? PanelBotColor(0.92f * alpha) : PanelBotColor(0.42f * alpha),
-                  sel ? RgbaColor{acc.r, acc.g, acc.b, 0.85f * alpha} : RgbaColor{acc.r, acc.g, acc.b, 0.14f * alpha},
-                  sel ? RgbaColor{acc.r, acc.g, acc.b, 0.45f * alpha} : RgbaColor{0, 0, 0, 0});
+        if (sel) {
+            DrawFocusBeam(m.padX, ry - 2.0f, leftW, rowH + 2.0f, acc, alpha * 0.90f);
+            SetCursorTarget(m.padX + 6.0f, ry + rowH * 0.45f);
+        }
 
         BeginQuadBatch();
-        // Tiny DVD (silver) or CD (blue) pill indicator on left edge
-        const RgbaColor discCol = isBlueCd ? RgbaColor{0.25f, 0.58f, 1.0f, alpha} : RgbaColor{0.82f, 0.86f, 0.94f, alpha};
-        PushQuad(white_tex_, m.padX + 16.0f, ry + 12.0f, 3.5f, rowH - 24.0f, discCol);
+        DrawText(g.title, m.padX + 26.0f, ry + 5.0f, 17.5f, sel ? STYLE_BODY_BOLD : STYLE_BODY,
+                 sel ? PrimaryTextColor(alpha) : SecondaryTextColor(alpha * 0.74f), leftW - 32.0f, 1);
 
-        DrawText(g.title, m.padX + 28.0f, ry + 7.0f, 15.0f, sel ? STYLE_BODY_BOLD : STYLE_BODY,
-                 sel ? PrimaryTextColor(alpha) : SecondaryTextColor(alpha * 0.9f), leftW - 56.0f, 1);
-
-        std::string sub = g.serial.empty() ? (isBlueCd ? "CD-ROM" : "DVD-ROM") : g.serial;
-        if (!g.sizeStr.empty()) sub += "  •  " + g.sizeStr;
+        std::string sub = g.serial.empty() ? (g.isArcade ? "ARCADE" : (isBlueCd ? "CD-ROM" : "DVD-ROM")) : g.serial;
+        if (!g.sizeStr.empty()) sub += " • " + g.sizeStr;
         if (g.saveCount > 0) {
             char sb[40];
-            std::snprintf(sb, sizeof(sb), "  •  %d %s", g.saveCount, TextOr("ps2ui_saves_word", "Saves").c_str());
+            std::snprintf(sb, sizeof(sb), " • %d %s", g.saveCount, TextOr("ps2ui_saves_word", "Saves").c_str());
             sub += sb;
         }
-        DrawText(sub, m.padX + 28.0f, ry + 30.0f, 11.0f, STYLE_MONO,
-                 sel ? RgbaColor{acc.r, acc.g, acc.b, alpha} : SecondaryTextColor(alpha * 0.60f), leftW - 56.0f, 1);
+        DrawText(sub, m.padX + 26.0f, ry + 29.0f, 13.0f, STYLE_MONO,
+                 sel ? RgbaColor{0.88f, 0.94f, 1.00f, alpha} : RgbaColor{0.62f, 0.70f, 0.80f, alpha},
+                 leftW - 32.0f, 1);
         FlushQuadBatch();
 
         if (overlay_ == OVERLAY_NONE) {
-            RegisterHit(m.padX + 8.0f, std::max(listTop, ry), leftW - 16.0f,
-                        std::min(rowH, listTop + listH - ry), HIT_GAME_ROW, i);
+            RegisterHit(m.padX, std::max(listTop, ry), leftW, std::min(rowH, listTop + listH - ry), HIT_GAME_ROW, i);
         }
     }
     glDisable(GL_SCISSOR_TEST);
 
-    // Right Showcase Panel: Tall DVD Box Cover Art (Aspect-Fit) + Spinning PS2 Disc + Action Buttons
-    DrawPanel(rightX, listTop, rightW, listH, 12.0f, 1.0f,
-              PanelTopColor(0.58f * alpha), PanelBotColor(0.74f * alpha), PanelBorderColor(0.38f * alpha));
+    // Animated Cursor outside clipped area
+    if (overlay_ == OVERLAY_NONE &&
+        cursor_y_ >= listTop - 10.0f && cursor_y_ <= listTop + listH + 10.0f) {
+        DrawAnimatedCursor(cursor_x_, cursor_y_, 12.0f, alpha);
+    }
 
-    const GameEntry& selGame = gamesCopy[game_index_];
-    const bool selBlueCd = (selGame.fileSizeBytes > 0 && selGame.fileSizeBytes < 750LL * 1024LL * 1024LL);
+    // Right Open Showcase: FRAMELESS Floating 3D Cover Art + True 3D Tilted Sliding Optical Disc
+    const GameEntry& selGame = gamesCopy[selRealIdx];
+    const bool selBlueCd = (!selGame.isArcade && selGame.fileSizeBytes > 0 && selGame.fileSizeBytes < 750LL * 1024LL * 1024LL);
 
-    // Top half of showcase: Spinning PS2 Silver DVD or Blue CD peeking out behind cover art
-    const float artH = std::min(198.0f, listH * 0.50f);
-    const float artW = artH * 0.72f; // Authentic tall PS2 DVD case proportions (~1:1.4)
-    const float centerShowcaseX = rightX + rightW * 0.5f;
-    const float artX = centerShowcaseX - artW * 0.62f;
-    const float artY = listTop + 16.0f;
+    const float artH = std::min(242.0f, listH * 0.58f);
+    const float artW = artH * 0.72f;
+    const float slideEase = EaseOutCubic(disc_slide_t_);
+    const float hoverY = std::sin(time_sec_ * 1.45f) * 3.2f;
 
-    const float discR = artH * 0.44f;
-    const float discCx = artX + artW + discR * 0.34f;
-    const float discCy = artY + artH * 0.50f;
-    DrawOpticalDisc(discCx, discCy, discR, disc_spin_angle_, selBlueCd ? 1 : 0, alpha * 0.96f);
+    const float groupW = artW + artH * 0.48f * slideEase;
+    const float artX = rightX + (rightW - groupW) * 0.5f;
+    const float artY = listTop + 6.0f + hoverY;
 
-    DrawPanel(artX - 3.0f, artY - 3.0f, artW + 6.0f, artH + 6.0f, 7.0f, 1.2f,
-              {0.02f, 0.03f, 0.06f, 0.94f * alpha}, {0.01f, 0.02f, 0.04f, 0.96f * alpha},
-              {acc.r, acc.g, acc.b, 0.45f * alpha});
+    // Soft radial floor reflection under floating case & disc
+    DrawFocusBeam(artX - 24.0f, artY + artH - 8.0f, groupW + 48.0f, 26.0f, acc, alpha * 0.55f);
 
-    const auto& coverImg = GetOrCreateImage(selGame.coverPath, 320);
+    // 3D Perspective-Tilted Spinning PS2 Disc sliding gracefully behind the cover art!
+    const float discR = artH * 0.42f;
+    const float discCx = artX + artW + discR * (-0.15f + 0.52f * slideEase);
+    const float discCy = artY + artH * 0.48f;
+    DrawOpticalDisc3D(discCx, discCy, discR, disc_spin_angle_, 0.14f, -0.26f, selBlueCd ? 1 : 0, alpha * 0.96f);
+
+    // Frameless floating Cover Art PNG (ZERO border, ZERO box!)
+    const auto& coverImg = GetOrCreateImage(selGame.coverPath, 384);
     if (coverImg.tex) {
         BeginQuadBatch();
         DrawImageAspectFit(coverImg, artX, artY, artW, artH, alpha, false);
         FlushQuadBatch();
     } else {
-        DrawOpticalDisc(artX + artW * 0.5f, artY + artH * 0.5f, artW * 0.36f, disc_spin_angle_ * 1.15f, selBlueCd ? 1 : 0, alpha * 0.75f);
+        DrawOpticalDisc3D(rightX + rightW * 0.5f, artY + artH * 0.5f, artH * 0.42f,
+                          disc_spin_angle_, 0.14f, -0.22f, selBlueCd ? 1 : 0, alpha * 0.85f);
     }
 
-    // Game Title, Metadata & Action Buttons
-    const float infoY = artY + artH + 14.0f;
+    // Crisp Floating Title, Metadata & Minimal Glow Action Buttons
+    const float infoY = listTop + 4.0f + artH + 10.0f;
     BeginQuadBatch();
-    DrawText(selGame.title, rightX + 16.0f, infoY, 18.0f, STYLE_BODY_BOLD,
-             PrimaryTextColor(alpha), rightW - 32.0f, 2, 1, rightW - 32.0f);
+    DrawText(selGame.title, rightX + 6.0f, infoY, 21.0f, STYLE_HEADER,
+             PrimaryTextColor(alpha), rightW - 12.0f, 2, 1, rightW - 12.0f);
 
-    std::string meta = (selBlueCd ? "PS2 CD-ROM" : "PS2 DVD-ROM");
-    if (!selGame.serial.empty()) meta += "  •  " + selGame.serial;
-    if (!selGame.sizeStr.empty()) meta += "  •  " + selGame.sizeStr;
-    if (!selGame.compatStatus.empty()) meta += "  •  " + selGame.compatStatus;
-    DrawText(meta, rightX + 14.0f, infoY + 46.0f, 11.5f, STYLE_MONO,
-             SecondaryTextColor(alpha * 0.85f), rightW - 28.0f, 1, 1, rightW - 28.0f);
+    std::string meta = selGame.isArcade ? "ARCADE" : (selBlueCd ? "CD-ROM" : "DVD-ROM");
+    if (!selGame.serial.empty()) meta += " • " + selGame.serial;
+    if (!selGame.sizeStr.empty()) meta += " • " + selGame.sizeStr;
+    if (!selGame.compatStatus.empty()) meta += " • " + selGame.compatStatus;
+    DrawText(meta, rightX + 2.0f, infoY + 48.0f, 13.0f, STYLE_MONO,
+             SecondaryTextColor(alpha * 0.88f), rightW - 4.0f, 1, 1, rightW - 4.0f);
     FlushQuadBatch();
 
-    const float btnY = listTop + listH - 48.0f;
+    const float btnY = listTop + listH - 44.0f;
     const bool hasCont = (selGame.latestSaveSlot >= 0);
     const float gap = 10.0f;
     const int btnCount = hasCont ? 3 : 2;
-    const float btnW = (rightW - 32.0f - gap * static_cast<float>(btnCount - 1)) / static_cast<float>(btnCount);
-    float bx = rightX + 16.0f;
+    const float btnW = (rightW - gap * static_cast<float>(btnCount - 1)) / static_cast<float>(btnCount);
+    const std::string confirmSym = settings_.swapConfirm ? "○" : "×";
+    float bx = rightX;
 
-    auto drawBtn = [&](const std::string& lbl, int hitKind, bool primary) {
-        DrawPanel(bx, btnY, btnW, 34.0f, 8.0f, 1.2f,
-                  primary ? PanelTopColor(0.95f * alpha) : PanelTopColor(0.64f * alpha),
-                  PanelBotColor(0.95f * alpha),
-                  {acc.r, acc.g, acc.b, (primary ? 0.90f : 0.45f) * alpha},
-                  primary ? RgbaColor{acc.r, acc.g, acc.b, 0.40f * alpha} : RgbaColor{0, 0, 0, 0});
+    auto drawActionBtn = [&](const std::string& lbl, int hitKind, bool primary) {
+        const RgbaColor topC = primary
+            ? RgbaColor{acc.r * 0.24f, acc.g * 0.34f, acc.b * 0.52f, 0.85f * alpha}
+            : PanelTopColor(0.55f * alpha);
+        const RgbaColor botC = primary
+            ? RgbaColor{acc.r * 0.10f, acc.g * 0.16f, acc.b * 0.32f, 0.90f * alpha}
+            : PanelBotColor(0.68f * alpha);
+        const RgbaColor brdC = primary
+            ? RgbaColor{acc.r, acc.g, acc.b, 0.88f * alpha}
+            : RgbaColor{acc.r, acc.g, acc.b, 0.36f * alpha};
+        DrawPanel(bx, btnY, btnW, 38.0f, 8.0f, primary ? 1.3f : 0.9f, topC, botC, brdC);
+
+        float lw = 0.0f, lh = 0.0f;
+        const float baseBtnFont = 14.5f;
+        MeasureText(lbl, baseBtnFont, STYLE_BODY_BOLD, 0.0f, 1, lw, lh);
+        const float availBw = std::max(24.0f, btnW - 10.0f);
+        const float fitFont = (lw > availBw && lw > 1.0f) ? std::max(10.5f, baseBtnFont * (availBw / lw)) : baseBtnFont;
+
         BeginQuadBatch();
-        DrawText(lbl, bx + 4.0f, btnY + 8.0f, 13.0f, STYLE_BODY_BOLD, PrimaryTextColor(alpha), btnW - 8.0f, 1, 1, btnW - 8.0f);
+        DrawText(lbl, bx + 5.0f, btnY + (38.0f - fitFont * 1.25f) * 0.5f, fitFont, STYLE_BODY_BOLD,
+                 PrimaryTextColor(alpha), availBw, 1, 1, availBw);
         FlushQuadBatch();
         if (overlay_ == OVERLAY_NONE) {
-            RegisterHit(bx, btnY, btnW, 34.0f, hitKind, game_index_);
+            RegisterHit(bx, btnY, btnW, 38.0f, hitKind, selRealIdx);
         }
         bx += btnW + gap;
     };
 
-    drawBtn(TextOr("ps2ui_btn_start", "Start"), HIT_GAME_START, true);
+    drawActionBtn(confirmSym + "  " + TextOr("ps2ui_btn_start", "Start"), HIT_GAME_START, true);
     if (hasCont) {
-        drawBtn(TextOr("ps2ui_btn_continue", "Continue"), HIT_GAME_CONTINUE, false);
+        drawActionBtn("□  " + TextOr("ps2ui_btn_continue", "Continue"), HIT_GAME_CONTINUE, false);
     }
-    drawBtn(TextOr("ps2ui_btn_options", "Options"), HIT_GAME_OPTIONS, false);
+    drawActionBtn("△  " + TextOr("ps2ui_btn_options", "Options"), HIT_GAME_OPTIONS, false);
+}
+
+void Ps2Renderer::DrawBrowserInsideCard(float alpha, const LayoutMetrics& m) {
+    const RgbaColor acc = AccentColor(alpha);
+    McSlotContents contents;
+    {
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        contents = (mc_open_slot_ == 1) ? slot1_contents_ : slot2_contents_;
+    }
+
+    const float topY = m.bodyTop + 36.0f;
+    const std::string slotHeader = (mc_open_slot_ == 1)
+        ? TextOr("ps2ui_mc_slot1", "MEMORY CARD (PS2) / 1")
+        : TextOr("ps2ui_mc_slot2", "MEMORY CARD (PS2) / 2");
+
+    char freeBuf[64];
+    std::snprintf(freeBuf, sizeof(freeBuf), "%d KB Free", contents.freeKb);
+    const std::string subTitle = slotHeader + "  —  " + contents.cardName + "    (" + freeBuf + ")";
+
+    BeginQuadBatch();
+    DrawText(subTitle, m.padX, topY, 15.0f, STYLE_MONO, acc, screen_width_ - m.padX * 2.0f - 125.0f, 1);
+    DrawText("← " + TextOr("ps2ui_mc_exit", "Back"), screen_width_ - m.padX - 120.0f, topY, 15.0f, STYLE_BODY_BOLD,
+             SecondaryTextColor(alpha), 120.0f, 1, 2, 120.0f);
+    FlushQuadBatch();
+    if (overlay_ == OVERLAY_NONE) {
+        RegisterHit(screen_width_ - m.padX - 130.0f, topY - 6.0f, 134.0f, 34.0f, HIT_MC_INNER_BACK, 0);
+    }
+
+    const float gridTop = topY + 30.0f;
+    const float gridH = m.bodyBot - gridTop;
+    const int nSaves = static_cast<int>(contents.saves.size());
+
+    if (nSaves == 0) {
+        // Spin translucent 3D data cube cleanly centered with "There is no data."
+        McSaveBlockEntry emptyCube;
+        emptyCube.colorRgb = 0x4298FF;
+        const float cw = 150.0f;
+        DrawSaveBlockIcon3D(screen_width_ * 0.5f - cw * 0.5f, gridTop + 32.0f, cw, cw, emptyCube, false, alpha * 0.72f);
+        BeginQuadBatch();
+        DrawText(TextOr("ps2ui_mc_no_data", "There is no data."), 0.0f, gridTop + 205.0f, 19.0f,
+                 STYLE_HEADER, SecondaryTextColor(alpha * 0.85f), screen_width_, 1, 1, screen_width_);
+        DrawText(freeBuf, 0.0f, gridTop + 240.0f, 13.0f, STYLE_MONO, acc, screen_width_, 1, 1, screen_width_);
+        FlushQuadBatch();
+        return;
+    }
+
+    mc_inner_idx_ = std::clamp(mc_inner_idx_, 0, nSaves - 1);
+    const int cols = (screen_width_ >= 800.0f) ? 5 : 4;
+    const int rows = 3;
+    const int perPage = cols * rows;
+    const int totalPages = std::max(1, (nSaves + perPage - 1) / perPage);
+    mc_inner_page_ = mc_inner_idx_ / perPage;
+    mc_inner_page_ = std::clamp(mc_inner_page_, 0, totalPages - 1);
+
+    const float gridW = screen_width_ * 0.57f;
+    const float inspX = m.padX + gridW + 26.0f;
+    const float inspW = screen_width_ - inspX - m.padX;
+    const float cellGap = 10.0f;
+    const float cellW = (gridW - cellGap * static_cast<float>(cols - 1)) / static_cast<float>(cols);
+    const float cellH = (gridH - 36.0f - cellGap * static_cast<float>(rows - 1)) / static_cast<float>(rows);
+
+    // Draw Animated Cursor Brackets first under/around selected 3D icon
+    for (int idx = 0; idx < perPage; ++idx) {
+        const int absIdx = mc_inner_page_ * perPage + idx;
+        if (absIdx >= nSaves) break;
+        const int r = idx / cols;
+        const int c = idx % cols;
+        const float cx = m.padX + static_cast<float>(c) * (cellW + cellGap);
+        const float cy = gridTop + static_cast<float>(r) * (cellH + cellGap);
+        const bool sel = (absIdx == mc_inner_idx_);
+        if (sel) {
+            DrawFocusBeam(cx - 4.0f, cy + cellH * 0.72f, cellW + 8.0f, 22.0f, acc, alpha * 0.85f);
+            BeginQuadBatch();
+            DrawAnimatedGridBrackets(cx, cy, cellW, cellH, acc, alpha);
+            FlushQuadBatch();
+            SetCursorTarget(cx + cellW * 0.5f, cy + cellH * 0.5f);
+        }
+        DrawSaveBlockIcon3D(cx + 4.0f, cy + 4.0f, cellW - 8.0f, cellH - 8.0f, contents.saves[absIdx], sel, alpha);
+        if (overlay_ == OVERLAY_NONE) {
+            RegisterHit(cx, cy, cellW, cellH, HIT_MC_INNER_ICON, absIdx);
+        }
+    }
+
+    if (totalPages > 1) {
+        char pBuf[32];
+        std::snprintf(pBuf, sizeof(pBuf), "%d / %d", mc_inner_page_ + 1, totalPages);
+        const float footY = gridTop + gridH - 24.0f;
+        BeginQuadBatch();
+        DrawText("<", m.padX, footY, 15.0f, STYLE_BODY_BOLD, PrimaryTextColor(alpha));
+        DrawText(pBuf, m.padX, footY + 1.0f, 12.0f, STYLE_MONO, SecondaryTextColor(alpha), gridW, 1, 1, gridW);
+        DrawText(">", m.padX + gridW - 14.0f, footY, 15.0f, STYLE_BODY_BOLD, PrimaryTextColor(alpha));
+        FlushQuadBatch();
+        if (overlay_ == OVERLAY_NONE) {
+            RegisterHit(m.padX - 6.0f, footY - 6.0f, 38.0f, 28.0f, HIT_MC_INNER_PREV, 0);
+            RegisterHit(m.padX + gridW - 32.0f, footY - 6.0f, 38.0f, 28.0f, HIT_MC_INNER_NEXT, 0);
+        }
+    }
+
+    // Right Open Inspector: Big Rotating 3D Save Icon + Decoded Title + Exact KB Size & Date
+    const McSaveBlockEntry& selSave = contents.saves[mc_inner_idx_];
+    const float heroSize = std::min(190.0f, inspW * 0.72f);
+    const float heroX = inspX + (inspW - heroSize) * 0.5f;
+    const float heroY = gridTop + 8.0f;
+    DrawFocusBeam(heroX - 24.0f, heroY + heroSize - 16.0f, heroSize + 48.0f, 26.0f, acc, alpha * 0.75f);
+    DrawSaveBlockIcon3D(heroX, heroY, heroSize, heroSize, selSave, true, alpha);
+
+    const float infoY = heroY + heroSize + 12.0f;
+    char szBuf[32];
+    std::snprintf(szBuf, sizeof(szBuf), "%d KB", selSave.sizeKb);
+    BeginQuadBatch();
+    DrawText(selSave.title, inspX, infoY, 20.0f, STYLE_HEADER, PrimaryTextColor(alpha), inspW, 2, 1, inspW);
+    DrawText(selSave.dirName, inspX, infoY + 50.0f, 14.0f, STYLE_MONO, acc, inspW, 1, 1, inspW);
+    DrawText(std::string(szBuf) + (selSave.dateStr.empty() ? "" : "  •  " + selSave.dateStr),
+             inspX, infoY + 74.0f, 14.0f, STYLE_MONO, SecondaryTextColor(alpha * 0.85f), inspW, 1, 1, inspW);
+    FlushQuadBatch();
 }
 
 void Ps2Renderer::DrawBrowserScreen(float alpha) {
     const LayoutMetrics m = ComputeMetrics();
     DrawHeaderBar(TextOr("ps2ui_menu_browser", "Browser"), alpha);
 
+    if (mc_tab_ == 2 && mc_open_slot_ > 0) {
+        DrawBrowserInsideCard(alpha, m);
+        return;
+    }
+
+    // Borderless Clean PS2 Floating Tab Headers w/ Luminous Cyan Underline
     const float tabY = m.bodyTop + 34.0f;
-    const float tabW = std::min(195.0f, (screen_width_ - m.padX * 2.0f - 20.0f) / 3.0f);
+    const float tabW = std::min(220.0f, (screen_width_ - m.padX * 2.0f - 24.0f) / 3.0f);
     const std::string tabLabels[3] = {
         TextOr("ps2ui_mc_tab_all", "Quick Saves"),
         TextOr("ps2ui_mc_tab_game", "Game Saves"),
@@ -1444,121 +2282,123 @@ void Ps2Renderer::DrawBrowserScreen(float alpha) {
     };
     const RgbaColor acc = AccentColor(alpha);
     for (int i = 0; i < 3; ++i) {
-        const float tx = m.padX + static_cast<float>(i) * (tabW + 10.0f);
+        const float tx = m.padX + static_cast<float>(i) * (tabW + 12.0f);
         const bool active = (mc_tab_ == i);
-        DrawPanel(tx, tabY, tabW, 30.0f, 8.0f, active ? 1.3f : 0.8f,
-                  active ? PanelTopColor(0.88f * alpha) : PanelTopColor(0.35f * alpha),
-                  PanelBotColor(0.88f * alpha),
-                  {acc.r, acc.g, acc.b, (active ? 0.90f : 0.25f) * alpha},
-                  active ? RgbaColor{acc.r, acc.g, acc.b, 0.36f * alpha} : RgbaColor{0, 0, 0, 0});
         BeginQuadBatch();
-        DrawText(tabLabels[i], tx + 6.0f, tabY + 6.5f, 12.5f, active ? STYLE_BODY_BOLD : STYLE_BODY,
-                 active ? PrimaryTextColor(alpha) : SecondaryTextColor(alpha * 0.78f),
-                 tabW - 12.0f, 1, 1, tabW - 12.0f);
+        DrawText(tabLabels[i], tx, tabY + 1.0f, 16.0f, active ? STYLE_BODY_BOLD : STYLE_BODY,
+                 active ? PrimaryTextColor(alpha) : SecondaryTextColor(alpha * 0.58f), tabW, 1, 1, tabW);
+        if (active) {
+            PushQuad(white_tex_, tx + tabW * 0.12f, tabY + 26.0f, tabW * 0.76f, 2.0f, acc);
+        }
         FlushQuadBatch();
         if (overlay_ == OVERLAY_NONE) {
-            RegisterHit(tx, tabY, tabW, 30.0f, HIT_MC_TAB, i);
+            RegisterHit(tx, tabY - 2.0f, tabW, 32.0f, HIT_MC_TAB, i);
         }
     }
 
-    const float contentTop = tabY + 38.0f;
+    const float contentTop = tabY + 34.0f;
     const float contentH = m.bodyBot - contentTop;
 
-    // TAB 2: Authentic PS2 Memory Card Browser (Slot 1 & Slot 2 + Available Cards List)
+    // TAB 2: True 3D Sculpted Rotating MagicGate Memory Cards Root (Zero Boxes around Slots!)
     if (mc_tab_ == 2) {
         std::string s1n, s1m, s1st, s2n, s2m, s2st;
+        McSlotContents c1, c2;
         std::vector<MemoryCardEntry> cards;
         {
             std::lock_guard<std::mutex> lock(data_mutex_);
-            s1n = slot1_card_name_;
-            s1m = slot1_card_meta_;
-            s1st = slot1_card_status_;
-            s2n = slot2_card_name_;
-            s2m = slot2_card_meta_;
-            s2st = slot2_card_status_;
+            s1n = slot1_card_name_; s1m = slot1_card_meta_; s1st = slot1_card_status_;
+            s2n = slot2_card_name_; s2m = slot2_card_meta_; s2st = slot2_card_status_;
+            c1 = slot1_contents_;
+            c2 = slot2_contents_;
             cards = memcards_;
         }
 
-        const float slotsAreaH = 148.0f;
-        const float slotW = (screen_width_ - m.padX * 2.0f - 18.0f) * 0.5f;
+        const float slotsAreaH = 166.0f;
+        const float slotW = (screen_width_ - m.padX * 2.0f - 28.0f) * 0.5f;
 
-        auto drawSlotBox = [&](int slotIdx, float x, const std::string& name, const std::string& meta, const std::string& status) {
+        auto drawSlot3D = [&](int slotIdx, float x, const std::string& name, const std::string& meta,
+                              const McSlotContents& cnt) {
             const bool focused = (mc_card_pane_ == 0 && mc_card_slot_idx_ == slotIdx);
             const bool empty = name.empty();
             bool isFolder = false;
             if (!empty) {
                 for (const auto& c : cards) {
-                    if (c.name == name) {
-                        isFolder = c.isFolder;
-                        break;
-                    }
+                    if (c.name == name) { isFolder = c.isFolder; break; }
                 }
             }
 
-            DrawPanel(x, contentTop, slotW, slotsAreaH, 12.0f, focused ? 1.5f : 0.9f,
-                      focused ? PanelTopColor(0.84f * alpha) : PanelTopColor(0.50f * alpha),
-                      PanelBotColor(0.90f * alpha),
-                      {acc.r, acc.g, acc.b, (focused ? 0.92f : 0.30f) * alpha},
-                      focused ? RgbaColor{acc.r, acc.g, acc.b, 0.28f * alpha} : RgbaColor{0, 0, 0, 0});
+            if (focused) {
+                DrawFocusBeam(x + 8.0f, contentTop + slotsAreaH - 22.0f, slotW - 16.0f, 26.0f, acc, alpha * 0.90f);
+            }
 
-            // 3D PS2 MagicGate Card Cartridge on left of slot box
-            const float cw = 82.0f;
-            const float ch = 104.0f;
-            const RgbaColor bodyCol = empty ? RgbaColor{0.18f, 0.24f, 0.36f, alpha} : RgbaColor{0.08f, 0.12f, 0.22f, alpha};
-            DrawMemoryCard3D(x + 16.0f, contentTop + 22.0f, cw, ch, bodyCol, acc, focused, empty, isFolder);
+            // Large, Sculpted, Slowly Rotating 3D PS2 MagicGate Cartridge
+            const float mcVw = 136.0f;
+            const float mcVh = 158.0f;
+            const float rotY = focused
+                ? (std::sin(time_sec_ * 1.15f) * 26.0f + (slotIdx == 0 ? 12.0f : -12.0f))
+                : (slotIdx == 0 ? 16.0f : -16.0f);
+            const float rotX = focused ? (10.0f + std::sin(time_sec_ * 1.4f) * 4.0f) : 12.0f;
+            DrawMemoryCard3DViewport(x + 6.0f, contentTop + 2.0f, mcVw, mcVh, rotX, rotY,
+                                     focused, empty, isFolder, alpha);
+
+            if (focused) {
+                SetCursorTarget(x + mcVw + 4.0f, contentTop + 42.0f);
+            }
 
             BeginQuadBatch();
-            const float tx = x + 114.0f;
-            const float tw = slotW - 128.0f;
+            const float tx = x + mcVw + 16.0f;
+            const float tw = slotW - mcVw - 22.0f;
             const std::string slotLbl = slotIdx == 0
                 ? TextOr("ps2ui_mc_slot1", "MEMORY CARD (PS2) / 1")
                 : TextOr("ps2ui_mc_slot2", "MEMORY CARD (PS2) / 2");
-            DrawText(slotLbl, tx, contentTop + 16.0f, 12.5f, STYLE_BODY_BOLD, acc, tw, 1);
+            DrawText(slotLbl, tx, contentTop + 14.0f, 13.5f, STYLE_BODY_BOLD, acc, tw, 1);
 
             if (empty) {
-                DrawText(TextOr("ps2ui_mc_empty_slot", "Empty Slot"), tx, contentTop + 52.0f, 16.0f,
-                         STYLE_BODY, SecondaryTextColor(alpha * 0.72f), tw, 1);
-            } else {
-                DrawText(name, tx, contentTop + 46.0f, 16.0f, STYLE_BODY_BOLD, PrimaryTextColor(alpha), tw, 1);
-                if (!meta.empty()) {
-                    DrawText(meta, tx, contentTop + 74.0f, 12.0f, STYLE_MONO, SecondaryTextColor(alpha * 0.85f), tw, 1);
-                }
-                if (!status.empty()) {
-                    DrawText(status, tx, contentTop + 98.0f, 11.5f, STYLE_BODY_BOLD, {0.40f, 0.95f, 0.68f, alpha}, tw, 1);
-                }
-            }
-            if (focused) {
-                DrawText(TextOr("ps2ui_mc_tap_cycle", "Tap / × to cycle mounted card"), tx, contentTop + 122.0f, 10.5f,
+                DrawText(TextOr("ps2ui_mc_empty_slot", "Empty Slot"), tx, contentTop + 48.0f, 18.0f,
                          STYLE_BODY, SecondaryTextColor(alpha * 0.65f), tw, 1);
+            } else {
+                DrawText(name, tx, contentTop + 40.0f, 19.5f, STYLE_HEADER, PrimaryTextColor(alpha), tw, 1);
+                char capBuf[96];
+                if (cnt.totalKb > 0) {
+                    std::snprintf(capBuf, sizeof(capBuf), "%zu %s • %d KB Free",
+                                  cnt.saves.size(), TextOr("ps2ui_saves_word", "Saves").c_str(), cnt.freeKb);
+                } else {
+                    std::snprintf(capBuf, sizeof(capBuf), "%s", meta.c_str());
+                }
+                DrawText(capBuf, tx, contentTop + 74.0f, 13.5f, STYLE_MONO, SecondaryTextColor(alpha * 0.88f), tw, 1);
+                if (focused) {
+                    DrawText("×  " + TextOr("ps2ui_mc_open_card", "Open Card"), tx, contentTop + 106.0f, 14.0f,
+                             STYLE_BODY_BOLD, {0.42f, 0.96f, 0.72f, alpha}, tw, 1);
+                }
             }
             FlushQuadBatch();
 
             if (overlay_ == OVERLAY_NONE) {
-                RegisterHit(x, contentTop, slotW, slotsAreaH, HIT_CARD_SLOT, slotIdx);
+                RegisterHit(x, contentTop, slotW, slotsAreaH, HIT_MC_OPEN_SLOT, slotIdx);
             }
         };
 
-        drawSlotBox(0, m.padX, s1n, s1m, s1st);
-        drawSlotBox(1, m.padX + slotW + 18.0f, s2n, s2m, s2st);
+        drawSlot3D(0, m.padX, s1n, s1m, c1);
+        drawSlot3D(1, m.padX + slotW + 28.0f, s2n, s2m, c2);
 
-        // Quick Action Toolbar between Slots and Card List
-        const float toolY = contentTop + slotsAreaH + 8.0f;
-        const float toolH = 30.0f;
+        // Borderless Clean Action Toolbar
+        const float toolY = contentTop + slotsAreaH + 2.0f;
+        const float toolH = 34.0f;
         struct ToolDef { std::string lbl; int action; };
         ToolDef tools[4] = {
-            {TextOr("ps2ui_mc_cycle", "Cycle Active Slot"), 0},
+            {TextOr("ps2ui_mc_cycle", "Cycle Slot"), 0},
             {TextOr("ps2ui_mc_swap", "Swap 1↔2"), 1},
             {TextOr("ps2ui_mc_eject", "Eject Slot"), 2},
             {TextOr("ps2ui_mc_create_short", "+ Create Card"), 3},
         };
-        const float toolW = (screen_width_ - m.padX * 2.0f - 30.0f) / 4.0f;
+        const float toolW = (screen_width_ - m.padX * 2.0f - 36.0f) / 4.0f;
         for (int i = 0; i < 4; ++i) {
-            const float bx = m.padX + static_cast<float>(i) * (toolW + 10.0f);
-            DrawPanel(bx, toolY, toolW, toolH, 7.0f, 1.0f,
-                      PanelTopColor(0.65f * alpha), PanelBotColor(0.75f * alpha),
-                      {acc.r, acc.g, acc.b, (i == 3 ? 0.72f : 0.36f) * alpha});
+            const float bx = m.padX + static_cast<float>(i) * (toolW + 12.0f);
+            DrawPanel(bx, toolY, toolW, toolH, 6.0f, 0.8f,
+                      PanelTopColor(0.38f * alpha), PanelBotColor(0.45f * alpha),
+                      {acc.r, acc.g, acc.b, (i == 3 ? 0.65f : 0.25f) * alpha});
             BeginQuadBatch();
-            DrawText(tools[i].lbl, bx + 4.0f, toolY + 6.5f, 11.5f, STYLE_BODY_BOLD,
+            DrawText(tools[i].lbl, bx + 4.0f, toolY + 7.5f, 13.5f, STYLE_BODY_BOLD,
                      PrimaryTextColor(alpha), toolW - 8.0f, 1, 1, toolW - 8.0f);
             FlushQuadBatch();
             if (overlay_ == OVERLAY_NONE) {
@@ -1566,78 +2406,78 @@ void Ps2Renderer::DrawBrowserScreen(float alpha) {
             }
         }
 
-        // Available Cards Scrollable List
+        // Floating Available Cards List
         const float listY = toolY + toolH + 8.0f;
         const float listH = m.bodyBot - listY;
-        DrawPanel(m.padX, listY, screen_width_ - m.padX * 2.0f, listH, 10.0f, 1.0f,
-                  PanelTopColor(0.55f * alpha), PanelBotColor(0.70f * alpha), PanelBorderColor(0.32f * alpha));
 
         if (cards.empty()) {
             BeginQuadBatch();
             DrawText(TextOr("ps2ui_mc_no_cards", "No PS2 memory cards found"),
-                     m.padX, listY + listH * 0.42f, 15.0f, STYLE_BODY, SecondaryTextColor(alpha),
+                     m.padX, listY + listH * 0.42f, 16.5f, STYLE_BODY, SecondaryTextColor(alpha),
                      screen_width_ - m.padX * 2.0f, 1, 1, screen_width_ - m.padX * 2.0f);
             FlushQuadBatch();
-            return;
-        }
+        } else {
+            mc_card_list_idx_ = std::clamp(mc_card_list_idx_, 0, static_cast<int>(cards.size()) - 1);
+            const float rowH = 40.0f;
+            const float rowStep = 44.0f;
+            const float maxSc = std::max(0.0f, static_cast<float>(cards.size()) * rowStep - (listH - 8.0f));
+            mc_card_scroll_target_y_ = std::clamp(mc_card_scroll_target_y_, 0.0f, maxSc);
+            mc_card_scroll_y_ = std::clamp(mc_card_scroll_y_, 0.0f, maxSc);
 
-        mc_card_list_idx_ = std::clamp(mc_card_list_idx_, 0, static_cast<int>(cards.size()) - 1);
-        const float rowH = 38.0f;
-        const float rowStep = 42.0f;
-        const float maxSc = std::max(0.0f, static_cast<float>(cards.size()) * rowStep - (listH - 12.0f));
-        mc_card_scroll_target_y_ = std::clamp(mc_card_scroll_target_y_, 0.0f, maxSc);
-        mc_card_scroll_y_ = std::clamp(mc_card_scroll_y_, 0.0f, maxSc);
+            glEnable(GL_SCISSOR_TEST);
+            const float sxScale = static_cast<float>(view_width_) / screen_width_;
+            const float syScale = static_cast<float>(view_height_) / kScreenHeight;
+            glScissor(
+                view_x_ + static_cast<int>(m.padX * sxScale),
+                view_y_ + static_cast<int>((kScreenHeight - (listY + listH)) * syScale),
+                std::max(1, static_cast<int>((screen_width_ - m.padX * 2.0f) * sxScale)),
+                std::max(1, static_cast<int>(listH * syScale)));
 
-        glEnable(GL_SCISSOR_TEST);
-        const float sxScale = static_cast<float>(view_width_) / screen_width_;
-        const float syScale = static_cast<float>(view_height_) / kScreenHeight;
-        glScissor(
-            view_x_ + static_cast<int>(m.padX * sxScale),
-            view_y_ + static_cast<int>((kScreenHeight - (listY + listH - 4.0f)) * syScale),
-            std::max(1, static_cast<int>((screen_width_ - m.padX * 2.0f) * sxScale)),
-            std::max(1, static_cast<int>((listH - 8.0f) * syScale)));
+            for (int i = 0; i < static_cast<int>(cards.size()); ++i) {
+                const float ry = listY + 4.0f + static_cast<float>(i) * rowStep - mc_card_scroll_y_;
+                if (ry + rowH < listY || ry > listY + listH) continue;
+                const bool sel = (mc_card_pane_ == 1 && mc_card_list_idx_ == i);
+                const auto& c = cards[i];
+                const bool inS1 = (!s1n.empty() && c.name == s1n);
+                const bool inS2 = (!s2n.empty() && c.name == s2n);
 
-        for (int i = 0; i < static_cast<int>(cards.size()); ++i) {
-            const float ry = listY + 6.0f + static_cast<float>(i) * rowStep - mc_card_scroll_y_;
-            if (ry + rowH < listY || ry > listY + listH) continue;
-            const bool sel = (mc_card_pane_ == 1 && mc_card_list_idx_ == i);
-            const auto& c = cards[i];
-            const bool inS1 = (!s1n.empty() && c.name == s1n);
-            const bool inS2 = (!s2n.empty() && c.name == s2n);
+                if (sel) {
+                    DrawFocusBeam(m.padX, ry, screen_width_ - m.padX * 2.0f, rowH, acc, alpha * 0.85f);
+                    SetCursorTarget(m.padX + 6.0f, ry + rowH * 0.45f);
+                }
 
-            DrawPanel(m.padX + 8.0f, ry, screen_width_ - m.padX * 2.0f - 16.0f, rowH, 7.0f, sel ? 1.2f : 0.6f,
-                      sel ? PanelTopColor(0.84f * alpha) : PanelTopColor(0.28f * alpha),
-                      PanelBotColor(0.65f * alpha),
-                      {acc.r, acc.g, acc.b, (sel ? 0.85f : 0.14f) * alpha},
-                      sel ? RgbaColor{acc.r, acc.g, acc.b, 0.35f * alpha} : RgbaColor{0, 0, 0, 0});
+                BeginQuadBatch();
+                const std::string tag = c.isFolder ? "[DIR]" : "[PS2]";
+                DrawText(tag, m.padX + 22.0f, ry + 10.0f, 13.0f, STYLE_MONO,
+                         c.isFolder ? RgbaColor{0.40f, 0.94f, 0.72f, alpha} : acc);
+                DrawText(c.name, m.padX + 82.0f, ry + 8.5f, 15.5f, sel ? STYLE_BODY_BOLD : STYLE_BODY,
+                         PrimaryTextColor(alpha), screen_width_ * 0.42f, 1);
 
-            BeginQuadBatch();
-            const std::string tag = c.isFolder ? "[DIR]" : "[PS2]";
-            DrawText(tag, m.padX + 18.0f, ry + 10.0f, 11.5f, STYLE_MONO,
-                     c.isFolder ? RgbaColor{0.42f, 0.94f, 0.72f, alpha} : acc);
-            DrawText(c.name, m.padX + 70.0f, ry + 9.0f, 14.0f, sel ? STYLE_BODY_BOLD : STYLE_BODY,
-                     PrimaryTextColor(alpha), screen_width_ * 0.42f, 1);
+                std::string rightMeta = c.sizeStr;
+                if (!c.dateStr.empty()) rightMeta += (rightMeta.empty() ? "" : " • ") + c.dateStr;
+                if (inS1) rightMeta += "   [SLOT 1]";
+                else if (inS2) rightMeta += "   [SLOT 2]";
 
-            std::string rightMeta = c.sizeStr;
-            if (!c.dateStr.empty()) rightMeta += (rightMeta.empty() ? "" : "  •  ") + c.dateStr;
-            if (inS1) rightMeta += "   [SLOT 1]";
-            else if (inS2) rightMeta += "   [SLOT 2]";
+                DrawText(rightMeta, m.padX, ry + 10.0f, 13.0f, STYLE_MONO,
+                         (inS1 || inS2) ? RgbaColor{0.42f, 0.96f, 0.68f, alpha} : SecondaryTextColor(alpha * 0.78f),
+                         screen_width_ - m.padX * 2.0f - 10.0f, 1, 2, screen_width_ - m.padX * 2.0f - 10.0f);
+                FlushQuadBatch();
 
-            DrawText(rightMeta, m.padX + 18.0f, ry + 10.0f, 11.5f, STYLE_MONO,
-                     (inS1 || inS2) ? RgbaColor{0.42f, 0.95f, 0.68f, alpha} : SecondaryTextColor(alpha * 0.82f),
-                     screen_width_ - m.padX * 2.0f - 36.0f, 1, 2, screen_width_ - m.padX * 2.0f - 36.0f);
-            FlushQuadBatch();
-
-            if (overlay_ == OVERLAY_NONE) {
-                RegisterHit(m.padX + 8.0f, std::max(listY, ry), screen_width_ - m.padX * 2.0f - 16.0f,
-                            std::min(rowH, listY + listH - ry), HIT_CARD_ROW, i);
+                if (overlay_ == OVERLAY_NONE) {
+                    RegisterHit(m.padX, std::max(listY, ry), screen_width_ - m.padX * 2.0f,
+                                std::min(rowH, listY + listH - ry), HIT_CARD_ROW, i);
+                }
             }
+            glDisable(GL_SCISSOR_TEST);
         }
-        glDisable(GL_SCISSOR_TEST);
+
+        if (overlay_ == OVERLAY_NONE) {
+            DrawAnimatedCursor(cursor_x_, cursor_y_, 12.0f, alpha);
+        }
         return;
     }
 
-    // TAB 0 / TAB 1: Quick Saves (.p2s) Grid + Inspector
+    // TAB 0 / TAB 1: Quick Saves (.p2s) Floating Borderless Grid + Frameless Inspector on Pure #000000
     std::vector<SaveEntry> savesCopy;
     bool loadingSaves = false;
     {
@@ -1655,12 +2495,9 @@ void Ps2Renderer::DrawBrowserScreen(float alpha) {
     mc_page_ = std::clamp(mc_page_, 0, totalPages - 1);
     mc_slot_index_ = std::clamp(mc_slot_index_, 0, perPage - 1);
 
-    const float gridW = screen_width_ * 0.56f;
-    const float inspX = m.padX + gridW + 18.0f;
+    const float gridW = screen_width_ * 0.525f;
+    const float inspX = m.padX + gridW + 24.0f;
     const float inspW = screen_width_ - inspX - m.padX;
-
-    DrawPanel(m.padX, contentTop, gridW, contentH, 12.0f, 1.0f,
-              PanelTopColor(0.56f * alpha), PanelBotColor(0.72f * alpha), PanelBorderColor(0.35f * alpha));
 
     if (totalFiltered == 0) {
         BeginQuadBatch();
@@ -1670,44 +2507,50 @@ void Ps2Renderer::DrawBrowserScreen(float alpha) {
                  gridW, 2, 1, gridW);
         FlushQuadBatch();
     } else {
-        const float cellGap = 8.0f;
-        const float cellW = (gridW - 24.0f - cellGap * static_cast<float>(cols - 1)) / static_cast<float>(cols);
-        const float cellH = (contentH - 42.0f - cellGap * static_cast<float>(rows - 1)) / static_cast<float>(rows);
+        const float cellGap = 10.0f;
+        const float cellW = (gridW - cellGap * static_cast<float>(cols - 1)) / static_cast<float>(cols);
+        const float cellH = (contentH - 36.0f - cellGap * static_cast<float>(rows - 1)) / static_cast<float>(rows);
 
         for (int idx = 0; idx < perPage; ++idx) {
             const int r = idx / cols;
             const int c = idx % cols;
-            const float cx = m.padX + 12.0f + static_cast<float>(c) * (cellW + cellGap);
-            const float cy = contentTop + 10.0f + static_cast<float>(r) * (cellH + cellGap);
+            const float cx = m.padX + static_cast<float>(c) * (cellW + cellGap);
+            const float cy = contentTop + static_cast<float>(r) * (cellH + cellGap);
             const int fIdx = mc_page_ * perPage + idx;
             const bool occupied = (fIdx < totalFiltered);
             const bool sel = (mc_focus_pane_ == 0 && mc_slot_index_ == idx);
 
-            DrawPanel(cx, cy, cellW, cellH, 8.0f, sel ? 1.5f : 0.7f,
-                      sel ? PanelTopColor(0.88f * alpha) : PanelTopColor(0.38f * alpha),
-                      PanelBotColor(0.82f * alpha),
-                      {acc.r, acc.g, acc.b, (sel ? 0.95f : (occupied ? 0.30f : 0.12f)) * alpha},
-                      sel ? RgbaColor{acc.r, acc.g, acc.b, 0.35f * alpha} : RgbaColor{0, 0, 0, 0});
+            if (sel) {
+                DrawFocusBeam(cx - 4.0f, cy - 4.0f, cellW + 8.0f, cellH + 8.0f, acc, alpha * 0.65f);
+                SetCursorTarget(cx - 6.0f, cy + cellH * 0.5f);
+            }
 
             if (occupied) {
                 const SaveEntry& sv = savesCopy[filtered[fIdx]];
                 const auto& img = GetOrCreateImage(sv.previewPath, 320);
                 if (img.tex) {
                     BeginQuadBatch();
-                    DrawImageAspectFit(img, cx + 4.0f, cy + 4.0f, cellW - 8.0f, cellH - 24.0f, alpha, true);
+                    DrawImageAspectFit(img, cx + 4.0f, cy + 4.0f, cellW - 8.0f, cellH - 24.0f,
+                                       alpha * (sel ? 1.0f : 0.72f), true);
                     FlushQuadBatch();
                 } else {
-                    DrawOpticalDisc(cx + cellW * 0.5f, cy + (cellH - 18.0f) * 0.5f,
-                                    std::min(cellW, cellH - 22.0f) * 0.34f, disc_spin_angle_, 0, alpha * 0.65f);
+                    DrawOpticalDisc3D(cx + cellW * 0.5f, cy + (cellH - 18.0f) * 0.5f,
+                                      std::min(cellW, cellH - 22.0f) * 0.34f, disc_spin_angle_, 0.12f, -0.18f, 0, alpha * 0.72f);
                 }
                 BeginQuadBatch();
-                DrawText(sv.slotLabel, cx + 6.0f, cy + cellH - 18.0f, 10.5f, STYLE_BODY_BOLD,
-                         sel ? acc : PrimaryTextColor(alpha * 0.9f), cellW - 12.0f, 1);
+                DrawText(sv.slotLabel, cx + 2.0f, cy + cellH - 18.0f, 12.5f, STYLE_BODY_BOLD,
+                         sel ? PrimaryTextColor(alpha) : SecondaryTextColor(alpha * 0.74f), cellW - 4.0f, 1);
                 FlushQuadBatch();
             } else {
                 BeginQuadBatch();
-                DrawText("—", cx, cy + cellH * 0.38f, 14.0f, STYLE_BODY,
-                         SecondaryTextColor(alpha * 0.30f), cellW, 1, 1, cellW);
+                DrawText("•", cx, cy + cellH * 0.38f, 14.0f, STYLE_BODY,
+                         SecondaryTextColor(alpha * (sel ? 0.65f : 0.24f)), cellW, 1, 1, cellW);
+                FlushQuadBatch();
+            }
+
+            if (sel) {
+                BeginQuadBatch();
+                DrawAnimatedGridBrackets(cx, cy, cellW, cellH, acc, alpha);
                 FlushQuadBatch();
             }
 
@@ -1716,83 +2559,90 @@ void Ps2Renderer::DrawBrowserScreen(float alpha) {
             }
         }
 
-        // Page footer inside grid
         const float footY = contentTop + contentH - 26.0f;
         char pBuf[32];
         std::snprintf(pBuf, sizeof(pBuf), "%d / %d", mc_page_ + 1, totalPages);
         BeginQuadBatch();
-        DrawText("<", m.padX + 16.0f, footY, 14.0f, STYLE_BODY_BOLD, PrimaryTextColor(alpha));
-        DrawText(pBuf, m.padX, footY + 1.0f, 12.0f, STYLE_MONO, SecondaryTextColor(alpha), gridW, 1, 1, gridW);
-        DrawText(">", m.padX + gridW - 28.0f, footY, 14.0f, STYLE_BODY_BOLD, PrimaryTextColor(alpha));
+        DrawText("<", m.padX, footY, 15.0f, STYLE_BODY_BOLD, PrimaryTextColor(alpha));
+        DrawText(pBuf, m.padX, footY + 1.0f, 14.0f, STYLE_MONO, SecondaryTextColor(alpha), gridW, 1, 1, gridW);
+        DrawText(">", m.padX + gridW - 14.0f, footY, 15.0f, STYLE_BODY_BOLD, PrimaryTextColor(alpha));
         FlushQuadBatch();
         if (overlay_ == OVERLAY_NONE) {
-            RegisterHit(m.padX + 8.0f, footY - 4.0f, 36.0f, 26.0f, HIT_MC_PAGE_PREV, 0);
-            RegisterHit(m.padX + gridW - 44.0f, footY - 4.0f, 36.0f, 26.0f, HIT_MC_PAGE_NEXT, 0);
+            RegisterHit(m.padX - 4.0f, footY - 4.0f, 38.0f, 28.0f, HIT_MC_PAGE_PREV, 0);
+            RegisterHit(m.padX + gridW - 34.0f, footY - 4.0f, 38.0f, 28.0f, HIT_MC_PAGE_NEXT, 0);
         }
     }
 
-    // Right Inspector Panel
-    DrawPanel(inspX, contentTop, inspW, contentH, 12.0f, 1.0f,
-              PanelTopColor(0.62f * alpha), PanelBotColor(0.76f * alpha), PanelBorderColor(0.38f * alpha));
-
+    // Frameless Open Save Preview + Action Buttons
     const int curPos = mc_page_ * perPage + mc_slot_index_;
     if (curPos >= 0 && curPos < totalFiltered) {
         const SaveEntry& sv = savesCopy[filtered[curPos]];
-        const float prevH = std::min(165.0f, contentH * 0.44f);
-        const float prevW = inspW - 28.0f;
-        const float prevX = inspX + 14.0f;
-        const float prevY = contentTop + 14.0f;
+        const float prevH = std::min(182.0f, contentH * 0.46f);
+        const float prevW = inspW;
+        const float prevX = inspX;
+        const float prevY = contentTop + 4.0f;
 
-        DrawPanel(prevX, prevY, prevW, prevH, 8.0f, 1.0f,
-                  {0.02f, 0.03f, 0.06f, alpha}, {0.01f, 0.02f, 0.04f, alpha},
-                  {acc.r, acc.g, acc.b, 0.42f * alpha});
-        const auto& img = GetOrCreateImage(sv.previewPath, 320);
+        const auto& img = GetOrCreateImage(sv.previewPath, 384);
         if (img.tex) {
             BeginQuadBatch();
-            DrawImageAspectFit(img, prevX + 2.0f, prevY + 2.0f, prevW - 4.0f, prevH - 4.0f, alpha, false);
+            DrawImageAspectFit(img, prevX, prevY, prevW, prevH, alpha, false);
             FlushQuadBatch();
         } else {
-            DrawOpticalDisc(prevX + prevW * 0.5f, prevY + prevH * 0.5f, prevH * 0.34f, disc_spin_angle_, 0, alpha * 0.72f);
+            DrawOpticalDisc3D(prevX + prevW * 0.5f, prevY + prevH * 0.5f, prevH * 0.36f,
+                              disc_spin_angle_, 0.12f, -0.20f, 0, alpha * 0.78f);
         }
 
         const float iy = prevY + prevH + 12.0f;
         BeginQuadBatch();
-        DrawText(sv.title, inspX + 16.0f, iy, 16.5f, STYLE_BODY_BOLD, PrimaryTextColor(alpha), inspW - 32.0f, 2);
-        DrawText(sv.slotLabel + (sv.serial.empty() ? "" : "  •  " + sv.serial),
-                 inspX + 16.0f, iy + 44.0f, 12.5f, STYLE_BODY_BOLD, acc, inspW - 32.0f, 1);
-        DrawText(sv.dateStr + (sv.sizeStr.empty() ? "" : "  •  " + sv.sizeStr),
-                 inspX + 16.0f, iy + 64.0f, 11.5f, STYLE_MONO, SecondaryTextColor(alpha * 0.85f), inspW - 32.0f, 1);
+        DrawText(sv.title, inspX, iy, 19.5f, STYLE_HEADER, PrimaryTextColor(alpha), inspW, 2);
+        DrawText(sv.slotLabel + (sv.serial.empty() ? "" : " • " + sv.serial),
+                 inspX, iy + 50.0f, 14.5f, STYLE_BODY_BOLD, acc, inspW, 1);
+        DrawText(sv.dateStr + (sv.sizeStr.empty() ? "" : " • " + sv.sizeStr),
+                 inspX, iy + 74.0f, 13.5f, STYLE_MONO, SecondaryTextColor(alpha * 0.85f), inspW, 1);
         FlushQuadBatch();
 
-        const float btnY = contentTop + contentH - 46.0f;
-        const float btnGap = 8.0f;
-        const float btnW = (inspW - 28.0f - btnGap * 2.0f) / 3.0f;
+        const float btnY = contentTop + contentH - 42.0f;
+        const float btnGap = 6.0f;
+        const float btnW = (inspW - btnGap * 2.0f) / 3.0f;
         const std::string bLbl[3] = {
             TextOr("ps2ui_mc_load", "Load"),
             TextOr("ps2ui_mc_delete", "Delete"),
             TextOr("ps2ui_mc_exit", "Back"),
         };
         for (int b = 0; b < 3; ++b) {
-            const float bx = inspX + 14.0f + static_cast<float>(b) * (btnW + btnGap);
+            const float bx = inspX + static_cast<float>(b) * (btnW + btnGap);
             const bool bf = (mc_focus_pane_ == 1 && mc_action_idx_ == b);
-            DrawPanel(bx, btnY, btnW, 32.0f, 7.0f, bf ? 1.4f : 0.9f,
-                      bf ? PanelTopColor(0.92f * alpha) : PanelTopColor(0.55f * alpha),
-                      PanelBotColor(0.88f * alpha),
-                      {acc.r, acc.g, acc.b, (bf ? 0.92f : 0.35f) * alpha},
-                      bf ? RgbaColor{acc.r, acc.g, acc.b, 0.35f * alpha} : RgbaColor{0, 0, 0, 0});
+            const RgbaColor topC = bf
+                ? RgbaColor{acc.r * 0.24f, acc.g * 0.34f, acc.b * 0.52f, 0.85f * alpha}
+                : PanelTopColor(0.50f * alpha);
+            const RgbaColor botC = bf
+                ? RgbaColor{acc.r * 0.10f, acc.g * 0.16f, acc.b * 0.32f, 0.90f * alpha}
+                : PanelBotColor(0.62f * alpha);
+            const RgbaColor brdC = bf
+                ? RgbaColor{acc.r, acc.g, acc.b, 0.88f * alpha}
+                : RgbaColor{acc.r, acc.g, acc.b, 0.34f * alpha};
+            DrawPanel(bx, btnY, btnW, 36.0f, 8.0f, bf ? 1.3f : 0.9f, topC, botC, brdC);
+            if (bf) {
+                SetCursorTarget(bx - 4.0f, btnY + 18.0f);
+            }
             BeginQuadBatch();
-            DrawText(bLbl[b], bx + 4.0f, btnY + 7.5f, 12.0f, STYLE_BODY_BOLD, PrimaryTextColor(alpha), btnW - 8.0f, 1, 1, btnW - 8.0f);
+            DrawText(bLbl[b], bx + 2.0f, btnY + 8.5f, 13.0f, STYLE_BODY_BOLD, PrimaryTextColor(alpha),
+                     btnW - 4.0f, 1, 1, btnW - 4.0f);
             FlushQuadBatch();
             if (overlay_ == OVERLAY_NONE) {
-                RegisterHit(bx, btnY, btnW, 32.0f, HIT_MC_ACTION, b);
+                RegisterHit(bx, btnY, btnW, 36.0f, HIT_MC_ACTION, b);
             }
         }
     } else {
         BeginQuadBatch();
-        DrawText(TextOr("ps2ui_mc_empty_block", "Select a save state block"),
-                 inspX + 12.0f, contentTop + contentH * 0.45f, 14.0f, STYLE_BODY,
-                 SecondaryTextColor(alpha * 0.72f), inspW - 24.0f, 2, 1, inspW - 24.0f);
+        DrawText(TextOr("ps2ui_mc_empty_block", "Select a save block"),
+                 inspX, contentTop + contentH * 0.44f, 15.5f, STYLE_BODY,
+                 SecondaryTextColor(alpha * 0.65f), inspW, 2, 1, inspW);
         FlushQuadBatch();
+    }
+
+    if (overlay_ == OVERLAY_NONE && mc_focus_pane_ == 1) {
+        DrawAnimatedCursor(cursor_x_, cursor_y_, 11.0f, alpha);
     }
 }
 
@@ -1800,17 +2650,57 @@ void Ps2Renderer::DrawSettingsScreen(float alpha) {
     const LayoutMetrics m = ComputeMetrics();
     DrawHeaderBar(TextOr("ps2ui_menu_settings", "System Configuration"), alpha);
 
-    const float listTop = m.bodyTop + 38.0f;
+    // Authentic PS2 System Configuration split: Left = Live 3D Crystal Clock Ring + Centered Digital Clock
+    const float listTop = m.bodyTop + 36.0f;
     const float listH = m.bodyBot - listTop;
-    const float listW = std::min(780.0f, screen_width_ - m.padX * 2.0f);
-    const float listX = (screen_width_ - listW) * 0.5f;
+    const float clockAreaW = screen_width_ * 0.34f;
+    const float clockCx = m.padX + clockAreaW * 0.50f;
+    const float clockCy = m.bodyTop + m.bodyH * 0.48f;
+    const float ringR = std::min(106.0f, clockAreaW * 0.41f);
+    const RgbaColor accRing = AccentColor(alpha);
 
-    DrawPanel(listX, listTop, listW, listH, 12.0f, 1.0f,
-              PanelTopColor(0.60f * alpha), PanelBotColor(0.75f * alpha), PanelBorderColor(0.38f * alpha));
+    std::time_t nowSec = std::time(nullptr);
+    std::tm tmNow{};
+    localtime_r(&nowSec, &tmNow);
+    char bigTime[24] = {};
+    if (settings_.time24h) {
+        std::snprintf(bigTime, sizeof(bigTime), "%02d:%02d:%02d", tmNow.tm_hour, tmNow.tm_min, tmNow.tm_sec);
+    } else {
+        int h12 = tmNow.tm_hour % 12;
+        if (h12 == 0) h12 = 12;
+        std::snprintf(bigTime, sizeof(bigTime), "%02d:%02d %s", h12, tmNow.tm_min, tmNow.tm_hour >= 12 ? "PM" : "AM");
+    }
+    char bigDate[32] = {};
+    std::snprintf(bigDate, sizeof(bigDate), "%04d/%02d/%02d", tmNow.tm_year + 1900, tmNow.tm_mon + 1, tmNow.tm_mday);
+
+    float timeW = 0.0f, timeH = 0.0f, dateW = 0.0f, dateH = 0.0f;
+    MeasureText(bigTime, 21.0f, STYLE_MONO, 0.0f, 1, timeW, timeH);
+    MeasureText(bigDate, 13.5f, STYLE_MONO, 0.0f, 1, dateW, dateH);
+    const float totalClkH = timeH + 4.0f + dateH;
+    const float topClkY = clockCy - totalClkH * 0.5f;
+
+    BeginQuadBatch();
+    for (int hTick = 0; hTick < 12; ++hTick) {
+        const float tickAng = (static_cast<float>(hTick) / 12.0f) * 2.0f * kPi - kPi * 0.5f;
+        const float tickR = ringR * 0.84f;
+        const float tx = clockCx + std::cos(tickAng) * tickR;
+        const float ty = clockCy + std::sin(tickAng) * tickR;
+        const bool isCardinal = (hTick % 3 == 0);
+        const float dotSz = isCardinal ? 4.0f : 2.5f;
+        const RgbaColor dotCol{accRing.r, accRing.g, accRing.b, alpha * (isCardinal ? 0.72f : 0.36f)};
+        PushQuad(white_tex_, tx - dotSz * 0.5f, ty - dotSz * 0.5f, dotSz, dotSz, dotCol);
+    }
+    DrawText(bigTime, clockCx - timeW * 0.5f, topClkY, 21.0f, STYLE_MONO, PrimaryTextColor(alpha));
+    DrawText(bigDate, clockCx - dateW * 0.5f, topClkY + timeH + 4.0f, 13.5f, STYLE_MONO,
+             SecondaryTextColor(alpha * 0.78f));
+    FlushQuadBatch();
+
+    const float listX = m.padX + clockAreaW + 12.0f;
+    const float listW = screen_width_ - listX - m.padX;
 
     const std::string themeNames[kThemeCount] = {
-        TextOr("ps2ui_theme_ocean", "Ocean Blue"),
-        TextOr("ps2ui_theme_obsidian", "Midnight Obsidian"),
+        TextOr("ps2ui_theme_ocean", "PS2 Classic"),
+        TextOr("ps2ui_theme_obsidian", "Midnight Silver"),
         TextOr("ps2ui_theme_emerald", "Emerald Matrix"),
         TextOr("ps2ui_theme_crimson", "Crimson Sakura"),
         TextOr("ps2ui_theme_amethyst", "Amethyst Nebula"),
@@ -1867,13 +2757,13 @@ void Ps2Renderer::DrawSettingsScreen(float alpha) {
         {TextOr("ps2ui_set_time_fmt", "Clock Format"), settings_.time24h ? TextOr("ps2ui_time_24h", "24-Hour") : TextOr("ps2ui_time_12h", "12-Hour")},
         {TextOr("ps2ui_set_date_fmt", "Date Format"), dateNames[std::clamp(settings_.dateFormat, 0, 2)]},
         {TextOr("ps2ui_set_keep_screen", "Keep Screen On"), settings_.keepScreenOn ? onStr : offStr},
-        {TextOr("ps2ui_set_sysinfo", "System Version"), TextOr("ps2ui_view", "View")},
+        {TextOr("ps2ui_set_sysinfo", "Version Information"), TextOr("ps2ui_view", "View")},
         {TextOr("ps2ui_set_restore", "Restore Defaults"), TextOr("ps2ui_reset", "Reset")},
     };
 
     const float rowH = 44.0f;
-    const float rowStep = 49.0f;
-    const float maxSc = std::max(0.0f, static_cast<float>(kSettingsCount) * rowStep - (listH - 16.0f));
+    const float rowStep = 48.0f;
+    const float maxSc = std::max(0.0f, static_cast<float>(kSettingsCount) * rowStep - (listH - 8.0f));
     settings_scroll_target_y_ = std::clamp(settings_scroll_target_y_, 0.0f, maxSc);
     settings_scroll_y_ = std::clamp(settings_scroll_y_, 0.0f, maxSc);
 
@@ -1881,73 +2771,86 @@ void Ps2Renderer::DrawSettingsScreen(float alpha) {
     const float sxScale = static_cast<float>(view_width_) / screen_width_;
     const float syScale = static_cast<float>(view_height_) / kScreenHeight;
     glScissor(
-        view_x_ + static_cast<int>(listX * sxScale),
-        view_y_ + static_cast<int>((kScreenHeight - (listTop + listH - 4.0f)) * syScale),
-        std::max(1, static_cast<int>(listW * sxScale)),
-        std::max(1, static_cast<int>((listH - 8.0f) * syScale)));
+        view_x_ + static_cast<int>((listX - 24.0f) * sxScale),
+        view_y_ + static_cast<int>((kScreenHeight - (listTop + listH)) * syScale),
+        std::max(1, static_cast<int>((listW + 28.0f) * sxScale)),
+        std::max(1, static_cast<int>(listH * syScale)));
 
     const RgbaColor acc = AccentColor(alpha);
     for (int i = 0; i < kSettingsCount; ++i) {
-        const float ry = listTop + 8.0f + static_cast<float>(i) * rowStep - settings_scroll_y_;
+        const float ry = listTop + 4.0f + static_cast<float>(i) * rowStep - settings_scroll_y_;
         if (ry + rowH < listTop || ry > listTop + listH) continue;
         const bool sel = (i == settings_index_);
 
-        DrawPanel(listX + 10.0f, ry, listW - 20.0f, rowH, 8.0f, sel ? 1.3f : 0.6f,
-                  sel ? PanelTopColor(0.86f * alpha) : PanelTopColor(0.28f * alpha),
-                  PanelBotColor(0.68f * alpha),
-                  {acc.r, acc.g, acc.b, (sel ? 0.88f : 0.14f) * alpha},
-                  sel ? RgbaColor{acc.r, acc.g, acc.b, 0.38f * alpha} : RgbaColor{0, 0, 0, 0});
+        if (sel) {
+            DrawFocusBeam(listX, ry, listW, rowH, acc, alpha * 0.90f);
+            SetCursorTarget(listX + 4.0f, ry + rowH * 0.46f);
+        }
 
         BeginQuadBatch();
-        DrawText(rows[i].label, listX + 26.0f, ry + 12.0f, 15.0f, sel ? STYLE_BODY_BOLD : STYLE_BODY,
-                 sel ? PrimaryTextColor(alpha) : SecondaryTextColor(alpha * 0.9f), listW * 0.52f, 1);
+        DrawText(rows[i].label, listX + 22.0f, ry + 10.0f, 16.0f, sel ? STYLE_BODY_BOLD : STYLE_BODY,
+                 sel ? PrimaryTextColor(alpha) : SecondaryTextColor(alpha * 0.74f), listW * 0.50f, 1);
 
-        const float valAreaW = listW * 0.38f;
-        const float valAreaX = listX + listW - valAreaW - 22.0f;
-        DrawText("<", valAreaX, ry + 11.0f, 15.0f, STYLE_BODY_BOLD,
-                 sel ? acc : SecondaryTextColor(alpha * 0.5f));
-        DrawText(rows[i].value, valAreaX + 18.0f, ry + 12.0f, 14.5f, STYLE_BODY_BOLD,
-                 sel ? acc : PrimaryTextColor(alpha * 0.88f), valAreaW - 36.0f, 1, 1, valAreaW - 36.0f);
-        DrawText(">", valAreaX + valAreaW - 14.0f, ry + 11.0f, 15.0f, STYLE_BODY_BOLD,
-                 sel ? acc : SecondaryTextColor(alpha * 0.5f));
+        const float valAreaW = listW * 0.42f;
+        const float valAreaX = listX + listW - valAreaW - 4.0f;
+        DrawText("<", valAreaX, ry + 9.5f, 15.5f, STYLE_BODY_BOLD,
+                 sel ? acc : SecondaryTextColor(alpha * 0.45f));
+        DrawText(rows[i].value, valAreaX + 16.0f, ry + 10.5f, 15.0f, STYLE_BODY_BOLD,
+                 sel ? acc : PrimaryTextColor(alpha * 0.88f), valAreaW - 32.0f, 1, 1, valAreaW - 32.0f);
+        DrawText(">", valAreaX + valAreaW - 14.0f, ry + 9.5f, 15.5f, STYLE_BODY_BOLD,
+                 sel ? acc : SecondaryTextColor(alpha * 0.45f));
         FlushQuadBatch();
 
         if (overlay_ == OVERLAY_NONE) {
-            RegisterHit(valAreaX - 10.0f, std::max(listTop, ry), 46.0f, std::min(rowH, listTop + listH - ry), HIT_SETTING_LEFT, i);
-            RegisterHit(valAreaX + valAreaW - 36.0f, std::max(listTop, ry), 46.0f, std::min(rowH, listTop + listH - ry), HIT_SETTING_RIGHT, i);
-            RegisterHit(listX + 10.0f, std::max(listTop, ry), listW - 20.0f, std::min(rowH, listTop + listH - ry), HIT_SETTING_ROW, i);
+            RegisterHit(valAreaX - 10.0f, std::max(listTop, ry), 44.0f, std::min(rowH, listTop + listH - ry), HIT_SETTING_LEFT, i);
+            RegisterHit(valAreaX + valAreaW - 34.0f, std::max(listTop, ry), 44.0f, std::min(rowH, listTop + listH - ry), HIT_SETTING_RIGHT, i);
+            RegisterHit(listX, std::max(listTop, ry), listW, std::min(rowH, listTop + listH - ry), HIT_SETTING_ROW, i);
         }
     }
     glDisable(GL_SCISSOR_TEST);
+
+    if (overlay_ == OVERLAY_NONE &&
+        cursor_y_ >= listTop - 10.0f && cursor_y_ <= listTop + listH + 10.0f) {
+        DrawAnimatedCursor(cursor_x_, cursor_y_, 11.5f, alpha);
+    }
 }
 
 void Ps2Renderer::DrawLaunchStage() {
-    const float p = Clamp01(launch_t_ / 0.85f);
+    // Sleek, clutter-free #000000 spinning 3D optical disc launch w/ subtle parting blue light curtains
+    const float p = Clamp01(launch_t_ / 1.05f);
     const float ease = EaseOutCubic(p);
+    const float vis = SmoothStep(0.0f, 0.14f, p) * (1.0f - SmoothStep(0.86f, 1.0f, p));
     const RgbaColor acc = AccentColor(1.0f);
 
-    if (settings_.towersMode != 2) {
-        const float aspect = screen_width_ / kScreenHeight;
-        float proj[16], view[16], mvp[16];
-        MakePerspective(0.90f, aspect, 0.2f, 65.0f, proj);
-        const float camZ = 4.5f - ease * 8.0f;
-        MakeLookAt(0.0f, 2.2f, camZ, 0.0f, 0.8f, camZ - 12.0f, 0.0f, 1.0f, 0.0f, view);
-        Mat4Mul(proj, view, mvp);
-        DrawTowers3D(mvp, 0.0f, 2.2f, camZ, 1.0f + ease * 0.45f, 0.65f * (1.0f - p * 0.35f));
-    }
+    FlushQuadBatch();
+    glBlendFunc(GL_ONE, GL_ONE);
+    glUseProgram(prog_launch_);
+    glUniform2f(lch_u_screen_, screen_width_, kScreenHeight);
+    glUniform1f(lch_u_progress_, p);
+    glUniform1f(lch_u_time_, time_sec_);
+    glUniform3f(lch_u_accent_col_, acc.r * 0.36f, acc.g * 0.36f, acc.b * 0.36f);
+    glBindVertexArray(fs_vao_);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     const float cx = screen_width_ * 0.5f;
-    const float cy = kScreenHeight * 0.45f;
-    const float r = 74.0f + 26.0f * ease;
-    DrawOpticalDisc(cx, cy, r, disc_spin_angle_ + ease * 10.0f, launch_is_blue_cd_ ? 1 : 0, 0.96f);
+    const float cy = kScreenHeight * 0.42f;
+    const float r = 70.0f + 26.0f * ease;
+    const float tiltX = 0.28f * (1.0f - ease);
+    const float tiltY = -0.24f * (1.0f - ease);
+
+    DrawFocusBeam(cx - r * 1.15f, cy + r - 12.0f, r * 2.30f, 28.0f, acc, 0.55f * vis);
+    DrawOpticalDisc3D(cx, cy, r, disc_spin_angle_ + ease * 10.0f,
+                      tiltX, tiltY, launch_is_blue_cd_ ? 1 : 0, 0.98f * vis);
 
     BeginQuadBatch();
     const std::string cap = launch_is_save_
         ? TextOr("ps2ui_launching_save", "Loading Quick Save...")
         : TextOr("ps2ui_launching_disc", "Reading PlayStation 2 Disc...");
-    DrawText(cap, 0.0f, cy + r + 26.0f, 17.0f, STYLE_HEADER, acc, screen_width_, 1, 1, screen_width_);
-    DrawText(launch_title_, 0.0f, cy + r + 52.0f, 20.0f, STYLE_BODY_BOLD, PrimaryTextColor(1.0f),
-             screen_width_ * 0.78f, 1, 1, screen_width_);
+    DrawText(cap, 0.0f, cy + r + 24.0f, 16.0f, STYLE_HEADER,
+             {0.58f, 0.84f, 1.0f, 0.95f * vis}, screen_width_, 1, 1, screen_width_);
+    DrawText(launch_title_, screen_width_ * 0.10f, cy + r + 52.0f, 22.0f, STYLE_BODY_BOLD,
+             PrimaryTextColor(vis), screen_width_ * 0.80f, 1, 1, screen_width_ * 0.80f);
     FlushQuadBatch();
 }
 
@@ -1957,34 +2860,40 @@ void Ps2Renderer::DrawConfirmDialog(
     const std::string& yesText,
     const std::string& noText,
     int focusedBtn) {
-    const float mw = std::min(430.0f, screen_width_ - 40.0f);
-    const float mh = 186.0f;
+    const float mw = std::min(460.0f, screen_width_ - 40.0f);
+    const float mh = 198.0f;
     const float mx = (screen_width_ - mw) * 0.5f;
     const float my = (kScreenHeight - mh) * 0.5f;
     const RgbaColor acc = AccentColor(1.0f);
 
-    DrawPanel(mx, my, mw, mh, 14.0f, 1.5f,
+    DrawPanel(mx, my, mw, mh, 12.0f, 1.0f,
               PanelTopColor(0.95f), PanelBotColor(0.97f),
-              {acc.r, acc.g, acc.b, 0.85f}, {acc.r, acc.g, acc.b, 0.25f});
+              {acc.r, acc.g, acc.b, 0.55f});
     BeginQuadBatch();
-    DrawText(title, mx + 20.0f, my + 18.0f, 18.5f, STYLE_HEADER, acc, mw - 40.0f, 1, 1, mw - 40.0f);
-    DrawText(message, mx + 22.0f, my + 56.0f, 14.0f, STYLE_BODY, PrimaryTextColor(0.94f), mw - 44.0f, 3, 1, mw - 44.0f);
+    DrawText(title, mx + 20.0f, my + 18.0f, 20.5f, STYLE_HEADER, acc, mw - 40.0f, 1, 1, mw - 40.0f);
+    DrawText(message, mx + 22.0f, my + 58.0f, 15.5f, STYLE_BODY, PrimaryTextColor(0.94f), mw - 44.0f, 3, 1, mw - 44.0f);
     FlushQuadBatch();
 
     const float bw = (mw - 68.0f) * 0.5f;
-    const float by = my + mh - 50.0f;
+    const float by = my + mh - 52.0f;
     for (int b = 0; b < 2; ++b) {
         const float bx = mx + 24.0f + static_cast<float>(b) * (bw + 20.0f);
         const bool sel = (focusedBtn == b);
-        DrawPanel(bx, by, bw, 34.0f, 8.0f, sel ? 1.4f : 0.9f,
-                  sel ? PanelTopColor(0.95f) : PanelTopColor(0.55f), PanelBotColor(0.92f),
-                  {acc.r, acc.g, acc.b, sel ? 0.92f : 0.35f},
-                  sel ? RgbaColor{acc.r, acc.g, acc.b, 0.40f} : RgbaColor{0, 0, 0, 0});
+        const RgbaColor topC = sel
+            ? RgbaColor{acc.r * 0.24f, acc.g * 0.34f, acc.b * 0.52f, 0.88f}
+            : PanelTopColor(0.55f);
+        const RgbaColor botC = sel
+            ? RgbaColor{acc.r * 0.10f, acc.g * 0.16f, acc.b * 0.32f, 0.92f}
+            : PanelBotColor(0.82f);
+        const RgbaColor brdC = sel
+            ? RgbaColor{acc.r, acc.g, acc.b, 0.88f}
+            : RgbaColor{acc.r, acc.g, acc.b, 0.32f};
+        DrawPanel(bx, by, bw, 36.0f, 8.0f, sel ? 1.3f : 0.9f, topC, botC, brdC);
         BeginQuadBatch();
-        DrawText(b == 0 ? yesText : noText, bx + 6.0f, by + 7.5f, 13.5f, STYLE_BODY_BOLD,
+        DrawText(b == 0 ? yesText : noText, bx + 6.0f, by + 7.5f, 15.0f, STYLE_BODY_BOLD,
                  PrimaryTextColor(1.0f), bw - 12.0f, 1, 1, bw - 12.0f);
         FlushQuadBatch();
-        RegisterHit(bx, by, bw, 34.0f, HIT_OVERLAY_ITEM, b);
+        RegisterHit(bx, by, bw, 36.0f, HIT_OVERLAY_ITEM, b);
     }
 }
 
@@ -1993,29 +2902,28 @@ void Ps2Renderer::DrawListModal(
     const std::vector<std::string>& items,
     int selectedIdx,
     float modalWidth) {
-    const float mw = std::min(modalWidth, screen_width_ - 40.0f);
-    const float rowH = 38.0f;
-    const float mh = 70.0f + static_cast<float>(items.size()) * (rowH + 6.0f);
+    const float mw = std::min(std::max(modalWidth, 400.0f), screen_width_ - 40.0f);
+    const float rowH = 42.0f;
+    const float mh = 76.0f + static_cast<float>(items.size()) * (rowH + 6.0f);
     const float mx = (screen_width_ - mw) * 0.5f;
     const float my = (kScreenHeight - mh) * 0.5f;
     const RgbaColor acc = AccentColor(1.0f);
 
-    DrawPanel(mx, my, mw, mh, 14.0f, 1.5f,
+    DrawPanel(mx, my, mw, mh, 12.0f, 1.0f,
               PanelTopColor(0.95f), PanelBotColor(0.97f),
-              {acc.r, acc.g, acc.b, 0.85f}, {acc.r, acc.g, acc.b, 0.25f});
+              {acc.r, acc.g, acc.b, 0.55f});
     BeginQuadBatch();
-    DrawText(title, mx + 18.0f, my + 16.0f, 18.0f, STYLE_HEADER, acc, mw - 36.0f, 1, 1, mw - 36.0f);
+    DrawText(title, mx + 18.0f, my + 16.0f, 20.5f, STYLE_HEADER, acc, mw - 36.0f, 1, 1, mw - 36.0f);
     FlushQuadBatch();
 
     for (size_t i = 0; i < items.size(); ++i) {
-        const float ry = my + 54.0f + static_cast<float>(i) * (rowH + 6.0f);
+        const float ry = my + 58.0f + static_cast<float>(i) * (rowH + 6.0f);
         const bool sel = (static_cast<int>(i) == selectedIdx);
-        DrawPanel(mx + 18.0f, ry, mw - 36.0f, rowH, 8.0f, sel ? 1.3f : 0.7f,
-                  sel ? PanelTopColor(0.90f) : PanelTopColor(0.45f), PanelBotColor(0.85f),
-                  {acc.r, acc.g, acc.b, sel ? 0.92f : 0.24f},
-                  sel ? RgbaColor{acc.r, acc.g, acc.b, 0.36f} : RgbaColor{0, 0, 0, 0});
+        if (sel) {
+            DrawFocusBeam(mx + 14.0f, ry, mw - 28.0f, rowH, acc, 0.92f);
+        }
         BeginQuadBatch();
-        DrawText(items[i], mx + 28.0f, ry + 9.0f, 14.0f, sel ? STYLE_BODY_BOLD : STYLE_BODY,
+        DrawText(items[i], mx + 28.0f, ry + 10.0f, 15.5f, sel ? STYLE_BODY_BOLD : STYLE_BODY,
                  PrimaryTextColor(1.0f), mw - 56.0f, 1);
         FlushQuadBatch();
         RegisterHit(mx + 18.0f, ry, mw - 36.0f, rowH, HIT_OVERLAY_ITEM, static_cast<int>(i));
@@ -2026,16 +2934,21 @@ void Ps2Renderer::DrawOverlay() {
     if (overlay_ == OVERLAY_NONE) return;
     FlushQuadBatch();
     BeginQuadBatch();
-    PushQuad(white_tex_, 0.0f, 0.0f, screen_width_, kScreenHeight, {0.0f, 0.01f, 0.04f, 0.62f});
+    PushQuad(white_tex_, 0.0f, 0.0f, screen_width_, kScreenHeight, {0.0f, 0.0f, 0.0f, 0.72f});
     FlushQuadBatch();
     RegisterHit(0.0f, 0.0f, screen_width_, kScreenHeight, HIT_OVERLAY_BACKDROP, 0);
 
     const RgbaColor acc = AccentColor(1.0f);
 
+    auto colonSpaced = [](std::string s) {
+        if (!s.empty() && s.back() != ' ') s.push_back(' ');
+        return s;
+    };
+
     if (overlay_ == OVERLAY_EXIT_CONFIRM) {
         DrawConfirmDialog(
-            TextOr("ps2ui_exit_title", "Exit System Shell"),
-            TextOr("ps2ui_exit_msg", "Return to the standard game library?"),
+            TextOr("ps2ui_exit_title", "Exit"),
+            TextOr("ps2ui_exit_msg", "Return to game library?"),
             TextOr("ps2ui_yes", "Yes"), TextOr("ps2ui_no", "No"), dialog_btn_);
     } else if (overlay_ == OVERLAY_DELETE_SAVE_CONFIRM) {
         DrawConfirmDialog(
@@ -2052,17 +2965,26 @@ void Ps2Renderer::DrawOverlay() {
         }
         DrawConfirmDialog(
             TextOr("ps2ui_del_card_title", "Delete Memory Card"),
-            TextOr("ps2ui_del_card_msg", "Delete memory card permanently?") +
+            TextOr("ps2ui_del_card_msg", "Delete this memory card permanently?") +
                 (cardName.empty() ? "" : "\n" + cardName),
             TextOr("ps2ui_yes", "Yes"), TextOr("ps2ui_no", "No"), dialog_btn_);
     } else if (overlay_ == OVERLAY_RESTORE_CONFIRM) {
         DrawConfirmDialog(
             TextOr("ps2ui_restore_title", "Restore Defaults"),
-            TextOr("ps2ui_restore_msg", "Reset all PS2 System Shell settings to default?"),
+            TextOr("ps2ui_restore_msg", "Restore default settings?"),
             TextOr("ps2ui_yes", "Yes"), TextOr("ps2ui_no", "No"), dialog_btn_);
     } else if (overlay_ == OVERLAY_GAME_OPTIONS) {
-        if (game_index_ >= 0 && game_index_ < static_cast<int>(games_.size())) {
-            const GameEntry& g = games_[game_index_];
+        const int realIdx = SelectedMasterGameIndex();
+        GameEntry g;
+        bool hasGame = false;
+        {
+            std::lock_guard<std::mutex> lock(data_mutex_);
+            if (realIdx >= 0 && realIdx < static_cast<int>(games_.size())) {
+                g = games_[realIdx];
+                hasGame = true;
+            }
+        }
+        if (hasGame) {
             std::vector<std::string> opts;
             opts.push_back(TextOr("ps2ui_opt_start", "Start Disc"));
             if (g.latestSaveSlot >= 0) opts.push_back(TextOr("ps2ui_opt_continue", "Continue Quick Save"));
@@ -2098,36 +3020,46 @@ void Ps2Renderer::DrawOverlay() {
         if (!isDef) {
             opts.push_back(TextOr("ps2ui_mc_delete", "Delete"));
         }
-        DrawListModal(cardName.empty() ? TextOr("ps2ui_mc_actions", "Card Actions") : cardName,
+        DrawListModal(cardName.empty() ? TextOr("ps2ui_mc_actions", "Options") : cardName,
                       opts, card_action_menu_idx_, 360.0f);
     } else if (overlay_ == OVERLAY_GAME_INFO) {
-        if (game_index_ >= 0 && game_index_ < static_cast<int>(games_.size())) {
-            const GameEntry& g = games_[game_index_];
-            const bool isBlueCd = (g.fileSizeBytes > 0 && g.fileSizeBytes < 750LL * 1024LL * 1024LL);
+        const int realIdx = SelectedMasterGameIndex();
+        GameEntry g;
+        bool hasGame = false;
+        {
+            std::lock_guard<std::mutex> lock(data_mutex_);
+            if (realIdx >= 0 && realIdx < static_cast<int>(games_.size())) {
+                g = games_[realIdx];
+                hasGame = true;
+            }
+        }
+        if (hasGame) {
+            const bool isBlueCd = (!g.isArcade && g.fileSizeBytes > 0 && g.fileSizeBytes < 750LL * 1024LL * 1024LL);
+            const std::string mediaLabel = g.isArcade ? "Namco System 246 / 256 Arcade"
+                : (isBlueCd ? "PlayStation 2 CD-ROM" : "PlayStation 2 DVD-ROM");
             const float mw = std::min(460.0f, screen_width_ - 40.0f);
             const float mh = 226.0f;
             const float mx = (screen_width_ - mw) * 0.5f;
             const float my = (kScreenHeight - mh) * 0.5f;
-            DrawPanel(mx, my, mw, mh, 14.0f, 1.5f, PanelTopColor(0.95f), PanelBotColor(0.97f),
-                      {acc.r, acc.g, acc.b, 0.85f});
+            DrawPanel(mx, my, mw, mh, 12.0f, 1.0f, PanelTopColor(0.95f), PanelBotColor(0.97f),
+                      {acc.r, acc.g, acc.b, 0.55f});
             BeginQuadBatch();
-            DrawText(TextOr("ps2ui_info_title", "Disc Information"), mx + 20.0f, my + 16.0f, 18.0f, STYLE_HEADER, acc);
-            DrawText(g.title, mx + 20.0f, my + 48.0f, 15.5f, STYLE_BODY_BOLD, PrimaryTextColor(1.0f), mw - 40.0f, 2);
-            DrawText(TextOr("ps2ui_info_serial", "Serial: ") + (g.serial.empty() ? "—" : g.serial),
-                     mx + 20.0f, my + 98.0f, 13.0f, STYLE_MONO, SecondaryTextColor(0.92f));
-            DrawText(TextOr("ps2ui_info_media", "Media: ") + std::string(isBlueCd ? "PlayStation 2 CD-ROM" : "PlayStation 2 DVD-ROM"),
-                     mx + 20.0f, my + 122.0f, 13.0f, STYLE_MONO, SecondaryTextColor(0.92f));
-            DrawText(TextOr("ps2ui_info_size", "Size: ") + (g.sizeStr.empty() ? "—" : g.sizeStr),
-                     mx + 20.0f, my + 146.0f, 13.0f, STYLE_MONO, SecondaryTextColor(0.92f));
+            DrawText(TextOr("ps2ui_info_title", "Disc Information"), mx + 20.0f, my + 16.0f, 20.5f, STYLE_HEADER, acc);
+            DrawText(g.title, mx + 20.0f, my + 50.0f, 16.5f, STYLE_BODY_BOLD, PrimaryTextColor(1.0f), mw - 40.0f, 2);
+            DrawText(colonSpaced(TextOr("ps2ui_info_serial", "Serial: ")) + (g.serial.empty() ? "—" : g.serial),
+                     mx + 20.0f, my + 102.0f, 14.5f, STYLE_MONO, SecondaryTextColor(0.92f));
+            DrawText(colonSpaced(TextOr("ps2ui_info_media", "Media: ")) + mediaLabel,
+                     mx + 20.0f, my + 128.0f, 14.5f, STYLE_MONO, SecondaryTextColor(0.92f));
+            DrawText(colonSpaced(TextOr("ps2ui_info_size", "Size: ")) + (g.sizeStr.empty() ? "—" : g.sizeStr),
+                     mx + 20.0f, my + 154.0f, 14.5f, STYLE_MONO, SecondaryTextColor(0.92f));
             FlushQuadBatch();
 
-            DrawPanel(mx + mw * 0.5f - 70.0f, my + mh - 46.0f, 140.0f, 32.0f, 8.0f, 1.2f,
-                      PanelTopColor(0.92f), PanelBotColor(0.95f), {acc.r, acc.g, acc.b, 0.90f});
+            DrawFocusBeam(mx + mw * 0.5f - 75.0f, my + mh - 48.0f, 150.0f, 36.0f, acc, 0.90f);
             BeginQuadBatch();
-            DrawText(TextOr("ps2ui_close", "Close"), mx + mw * 0.5f - 70.0f, my + mh - 39.0f, 13.5f, STYLE_BODY_BOLD,
-                     PrimaryTextColor(1.0f), 140.0f, 1, 1, 140.0f);
+            DrawText(TextOr("ps2ui_close", "Close"), mx + mw * 0.5f - 75.0f, my + mh - 40.0f, 15.0f, STYLE_BODY_BOLD,
+                     PrimaryTextColor(1.0f), 150.0f, 1, 1, 150.0f);
             FlushQuadBatch();
-            RegisterHit(mx + mw * 0.5f - 70.0f, my + mh - 46.0f, 140.0f, 32.0f, HIT_OVERLAY_ITEM, 0);
+            RegisterHit(mx + mw * 0.5f - 75.0f, my + mh - 48.0f, 150.0f, 36.0f, HIT_OVERLAY_ITEM, 0);
         }
     } else if (overlay_ == OVERLAY_SYSTEM_INFO) {
         SystemStatus st;
@@ -2135,58 +3067,56 @@ void Ps2Renderer::DrawOverlay() {
             std::lock_guard<std::mutex> lock(data_mutex_);
             st = status_;
         }
-        const float mw = std::min(460.0f, screen_width_ - 40.0f);
-        const float mh = 232.0f;
-        const float mx = (screen_width_ - mw) * 0.5f;
-        const float my = (kScreenHeight - mh) * 0.5f;
-        DrawPanel(mx, my, mw, mh, 14.0f, 1.5f, PanelTopColor(0.95f), PanelBotColor(0.97f),
-                  {acc.r, acc.g, acc.b, 0.85f});
-        BeginQuadBatch();
-        DrawText(TextOr("ps2ui_set_sysinfo", "Version Information"), mx + 20.0f, my + 16.0f, 18.0f, STYLE_HEADER, acc);
-        DrawText(TextOr("ps2ui_sys_app", "Console: ") + "EmuCoreX PS2  v" + st.appVersion,
-                 mx + 20.0f, my + 54.0f, 13.5f, STYLE_MONO, PrimaryTextColor(0.95f));
-        DrawText(TextOr("ps2ui_sys_device", "Device: ") + st.deviceName,
-                 mx + 20.0f, my + 80.0f, 13.5f, STYLE_MONO, SecondaryTextColor(0.90f));
-        DrawText(TextOr("ps2ui_sys_bios", "BIOS ROM: ") + st.biosStatus,
-                 mx + 20.0f, my + 106.0f, 13.5f, STYLE_MONO,
-                 st.biosValid ? RgbaColor{0.42f, 0.96f, 0.68f, 1.0f} : RgbaColor{1.0f, 0.45f, 0.40f, 1.0f});
-        DrawText(TextOr("ps2ui_sys_storage", "Free Storage: ") + st.freeStorage,
-                 mx + 20.0f, my + 132.0f, 13.5f, STYLE_MONO, SecondaryTextColor(0.90f));
-        FlushQuadBatch();
-
-        DrawPanel(mx + mw * 0.5f - 70.0f, my + mh - 46.0f, 140.0f, 32.0f, 8.0f, 1.2f,
-                  PanelTopColor(0.92f), PanelBotColor(0.95f), {acc.r, acc.g, acc.b, 0.90f});
-        BeginQuadBatch();
-        DrawText(TextOr("ps2ui_close", "Close"), mx + mw * 0.5f - 70.0f, my + mh - 39.0f, 13.5f, STYLE_BODY_BOLD,
-                 PrimaryTextColor(1.0f), 140.0f, 1, 1, 140.0f);
-        FlushQuadBatch();
-        RegisterHit(mx + mw * 0.5f - 70.0f, my + mh - 46.0f, 140.0f, 32.0f, HIT_OVERLAY_ITEM, 0);
-    } else if (overlay_ == OVERLAY_TOUCH_GUIDE) {
         const float mw = std::min(480.0f, screen_width_ - 40.0f);
-        const float mh = 236.0f;
+        const float mh = 246.0f;
         const float mx = (screen_width_ - mw) * 0.5f;
         const float my = (kScreenHeight - mh) * 0.5f;
-        DrawPanel(mx, my, mw, mh, 14.0f, 1.5f, PanelTopColor(0.95f), PanelBotColor(0.97f),
-                  {acc.r, acc.g, acc.b, 0.85f});
+        DrawPanel(mx, my, mw, mh, 12.0f, 1.0f, PanelTopColor(0.95f), PanelBotColor(0.97f),
+                  {acc.r, acc.g, acc.b, 0.55f});
         BeginQuadBatch();
-        DrawText(TextOr("ps2ui_touch_guide_title", "Touch Controls Guide"), mx + 20.0f, my + 16.0f, 18.0f, STYLE_HEADER, acc);
-        DrawText("• " + TextOr("ps2ui_touch_tip_1", "Tap an item to focus, tap again to open or launch"),
-                 mx + 20.0f, my + 56.0f, 13.0f, STYLE_BODY, PrimaryTextColor(0.94f), mw - 40.0f, 2);
-        DrawText("• " + TextOr("ps2ui_touch_tip_2", "Swipe up or down to scroll lists smoothly"),
-                 mx + 20.0f, my + 86.0f, 13.0f, STYLE_BODY, PrimaryTextColor(0.94f), mw - 40.0f, 2);
-        DrawText("• " + TextOr("ps2ui_touch_tip_3", "Long-press a game or card for extra options"),
-                 mx + 20.0f, my + 116.0f, 13.0f, STYLE_BODY, PrimaryTextColor(0.94f), mw - 40.0f, 2);
-        DrawText("• " + TextOr("ps2ui_touch_tip_4", "Two-finger tap goes back anywhere"),
-                 mx + 20.0f, my + 146.0f, 13.0f, STYLE_BODY, PrimaryTextColor(0.94f), mw - 40.0f, 2);
+        DrawText(TextOr("ps2ui_set_sysinfo", "Version Information"), mx + 20.0f, my + 16.0f, 20.5f, STYLE_HEADER, acc);
+        DrawText(colonSpaced(TextOr("ps2ui_sys_app", "Console: ")) + "PlayStation 2",
+                 mx + 20.0f, my + 56.0f, 15.0f, STYLE_MONO, PrimaryTextColor(0.95f));
+        DrawText(colonSpaced(TextOr("ps2ui_sys_device", "Device: ")) + st.deviceName,
+                 mx + 20.0f, my + 84.0f, 15.0f, STYLE_MONO, SecondaryTextColor(0.90f));
+        DrawText(colonSpaced(TextOr("ps2ui_sys_bios", "BIOS ROM: ")) + st.biosStatus,
+                 mx + 20.0f, my + 112.0f, 15.0f, STYLE_MONO,
+                 st.biosValid ? RgbaColor{0.42f, 0.96f, 0.68f, 1.0f} : RgbaColor{1.0f, 0.45f, 0.40f, 1.0f});
+        DrawText(colonSpaced(TextOr("ps2ui_sys_storage", "Free Storage: ")) + st.freeStorage,
+                 mx + 20.0f, my + 140.0f, 15.0f, STYLE_MONO, SecondaryTextColor(0.90f));
         FlushQuadBatch();
 
-        DrawPanel(mx + mw * 0.5f - 75.0f, my + mh - 46.0f, 150.0f, 32.0f, 8.0f, 1.2f,
-                  PanelTopColor(0.92f), PanelBotColor(0.95f), {acc.r, acc.g, acc.b, 0.90f});
+        DrawFocusBeam(mx + mw * 0.5f - 75.0f, my + mh - 48.0f, 150.0f, 36.0f, acc, 0.90f);
         BeginQuadBatch();
-        DrawText(TextOr("ps2ui_got_it", "Got it"), mx + mw * 0.5f - 75.0f, my + mh - 39.0f, 13.5f, STYLE_BODY_BOLD,
+        DrawText(TextOr("ps2ui_close", "Close"), mx + mw * 0.5f - 75.0f, my + mh - 40.0f, 15.0f, STYLE_BODY_BOLD,
                  PrimaryTextColor(1.0f), 150.0f, 1, 1, 150.0f);
         FlushQuadBatch();
-        RegisterHit(mx + mw * 0.5f - 75.0f, my + mh - 46.0f, 150.0f, 32.0f, HIT_OVERLAY_ITEM, 0);
+        RegisterHit(mx + mw * 0.5f - 75.0f, my + mh - 48.0f, 150.0f, 36.0f, HIT_OVERLAY_ITEM, 0);
+    } else if (overlay_ == OVERLAY_TOUCH_GUIDE) {
+        const float mw = std::min(510.0f, screen_width_ - 40.0f);
+        const float mh = 256.0f;
+        const float mx = (screen_width_ - mw) * 0.5f;
+        const float my = (kScreenHeight - mh) * 0.5f;
+        DrawPanel(mx, my, mw, mh, 12.0f, 1.0f, PanelTopColor(0.95f), PanelBotColor(0.97f),
+                  {acc.r, acc.g, acc.b, 0.55f});
+        BeginQuadBatch();
+        DrawText(TextOr("ps2ui_touch_guide_title", "Touch Controls Guide"), mx + 20.0f, my + 16.0f, 20.5f, STYLE_HEADER, acc);
+        DrawText("• " + TextOr("ps2ui_touch_tip_1", "Tap an item to focus, tap again to open or launch"),
+                 mx + 20.0f, my + 58.0f, 15.0f, STYLE_BODY, PrimaryTextColor(0.94f), mw - 40.0f, 2);
+        DrawText("• " + TextOr("ps2ui_touch_tip_2", "Swipe up or down to scroll lists smoothly"),
+                 mx + 20.0f, my + 92.0f, 15.0f, STYLE_BODY, PrimaryTextColor(0.94f), mw - 40.0f, 2);
+        DrawText("• " + TextOr("ps2ui_touch_tip_3", "Long-press a game or card for extra options"),
+                 mx + 20.0f, my + 126.0f, 15.0f, STYLE_BODY, PrimaryTextColor(0.94f), mw - 40.0f, 2);
+        DrawText("• " + TextOr("ps2ui_touch_tip_4", "Two-finger tap goes back anywhere"),
+                 mx + 20.0f, my + 160.0f, 15.0f, STYLE_BODY, PrimaryTextColor(0.94f), mw - 40.0f, 2);
+        FlushQuadBatch();
+
+        DrawFocusBeam(mx + mw * 0.5f - 80.0f, my + mh - 48.0f, 160.0f, 36.0f, acc, 0.90f);
+        BeginQuadBatch();
+        DrawText(TextOr("ps2ui_got_it", "Got it"), mx + mw * 0.5f - 80.0f, my + mh - 40.0f, 15.0f, STYLE_BODY_BOLD,
+                 PrimaryTextColor(1.0f), 160.0f, 1, 1, 160.0f);
+        FlushQuadBatch();
+        RegisterHit(mx + mw * 0.5f - 80.0f, my + mh - 48.0f, 160.0f, 36.0f, HIT_OVERLAY_ITEM, 0);
     }
 }
 
@@ -2208,19 +3138,35 @@ void Ps2Renderer::Draw() {
     if (has_frame_tp_) {
         dt = std::chrono::duration<float>(now - last_frame_tp_).count();
         dt = std::clamp(dt, 0.001f, 0.05f);
+        smooth_dt_ += (dt - smooth_dt_) * 0.25f;
+        dt = smooth_dt_;
     }
     last_frame_tp_ = now;
     has_frame_tp_ = true;
 
     time_sec_ += dt;
     disc_spin_angle_ += dt * (launching_ ? 7.5f : 1.55f);
+    if (disc_slide_t_ < 1.0f) {
+        disc_slide_t_ = std::min(1.0f, disc_slide_t_ + dt * 3.8f);
+    }
     image_decodes_this_frame_ = 0;
 
-    // Smoothly interpolate orbital tilt toward main menu selection
-    const float targetTilt = (screen_ == SCREEN_MAIN_MENU) ? (-0.18f + static_cast<float>(main_index_) * 0.18f) : 0.0f;
-    orb_tilt_cur_ += (targetTilt - orb_tilt_cur_) * std::min(1.0f, dt * 8.0f);
+    // Smooth autonomous harmonic orbital course changes + swoop decay (decoupled from menu cursor)
+    const float targetTilt = (screen_ == SCREEN_MAIN_MENU)
+        ? (std::sin(time_sec_ * 0.29f) * 0.65f + std::cos(time_sec_ * 0.17f) * 0.35f)
+        : 0.0f;
+    orb_tilt_cur_ += (targetTilt - orb_tilt_cur_) * std::min(1.0f, dt * 4.5f);
+    orb_swoop_t_ = std::max(0.0f, orb_swoop_t_ - dt * 1.20f);
+    orb_flash_t_ = std::max(0.0f, orb_flash_t_ - dt * 3.0f);
 
-    // Smooth scroll kinetic damping
+    if (cursor_pos_init_) {
+        cursor_x_ += (cursor_target_x_ - cursor_x_) * std::min(1.0f, dt * 18.0f);
+        cursor_y_ += (cursor_target_y_ - cursor_y_) * std::min(1.0f, dt * 18.0f);
+        cursor_trail_x_ += (cursor_x_ - cursor_trail_x_) * std::min(1.0f, dt * 7.5f);
+        cursor_trail_y_ += (cursor_y_ - cursor_trail_y_) * std::min(1.0f, dt * 7.5f);
+    }
+    cursor_flash_t_ = std::max(0.0f, cursor_flash_t_ - dt * 3.5f);
+
     game_scroll_y_ += (game_scroll_target_y_ - game_scroll_y_) * std::min(1.0f, dt * 16.0f);
     settings_scroll_y_ += (settings_scroll_target_y_ - settings_scroll_y_) * std::min(1.0f, dt * 16.0f);
     mc_card_scroll_y_ += (mc_card_scroll_target_y_ - mc_card_scroll_y_) * std::min(1.0f, dt * 16.0f);
@@ -2237,13 +3183,13 @@ void Ps2Renderer::Draw() {
         boot_t_ += dt;
         if (boot_t_ >= boot_duration_) {
             boot_active_ = false;
-            screen_fade_t_ = 0.45f;
+            screen_fade_t_ = 0.55f;
         }
     }
 
     if (launching_) {
         launch_t_ += dt;
-        if (!launch_dispatched_ && launch_t_ >= 0.72f) {
+        if (!launch_dispatched_ && launch_t_ >= 1.05f) {
             launch_dispatched_ = true;
             if (launch_is_save_) {
                 HostNotifySaveLaunch(launch_path_, launch_save_slot_);
@@ -2253,7 +3199,6 @@ void Ps2Renderer::Draw() {
         }
     }
 
-    // Apply dirty image paths invalidated from Kotlin on resume
     {
         std::lock_guard<std::mutex> lock(data_mutex_);
         if (image_cache_dirty_) {
@@ -2270,7 +3215,6 @@ void Ps2Renderer::Draw() {
         }
     }
 
-    // Compute viewport matching Aspect Mode (0 = Full Screen, 1 = 16:9, 2 = 4:3)
     const float surfAspect = static_cast<float>(surface_width_) / static_cast<float>(surface_height_);
     float targetAspect = surfAspect;
     if (settings_.aspectMode == 1) targetAspect = 16.0f / 9.0f;
@@ -2300,9 +3244,8 @@ void Ps2Renderer::Draw() {
         last_raster_scale_ = raster_scale_;
     }
 
-    // Clear full physical surface to deep obsidian void for pillarbox/letterbox if 16:9/4:3 selected
     glViewport(0, 0, surface_width_, surface_height_);
-    glClearColor(0.004f, 0.006f, 0.018f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
     glViewport(view_x_, view_y_, view_width_, view_height_);
@@ -2313,45 +3256,26 @@ void Ps2Renderer::Draw() {
 
     hit_targets_.clear();
 
-    // Pass 1: PS2 Cosmic Void + Volumetric Mist + 7 Orbiting Crystal Clock Orbs
-    float orbCx = 0.0f, orbCy = 0.0f, coreBoost = 0.0f;
-    float orbsData[28] = {};
-    float trailsData[28] = {};
-    ComputeBackgroundOrbs(orbCx, orbCy, coreBoost, orbsData, trailsData);
-
+    // Pass 1: Pure #000000 Black Void (+ Localized Mist behind Boot / Main Menu Vortex)
     glUseProgram(prog_bg_);
     glUniform2f(bg_u_screen_, screen_width_, kScreenHeight);
-    glUniform2f(bg_u_orb_center_, orbCx, orbCy);
+    glUniform2f(bg_u_mist_center_, orb_center_cur_x_, orb_center_cur_y_);
     glUniform1f(bg_u_time_, time_sec_);
-    glUniform1f(bg_u_core_boost_, coreBoost);
+    glUniform1f(bg_u_mist_strength_, mist_strength_cur_);
     glUniform1i(bg_u_theme_, std::clamp(settings_.theme, 0, kThemeCount - 1));
-    glUniform4fv(bg_u_orbs_, 7, orbsData);
-    glUniform4fv(bg_u_trails_, 7, trailsData);
     glBindVertexArray(fs_vao_);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-    // Smooth cursor lerp
-    if (screen_ == SCREEN_MAIN_MENU && !boot_active_ && !launching_) {
-        const LayoutMetrics m = ComputeMetrics();
-        const float orbCxRef = screen_width_ * 0.285f;
-        const float menuX = std::max(screen_width_ * 0.51f, orbCxRef + 150.0f);
-        const float rowH = 66.0f;
-        const float rowGap = 16.0f;
-        const float startY = kScreenHeight * 0.50f - (3.0f * rowH + 2.0f * rowGap) * 0.5f - 6.0f;
-        const float targetY = startY + static_cast<float>(main_index_) * (rowH + rowGap) + rowH * 0.5f;
-        cursor_x_ = menuX - 18.0f;
-        cursor_y_ += (targetY - cursor_y_) * std::min(1.0f, dt * 16.0f);
-        (void)m;
-    }
-
-    // Pass 2: Active Scene
+    // Pass 2: 3D Orbiting Crystal Clock Orbs w/ Curved Luminous Plasma Ribbons
     const float uiAlpha = EaseOutCubic(screen_fade_t_);
+    UpdateAndDrawOrbs3D(dt);
+
+    // Pass 3: Active Scene UI (Status Bar & Bottom Bar drawn last so nothing paints over them)
     if (boot_active_) {
         DrawBootIntro(1.0f);
     } else if (launching_) {
         DrawLaunchStage();
     } else {
-        DrawStatusBar(uiAlpha);
         if (screen_ == SCREEN_MAIN_MENU) {
             DrawMainMenu(uiAlpha);
         } else if (screen_ == SCREEN_GAMES) {
@@ -2361,11 +3285,12 @@ void Ps2Renderer::Draw() {
         } else if (screen_ == SCREEN_SETTINGS) {
             DrawSettingsScreen(uiAlpha);
         }
+        DrawStatusBar(uiAlpha);
         DrawBottomBar(uiAlpha);
         DrawOverlay();
     }
 
-    // Pass 3: Optional CRT Scanlines
+    // Pass 4: Optional CRT Scanlines
     DrawScanlinesPass();
 }
 
@@ -2395,8 +3320,14 @@ bool Ps2Renderer::SurfaceNormToVirtual(float normX, float normY, float& outVx, f
 void Ps2Renderer::SwitchScreen(int nextScreen) {
     if (screen_ != nextScreen) {
         screen_ = nextScreen;
-        // Never drop to 0.0 opacity so switching screens never blinks transparent
         screen_fade_t_ = 0.45f;
+        orb_swoop_t_ = 1.0f;
+        orb_swoop_dir_ = (nextScreen == SCREEN_MAIN_MENU) ? -1 : 1;
+        orb_flash_t_ = 1.0f;
+        cursor_pos_init_ = false;
+        if (nextScreen == SCREEN_GAMES) {
+            SnapGameScrollToSelected();
+        }
     }
 }
 
@@ -2407,6 +3338,8 @@ void Ps2Renderer::StartLaunchGame(
     const std::string& coverPath,
     bool isBlueCd) {
     if (path.empty() || launching_) return;
+    pending_restore_game_path_ = path;
+    selected_game_path_ = path;
     launching_ = true;
     launch_is_save_ = false;
     launch_dispatched_ = false;
@@ -2427,6 +3360,8 @@ void Ps2Renderer::StartLaunchQuickSave(
     const std::string& coverPath,
     bool isBlueCd) {
     if (path.empty() || launching_) return;
+    pending_restore_game_path_ = path;
+    selected_game_path_ = path;
     launching_ = true;
     launch_is_save_ = true;
     launch_save_slot_ = slot;
@@ -2472,7 +3407,7 @@ void Ps2Renderer::ActivateGameLaunch(int gameIdx) {
         }
         g = games_[gameIdx];
     }
-    const bool isBlueCd = (g.fileSizeBytes > 0 && g.fileSizeBytes < 750LL * 1024LL * 1024LL);
+    const bool isBlueCd = (!g.isArcade && g.fileSizeBytes > 0 && g.fileSizeBytes < 750LL * 1024LL * 1024LL);
     StartLaunchGame(g.path, g.title, g.serial, g.coverPath, isBlueCd);
 }
 
@@ -2537,6 +3472,24 @@ void Ps2Renderer::CycleSetting(int row, int delta) {
     }
 }
 
+std::vector<int> Ps2Renderer::FilteredGameIndices() const {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    std::vector<int> out;
+    out.reserve(games_.size());
+    for (int i = 0; i < static_cast<int>(games_.size()); ++i) {
+        if (!has_arcade_games_ || games_[i].isArcade == (game_tab_ == 1)) {
+            out.push_back(i);
+        }
+    }
+    return out;
+}
+
+int Ps2Renderer::SelectedMasterGameIndex() const {
+    const std::vector<int> filtered = FilteredGameIndices();
+    if (filtered.empty()) return -1;
+    return filtered[std::clamp(game_index_, 0, static_cast<int>(filtered.size()) - 1)];
+}
+
 std::vector<int> Ps2Renderer::FilteredSaveIndices() const {
     std::lock_guard<std::mutex> lock(data_mutex_);
     std::vector<int> out;
@@ -2557,17 +3510,43 @@ std::vector<int> Ps2Renderer::FilteredSaveIndices() const {
 
 void Ps2Renderer::ClampSelectionIndices() {
     main_index_ = std::clamp(main_index_, 0, 2);
-    if (!games_.empty()) {
-        game_index_ = std::clamp(game_index_, 0, static_cast<int>(games_.size()) - 1);
+    const std::vector<int> filteredGames = FilteredGameIndices();
+    if (!filteredGames.empty()) {
+        game_index_ = std::clamp(game_index_, 0, static_cast<int>(filteredGames.size()) - 1);
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        const int realIdx = filteredGames[game_index_];
+        if (realIdx >= 0 && realIdx < static_cast<int>(games_.size())) {
+            selected_game_path_ = games_[realIdx].path;
+        }
     } else {
         game_index_ = 0;
     }
-    if (!memcards_.empty()) {
-        mc_card_list_idx_ = std::clamp(mc_card_list_idx_, 0, static_cast<int>(memcards_.size()) - 1);
-    } else {
-        mc_card_list_idx_ = 0;
+    {
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        if (!memcards_.empty()) {
+            mc_card_list_idx_ = std::clamp(mc_card_list_idx_, 0, static_cast<int>(memcards_.size()) - 1);
+        } else {
+            mc_card_list_idx_ = 0;
+        }
     }
     settings_index_ = std::clamp(settings_index_, 0, kSettingsCount - 1);
+}
+
+void Ps2Renderer::SnapGameScrollToSelected() {
+    const std::vector<int> filtered = FilteredGameIndices();
+    if (filtered.empty()) {
+        game_scroll_target_y_ = 0.0f;
+        game_scroll_y_ = 0.0f;
+        return;
+    }
+    game_index_ = std::clamp(game_index_, 0, static_cast<int>(filtered.size()) - 1);
+    const float rowStep = 60.0f;
+    const float viewH = std::max(120.0f, ComputeMetrics().bodyH - (has_arcade_games_ ? 80.0f : 42.0f));
+    const float maxScroll = std::max(0.0f, static_cast<float>(filtered.size()) * rowStep - (viewH - 12.0f));
+    const float target = std::clamp(static_cast<float>(game_index_) * rowStep - viewH * 0.35f, 0.0f, maxScroll);
+    game_scroll_target_y_ = target;
+    game_scroll_y_ = target;
+    cursor_pos_init_ = false;
 }
 
 void Ps2Renderer::OnKey(int key) {
@@ -2575,12 +3554,11 @@ void Ps2Renderer::OnKey(int key) {
     if (boot_active_) {
         if (key == KEY_CONFIRM || key == KEY_BACK || key == KEY_START) {
             boot_active_ = false;
-            screen_fade_t_ = 0.45f;
+            screen_fade_t_ = 0.55f;
         }
         return;
     }
 
-    // Active Overlays
     if (overlay_ != OVERLAY_NONE) {
         if (overlay_ == OVERLAY_EXIT_CONFIRM ||
             overlay_ == OVERLAY_DELETE_SAVE_CONFIRM ||
@@ -2599,16 +3577,12 @@ void Ps2Renderer::OnKey(int key) {
                         int delIdx = pending_delete_save_idx_;
                         overlay_ = OVERLAY_NONE;
                         pending_delete_save_idx_ = -1;
-                        if (delIdx >= 0) {
-                            HostNotifyDeleteSave(delIdx);
-                        }
+                        if (delIdx >= 0) HostNotifyDeleteSave(delIdx);
                     } else if (overlay_ == OVERLAY_DELETE_CARD_CONFIRM) {
                         int delCard = pending_card_idx_;
                         overlay_ = OVERLAY_NONE;
                         pending_card_idx_ = -1;
-                        if (delCard >= 0) {
-                            HostNotifyMemoryCardAction(MC_ACTION_DELETE_CARD, mc_card_slot_idx_ + 1, delCard, 0);
-                        }
+                        if (delCard >= 0) HostNotifyMemoryCardAction(MC_ACTION_DELETE_CARD, mc_card_slot_idx_ + 1, delCard, 0);
                     } else if (overlay_ == OVERLAY_RESTORE_CONFIRM) {
                         settings_ = ShellSettings{};
                         overlay_ = OVERLAY_NONE;
@@ -2626,14 +3600,15 @@ void Ps2Renderer::OnKey(int key) {
         }
 
         if (overlay_ == OVERLAY_GAME_OPTIONS) {
+            const int realIdx = SelectedMasterGameIndex();
             GameEntry g;
             {
                 std::lock_guard<std::mutex> lock(data_mutex_);
-                if (game_index_ >= static_cast<int>(games_.size())) {
+                if (realIdx < 0 || realIdx >= static_cast<int>(games_.size())) {
                     overlay_ = OVERLAY_NONE;
                     return;
                 }
-                g = games_[game_index_];
+                g = games_[realIdx];
             }
             const bool hasCont = (g.latestSaveSlot >= 0);
             const int optCount = hasCont ? 5 : 4;
@@ -2650,9 +3625,9 @@ void Ps2Renderer::OnKey(int key) {
                 int sel = options_index_;
                 overlay_ = OVERLAY_NONE;
                 if (sel == 0) {
-                    ActivateGameLaunch(game_index_);
+                    ActivateGameLaunch(realIdx);
                 } else if (hasCont && sel == 1) {
-                    const bool isBlueCd = (g.fileSizeBytes > 0 && g.fileSizeBytes < 750LL * 1024LL * 1024LL);
+                    const bool isBlueCd = (!g.isArcade && g.fileSizeBytes > 0 && g.fileSizeBytes < 750LL * 1024LL * 1024LL);
                     StartLaunchQuickSave(g.path, g.latestSaveSlot, g.title, g.serial, g.coverPath, isBlueCd);
                 } else {
                     int rem = sel - (hasCont ? 2 : 1);
@@ -2660,6 +3635,7 @@ void Ps2Renderer::OnKey(int key) {
                         mc_filter_game_path_ = g.path;
                         mc_filter_game_title_ = g.title;
                         mc_tab_ = 1;
+                        mc_open_slot_ = 0;
                         mc_page_ = 0;
                         mc_slot_index_ = 0;
                         mc_focus_pane_ = 0;
@@ -2671,7 +3647,7 @@ void Ps2Renderer::OnKey(int key) {
                         HostPlaySfx(SFX_CONFIRM);
                     } else if (rem == 2) {
                         HostPlaySfx(SFX_CONFIRM);
-                        HostNotifyOpenGameSettings(game_index_);
+                        HostNotifyOpenGameSettings(realIdx);
                     }
                 }
             }
@@ -2745,7 +3721,6 @@ void Ps2Renderer::OnKey(int key) {
             return;
         }
 
-        // Info / Touch guide modals
         if (key == KEY_CONFIRM || key == KEY_BACK) {
             overlay_ = OVERLAY_NONE;
             HostPlaySfx(SFX_CANCEL);
@@ -2753,7 +3728,6 @@ void Ps2Renderer::OnKey(int key) {
         return;
     }
 
-    // Main Menu
     if (screen_ == SCREEN_MAIN_MENU) {
         if (key == KEY_UP) {
             main_index_ = (main_index_ + 2) % 3;
@@ -2770,10 +3744,12 @@ void Ps2Renderer::OnKey(int key) {
             if (main_index_ == 0) {
                 SwitchScreen(SCREEN_GAMES);
             } else if (main_index_ == 1) {
-                mc_tab_ = 0;
+                mc_tab_ = 0; // Restore Quick Saves as default Browser tab
+                mc_open_slot_ = 0;
                 mc_page_ = 0;
                 mc_slot_index_ = 0;
                 mc_focus_pane_ = 0;
+                mc_card_pane_ = 0;
                 mc_filter_game_path_.clear();
                 SwitchScreen(SCREEN_BROWSER);
             } else {
@@ -2787,28 +3763,39 @@ void Ps2Renderer::OnKey(int key) {
         return;
     }
 
-    // Games Screen
     if (screen_ == SCREEN_GAMES) {
         if (key == KEY_BACK) {
             SwitchScreen(SCREEN_MAIN_MENU);
             HostPlaySfx(SFX_CANCEL);
             return;
         }
-        int n = 0;
+        if (has_arcade_games_ &&
+            (key == KEY_PREV_TAB || key == KEY_NEXT_TAB || key == KEY_LEFT || key == KEY_RIGHT)) {
+            game_tab_ = 1 - game_tab_;
+            game_index_ = 0;
+            game_scroll_target_y_ = 0.0f;
+            last_disc_game_idx_ = -1;
+            cursor_pos_init_ = false;
+            HostPlaySfx(SFX_MOVE);
+            return;
+        }
+        const std::vector<int> filtered = FilteredGameIndices();
+        const int n = static_cast<int>(filtered.size());
+        if (n == 0) return;
+
+        game_index_ = std::clamp(game_index_, 0, n - 1);
+        const int realIdx = filtered[game_index_];
         GameEntry curGame;
         {
             std::lock_guard<std::mutex> lock(data_mutex_);
-            n = static_cast<int>(games_.size());
-            if (n > 0) {
-                game_index_ = std::clamp(game_index_, 0, n - 1);
-                curGame = games_[game_index_];
+            if (realIdx < static_cast<int>(games_.size())) {
+                curGame = games_[realIdx];
             }
         }
-        if (n == 0) return;
 
         auto ensureGameVisible = [&]() {
-            const float rowStep = 59.0f;
-            const float viewH = ComputeMetrics().bodyH - 44.0f;
+            const float rowStep = 60.0f;
+            const float viewH = ComputeMetrics().bodyH - (has_arcade_games_ ? 80.0f : 42.0f);
             const float itemTop = static_cast<float>(game_index_) * rowStep;
             const float itemBot = itemTop + 54.0f;
             if (itemTop < game_scroll_target_y_) game_scroll_target_y_ = itemTop;
@@ -2832,10 +3819,10 @@ void Ps2Renderer::OnKey(int key) {
             ensureGameVisible();
             HostPlaySfx(SFX_MOVE);
         } else if (key == KEY_CONFIRM || key == KEY_START) {
-            ActivateGameLaunch(game_index_);
+            ActivateGameLaunch(realIdx);
         } else if (key == KEY_SECONDARY) {
             if (curGame.latestSaveSlot >= 0) {
-                const bool isBlueCd = (curGame.fileSizeBytes > 0 && curGame.fileSizeBytes < 750LL * 1024LL * 1024LL);
+                const bool isBlueCd = (!curGame.isArcade && curGame.fileSizeBytes > 0 && curGame.fileSizeBytes < 750LL * 1024LL * 1024LL);
                 StartLaunchQuickSave(curGame.path, curGame.latestSaveSlot, curGame.title, curGame.serial, curGame.coverPath, isBlueCd);
             } else {
                 HostPlaySfx(SFX_ERROR);
@@ -2848,8 +3835,38 @@ void Ps2Renderer::OnKey(int key) {
         return;
     }
 
-    // Browser Screen (Quick Saves + PS2 Memory Cards)
     if (screen_ == SCREEN_BROWSER) {
+        // Inside an opened PS2 Memory Card showing 3D animated save icons
+        if (mc_tab_ == 2 && mc_open_slot_ > 0) {
+            if (key == KEY_BACK) {
+                mc_open_slot_ = 0;
+                cursor_pos_init_ = false;
+                HostPlaySfx(SFX_CANCEL);
+                return;
+            }
+            int nSaves = 0;
+            {
+                std::lock_guard<std::mutex> lock(data_mutex_);
+                nSaves = static_cast<int>((mc_open_slot_ == 1 ? slot1_contents_ : slot2_contents_).saves.size());
+            }
+            if (nSaves <= 0) return;
+            const int cols = (screen_width_ >= 800.0f) ? 5 : 4;
+            if (key == KEY_LEFT) {
+                mc_inner_idx_ = (mc_inner_idx_ - 1 + nSaves) % nSaves;
+                HostPlaySfx(SFX_MOVE);
+            } else if (key == KEY_RIGHT) {
+                mc_inner_idx_ = (mc_inner_idx_ + 1) % nSaves;
+                HostPlaySfx(SFX_MOVE);
+            } else if (key == KEY_UP) {
+                mc_inner_idx_ = (mc_inner_idx_ - cols + nSaves * 2) % nSaves;
+                HostPlaySfx(SFX_MOVE);
+            } else if (key == KEY_DOWN) {
+                mc_inner_idx_ = (mc_inner_idx_ + cols) % nSaves;
+                HostPlaySfx(SFX_MOVE);
+            }
+            return;
+        }
+
         if (key == KEY_BACK) {
             if (mc_focus_pane_ == 1) {
                 mc_focus_pane_ = 0;
@@ -2864,6 +3881,7 @@ void Ps2Renderer::OnKey(int key) {
             mc_tab_ = (mc_tab_ + 2) % 3;
             mc_focus_pane_ = 0;
             mc_page_ = 0;
+            cursor_pos_init_ = false;
             HostPlaySfx(SFX_MOVE);
             return;
         }
@@ -2871,14 +3889,18 @@ void Ps2Renderer::OnKey(int key) {
             mc_tab_ = (mc_tab_ + 1) % 3;
             mc_focus_pane_ = 0;
             mc_page_ = 0;
+            cursor_pos_init_ = false;
             HostPlaySfx(SFX_MOVE);
             return;
         }
         if (mc_tab_ == 2) {
             int cardCount = 0;
+            bool slot1Mounted = false, slot2Mounted = false;
             {
                 std::lock_guard<std::mutex> lock(data_mutex_);
                 cardCount = static_cast<int>(memcards_.size());
+                slot1Mounted = !slot1_card_name_.empty();
+                slot2Mounted = !slot2_card_name_.empty();
             }
             if (key == KEY_SECONDARY) {
                 HostPlaySfx(SFX_CONFIRM);
@@ -2899,8 +3921,17 @@ void Ps2Renderer::OnKey(int key) {
                     mc_card_pane_ = 1;
                     HostPlaySfx(SFX_MOVE);
                 } else if (key == KEY_CONFIRM || key == KEY_START) {
-                    HostPlaySfx(SFX_CONFIRM);
-                    HostNotifyMemoryCardAction(MC_ACTION_CYCLE_SLOT, mc_card_slot_idx_ + 1, 0, 0);
+                    bool mounted = (mc_card_slot_idx_ == 0) ? slot1Mounted : slot2Mounted;
+                    if (mounted) {
+                        mc_open_slot_ = mc_card_slot_idx_ + 1;
+                        mc_inner_idx_ = 0;
+                        mc_inner_page_ = 0;
+                        cursor_pos_init_ = false;
+                        HostPlaySfx(SFX_CONFIRM);
+                    } else {
+                        HostPlaySfx(SFX_CONFIRM);
+                        HostNotifyMemoryCardAction(MC_ACTION_CYCLE_SLOT, mc_card_slot_idx_ + 1, 0, 0);
+                    }
                 }
             } else {
                 if (key == KEY_UP) {
@@ -2928,49 +3959,25 @@ void Ps2Renderer::OnKey(int key) {
         const int totalFiltered = static_cast<int>(filtered.size());
         const int cols = (screen_width_ >= 780.0f) ? 4 : 3;
         const int perPage = cols * 3;
-        const int totalPages = std::max(1, (totalFiltered + perPage - 1) / perPage);
         const int curFilteredPos = mc_page_ * perPage + mc_slot_index_;
         const bool hasSave = (curFilteredPos >= 0 && curFilteredPos < totalFiltered);
 
         if (mc_focus_pane_ == 0) {
             const int col = mc_slot_index_ % cols;
             if (key == KEY_LEFT) {
-                if (col > 0) {
-                    mc_slot_index_--;
-                    HostPlaySfx(SFX_MOVE);
-                } else if (mc_page_ > 0) {
-                    mc_page_--;
-                    mc_slot_index_ += (cols - 1);
-                    HostPlaySfx(SFX_MOVE);
-                }
+                if (col > 0) { mc_slot_index_--; HostPlaySfx(SFX_MOVE); }
+                else if (mc_page_ > 0) { mc_page_--; mc_slot_index_ += (cols - 1); HostPlaySfx(SFX_MOVE); }
             } else if (key == KEY_RIGHT) {
-                if (col < cols - 1) {
-                    mc_slot_index_++;
-                    HostPlaySfx(SFX_MOVE);
-                } else {
-                    mc_focus_pane_ = 1;
-                    mc_action_idx_ = hasSave ? 0 : 2;
-                    HostPlaySfx(SFX_MOVE);
-                }
+                if (col < cols - 1) { mc_slot_index_++; HostPlaySfx(SFX_MOVE); }
+                else { mc_focus_pane_ = 1; mc_action_idx_ = hasSave ? 0 : 2; HostPlaySfx(SFX_MOVE); }
             } else if (key == KEY_UP) {
-                if (mc_slot_index_ >= cols) {
-                    mc_slot_index_ -= cols;
-                    HostPlaySfx(SFX_MOVE);
-                }
+                if (mc_slot_index_ >= cols) { mc_slot_index_ -= cols; HostPlaySfx(SFX_MOVE); }
             } else if (key == KEY_DOWN) {
-                if (mc_slot_index_ + cols < perPage) {
-                    mc_slot_index_ += cols;
-                    HostPlaySfx(SFX_MOVE);
-                }
+                if (mc_slot_index_ + cols < perPage) { mc_slot_index_ += cols; HostPlaySfx(SFX_MOVE); }
             } else if (key == KEY_CONFIRM || key == KEY_START) {
                 if (hasSave) {
-                    if (key == KEY_START) {
-                        StartLaunchSave(curFilteredPos);
-                    } else {
-                        mc_focus_pane_ = 1;
-                        mc_action_idx_ = 0;
-                        HostPlaySfx(SFX_CONFIRM);
-                    }
+                    if (key == KEY_START) StartLaunchSave(curFilteredPos);
+                    else { mc_focus_pane_ = 1; mc_action_idx_ = 0; HostPlaySfx(SFX_CONFIRM); }
                 } else {
                     HostPlaySfx(SFX_ERROR);
                 }
@@ -2982,25 +3989,16 @@ void Ps2Renderer::OnKey(int key) {
             }
         } else {
             if (key == KEY_LEFT) {
-                if (mc_action_idx_ > 0) {
-                    mc_action_idx_--;
-                    HostPlaySfx(SFX_MOVE);
-                } else {
-                    mc_focus_pane_ = 0;
-                    HostPlaySfx(SFX_MOVE);
-                }
+                if (mc_action_idx_ > 0) { mc_action_idx_--; HostPlaySfx(SFX_MOVE); }
+                else { mc_focus_pane_ = 0; HostPlaySfx(SFX_MOVE); }
             } else if (key == KEY_RIGHT) {
-                if (mc_action_idx_ < 2) {
-                    mc_action_idx_++;
-                    HostPlaySfx(SFX_MOVE);
-                }
+                if (mc_action_idx_ < 2) { mc_action_idx_++; HostPlaySfx(SFX_MOVE); }
             } else if (key == KEY_UP) {
                 mc_focus_pane_ = 0;
                 HostPlaySfx(SFX_MOVE);
             } else if (key == KEY_CONFIRM) {
-                if (mc_action_idx_ == 0 && hasSave) {
-                    StartLaunchSave(curFilteredPos);
-                } else if (mc_action_idx_ == 1 && hasSave) {
+                if (mc_action_idx_ == 0 && hasSave) StartLaunchSave(curFilteredPos);
+                else if (mc_action_idx_ == 1 && hasSave) {
                     pending_delete_save_idx_ = filtered[curFilteredPos];
                     dialog_btn_ = 1;
                     overlay_ = OVERLAY_DELETE_SAVE_CONFIRM;
@@ -3013,11 +4011,9 @@ void Ps2Renderer::OnKey(int key) {
                 }
             }
         }
-        (void)totalPages;
         return;
     }
 
-    // Settings Screen
     if (screen_ == SCREEN_SETTINGS) {
         if (key == KEY_BACK) {
             SwitchScreen(SCREEN_MAIN_MENU);
@@ -3025,8 +4021,8 @@ void Ps2Renderer::OnKey(int key) {
             return;
         }
         auto ensureSettingVisible = [&]() {
-            const float rowStep = 49.0f;
-            const float viewH = ComputeMetrics().bodyH - 42.0f;
+            const float rowStep = 48.0f;
+            const float viewH = ComputeMetrics().bodyH - 40.0f;
             const float top = static_cast<float>(settings_index_) * rowStep;
             const float bot = top + 44.0f;
             if (top < settings_scroll_target_y_) settings_scroll_target_y_ = top;
@@ -3059,11 +4055,11 @@ void Ps2Renderer::OnTouchDown(float normX, float normY) {
     touch_drag_target_ = 0;
 
     if (overlay_ == OVERLAY_NONE) {
-        if (screen_ == SCREEN_GAMES && vx < screen_width_ * 0.56f) {
+        if (screen_ == SCREEN_GAMES && vx < screen_width_ * 0.52f) {
             touch_drag_target_ = 1;
-        } else if (screen_ == SCREEN_SETTINGS) {
+        } else if (screen_ == SCREEN_SETTINGS && vx > screen_width_ * 0.34f) {
             touch_drag_target_ = 2;
-        } else if (screen_ == SCREEN_BROWSER && mc_tab_ == 2 && vy > 250.0f) {
+        } else if (screen_ == SCREEN_BROWSER && mc_tab_ == 2 && mc_open_slot_ == 0 && vy > 275.0f) {
             touch_drag_target_ = 3;
         }
     }
@@ -3103,7 +4099,7 @@ void Ps2Renderer::OnTouchUp(float normX, float normY) {
 
     if (boot_active_) {
         boot_active_ = false;
-        screen_fade_t_ = 0.45f;
+        screen_fade_t_ = 0.55f;
         return;
     }
 
@@ -3149,9 +4145,20 @@ void Ps2Renderer::OnTouchUp(float normX, float normY) {
             OnKey(KEY_CONFIRM);
             break;
 
+        case HIT_GAME_TAB:
+            if (game_tab_ != hit->index) {
+                game_tab_ = std::clamp(hit->index, 0, 1);
+                game_index_ = 0;
+                game_scroll_target_y_ = 0.0f;
+                last_disc_game_idx_ = -1;
+                cursor_pos_init_ = false;
+                HostPlaySfx(SFX_MOVE);
+            }
+            break;
+
         case HIT_GAME_ROW:
             if (game_index_ == hit->index) {
-                ActivateGameLaunch(hit->index);
+                ActivateGameLaunch(SelectedMasterGameIndex());
             } else {
                 game_index_ = hit->index;
                 HostPlaySfx(SFX_MOVE);
@@ -3189,10 +4196,73 @@ void Ps2Renderer::OnTouchUp(float normX, float normY) {
 
         case HIT_MC_TAB:
             mc_tab_ = hit->index;
+            mc_open_slot_ = 0;
             mc_focus_pane_ = 0;
             mc_page_ = 0;
+            cursor_pos_init_ = false;
             HostPlaySfx(SFX_MOVE);
             break;
+
+        case HIT_MC_OPEN_SLOT: {
+            mc_card_pane_ = 0;
+            bool mounted = false;
+            {
+                std::lock_guard<std::mutex> lock(data_mutex_);
+                mounted = (hit->index == 0) ? !slot1_card_name_.empty() : !slot2_card_name_.empty();
+            }
+            if (mc_card_slot_idx_ == hit->index) {
+                if (mounted) {
+                    mc_open_slot_ = hit->index + 1;
+                    mc_inner_idx_ = 0;
+                    mc_inner_page_ = 0;
+                    cursor_pos_init_ = false;
+                    HostPlaySfx(SFX_CONFIRM);
+                } else {
+                    HostPlaySfx(SFX_CONFIRM);
+                    HostNotifyMemoryCardAction(MC_ACTION_CYCLE_SLOT, mc_card_slot_idx_ + 1, 0, 0);
+                }
+            } else {
+                mc_card_slot_idx_ = hit->index;
+                HostPlaySfx(SFX_MOVE);
+            }
+            break;
+        }
+
+        case HIT_MC_INNER_ICON:
+            mc_inner_idx_ = hit->index;
+            HostPlaySfx(SFX_MOVE);
+            break;
+
+        case HIT_MC_INNER_BACK:
+            mc_open_slot_ = 0;
+            cursor_pos_init_ = false;
+            HostPlaySfx(SFX_CANCEL);
+            break;
+
+        case HIT_MC_INNER_PREV:
+            if (mc_inner_page_ > 0) {
+                mc_inner_page_--;
+                const int cols = (screen_width_ >= 800.0f) ? 5 : 4;
+                mc_inner_idx_ = mc_inner_page_ * cols * 3;
+                HostPlaySfx(SFX_MOVE);
+            }
+            break;
+
+        case HIT_MC_INNER_NEXT: {
+            int nSaves = 0;
+            {
+                std::lock_guard<std::mutex> lock(data_mutex_);
+                nSaves = static_cast<int>((mc_open_slot_ == 1 ? slot1_contents_ : slot2_contents_).saves.size());
+            }
+            const int cols = (screen_width_ >= 800.0f) ? 5 : 4;
+            const int totalPages = std::max(1, (nSaves + cols * 3 - 1) / (cols * 3));
+            if (mc_inner_page_ + 1 < totalPages) {
+                mc_inner_page_++;
+                mc_inner_idx_ = mc_inner_page_ * cols * 3;
+                HostPlaySfx(SFX_MOVE);
+            }
+            break;
+        }
 
         case HIT_MC_BLOCK:
             mc_focus_pane_ = 0;
@@ -3218,33 +4288,16 @@ void Ps2Renderer::OnTouchUp(float normX, float normY) {
             break;
 
         case HIT_MC_PAGE_PREV:
-            if (mc_page_ > 0) {
-                mc_page_--;
-                HostPlaySfx(SFX_MOVE);
-            }
+            if (mc_page_ > 0) { mc_page_--; HostPlaySfx(SFX_MOVE); }
             break;
 
         case HIT_MC_PAGE_NEXT: {
             const int totalFiltered = static_cast<int>(FilteredSaveIndices().size());
             const int cols = (screen_width_ >= 780.0f) ? 4 : 3;
             const int totalPages = std::max(1, (totalFiltered + (cols * 3) - 1) / (cols * 3));
-            if (mc_page_ + 1 < totalPages) {
-                mc_page_++;
-                HostPlaySfx(SFX_MOVE);
-            }
+            if (mc_page_ + 1 < totalPages) { mc_page_++; HostPlaySfx(SFX_MOVE); }
             break;
         }
-
-        case HIT_CARD_SLOT:
-            mc_card_pane_ = 0;
-            if (mc_card_slot_idx_ == hit->index) {
-                HostPlaySfx(SFX_CONFIRM);
-                HostNotifyMemoryCardAction(MC_ACTION_CYCLE_SLOT, mc_card_slot_idx_ + 1, 0, 0);
-            } else {
-                mc_card_slot_idx_ = hit->index;
-                HostPlaySfx(SFX_MOVE);
-            }
-            break;
 
         case HIT_CARD_TOOL:
             if (hit->index == 0) {
@@ -3282,10 +4335,6 @@ void Ps2Renderer::OnTouchUp(float normX, float normY) {
             break;
 
         case HIT_SETTING_RIGHT:
-            settings_index_ = hit->index;
-            CycleSetting(hit->index, 1);
-            break;
-
         case HIT_SETTING_ROW:
             settings_index_ = hit->index;
             CycleSetting(hit->index, 1);
@@ -3336,16 +4385,19 @@ void Ps2Renderer::OnTouchLongPress(float normX, float normY) {
         card_action_menu_idx_ = 0;
         overlay_ = OVERLAY_CARD_ACTIONS;
         HostPlaySfx(SFX_CONFIRM);
+    } else if (hit->kind == HIT_MC_OPEN_SLOT) {
+        HostPlaySfx(SFX_CONFIRM);
+        HostNotifyMemoryCardAction(MC_ACTION_CYCLE_SLOT, hit->index + 1, 0, 0);
     }
 }
 
 void Ps2Renderer::SetStrings(std::unordered_map<std::string, std::string> strings) {
-    std::lock_guard<std::mutex> lock(data_mutex_);
+    std::lock_guard<std::mutex> lock(strings_mutex_);
     strings_ = std::move(strings);
 }
 
 std::string Ps2Renderer::TextOr(const std::string& key, const char* fallback) const {
-    std::lock_guard<std::mutex> lock(data_mutex_);
+    std::lock_guard<std::mutex> lock(strings_mutex_);
     auto it = strings_.find(key);
     if (it != strings_.end() && !it->second.empty()) {
         return it->second;
@@ -3354,15 +4406,75 @@ std::string Ps2Renderer::TextOr(const std::string& key, const char* fallback) co
 }
 
 void Ps2Renderer::SetGames(std::vector<GameEntry> games) {
+    std::string targetPath = pending_restore_game_path_;
+    if (targetPath.empty()) {
+        const int curMaster = SelectedMasterGameIndex();
+        if (curMaster >= 0) {
+            std::lock_guard<std::mutex> lock(data_mutex_);
+            if (curMaster < static_cast<int>(games_.size())) {
+                targetPath = games_[curMaster].path;
+            }
+        }
+        if (targetPath.empty()) {
+            targetPath = selected_game_path_;
+        }
+    }
+
+    bool hasArcade = false;
+    bool hasPs2 = false;
+    for (auto& g : games) {
+        g.isArcade = IsArcadeEntry(g);
+        if (g.isArcade) hasArcade = true;
+        else hasPs2 = true;
+    }
+    int matchedMasterIdx = -1;
+    bool matchedIsArcade = false;
     {
         std::lock_guard<std::mutex> lock(data_mutex_);
         for (const auto& g : games) {
             if (!g.coverPath.empty()) dirty_image_paths_.insert(g.coverPath);
         }
+        has_arcade_games_ = hasArcade;
+        if (!hasArcade) game_tab_ = 0;
+        else if (!hasPs2) game_tab_ = 1;
         games_ = std::move(games);
         if (!dirty_image_paths_.empty()) image_cache_dirty_ = true;
+
+        if (!targetPath.empty()) {
+            for (int i = 0; i < static_cast<int>(games_.size()); ++i) {
+                if (games_[i].path == targetPath) {
+                    matchedMasterIdx = i;
+                    matchedIsArcade = games_[i].isArcade;
+                    break;
+                }
+            }
+        }
     }
-    ClampSelectionIndices();
+
+    if (matchedMasterIdx >= 0) {
+        if (hasArcade) {
+            game_tab_ = matchedIsArcade ? 1 : 0;
+        }
+        const std::vector<int> filtered = FilteredGameIndices();
+        for (int fi = 0; fi < static_cast<int>(filtered.size()); ++fi) {
+            if (filtered[fi] == matchedMasterIdx) {
+                game_index_ = fi;
+                break;
+            }
+        }
+        selected_game_path_ = targetPath;
+        pending_restore_game_path_.clear();
+        pending_restore_game_index_ = -1;
+        SnapGameScrollToSelected();
+        ClampSelectionIndices();
+    } else if (pending_restore_game_index_ >= 0 && !FilteredGameIndices().empty()) {
+        game_index_ = pending_restore_game_index_;
+        pending_restore_game_index_ = -1;
+        ClampSelectionIndices();
+        SnapGameScrollToSelected();
+    } else {
+        ClampSelectionIndices();
+    }
     RebuildTowersLayout();
 }
 
@@ -3399,6 +4511,20 @@ void Ps2Renderer::SetMemoryCards(
     ClampSelectionIndices();
 }
 
+void Ps2Renderer::SetMemoryCardContents(
+    int slot,
+    std::string cardName,
+    int freeKb,
+    int totalKb,
+    std::vector<McSaveBlockEntry> saves) {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    McSlotContents& dst = (slot == 2) ? slot2_contents_ : slot1_contents_;
+    dst.cardName = std::move(cardName);
+    dst.freeKb = freeKb;
+    dst.totalKb = totalKb;
+    dst.saves = std::move(saves);
+}
+
 void Ps2Renderer::SetSettings(const ShellSettings& settings) {
     settings_ = settings;
     settings_.theme = std::clamp(settings_.theme, 0, kThemeCount - 1);
@@ -3431,17 +4557,14 @@ void Ps2Renderer::TriggerTransition(int kind) {
     launch_dispatched_ = false;
     launch_t_ = 0.0f;
     overlay_ = OVERLAY_NONE;
-    if (kind == 1) {
+    if (kind == 1 || settings_.bootAnimMode == 2) {
         boot_active_ = false;
-        screen_fade_t_ = 0.45f;
-    } else if (settings_.bootAnimMode == 2) {
-        boot_active_ = false;
-        screen_fade_t_ = 0.45f;
+        screen_fade_t_ = 0.55f;
     } else {
         boot_active_ = true;
         boot_t_ = 0.0f;
         boot_sfx_played_ = false;
-        boot_duration_ = (settings_.bootAnimMode == 1) ? 1.15f : 2.65f;
+        boot_duration_ = (settings_.bootAnimMode == 1) ? 1.80f : 3.80f;
     }
 }
 
@@ -3452,9 +4575,50 @@ std::vector<int> Ps2Renderer::GetState() const {
 void Ps2Renderer::SetState(int screen, int mainIndex, int gameIndex, int saveIndex) {
     screen_ = std::clamp(screen, 0, 3);
     main_index_ = std::clamp(mainIndex, 0, 2);
-    game_index_ = std::max(0, gameIndex);
+    pending_restore_game_index_ = std::max(0, gameIndex);
+    game_index_ = pending_restore_game_index_;
     mc_slot_index_ = std::max(0, saveIndex);
     ClampSelectionIndices();
+    if (!FilteredGameIndices().empty()) {
+        pending_restore_game_index_ = -1;
+        SnapGameScrollToSelected();
+    }
+}
+
+void Ps2Renderer::SelectGameByPath(const std::string& path) {
+    if (path.empty()) return;
+    pending_restore_game_path_ = path;
+    selected_game_path_ = path;
+    int masterIdx = -1;
+    bool isArcade = false;
+    bool hasArcade = false;
+    {
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        hasArcade = has_arcade_games_;
+        for (int i = 0; i < static_cast<int>(games_.size()); ++i) {
+            if (games_[i].path == path) {
+                masterIdx = i;
+                isArcade = games_[i].isArcade;
+                break;
+            }
+        }
+    }
+    if (masterIdx >= 0) {
+        if (hasArcade) {
+            game_tab_ = isArcade ? 1 : 0;
+        }
+        const std::vector<int> filtered = FilteredGameIndices();
+        for (int fi = 0; fi < static_cast<int>(filtered.size()); ++fi) {
+            if (filtered[fi] == masterIdx) {
+                game_index_ = fi;
+                break;
+            }
+        }
+        pending_restore_game_path_.clear();
+        pending_restore_game_index_ = -1;
+        last_disc_game_idx_ = -1;
+        SnapGameScrollToSelected();
+    }
 }
 
 } // namespace ps2ui

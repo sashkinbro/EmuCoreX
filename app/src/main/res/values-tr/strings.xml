@@ -3186,12 +3186,12 @@
     <string name="ra_notif_hardcore_unrecognized_media">Hardcore kapatıldı. Tanınmayan ortam takıldı.</string>
 
     <!-- PS2 BIOS Native Shell -->
-    <string name="ps2ui_main_menu">Sistem Menüsü</string>
+    <string name="ps2ui_main_menu">PlayStation 2</string>
     <string name="ps2ui_menu_games">Oyunlar</string>
     <string name="ps2ui_menu_browser">Tarayıcı</string>
     <string name="ps2ui_menu_settings">Sistem Yapılandırması</string>
     <string name="ps2ui_menu_settings_sub">Tema, Ekran ve Ses</string>
-    <string name="ps2ui_boot_subtitle">PlayStation 2 Sistem Arayüzü</string>
+    <string name="ps2ui_boot_subtitle">PlayStation 2</string>
     <string name="ps2ui_hint_select">Seç</string>
     <string name="ps2ui_hint_version">Sürüm</string>
     <string name="ps2ui_hint_exit">Çıkış</string>
@@ -3234,8 +3234,8 @@
     <string name="ps2ui_mc_load">Yükle</string>
     <string name="ps2ui_mc_delete">Sil</string>
     <string name="ps2ui_mc_exit">Geri</string>
-    <string name="ps2ui_theme_ocean">Okyanus Mavisi</string>
-    <string name="ps2ui_theme_obsidian">Gece Obsidyen</string>
+    <string name="ps2ui_theme_ocean">PS2 Klasik</string>
+    <string name="ps2ui_theme_obsidian">Gece Gümüşü</string>
     <string name="ps2ui_theme_emerald">Zümrüt Matris</string>
     <string name="ps2ui_theme_crimson">Kızıl Sakura</string>
     <string name="ps2ui_theme_amethyst">Ametist Bulutsu</string>
@@ -3278,14 +3278,14 @@
     <string name="ps2ui_set_restore">Varsayılanlara Dön</string>
     <string name="ps2ui_launching_save">Hızlı Kayıt Yükleniyor...</string>
     <string name="ps2ui_launching_disc">PlayStation 2 Diski Okunuyor...</string>
-    <string name="ps2ui_exit_title">Sistem Arayüzünden Çık</string>
-    <string name="ps2ui_exit_msg">Standart oyun kütüphanesine dönülsün mü?</string>
+    <string name="ps2ui_exit_title">Çıkış</string>
+    <string name="ps2ui_exit_msg">Oyun kütüphanesine dönülsün mü?</string>
     <string name="ps2ui_del_title">Hızlı Kaydı Sil</string>
     <string name="ps2ui_del_msg">Bu kayıt kalıcı olarak silinsin mi?</string>
     <string name="ps2ui_del_card_title">Hafıza Kartını Sil</string>
     <string name="ps2ui_del_card_msg">Bu hafıza kartı kalıcı olarak silinsin mi?</string>
     <string name="ps2ui_restore_title">Varsayılanlara Dön</string>
-    <string name="ps2ui_restore_msg">Tüm PS2 arayüz ayarları sıfırlansın mı?</string>
+    <string name="ps2ui_restore_msg">Varsayılan ayarlar geri yüklensin mi?</string>
     <string name="ps2ui_yes">Evet</string>
     <string name="ps2ui_no">Hayır</string>
     <string name="ps2ui_opt_start">Diski Başlat</string>
@@ -3314,4 +3314,6 @@
     <string name="ps2ui_bios_missing">Eksik</string>
     <string name="ps2ui_slot_auto">Oto Kayıt</string>
     <string name="ps2ui_slot_fmt">Yuva %1$d</string>
+    <string name="ps2ui_mc_open_card">Kartı Aç</string>
+    <string name="ps2ui_mc_no_data">Veri yok.</string>
 </resources>

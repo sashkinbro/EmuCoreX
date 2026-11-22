@@ -3196,12 +3196,12 @@
     <string name="ra_notif_hardcore_unrecognized_media">Хардкорный режим отключён. Вставлен нераспознанный носитель.</string>
 
     <!-- PS2 BIOS Native Shell -->
-    <string name="ps2ui_main_menu">Системное меню</string>
+    <string name="ps2ui_main_menu">PlayStation 2</string>
     <string name="ps2ui_menu_games">Игры</string>
     <string name="ps2ui_menu_browser">Браузер</string>
     <string name="ps2ui_menu_settings">Конфигурация системы</string>
     <string name="ps2ui_menu_settings_sub">Тема, экран и звук</string>
-    <string name="ps2ui_boot_subtitle">Системная оболочка PlayStation 2</string>
+    <string name="ps2ui_boot_subtitle">PlayStation 2</string>
     <string name="ps2ui_hint_select">Выбрать</string>
     <string name="ps2ui_hint_version">Версия</string>
     <string name="ps2ui_hint_exit">Выход</string>
@@ -3244,8 +3244,8 @@
     <string name="ps2ui_mc_load">Загрузить</string>
     <string name="ps2ui_mc_delete">Удалить</string>
     <string name="ps2ui_mc_exit">Назад</string>
-    <string name="ps2ui_theme_ocean">Океанский синий</string>
-    <string name="ps2ui_theme_obsidian">Ночной обсидиан</string>
+    <string name="ps2ui_theme_ocean">Классический PS2</string>
+    <string name="ps2ui_theme_obsidian">Полночное серебро</string>
     <string name="ps2ui_theme_emerald">Изумрудная матрица</string>
     <string name="ps2ui_theme_crimson">Багряная сакура</string>
     <string name="ps2ui_theme_amethyst">Аметистовая туманность</string>
@@ -3288,14 +3288,14 @@
     <string name="ps2ui_set_restore">Сбросить настройки</string>
     <string name="ps2ui_launching_save">Загрузка сохранения...</string>
     <string name="ps2ui_launching_disc">Чтение диска PlayStation 2...</string>
-    <string name="ps2ui_exit_title">Выход из оболочки</string>
-    <string name="ps2ui_exit_msg">Вернуться к стандартной библиотеке игр?</string>
+    <string name="ps2ui_exit_title">Выход</string>
+    <string name="ps2ui_exit_msg">Вернуться в библиотеку игр?</string>
     <string name="ps2ui_del_title">Удалить сохранение</string>
     <string name="ps2ui_del_msg">Удалить это быстрое сохранение навсегда?</string>
     <string name="ps2ui_del_card_title">Удалить карту памяти</string>
     <string name="ps2ui_del_card_msg">Удалить эту карту памяти навсегда?</string>
     <string name="ps2ui_restore_title">Сброс настроек</string>
-    <string name="ps2ui_restore_msg">Сбросить все параметры оболочки PS2 по умолчанию?</string>
+    <string name="ps2ui_restore_msg">Сбросить настройки по умолчанию?</string>
     <string name="ps2ui_yes">Да</string>
     <string name="ps2ui_no">Нет</string>
     <string name="ps2ui_opt_start">Запустить диск</string>
@@ -3324,4 +3324,6 @@
     <string name="ps2ui_bios_missing">Отсутствует</string>
     <string name="ps2ui_slot_auto">Автосохранение</string>
     <string name="ps2ui_slot_fmt">Слот %1$d</string>
+    <string name="ps2ui_mc_open_card">Открыть карту</string>
+    <string name="ps2ui_mc_no_data">Нет данных.</string>
 </resources>

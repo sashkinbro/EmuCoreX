@@ -11,6 +11,8 @@ object Ps2ShellNative {
 
     external fun nativeInit(): Boolean
 
+    external fun nativeSetUiScale(scale: Float)
+
     external fun nativeResize(width: Int, height: Int)
 
     external fun nativeDraw()
@@ -72,6 +74,19 @@ object Ps2ShellNative {
         cardIsDefault: BooleanArray,
     )
 
+    external fun nativeSetMemoryCardContents(
+        slot: Int,
+        cardName: String,
+        freeKb: Int,
+        totalKb: Int,
+        dirNames: Array<String>,
+        titles: Array<String>,
+        sizesKb: IntArray,
+        dates: Array<String>,
+        colorsRgb: IntArray,
+        iconMeshes: Array<FloatArray?>,
+    )
+
     external fun nativeSetSettings(
         theme: Int,
         aspectMode: Int,
@@ -112,4 +127,6 @@ object Ps2ShellNative {
     external fun nativeGetState(): IntArray
 
     external fun nativeSetState(screen: Int, mainIndex: Int, gameIndex: Int, saveIndex: Int)
+
+    external fun nativeSelectGameByPath(path: String)
 }

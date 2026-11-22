@@ -3188,12 +3188,12 @@
     <string name="ra_notif_hardcore_unrecognized_media">Hardcore deaktiviert. Unbekanntes Medium eingelegt.</string>
 
     <!-- PS2 BIOS Native Shell -->
-    <string name="ps2ui_main_menu">Systemmenü</string>
+    <string name="ps2ui_main_menu">PlayStation 2</string>
     <string name="ps2ui_menu_games">Spiele</string>
     <string name="ps2ui_menu_browser">Browser</string>
     <string name="ps2ui_menu_settings">Systemkonfiguration</string>
     <string name="ps2ui_menu_settings_sub">Design, Anzeige &amp; Audio</string>
-    <string name="ps2ui_boot_subtitle">PlayStation 2 Systemoberfläche</string>
+    <string name="ps2ui_boot_subtitle">PlayStation 2</string>
     <string name="ps2ui_hint_select">Auswählen</string>
     <string name="ps2ui_hint_version">Version</string>
     <string name="ps2ui_hint_exit">Beenden</string>
@@ -3236,8 +3236,8 @@
     <string name="ps2ui_mc_load">Laden</string>
     <string name="ps2ui_mc_delete">Löschen</string>
     <string name="ps2ui_mc_exit">Zurück</string>
-    <string name="ps2ui_theme_ocean">Ozeanblau</string>
-    <string name="ps2ui_theme_obsidian">Mitternachts-Obsidian</string>
+    <string name="ps2ui_theme_ocean">PS2 Klassik</string>
+    <string name="ps2ui_theme_obsidian">Mitternachtssilber</string>
     <string name="ps2ui_theme_emerald">Smaragd-Matrix</string>
     <string name="ps2ui_theme_crimson">Karmesin-Sakura</string>
     <string name="ps2ui_theme_amethyst">Amethyst-Nebel</string>
@@ -3280,14 +3280,14 @@
     <string name="ps2ui_set_restore">Standard wiederherstellen</string>
     <string name="ps2ui_launching_save">Schnellspeicherstand wird geladen...</string>
     <string name="ps2ui_launching_disc">PlayStation 2-Disc wird gelesen...</string>
-    <string name="ps2ui_exit_title">Systemmenü verlassen</string>
-    <string name="ps2ui_exit_msg">Zur Standard-Spielebibliothek zurückkehren?</string>
+    <string name="ps2ui_exit_title">Beenden</string>
+    <string name="ps2ui_exit_msg">Zur Spielebibliothek zurückkehren?</string>
     <string name="ps2ui_del_title">Schnellstand löschen</string>
     <string name="ps2ui_del_msg">Diesen Speicherstand endgültig löschen?</string>
     <string name="ps2ui_del_card_title">Memory Card löschen</string>
     <string name="ps2ui_del_card_msg">Diese Memory Card endgültig löschen?</string>
     <string name="ps2ui_restore_title">Standardwerte laden</string>
-    <string name="ps2ui_restore_msg">Alle Einstellungen des PS2-Menüs zurücksetzen?</string>
+    <string name="ps2ui_restore_msg">Standardeinstellungen wiederherstellen?</string>
     <string name="ps2ui_yes">Ja</string>
     <string name="ps2ui_no">Nein</string>
     <string name="ps2ui_opt_start">Disc starten</string>
@@ -3316,4 +3316,6 @@
     <string name="ps2ui_bios_missing">Fehlt</string>
     <string name="ps2ui_slot_auto">Auto-Stand</string>
     <string name="ps2ui_slot_fmt">Slot %1$d</string>
+    <string name="ps2ui_mc_open_card">Karte öffnen</string>
+    <string name="ps2ui_mc_no_data">Keine Daten vorhanden.</string>
 </resources>

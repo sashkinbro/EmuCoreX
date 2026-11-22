@@ -3185,12 +3185,12 @@
     <string name="ra_notif_hardcore_unrecognized_media">하드코어가 비활성화되었습니다. 인식할 수 없는 미디어가 삽입되었습니다.</string>
 
     <!-- PS2 BIOS Native Shell -->
-    <string name="ps2ui_main_menu">시스템 메뉴</string>
+    <string name="ps2ui_main_menu">PlayStation 2</string>
     <string name="ps2ui_menu_games">게임</string>
     <string name="ps2ui_menu_browser">브라우저</string>
     <string name="ps2ui_menu_settings">시스템 설정</string>
     <string name="ps2ui_menu_settings_sub">테마, 화면 및 오디오</string>
-    <string name="ps2ui_boot_subtitle">PlayStation 2 시스템 셸</string>
+    <string name="ps2ui_boot_subtitle">PlayStation 2</string>
     <string name="ps2ui_hint_select">선택</string>
     <string name="ps2ui_hint_version">버전</string>
     <string name="ps2ui_hint_exit">종료</string>
@@ -3233,8 +3233,8 @@
     <string name="ps2ui_mc_load">불러오기</string>
     <string name="ps2ui_mc_delete">삭제</string>
     <string name="ps2ui_mc_exit">뒤로</string>
-    <string name="ps2ui_theme_ocean">오션 블루</string>
-    <string name="ps2ui_theme_obsidian">미드나잇 옵시디언</string>
+    <string name="ps2ui_theme_ocean">PS2 클래식</string>
+    <string name="ps2ui_theme_obsidian">미드나잇 실버</string>
     <string name="ps2ui_theme_emerald">에메랄드 매트릭스</string>
     <string name="ps2ui_theme_crimson">크림슨 사쿠라</string>
     <string name="ps2ui_theme_amethyst">아메시스트 네뷸라</string>
@@ -3277,14 +3277,14 @@
     <string name="ps2ui_set_restore">기본값 복원</string>
     <string name="ps2ui_launching_save">빠른 저장 불러오는 중...</string>
     <string name="ps2ui_launching_disc">PlayStation 2 디스크 읽는 중...</string>
-    <string name="ps2ui_exit_title">시스템 셸 종료</string>
-    <string name="ps2ui_exit_msg">기본 게임 라이브러리로 돌아갈까요?</string>
+    <string name="ps2ui_exit_title">종료</string>
+    <string name="ps2ui_exit_msg">게임 라이브러리로 돌아가시겠습니까?</string>
     <string name="ps2ui_del_title">빠른 저장 삭제</string>
     <string name="ps2ui_del_msg">이 저장 데이터를 영구 삭제할까요?</string>
     <string name="ps2ui_del_card_title">메모리 카드 삭제</string>
     <string name="ps2ui_del_card_msg">이 메모리 카드를 영구 삭제할까요?</string>
     <string name="ps2ui_restore_title">기본값 복원</string>
-    <string name="ps2ui_restore_msg">PS2 시스템 셸 설정을 초기화할까요?</string>
+    <string name="ps2ui_restore_msg">기본 설정으로 복원하시겠습니까?</string>
     <string name="ps2ui_yes">예</string>
     <string name="ps2ui_no">아니요</string>
     <string name="ps2ui_opt_start">디스크 실행</string>
@@ -3313,4 +3313,6 @@
     <string name="ps2ui_bios_missing">없음</string>
     <string name="ps2ui_slot_auto">자동 저장</string>
     <string name="ps2ui_slot_fmt">슬롯 %1$d</string>
+    <string name="ps2ui_mc_open_card">카드 열기</string>
+    <string name="ps2ui_mc_no_data">데이터가 없습니다.</string>
 </resources>

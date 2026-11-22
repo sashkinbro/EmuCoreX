@@ -3206,12 +3206,12 @@
     <string name="ra_notif_hardcore_unrecognized_media">Hardcore vypnut. Vložen nerozpoznaný disk.</string>
 
     <!-- PS2 BIOS Native Shell -->
-    <string name="ps2ui_main_menu">Systémové menu</string>
+    <string name="ps2ui_main_menu">PlayStation 2</string>
     <string name="ps2ui_menu_games">Hry</string>
     <string name="ps2ui_menu_browser">Prohlížeč</string>
     <string name="ps2ui_menu_settings">Konfigurace systému</string>
     <string name="ps2ui_menu_settings_sub">Motiv, obraz a zvuk</string>
-    <string name="ps2ui_boot_subtitle">Systémové rozhraní PlayStation 2</string>
+    <string name="ps2ui_boot_subtitle">PlayStation 2</string>
     <string name="ps2ui_hint_select">Potvrdit</string>
     <string name="ps2ui_hint_version">Verze</string>
     <string name="ps2ui_hint_exit">Ukončit</string>
@@ -3254,8 +3254,8 @@
     <string name="ps2ui_mc_load">Načíst</string>
     <string name="ps2ui_mc_delete">Smazat</string>
     <string name="ps2ui_mc_exit">Zpět</string>
-    <string name="ps2ui_theme_ocean">Oceánově modrá</string>
-    <string name="ps2ui_theme_obsidian">Půlnoční obsidián</string>
+    <string name="ps2ui_theme_ocean">Klasické PS2</string>
+    <string name="ps2ui_theme_obsidian">Půlnoční stříbrná</string>
     <string name="ps2ui_theme_emerald">Smaragdový matrix</string>
     <string name="ps2ui_theme_crimson">Karmínová sakura</string>
     <string name="ps2ui_theme_amethyst">Ametystová mlhovina</string>
@@ -3298,14 +3298,14 @@
     <string name="ps2ui_set_restore">Obnovit výchozí</string>
     <string name="ps2ui_launching_save">Načítání rychlé pozice...</string>
     <string name="ps2ui_launching_disc">Čtení disku PlayStation 2...</string>
-    <string name="ps2ui_exit_title">Ukončit systémové menu</string>
-    <string name="ps2ui_exit_msg">Vrátit se do standardní knihovny her?</string>
+    <string name="ps2ui_exit_title">Konec</string>
+    <string name="ps2ui_exit_msg">Vrátit se do knihovny her?</string>
     <string name="ps2ui_del_title">Smazat rychlou pozici</string>
     <string name="ps2ui_del_msg">Smazat tuto pozici trvale?</string>
     <string name="ps2ui_del_card_title">Smazat paměťovou kartu</string>
     <string name="ps2ui_del_card_msg">Smazat tuto paměťovou kartu trvale?</string>
     <string name="ps2ui_restore_title">Obnovit výchozí</string>
-    <string name="ps2ui_restore_msg">Obnovit všechna nastavení PS2 menu na výchozí?</string>
+    <string name="ps2ui_restore_msg">Obnovit výchozí nastavení?</string>
     <string name="ps2ui_yes">Ano</string>
     <string name="ps2ui_no">Ne</string>
     <string name="ps2ui_opt_start">Spustit disk</string>
@@ -3334,4 +3334,6 @@
     <string name="ps2ui_bios_missing">Chybí</string>
     <string name="ps2ui_slot_auto">Automatická</string>
     <string name="ps2ui_slot_fmt">Slot %1$d</string>
+    <string name="ps2ui_mc_open_card">Otevřít kartu</string>
+    <string name="ps2ui_mc_no_data">Žádná data.</string>
 </resources>

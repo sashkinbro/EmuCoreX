@@ -3186,12 +3186,12 @@
     <string name="ra_notif_hardcore_unrecognized_media">हार्डकोर बंद किया गया। अज्ञात मीडिया डाला गया।</string>
 
     <!-- PS2 BIOS Native Shell -->
-    <string name="ps2ui_main_menu">सिस्टम मेनू</string>
+    <string name="ps2ui_main_menu">PlayStation 2</string>
     <string name="ps2ui_menu_games">गेम्स</string>
     <string name="ps2ui_menu_browser">ब्राउज़र</string>
     <string name="ps2ui_menu_settings">सिस्टम कॉन्फ़िगरेशन</string>
     <string name="ps2ui_menu_settings_sub">थीम, डिस्प्ले और ऑडियो</string>
-    <string name="ps2ui_boot_subtitle">PlayStation 2 सिस्टम शेल</string>
+    <string name="ps2ui_boot_subtitle">PlayStation 2</string>
     <string name="ps2ui_hint_select">चुनें</string>
     <string name="ps2ui_hint_version">संस्करण</string>
     <string name="ps2ui_hint_exit">बाहर</string>
@@ -3234,8 +3234,8 @@
     <string name="ps2ui_mc_load">लोड करें</string>
     <string name="ps2ui_mc_delete">हटाएं</string>
     <string name="ps2ui_mc_exit">वापस</string>
-    <string name="ps2ui_theme_ocean">ओशन ब्लू</string>
-    <string name="ps2ui_theme_obsidian">मिडनाइट ऑब्सीडियन</string>
+    <string name="ps2ui_theme_ocean">PS2 क्लासिक</string>
+    <string name="ps2ui_theme_obsidian">मिडनाइट सिल्वर</string>
     <string name="ps2ui_theme_emerald">एमराल्ड मैट्रिक्स</string>
     <string name="ps2ui_theme_crimson">क्रिमसन सकुरा</string>
     <string name="ps2ui_theme_amethyst">एमेथिस्ट नेबुला</string>
@@ -3278,14 +3278,14 @@
     <string name="ps2ui_set_restore">डिफ़ॉल्ट रीसेट</string>
     <string name="ps2ui_launching_save">क्विक सेव लोड हो रहा है...</string>
     <string name="ps2ui_launching_disc">PlayStation 2 डिस्क पढ़ा जा रहा है...</string>
-    <string name="ps2ui_exit_title">सिस्टम शेल से बाहर</string>
-    <string name="ps2ui_exit_msg">सामान्य गेम लाइब्रेरी पर लौटें?</string>
+    <string name="ps2ui_exit_title">बाहर निकलें</string>
+    <string name="ps2ui_exit_msg">गेम लाइब्रेरी पर वापस जाएं?</string>
     <string name="ps2ui_del_title">क्विक सेव हटाएं</string>
     <string name="ps2ui_del_msg">क्या इस सेव को हमेशा के लिए हटाएं?</string>
     <string name="ps2ui_del_card_title">मेमोरी कार्ड हटाएं</string>
     <string name="ps2ui_del_card_msg">क्या इस मेमोरी कार्ड को हमेशा के लिए हटाएं?</string>
     <string name="ps2ui_restore_title">डिफ़ॉल्ट बहाल करें</string>
-    <string name="ps2ui_restore_msg">सभी PS2 शेल सेटिंग्स रीसेट करें?</string>
+    <string name="ps2ui_restore_msg">डिफ़ॉल्ट सेटिंग्स पुनर्स्थापित करें?</string>
     <string name="ps2ui_yes">हाँ</string>
     <string name="ps2ui_no">नहीं</string>
     <string name="ps2ui_opt_start">डिस्क शुरू करें</string>
@@ -3314,4 +3314,6 @@
     <string name="ps2ui_bios_missing">अनुपलब्ध</string>
     <string name="ps2ui_slot_auto">ऑटो सेव</string>
     <string name="ps2ui_slot_fmt">स्लॉट %1$d</string>
+    <string name="ps2ui_mc_open_card">कार्ड खोलें</string>
+    <string name="ps2ui_mc_no_data">कोई डेटा नहीं है।</string>
 </resources>

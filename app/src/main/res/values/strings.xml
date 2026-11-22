@@ -3212,12 +3212,12 @@
     <string name="ra_notif_hardcore_unrecognized_media">Hardcore disabled. Unrecognized media inserted.</string>
 
     <!-- PS2 BIOS Native Shell -->
-    <string name="ps2ui_main_menu">System Shell</string>
+    <string name="ps2ui_main_menu">PlayStation 2</string>
     <string name="ps2ui_menu_games">Games</string>
     <string name="ps2ui_menu_browser">Browser</string>
     <string name="ps2ui_menu_settings">System Configuration</string>
     <string name="ps2ui_menu_settings_sub">Theme, Display &amp; Audio</string>
-    <string name="ps2ui_boot_subtitle">PlayStation 2 System Shell</string>
+    <string name="ps2ui_boot_subtitle">PlayStation 2</string>
     <string name="ps2ui_hint_select">Enter</string>
     <string name="ps2ui_hint_version">Version</string>
     <string name="ps2ui_hint_exit">Exit</string>
@@ -3260,8 +3260,8 @@
     <string name="ps2ui_mc_load">Load</string>
     <string name="ps2ui_mc_delete">Delete</string>
     <string name="ps2ui_mc_exit">Back</string>
-    <string name="ps2ui_theme_ocean">Ocean Blue</string>
-    <string name="ps2ui_theme_obsidian">Midnight Obsidian</string>
+    <string name="ps2ui_theme_ocean">PS2 Classic</string>
+    <string name="ps2ui_theme_obsidian">Midnight Silver</string>
     <string name="ps2ui_theme_emerald">Emerald Matrix</string>
     <string name="ps2ui_theme_crimson">Crimson Sakura</string>
     <string name="ps2ui_theme_amethyst">Amethyst Nebula</string>
@@ -3304,14 +3304,14 @@
     <string name="ps2ui_set_restore">Restore Defaults</string>
     <string name="ps2ui_launching_save">Loading Quick Save...</string>
     <string name="ps2ui_launching_disc">Reading PlayStation 2 Disc...</string>
-    <string name="ps2ui_exit_title">Exit System Shell</string>
-    <string name="ps2ui_exit_msg">Return to the standard game library?</string>
+    <string name="ps2ui_exit_title">Exit</string>
+    <string name="ps2ui_exit_msg">Return to game library?</string>
     <string name="ps2ui_del_title">Delete Quick Save</string>
     <string name="ps2ui_del_msg">Delete this save state permanently?</string>
     <string name="ps2ui_del_card_title">Delete Memory Card</string>
     <string name="ps2ui_del_card_msg">Delete this memory card permanently?</string>
     <string name="ps2ui_restore_title">Restore Defaults</string>
-    <string name="ps2ui_restore_msg">Reset all PS2 System Shell settings to default?</string>
+    <string name="ps2ui_restore_msg">Restore default settings?</string>
     <string name="ps2ui_yes">Yes</string>
     <string name="ps2ui_no">No</string>
     <string name="ps2ui_opt_start">Start Disc</string>
@@ -3340,4 +3340,6 @@
     <string name="ps2ui_bios_missing">Missing</string>
     <string name="ps2ui_slot_auto">Auto Save</string>
     <string name="ps2ui_slot_fmt">Slot %1$d</string>
+    <string name="ps2ui_mc_open_card">Open Card</string>
+    <string name="ps2ui_mc_no_data">There is no data.</string>
 </resources>

@@ -25,18 +25,31 @@ android {
         }
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     buildTypes {
         debug {
             externalNativeBuild {
                 cmake {
                     cppFlags += "-O3"
+                    arguments += listOf(
+                        "-DPS2UI_ENABLE_LTO=ON",
+                        "-DPS2UI_DISABLE_LOGS=OFF",
+                    )
                 }
             }
         }
         release {
             externalNativeBuild {
                 cmake {
-                    arguments += listOf("-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O3 -g -DNDEBUG")
+                    arguments += listOf(
+                        "-DPS2UI_ENABLE_LTO=ON",
+                        "-DPS2UI_DISABLE_LOGS=ON",
+                        "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O3 -DNDEBUG -DPS2UI_DISABLE_LOGS=1",
+                        "-DCMAKE_CXX_FLAGS_RELEASE=-O3 -DNDEBUG -DPS2UI_DISABLE_LOGS=1",
+                    )
                 }
             }
         }

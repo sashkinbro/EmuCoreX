@@ -5,6 +5,7 @@ project(emucorex_ps2ui CXX)
 add_link_options("-Wl,-z,max-page-size=16384" "-Wl,-z,common-page-size=16384")
 
 option(PS2UI_ENABLE_LTO "Enable ThinLTO for the native PS2 UI renderer" ON)
+option(PS2UI_DISABLE_LOGS "Disable all native Android logging in Release builds" OFF)
 
 add_library(emucorex_ps2ui SHARED
     ps2_jni.cpp
@@ -16,7 +17,10 @@ target_compile_options(emucorex_ps2ui PRIVATE
     -Wall -Wextra -Wno-unused-parameter
     -O3
     -fno-exceptions -fno-rtti
+    -ffunction-sections -fdata-sections
 )
+
+target_link_options(emucorex_ps2ui PRIVATE "-Wl,--gc-sections")
 
 if(PS2UI_ENABLE_LTO AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(emucorex_ps2ui PRIVATE "-flto=thin")
@@ -29,6 +33,11 @@ set_target_properties(emucorex_ps2ui PROPERTIES
 )
 
 find_library(android-lib android)
-find_library(log-lib log)
 find_library(GLESv3-lib GLESv3)
-target_link_libraries(emucorex_ps2ui PRIVATE ${android-lib} ${log-lib} ${GLESv3-lib})
+if(PS2UI_DISABLE_LOGS)
+    target_compile_definitions(emucorex_ps2ui PRIVATE PS2UI_DISABLE_LOGS=1)
+    target_link_libraries(emucorex_ps2ui PRIVATE ${android-lib} ${GLESv3-lib})
+else()
+    find_library(log-lib log)
+    target_link_libraries(emucorex_ps2ui PRIVATE ${android-lib} ${log-lib} ${GLESv3-lib})
+endif()

@@ -1,6 +1,5 @@
 #include "ps2_renderer.h"
 
-#include <android/log.h>
 #include <algorithm>
 #include <cstring>
 #include <jni.h>
@@ -8,8 +7,13 @@
 #include <string>
 #include <vector>
 
+#if defined(PS2UI_DISABLE_LOGS) || defined(NDEBUG)
+#define LOGE(...) ((void)0)
+#else
+#include <android/log.h>
 #define LOG_TAG "Ps2ShellJNI"
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#endif
 
 namespace {
 
@@ -390,6 +394,12 @@ Java_com_sbro_emucorex_ps2ui_Ps2ShellNative_nativeInit(JNIEnv* /*env*/, jobject 
 }
 
 JNIEXPORT void JNICALL
+Java_com_sbro_emucorex_ps2ui_Ps2ShellNative_nativeSetUiScale(
+    JNIEnv* /*env*/, jobject /*thiz*/, jfloat scale) {
+    if (g_renderer) g_renderer->SetUiScale(scale);
+}
+
+JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_ps2ui_Ps2ShellNative_nativeResize(
     JNIEnv* /*env*/, jobject /*thiz*/, jint width, jint height) {
     if (g_renderer) g_renderer->Resize(width, height);
@@ -595,6 +605,60 @@ Java_com_sbro_emucorex_ps2ui_Ps2ShellNative_nativeSetMemoryCards(
 }
 
 JNIEXPORT void JNICALL
+Java_com_sbro_emucorex_ps2ui_Ps2ShellNative_nativeSetMemoryCardContents(
+    JNIEnv* env,
+    jobject /*thiz*/,
+    jint slot,
+    jstring cardName,
+    jint freeKb,
+    jint totalKb,
+    jobjectArray dirNames,
+    jobjectArray titles,
+    jintArray sizesKb,
+    jobjectArray dates,
+    jintArray colorsRgb,
+    jobjectArray iconMeshes) {
+    if (!g_renderer) return;
+    auto dirs = ReadStringArray(env, dirNames);
+    auto ttl = ReadStringArray(env, titles);
+    auto sz = ReadIntArray(env, sizesKb);
+    auto dt = ReadStringArray(env, dates);
+    auto col = ReadIntArray(env, colorsRgb);
+
+    const size_t n = ttl.size();
+    const jsize meshArrLen = iconMeshes ? env->GetArrayLength(iconMeshes) : 0;
+    std::vector<ps2ui::McSaveBlockEntry> saves;
+    saves.reserve(n);
+    for (size_t i = 0; i < n; ++i) {
+        ps2ui::McSaveBlockEntry entry;
+        if (i < dirs.size()) entry.dirName = dirs[i];
+        entry.title = ttl[i];
+        if (i < sz.size()) entry.sizeKb = sz[i];
+        if (i < dt.size()) entry.dateStr = dt[i];
+        if (i < col.size()) entry.colorRgb = col[i];
+        if (static_cast<jsize>(i) < meshArrLen && iconMeshes) {
+            auto* jmesh = static_cast<jfloatArray>(env->GetObjectArrayElement(iconMeshes, static_cast<jsize>(i)));
+            if (jmesh) {
+                const jsize flen = env->GetArrayLength(jmesh);
+                if (flen >= 27 && flen <= 50000) {
+                    entry.iconMesh.resize(static_cast<size_t>(flen));
+                    env->GetFloatArrayRegion(jmesh, 0, flen, entry.iconMesh.data());
+                }
+                env->DeleteLocalRef(jmesh);
+            }
+        }
+        saves.push_back(std::move(entry));
+    }
+
+    g_renderer->SetMemoryCardContents(
+        static_cast<int>(slot),
+        JstringToUtf8(env, cardName),
+        static_cast<int>(freeKb),
+        static_cast<int>(totalKb),
+        std::move(saves));
+}
+
+JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_ps2ui_Ps2ShellNative_nativeSetSettings(
     JNIEnv* /*env*/,
     jobject /*thiz*/,
@@ -698,6 +762,12 @@ JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_ps2ui_Ps2ShellNative_nativeSetState(
     JNIEnv* /*env*/, jobject /*thiz*/, jint screen, jint mainIndex, jint gameIndex, jint saveIndex) {
     if (g_renderer) g_renderer->SetState(screen, mainIndex, gameIndex, saveIndex);
+}
+
+JNIEXPORT void JNICALL
+Java_com_sbro_emucorex_ps2ui_Ps2ShellNative_nativeSelectGameByPath(
+    JNIEnv* env, jobject /*thiz*/, jstring path) {
+    if (g_renderer) g_renderer->SelectGameByPath(JstringToUtf8(env, path));
 }
 
 } // extern "C"

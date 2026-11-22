@@ -3185,12 +3185,12 @@
     <string name="ra_notif_hardcore_unrecognized_media">ハードコアを無効にしました。認識されないメディアが挿入されました。</string>
 
     <!-- PS2 BIOS Native Shell -->
-    <string name="ps2ui_main_menu">システムメニュー</string>
+    <string name="ps2ui_main_menu">PlayStation 2</string>
     <string name="ps2ui_menu_games">ゲーム</string>
     <string name="ps2ui_menu_browser">ブラウザー</string>
     <string name="ps2ui_menu_settings">システム設定</string>
     <string name="ps2ui_menu_settings_sub">テーマ・画面・サウンド</string>
-    <string name="ps2ui_boot_subtitle">PlayStation 2 システムシェル</string>
+    <string name="ps2ui_boot_subtitle">PlayStation 2</string>
     <string name="ps2ui_hint_select">決定</string>
     <string name="ps2ui_hint_version">バージョン</string>
     <string name="ps2ui_hint_exit">終了</string>
@@ -3233,8 +3233,8 @@
     <string name="ps2ui_mc_load">ロード</string>
     <string name="ps2ui_mc_delete">削除</string>
     <string name="ps2ui_mc_exit">戻る</string>
-    <string name="ps2ui_theme_ocean">オーシャンブルー</string>
-    <string name="ps2ui_theme_obsidian">ミッドナイト黒</string>
+    <string name="ps2ui_theme_ocean">PS2 クラシック</string>
+    <string name="ps2ui_theme_obsidian">ミッドナイトシルバー</string>
     <string name="ps2ui_theme_emerald">エメラルド緑</string>
     <string name="ps2ui_theme_crimson">クリムゾン桜</string>
     <string name="ps2ui_theme_amethyst">アメジスト星雲</string>
@@ -3277,14 +3277,14 @@
     <string name="ps2ui_set_restore">初期設定に戻す</string>
     <string name="ps2ui_launching_save">クイックセーブを読み込み中...</string>
     <string name="ps2ui_launching_disc">PlayStation 2 ディスクを読み込み中...</string>
-    <string name="ps2ui_exit_title">システムシェルを終了</string>
-    <string name="ps2ui_exit_msg">通常のゲームライブラリに戻りますか？</string>
+    <string name="ps2ui_exit_title">終了</string>
+    <string name="ps2ui_exit_msg">ゲームライブラリに戻りますか？</string>
     <string name="ps2ui_del_title">クイックセーブ削除</string>
     <string name="ps2ui_del_msg">このセーブデータを完全に削除しますか？</string>
     <string name="ps2ui_del_card_title">メモリーカード削除</string>
     <string name="ps2ui_del_card_msg">このメモリーカードを完全に削除しますか？</string>
     <string name="ps2ui_restore_title">設定の初期化</string>
-    <string name="ps2ui_restore_msg">PS2システムシェルの設定を初期化しますか？</string>
+    <string name="ps2ui_restore_msg">設定を初期状態に戻しますか？</string>
     <string name="ps2ui_yes">はい</string>
     <string name="ps2ui_no">いいえ</string>
     <string name="ps2ui_opt_start">ディスクを起動</string>
@@ -3313,4 +3313,6 @@
     <string name="ps2ui_bios_missing">未設定</string>
     <string name="ps2ui_slot_auto">オートセーブ</string>
     <string name="ps2ui_slot_fmt">スロット %1$d</string>
+    <string name="ps2ui_mc_open_card">カードを開く</string>
+    <string name="ps2ui_mc_no_data">データがありません。</string>
 </resources>
