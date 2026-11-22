@@ -170,6 +170,7 @@ import com.sbro.emucorex.ui.common.showNoDocumentPickerMessage
 import com.sbro.emucorex.ui.common.skipGamepadTextFieldFocus
 import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.customization.HomeBackgroundMedia
+import com.sbro.emucorex.ui.ps2shell.Ps2ShellScreen
 import com.sbro.emucorex.ui.theme.GradientEnd
 import com.sbro.emucorex.ui.theme.GradientStart
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
@@ -194,6 +195,18 @@ fun HomeScreen(
     onManageGameClick: (GameItem) -> Unit,
     onCreateShortcutClick: (GameItem) -> Unit,
     onOpenGameDbClick: (GameItem) -> Unit,
+    onGamePathClick: (String) -> Unit = { path ->
+        onGameClick(
+            GameItem(
+                title = path.substringAfterLast('/'),
+                path = path,
+                fileName = path.substringAfterLast('/'),
+                fileSize = 0L,
+                lastModified = 0L
+            )
+        )
+    },
+    onSaveSelected: (gamePath: String, slot: Int) -> Unit = { _, _ -> },
     onMenuClick: (() -> Unit)? = null,
     onShelfModeChanged: (Boolean) -> Unit = {},
     viewModel: HomeViewModel = viewModel()
@@ -512,89 +525,23 @@ fun HomeScreen(
                 },
                 topInset = topInset
             )
-        } else {
-            AnimatedContent(
-                targetState = isShelfView,
-                transitionSpec = {
-                    if (targetState) {
-                        (
-                            slideInHorizontally(
-                                initialOffsetX = { it / 5 },
-                                animationSpec = tween(190, easing = EaseOut)
-                            ) +
-                                fadeIn(animationSpec = tween(170, easing = EaseOut)) +
-                                scaleIn(
-                                    initialScale = 0.97f,
-                                    animationSpec = tween(190, easing = EaseOut)
-                                )
-                            ) togetherWith
-                            (
-                                slideOutHorizontally(
-                                    targetOffsetX = { -it / 8 },
-                                    animationSpec = tween(150, easing = EaseIn)
-                                ) +
-                                    fadeOut(animationSpec = tween(130, easing = EaseIn)) +
-                                    scaleOut(
-                                        targetScale = 0.985f,
-                                        animationSpec = tween(150, easing = EaseIn)
-                                    )
-                                )
-                    } else {
-                        (
-                            slideInHorizontally(
-                                initialOffsetX = { -it / 5 },
-                                animationSpec = tween(190, easing = EaseOut)
-                            ) +
-                                fadeIn(animationSpec = tween(170, easing = EaseOut)) +
-                                scaleIn(
-                                    initialScale = 0.985f,
-                                    animationSpec = tween(190, easing = EaseOut)
-                                )
-                            ) togetherWith
-                            (
-                                slideOutHorizontally(
-                                    targetOffsetX = { it / 5 },
-                                    animationSpec = tween(160, easing = EaseIn)
-                                ) +
-                                    fadeOut(animationSpec = tween(140, easing = EaseIn)) +
-                                    scaleOut(
-                                        targetScale = 0.97f,
-                                        animationSpec = tween(160, easing = EaseIn)
-                                    )
-                                )
-                    }
+        } else if (isShelfView) {
+            // Replace only the 3D carousel shelf with the native GLES 3.0 PS2 BIOS shell
+            // without slide/scale animations that can freeze SurfaceView BLAST crop on resize.
+            Ps2ShellScreen(
+                games = uiState.games,
+                isLoadingGames = uiState.isLoading || uiState.isBootstrapping,
+                isCoverArtDisabled = uiState.isCoverArtDisabled,
+                onGamePathSelected = onGamePathClick,
+                onSaveSelected = onSaveSelected,
+                onManageGame = onManageGameClick,
+                onExitShell = {
+                    onShelfModeChanged(false)
+                    viewModel.toggleShelfMode()
                 },
-                label = "home-library-mode"
-            ) { shelfMode ->
-                if (shelfMode) {
-                    HomeShelfMode(
-                        games = uiState.games,
-                        recentGames = uiState.recentGames,
-                        isCoverArtDisabled = uiState.isCoverArtDisabled,
-                        // Keep the outgoing shelf edge-to-edge until its exit animation finishes.
-                        // The parent state already points at the standard Home layout at that time.
-                        topInset = 0.dp,
-                        bottomInset = 0.dp,
-                        horizontalInset = horizontalInset,
-                        modifier = Modifier.fillMaxSize(),
-                        onExitShelfMode = viewModel::toggleShelfMode,
-                        onEnable3dCoverArt = viewModel::enable3dCoverArt,
-                        onGameClick = onGameClick,
-                        onLongClickStart = onGameClick,
-                        onLongClickContinue = onContinueGame,
-                        onLongClickLoadSave = onLoadSaveClick,
-                        onLongClickManage = onManageGameClick,
-                        onLongClickCreateShortcut = onCreateShortcutClick,
-                        onLongClickOpenGameDb = onOpenGameDbClick,
-                        onLongClickHide = { viewModel.setGameHidden(it, true) },
-                        onShowHiddenGames = onShowHiddenGames,
-                        onLongClickCustomCover = { game ->
-                            gameAwaitingPickerLaunch = game
-                        },
-                        onLongClickRestoreCover = { game -> restoreCustomCover(game) },
-                        onLongClickChangeSerial = requestSerialChange
-                    )
-                } else {
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
                     val columns = if (isListView) GridCells.Fixed(1) else GridCells.Adaptive(minSize = minCellSize)
 
                     Box(
@@ -627,7 +574,10 @@ fun HomeScreen(
                                     sortOption = uiState.sortOption,
                                     onSortSelected = viewModel::updateSortOption,
                                     onRefresh = viewModel::refreshGames,
-                                    onToggleShelfMode = viewModel::toggleShelfMode,
+                                    onToggleShelfMode = {
+                                        onShelfModeChanged(true)
+                                        viewModel.toggleShelfMode()
+                                    },
                                     onToggleLibraryViewMode = viewModel::toggleLibraryViewMode,
                                     onMenuClick = onMenuClick
                                 )
@@ -824,8 +774,6 @@ fun HomeScreen(
                             }
                         )
                     }
-                }
-            }
         }
     }
     if (showHiddenGames && uiState.hiddenGames.isNotEmpty()) HiddenGamesDialog(

@@ -56,6 +56,7 @@ object UiSoundManager {
     private var settings = UiSoundSettings()
     private var appForeground = false
     private var emulationActive = false
+    private var nativeShellActive = false
     private var gameMenuOpen = false
 
     // Short samples.
@@ -126,6 +127,12 @@ object UiSoundManager {
         if (emulationActive == active) return
         emulationActive = active
         if (!active) gameMenuOpen = false
+        syncMusic()
+    }
+
+    fun setNativeShellActive(active: Boolean) {
+        if (nativeShellActive == active) return
+        nativeShellActive = active
         syncMusic()
     }
 
@@ -326,7 +333,7 @@ object UiSoundManager {
             enabled = music.enabled,
             volumePercent = music.volume,
             appForeground = appForeground,
-            emulationActive = emulationActive,
+            emulationActive = emulationActive || nativeShellActive,
             suppressedByFocusLoss = suppressedByFocusLoss
         )
     }

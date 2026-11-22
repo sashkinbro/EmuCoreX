@@ -559,6 +559,16 @@ fun AppNavigation(
                                 launchSingleTop = true
                             }
                         },
+                        onGamePathClick = { gamePath ->
+                            navController.navigate(EmulationRoute(gamePath = gamePath)) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onSaveSelected = { gamePath, saveSlot ->
+                            navController.navigate(EmulationRoute(gamePath = gamePath, saveSlot = saveSlot)) {
+                                launchSingleTop = true
+                            }
+                        },
                         onMenuClick = openDrawer,
                         onShelfModeChanged = { isShelfMode ->
                             homeDrawerEnabled = !isShelfMode

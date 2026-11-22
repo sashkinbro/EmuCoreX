@@ -1485,8 +1485,15 @@ void Ps2Renderer::DrawBrowserScreen(float alpha) {
         auto drawSlotBox = [&](int slotIdx, float x, const std::string& name, const std::string& meta, const std::string& status) {
             const bool focused = (mc_card_pane_ == 0 && mc_card_slot_idx_ == slotIdx);
             const bool empty = name.empty();
-            const bool isFolder = (!empty && name.find(".ps2") == std::string::npos &&
-                                   meta.find("Folder") != std::string::npos);
+            bool isFolder = false;
+            if (!empty) {
+                for (const auto& c : cards) {
+                    if (c.name == name) {
+                        isFolder = c.isFolder;
+                        break;
+                    }
+                }
+            }
 
             DrawPanel(x, contentTop, slotW, slotsAreaH, 12.0f, focused ? 1.5f : 0.9f,
                       focused ? PanelTopColor(0.84f * alpha) : PanelTopColor(0.50f * alpha),
