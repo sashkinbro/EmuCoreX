@@ -149,6 +149,16 @@ static const Fixture kFixtures[] = {
 		"Broadcom", "V3D 7.1.7", "OpenGL ES 3.1 Mesa 25.0.0", false, false, 0},
 	{"unknown-vendor", 0x1234, 0, false, 0, "Mystery GPU 9000", "", "", 0, "", false,
 		"Acme", "Mystery GPU 9000", "OpenGL ES 3.2", false, false, 0},
+	// No VK_KHR_driver_properties (old Android drivers): the vendor ID alone must classify the driver, so
+	// these keep the Arm / Apple / V3DV rules exactly as the vendor-keyed code gave them.
+	{"mali-g57-no-driver-properties", 0x13b5, 0, false, 0, "Mali-G57", "", "", 0,
+		"UNISOC ums9620_2h10 ums9620 arm64-v8a", false,
+		"ARM", "Mali-G57", "OpenGL ES 3.2 v1.r40p0-01eac0", false, false, 0},
+	{"apple-m2-no-driver-properties", 0x106b, 0, false, 0, "Apple M2", "", "", 0, "", false,
+		"Apple", "Apple M2", "OpenGL 4.1 Metal", false, false, 0},
+	{"broadcom-v3d-no-driver-properties", 0x14e4, 0, false, 0, "V3D 7.1.7", "", "", 0,
+		"Raspberry Pi 5 bcm2712 arm64-v8a", false,
+		"Broadcom", "V3D 7.1.7", "OpenGL ES 3.1 Mesa 25.0.0", false, false, 0},
 };
 
 struct CapSet
@@ -193,7 +203,8 @@ static GSVulkanRoad::Identity MakeIdentity(const Fixture& f)
 	return {.vendor = f.vendor, .driver = MapDriver(f), .name = f.name,
 		.driver_name = f.driver_props ? std::string_view(f.driver_name) : std::string_view{},
 		.info = f.driver_props ? std::string_view(f.info) : std::string_view{},
-		.platform = f.platform, .mediatek = f.mediatek, .device_id = f.device_id};
+		.platform = f.platform, .mediatek = f.mediatek, .device_id = f.device_id,
+		.raw_driver_id = f.driver_props ? static_cast<u32>(f.driver_id) : 0u};
 }
 
 // Mirror of GetVulkanVendorHint in GSDeviceVK.cpp.
@@ -225,9 +236,19 @@ static bool GLQualcommProprietary(const std::string& vendor, const std::string& 
 		return false;
 	return GpuProfileDetector::Detect(vendor, renderer) == RuntimeGpuProfile::Adreno;
 }
+// Mirror of IsQualcommFamilyGLDriver (Qualcomm proprietary, freedreno, ANGLE on Qualcomm).
+static bool GLQualcommFamily(const std::string& vendor, const std::string& renderer, const std::string& version)
+{
+	if (GLQualcommProprietary(vendor, renderer, version))
+		return true;
+	const std::string hints = GSVulkanRoad::Lower(vendor + " " + renderer + " " + version);
+	const bool freedreno_or_angle = hints.find("turnip") != std::string::npos ||
+		hints.find("freedreno") != std::string::npos || hints.find("angle") != std::string::npos;
+	return freedreno_or_angle && GpuProfileDetector::Detect(vendor, renderer) == RuntimeGpuProfile::Adreno;
+}
 static bool GLSingleRGBA8EXTFetch(const std::string& vendor, const std::string& renderer, const std::string& version)
 {
-	return vendor == "Qualcomm" && renderer == "Adreno (TM) 840" && std::string_view(version).starts_with("OpenGL ES 3.2 V@0842.52 ");
+	return GLQualcommProprietary(vendor, renderer, version) && std::string_view(version).starts_with("OpenGL ES 3.2 V@0842.52 ");
 }
 
 static const char* RoadName(GSSelfReadRoad r)
@@ -419,6 +440,13 @@ static void DumpDerived(std::string& out, const Fixture& fx)
 	out += Fmt("%s vk.shader_workarounds scalarize_vector_bitwise_and=%d store_bitwise_negation_in_temporary=%d gl.shader_workarounds=%d adreno_generation_unified=%u\n",
 		fx.id, rules.scalarize_vector_bitwise_and, rules.store_bitwise_negation_in_temporary,
 		GLArmOrImaginationProprietary(fx.gl_vendor, fx.gl_renderer, fx.gl_version), GSVulkanRoad::AdrenoGeneration(identity));
+	// Driver facts that replaced vendor terms (steps 5-6): V3DV carry, Arm/PanVK measured carry and depth
+	// nudge, Adreno-hardware depth-read rule (GSDeviceVK::ResolveDepthSamplingFeatures), Qualcomm-family GL
+	// depth-feedback Auto choice. no_ps2_z_quantization is the platform rule above, restated per driver.
+	out += Fmt("%s vk.driver_facts v3dv=%d arm_driver=%d no_ps2_z_quantization=%d depth_read_unvalidated=%d gl.qualcomm_family=%d\n",
+		fx.id, raw_facts.v3dv, raw_facts.arm_driver, rules.no_ps2_z_quantization,
+		raw_facts.adreno,
+		GLQualcommFamily(fx.gl_vendor, fx.gl_renderer, fx.gl_version));
 	// GSDeviceVK::UseGeneralAttachmentLayout = framebuffer_fetch || texture_barrier || feedback-loop layout
 	// (the last implies texture_barrier), per capability set.
 	for (const CapSet& c : kCapSets)

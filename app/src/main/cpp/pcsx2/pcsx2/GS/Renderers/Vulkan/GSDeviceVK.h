@@ -185,6 +185,8 @@ public:
 	/// The shader-source workarounds for the ARM and Imagination proprietary compilers
 	/// (GSVulkanDevicePolicy::Rules::scalarize_vector_bitwise_and).
 	__fi bool ScalarizeVectorBitwiseAnd() const { return m_platform_rules.scalarize_vector_bitwise_and; }
+	/// Depth nudge in the TFX shaders, taken on the Arm proprietary driver and PanVK (driver facts).
+	__fi bool MaliDepthNudge() const { return m_road_facts.arm_driver; }
 
 	__fi bool UsesInputAttachmentFeedbackPath() const
 	{

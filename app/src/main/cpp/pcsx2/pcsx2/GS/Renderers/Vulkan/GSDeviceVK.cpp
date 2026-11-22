@@ -195,7 +195,11 @@ void GSDeviceVK::ResolveDepthSamplingFeatures()
 	// Ordering a color feedback loop does not validate barrier-free reads of
 	// Adreno's live depth attachment. Require the renderer's explicit depth
 	// hazard handling; HLE draws use their existing depth-copy fallback.
-	m_features.test_and_sample_depth = m_features.texture_barrier && !m_road_facts.adreno;
+	// Named rule: no driver on this hardware family has been validated for barrier-free depth reads yet
+	// (Qualcomm proprietary, Turnip, ANGLE and unknown drivers on Adreno all keep the barrier road).
+	// Lift it per driver ID once a driver is measured.
+	const bool depth_read_unvalidated = m_road_facts.adreno;
+	m_features.test_and_sample_depth = m_features.texture_barrier && !depth_read_unvalidated;
 }
 
 static VkAttachmentLoadOp GetLoadOpForTexture(GSTextureVK* tex)
@@ -5958,7 +5962,7 @@ static void AddShaderHeader(std::stringstream& ss)
 		features.texture_barrier,
 		features.texture_barrier && dev->UseFeedbackLoopLayout(),
 		dev->ScalarizeVectorBitwiseAnd(),
-		features.provoking_vertex_last, dev->GetDeviceProperties().vendorID == 0x13b5};
+		features.provoking_vertex_last, dev->MaliDepthNudge()};
 	AddShaderHeader(ss, capabilities);
 }
 
@@ -7232,7 +7236,7 @@ VkShaderModule GSDeviceVK::GetTFXVertexShader(GSHWDrawConfig::VSSelector sel)
 		m_features.texture_barrier,
 		m_features.texture_barrier && UseFeedbackLoopLayout(),
 		ScalarizeVectorBitwiseAnd(),
-		m_features.provoking_vertex_last, m_device_properties.vendorID == 0x13b5};
+		m_features.provoking_vertex_last, MaliDepthNudge()};
 	VkShaderModule mod = g_vulkan_shader_cache->GetVertexShader(
 		BuildTFXVertexShaderSource(m_tfx_source, sel, capabilities));
 	if (mod)
@@ -7265,7 +7269,7 @@ VkShaderModule GSDeviceVK::GetTFXFragmentShader(const GSHWDrawConfig::PSSelector
 		m_features.texture_barrier,
 		m_features.texture_barrier && UseFeedbackLoopLayout(),
 		ScalarizeVectorBitwiseAnd(),
-		m_features.provoking_vertex_last, m_device_properties.vendorID == 0x13b5};
+		m_features.provoking_vertex_last, MaliDepthNudge()};
 	VkShaderModule mod = g_vulkan_shader_cache->GetFragmentShader(
 		BuildTFXFragmentShaderSource(m_tfx_source, sel, capabilities));
 	if (mod)
@@ -7895,7 +7899,7 @@ std::string GSDeviceVK::GetTFXPreparationIdentity(std::string_view driver_identi
 {
 	const TFXShaderSourceCapabilities capabilities = {
 		m_features.rov, m_features.texture_barrier, m_features.texture_barrier && UseFeedbackLoopLayout(),
-		ScalarizeVectorBitwiseAnd(), m_features.provoking_vertex_last, m_device_properties.vendorID == 0x13b5};
+		ScalarizeVectorBitwiseAnd(), m_features.provoking_vertex_last, MaliDepthNudge()};
 	return BuildTFXPreparationIdentity(m_tfx_source, capabilities, m_device_properties,
 		m_features.vs_expand, VKShaderCache::GetTFXPreparationCacheVersion(), driver_identity);
 }
@@ -12123,7 +12127,9 @@ GSVulkanRoad::Identity GSDeviceVK::GetRoadIdentity() const
         .driver_name = m_optional_extensions.vk_khr_driver_properties ? std::string_view(m_device_driver_properties.driverName) : std::string_view{},
         .info = m_optional_extensions.vk_khr_driver_properties ? std::string_view(m_device_driver_properties.driverInfo) : std::string_view{},
         .platform = m_road_platform_hints, .mediatek = GpuProfileDetector::DetectMediaTekSoC(),
-        .device_id = m_device_properties.deviceID};
+        .device_id = m_device_properties.deviceID,
+        .raw_driver_id = m_optional_extensions.vk_khr_driver_properties ?
+            static_cast<u32>(m_device_driver_properties.driverID) : 0u};
 }
 
 GSVulkanRoad::Capabilities GSDeviceVK::GetRoadCapabilities(u32 push_count) const
@@ -12412,7 +12418,7 @@ std::string GSDeviceVK::GetTFXPipelineKeyFingerprint() const
 		ss << static_cast<u32>(LookupNativeFormat(fmt)) << ' ';
 	}
 	const TFXShaderSourceCapabilities caps = {m_features.rov, m_features.texture_barrier,
-		m_features.texture_barrier && UseFeedbackLoopLayout(), ScalarizeVectorBitwiseAnd(), m_features.provoking_vertex_last, m_device_properties.vendorID == 0x13b5};
+		m_features.texture_barrier && UseFeedbackLoopLayout(), ScalarizeVectorBitwiseAnd(), m_features.provoking_vertex_last, MaliDepthNudge()};
 	AddShaderHeader(ss, caps);
 	return ss.str();
 }

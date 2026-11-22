@@ -23,6 +23,9 @@ struct Identity
     std::string_view name, driver_name, info, platform;
     bool mediatek = false;
     u32 device_id = 0;
+    // Raw VkDriverId (0 when VK_KHR_driver_properties is absent). Driver enum above only names the
+    // drivers a road rule reads; V3DV is identified from this.
+    u32 raw_driver_id = 0;
 };
 struct Capabilities
 {
@@ -45,6 +48,9 @@ struct Facts
     bool ordered_input = false, measured_layout = false, measured_barrier = false;
     bool driver_orders_loop = false, order_on_request = false, prefer_declared_barrier = false;
     bool avoid_push = false, adreno8xx_proprietary = false;
+    // Driver facts (not vendor facts) read by ResolveSelection: Mesa V3DV by raw driver ID, and the
+    // Arm proprietary / PanVK pair that the Mali-measured carry rules were taken on.
+    bool v3dv = false, arm_driver = false;
     Driver driver = Driver::Unknown;
     u32 model = 0, fix_generation = 0;
 };
@@ -202,6 +208,10 @@ inline Facts ResolveFacts(const Identity& id, bool roaa, u32 max_push)
         else if (f.adreno) f.driver = Driver::Qualcomm;
         else if (f.powervr) f.driver = Driver::Imagination;
     }
+    // V3DV: the raw driver ID when the driver reported one, else the Broadcom vendor ID (a device
+    // without VK_KHR_driver_properties reports raw ID 0 and must keep carrying, as before).
+    f.v3dv = id.raw_driver_id == 19 || (id.raw_driver_id == 0 && f.broadcom); // VK_DRIVER_ID_MESA_V3DV
+    f.arm_driver = f.driver == Driver::Arm || f.driver == Driver::PanVK;
     f.model = f.adreno ? AdrenoModel(id) : Model(name, "mali-g");
     if (f.mali && !f.model) f.model = Model(name, "immortalis-g");
     f.malisx2 = info.find("malisx2") != std::string::npos;
@@ -257,21 +267,26 @@ inline Selection ResolveSelection(const Facts& f, const Capabilities& c)
         .driver_prefers_declared_loop_with_barriers = f.prefer_declared_barrier,
         .override_texture_barriers = c.texture_barriers});
     const bool sampler = out.road.spelling == GSSelfReadSpelling::FeedbackLoopLayout;
-    out.carry = GSFeedbackCarryForDevice({.device_always_carries = f.broadcom,
-        .device_is_measured_vendor = f.mali || f.ordered_input,
-        .device_is_layout_road_vendor = f.adreno,
+    // Carry is decided per driver, not per GPU vendor: V3DV carries unconditionally; the fetch road's
+    // carry was measured on the Arm proprietary driver and PanVK (Mali) and on PowerVR's ordered
+    // in-tile road; the driver-ordered layout road is Turnip's (Qualcomm proprietary is forced to None
+    // below, so only Turnip reaches the layout term on Adreno).
+    out.carry = GSFeedbackCarryForDevice({.device_always_carries = f.v3dv,
+        .device_is_measured_vendor = f.arm_driver || f.ordered_input,
+        .device_is_layout_road_vendor = f.driver == Driver::Turnip,
         .barriers_order_reads = out.road.texture_barrier,
         .device_is_barrier_road_vendor = f.measured_barrier,
         .framebuffer_fetch = out.road.in_tile_read, .feedback_loop_layout = sampler});
-    // Mali on the plain barrier road (no in-tile fetch, no feedback-loop layout): a draw that does
+    // Arm proprietary / PanVK on the plain barrier road (no in-tile fetch, no feedback-loop layout): a draw that does
     // not read the target keeps the open pass's loop bit instead of ending the pass. Readers still
     // set their own bit and barrier. Measured on Mali-G57 r40p0 GS dumps with bit-identical output:
     // Shadow of the Colossus 2736 -> 289 render passes, 3.3x faster GPU replay.
-    if (out.carry == GSFeedbackCarry::None && f.mali && out.road.texture_barrier && !out.road.in_tile_read && !sampler)
+    if (out.carry == GSFeedbackCarry::None && f.arm_driver && out.road.texture_barrier && !out.road.in_tile_read && !sampler)
         out.carry = GSFeedbackCarry::NonReaders;
     // Qualcomm's proprietary driver never carries: on Adreno 840 carry changed GS dump output and
-    // lost the device in NFS Underground 2. Its in-pass reads keep draw-local loop bits.
-    if (f.adreno && f.driver == Driver::Qualcomm)
+    // lost the device in NFS Underground 2. Its in-pass reads keep draw-local loop bits. No driver
+    // version bound was measured, so the rule covers every Qualcomm proprietary build.
+    if (f.driver == Driver::Qualcomm)
         out.carry = GSFeedbackCarry::None;
     out.dynamic_loop = GSDeclaresLoopPerDraw({.layout_road_live = sampler,
         .dynamic_state_available = c.dynamic_state && c.dynamic_command, .device_measured = f.measured_layout});

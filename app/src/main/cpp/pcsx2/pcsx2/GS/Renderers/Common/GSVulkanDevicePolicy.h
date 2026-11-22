@@ -15,6 +15,10 @@ struct Facts {
 // VkDriverId values, spelled as literals so this pure CPU policy needs no Vulkan header.
 // GSDeviceVK.cpp static_asserts them against the real enum.
 inline constexpr u32 kDriverImaginationProprietary=7;
+inline constexpr u32 kDriverArmProprietary=9;
+inline constexpr u32 kDriverMoltenVK=14;
+inline constexpr u32 kDriverMesaPanVK=20;
+inline constexpr u32 kDriverMesaHoneykrisp=26;
 inline constexpr u32 kDriverQualcommProprietary=8;
 inline constexpr u32 kDriverMesaTurnip=18;
 struct Rules {
@@ -47,12 +51,20 @@ constexpr Rules Resolve(const Facts& f) {
     const u32 major=f.version>>22,minor=(f.version>>12)&0x3ff,patch=f.version&0xfff;
     const bool known=f.version!=0&&patch==0&&major<=100;
     const bool measured_revision=known&&major==44&&minor==1;
+    // Upstream PCSX2 skips PS2 Z quantization on Mali and Apple. Expressed per driver: Arm proprietary
+    // and PanVK (Mali), Honeykrisp and MoltenVK (Apple). A device that reports no
+    // driver ID (no VK_KHR_driver_properties, raw ID 0) falls back to the vendor ID, as before, so old
+    // Mali and Apple drivers keep the rule. An explicitly reported other driver no longer matches.
+    const bool no_driver_id=f.driver==0;
+    const bool arm_driver=f.driver==kDriverArmProprietary||f.driver==kDriverMesaPanVK||(no_driver_id&&mali);
+    const bool apple_driver=f.driver==kDriverMesaHoneykrisp||f.driver==kDriverMoltenVK||(no_driver_id&&f.vendor==0x106b);
+    const bool no_z_quantization=arm_driver||apple_driver;
     return {
         mali&&f.name.find("Mali-G615")!=std::string_view::npos,
         adreno&&!turnip&&(f.device<0x06000000u||f.version<0x801EA000u),
         mali&&f.name.find("Mali-G57")!=std::string_view::npos,
         mali&&f.arm_proprietary&&!measured_revision,
-        mali||f.vendor==0x106b,
+        no_z_quantization,
         adreno&&f.driver==kDriverQualcommProprietary,
         shader_workaround,
         shader_workaround,

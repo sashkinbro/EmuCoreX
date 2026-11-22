@@ -92,6 +92,23 @@ static bool IsQualcommProprietaryGLDriver(const char* vendor, const char* render
 	return GpuProfileDetector::Detect(vendor, renderer) == RuntimeGpuProfile::Adreno;
 }
 
+// The Qualcomm driver family on GL: the Qualcomm proprietary driver, Mesa freedreno, and ANGLE running
+// on Qualcomm hardware (it compiles through Qualcomm's Vulkan driver). This is the driver-family fact
+// behind the Auto depth-feedback choice (Adreno's coherent in-tile fetch); it covers exactly what the
+// Adreno runtime profile covered, spelled as the driver families it consists of.
+static bool IsQualcommFamilyGLDriver(const char* vendor, const char* renderer, const char* version)
+{
+	if (IsQualcommProprietaryGLDriver(vendor, renderer, version))
+		return true;
+	std::string hints = std::string(vendor) + " " + renderer + " " + version;
+	std::transform(hints.begin(), hints.end(), hints.begin(), [](unsigned char c) {
+		return (c >= 'A' && c <= 'Z') ? static_cast<char>(c + ('a' - 'A')) : static_cast<char>(c);
+	});
+	const bool freedreno_or_angle = hints.find("turnip") != std::string::npos ||
+		hints.find("freedreno") != std::string::npos || hints.find("angle") != std::string::npos;
+	return freedreno_or_angle && GpuProfileDetector::Detect(vendor, renderer) == RuntimeGpuProfile::Adreno;
+}
+
 // The ARM (Mali, Immortalis) and Imagination (PowerVR) proprietary GL compilers need the scalarized
 // vector bitwise AND and the stored bitwise negation (m_bugs.scalarize_vector_bitwise_and /
 // store_bitwise_negation_in_temporary). The vendor/renderer name only says which silicon vendor
@@ -111,9 +128,12 @@ static bool IsArmOrImaginationProprietaryGLDriver(const char* vendor, const char
 // Device pixel controls on this exact native driver reproduce stale EXT MRT
 // colour and zero RGBA16 fetches, including standalone highp shaders. Keep
 // other models/builds on their existing path until separately measured.
+// Measured rule: the Qualcomm proprietary GLES driver build V@0842.52 (the build shipped for Adreno 840,
+// the only device it was measured on). The driver version string is the discriminator; no other
+// Qualcomm build is covered.
 static bool RequiresSingleRGBA8EXTFetch(const char* vendor, const char* renderer, const char* version)
 {
-	return std::string_view(vendor) == "Qualcomm" && std::string_view(renderer) == "Adreno (TM) 840" &&
+	return IsQualcommProprietaryGLDriver(vendor, renderer, version) &&
 		std::string_view(version).starts_with("OpenGL ES 3.2 V@0842.52 ");
 }
 
@@ -1242,6 +1262,7 @@ bool GSDeviceOGL::CheckFeatures()
 		GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()), renderer_str,
 		IsMediaTekSoC() ? ", MediaTek SoC" : "");
 	const bool gpu_profile_adreno = IsAdrenoGPUProfile();
+	const bool qualcomm_family_gl = IsQualcommFamilyGLDriver(vendor_str, renderer_str, version_str);
 
 	GLint major_gl = 0;
 	GLint minor_gl = 0;
@@ -1490,7 +1511,7 @@ bool GSDeviceOGL::CheckFeatures()
 	m_features.test_and_sample_depth = m_features.texture_barrier;
 	// Depth-as-RT feedback works from a copied R32 target, so it doesn't need texture barriers.
 	// Direct depth uses native barriers, coherent ARM depth fetch, or explicit per-primitive copies.
-	m_features.depth_feedback = GetOGLDepthFeedbackSupport(GSConfig.DepthFeedbackMode, gpu_profile_adreno && m_features.framebuffer_fetch);
+	m_features.depth_feedback = GetOGLDepthFeedbackSupport(GSConfig.DepthFeedbackMode, qualcomm_family_gl && m_features.framebuffer_fetch);
 
 	GLint max_vertex_ssbos = 0;
 	// GLES 3.2 has SSBOs and base-vertex draws in core, without desktop ARB flags. (AI-assisted)
