@@ -58,6 +58,19 @@ class MaliSx2DriverCompatibilityTest {
                     DeviceGpuInfoResolver.resolve(renderer, null)
                 ))
             }
+        // 0.6.0 added the 5th-generation G620/G720 (also sold as Immortalis-G720).
+        listOf("Mali-G620 MC6", "Mali-G720 MC7", "Immortalis-G720 MC12")
+            .forEach { renderer ->
+                assertTrue(renderer, GpuDriverCompatibility.isInstalledDriverCompatible(
+                    "libvulkan_malisx2.so", maliDevice, maliDevice,
+                    DeviceGpuInfoResolver.resolve(renderer, null)
+                ))
+            }
+        // Neighbouring 5th-generation parts the package does not list stay refused.
+        assertFalse(GpuDriverCompatibility.isInstalledDriverCompatible(
+            "libvulkan_malisx2.so", maliDevice, maliDevice,
+            DeviceGpuInfoResolver.resolve("Immortalis-G925 MC12", null)
+        ))
         assertTrue(GpuDriverCompatibility.isInstalledDriverCompatible(
             "drivers/vendor/libvulkan_malisx2.so", maliDevice, maliDevice, supported
         ))

@@ -208,12 +208,12 @@ object GpuDriverCompatibility {
     /**
      * Fallback model list for catalog entries that predate `supportedGpuModels` and
      * for already-installed libraries, which carry no version context. It must match
-     * the models the newest package supports (0.5.0: G31, G51, G52, G57, G68, G76,
-     * G77, G78(AE), G310, G510, G610, G615, G710, G715), so an installed library is
+     * the models the newest package supports (0.6.0: G31, G51, G52, G57, G68, G76,
+     * G77, G78(AE), G310, G510, G610, G615, G620, G710, G715, G720), so an installed library is
      * not refused at launch. Trailing core-count/revision suffixes are ignored.
      */
     private val MALI_SX2_SUPPORTED_MODEL = Regex(
-        """^(?:mali|immortalis)-g(?:31|51|52|57|68|76|77|78(?:ae)?|310|510|610|615|710|715)""" +
+        """^(?:mali|immortalis)-g(?:31|51|52|57|68|76|77|78(?:ae)?|310|510|610|615|620|710|715|720)""" +
             MALI_SX2_SUFFIX,
         RegexOption.IGNORE_CASE
     )
