@@ -205,7 +205,7 @@ void GSDeviceVK::TestDriverSafety(void (*check)(bool,const char*))
         Observation out;out.provoking_extension=m_optional_extensions.vk_ext_provoking_vertex;
         out.provoking_feature=m_features.provoking_vertex_last;out.depth_format=m_depth_format;out.stencil=m_features.stencil_buffer;
         const TFXShaderSourceCapabilities caps={m_features.rov,m_features.texture_barrier,
-            m_features.texture_barrier&&UseFeedbackLoopLayout(),HasMobileGPUProfile(),m_features.provoking_vertex_last};
+            m_features.texture_barrier&&UseFeedbackLoopLayout(),ScalarizeVectorBitwiseAnd(),m_features.provoking_vertex_last};
         const auto source=BuildTFXVertexShaderSource(m_tfx_source,{},caps);
         out.source_captured=source.find("#define VS_PROVOKING_VERTEX_LAST ")!=std::string::npos&&source.find("void main()")!=std::string::npos;
         out.source_provoking_last=source.find("#define VS_PROVOKING_VERTEX_LAST 1\n")!=std::string::npos;

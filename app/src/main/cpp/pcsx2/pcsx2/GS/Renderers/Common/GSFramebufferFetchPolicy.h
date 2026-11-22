@@ -33,33 +33,23 @@ struct GSFramebufferFetchDecision
 	bool enabled = false;
 	GSFramebufferFetchBackend backend = GSFramebufferFetchBackend::None;
 	GSFramebufferFetchVeto veto = GSFramebufferFetchVeto::NoExtension;
-
-	// A Mali profile that cannot reach the ARM shader path has to move to the PowerVR profile,
-	// which shares the EXT/PLS arm with the catch-all default.
-	bool demote_mali_to_powervr = false;
 };
 
 // `driver_blocklisted` is the driver-bug database's UseRenderTargetCopyForFeedback workaround,
-// which no GL rule sets today. `mali_profile` and `powervr_profile` are the runtime GPU profile,
-// which is what tfx_fs.glsl keys its backend selection off, not the extension set.
+// which no GL rule sets today.
 //
-// PowerVR prefers the ARM builtin like Mali does. On ANGLE (Pixel 10/11, Tensor G5/G6) both
-// extensions are advertised, the shader header enables only GL_ARM_shader_framebuffer_fetch, and
-// the EXT `inout` declaration then fails to compile ("'inout' : invalid qualifier"): every draw
-// that reads the destination was dropped, which is where the missing reflections came from. The
-// ARM path is also the one that orders overlapping primitives (FbFetchOrdersOverlappingPrims), so
-// those draws stop being split per primitive. ANGLE exposes coherent fetch on IMG hardware.
+// The backend follows the extension set alone, never the GPU's name: GL_ARM_shader_framebuffer_fetch
+// is preferred whenever it is advertised, EXT/PLS only when it is not. The ARM extension is the
+// spec-ordered one (see FbFetchOrdersOverlappingPrims), so those draws are not split per primitive.
+// On ANGLE (Pixel 10/11, Tensor G5/G6, PowerVR) both extensions are advertised, the shader header
+// enables only GL_ARM_shader_framebuffer_fetch, and the EXT `inout` declaration then fails to
+// compile ("'inout' : invalid qualifier"): every draw that reads the destination was dropped, which
+// is where the missing reflections came from. Mali's EXT inout path is broken on its drivers too.
+// Qualcomm's GL driver advertises EXT (and only ARM depth/stencil), so it keeps EXT.
 constexpr GSFramebufferFetchDecision DecideGLFramebufferFetch(bool has_arm_fetch, bool has_ext_fetch,
-	bool has_pls_fetch, bool driver_blocklisted, bool user_disabled, bool mali_profile,
-	bool powervr_profile = false)
+	bool has_pls_fetch, bool driver_blocklisted, bool user_disabled)
 {
 	GSFramebufferFetchDecision decision;
-
-	// Demotion depends on the extensions alone. A blocklist or the user's setting turns fetch off
-	// but the Mali profile keeps its own tuning and takes the copy blend path; demoting there would
-	// swap in PowerVR's tuning as a side effect of a correctness gate.
-	decision.demote_mali_to_powervr = mali_profile && !has_arm_fetch;
-	const bool effective_mali_profile = mali_profile && !decision.demote_mali_to_powervr;
 
 	if (!has_arm_fetch && !has_ext_fetch)
 		decision.veto = GSFramebufferFetchVeto::NoExtension;
@@ -72,13 +62,9 @@ constexpr GSFramebufferFetchDecision DecideGLFramebufferFetch(bool has_arm_fetch
 
 	decision.enabled = (decision.veto == GSFramebufferFetchVeto::None);
 
-	// Mirrors `#if GPU_PROFILE_MALI || GPU_PROFILE_POWERVR` in tfx_fs.glsl: Mali and PowerVR read
-	// through gl_LastFragColorARM even when EXT is advertised (the EXT inout path is broken on Mali
-	// drivers and does not compile under ANGLE on PowerVR); everything else prefers EXT/PLS and falls
-	// back to the ARM builtin only when EXT is absent.
 	if (!decision.enabled)
 		decision.backend = GSFramebufferFetchBackend::None;
-	else if ((effective_mali_profile || powervr_profile) && has_arm_fetch)
+	else if (has_arm_fetch)
 		decision.backend = GSFramebufferFetchBackend::ARM;
 	else if (has_ext_fetch || has_pls_fetch)
 		decision.backend = GSFramebufferFetchBackend::EXT;
@@ -140,31 +126,20 @@ static_assert(GLUsesPerPrimitiveFbCopy(false, false));
 static_assert(!GLUsesPerPrimitiveFbCopy(true, true));
 static_assert(!GLUsesPerPrimitiveFbCopy(true, false));
 
-// A blocklisted driver or the user's setting must survive the Mali profile, and must not demote
-// the profile to PowerVR.
-static_assert(!DecideGLFramebufferFetch(true, true, true, true, false, true).enabled);
-static_assert(!DecideGLFramebufferFetch(true, true, true, true, false, true).demote_mali_to_powervr);
-static_assert(!DecideGLFramebufferFetch(true, true, true, false, true, true).enabled);
-static_assert(!DecideGLFramebufferFetch(true, true, true, false, true, true).demote_mali_to_powervr);
-static_assert(DecideGLFramebufferFetch(true, true, true, false, false, true).enabled);
-static_assert(DecideGLFramebufferFetch(true, true, true, false, false, true).backend ==
-			  GSFramebufferFetchBackend::ARM);
-static_assert(DecideGLFramebufferFetch(false, true, true, false, false, true).demote_mali_to_powervr);
-
-// PowerVR under ANGLE (ARM + EXT advertised, no PLS): the ARM builtin, so the header's
+// A blocklisted driver or the user's setting turns fetch off whatever is advertised.
+static_assert(!DecideGLFramebufferFetch(true, true, true, true, false).enabled);
+static_assert(!DecideGLFramebufferFetch(true, true, true, false, true).enabled);
+static_assert(DecideGLFramebufferFetch(true, true, true, false, false).enabled);
+// Both extensions advertised (Mali, PowerVR/Tensor under ANGLE): the ARM builtin, so the header's
 // GL_ARM_shader_framebuffer_fetch directive and the shader agree, and overlap ordering applies.
-static_assert(DecideGLFramebufferFetch(true, true, false, false, false, false, true).backend ==
-			  GSFramebufferFetchBackend::ARM);
-static_assert(FbFetchOrdersOverlappingPrims(
-	DecideGLFramebufferFetch(true, true, false, false, false, false, true).backend));
-// PowerVR without the ARM extension (native IMG GLES drivers) keeps EXT/PLS.
-static_assert(DecideGLFramebufferFetch(false, true, true, false, false, false, true).backend ==
-			  GSFramebufferFetchBackend::EXT);
-// The PowerVR preference does not survive the user's setting.
-static_assert(!DecideGLFramebufferFetch(true, true, false, false, true, false, true).enabled);
-// Every other profile is unchanged: EXT wins when both are advertised.
-static_assert(DecideGLFramebufferFetch(true, true, false, false, false, false).backend ==
-			  GSFramebufferFetchBackend::EXT);
+static_assert(DecideGLFramebufferFetch(true, true, true, false, false).backend == GSFramebufferFetchBackend::ARM);
+static_assert(DecideGLFramebufferFetch(true, true, false, false, false).backend == GSFramebufferFetchBackend::ARM);
+static_assert(FbFetchOrdersOverlappingPrims(DecideGLFramebufferFetch(true, true, false, false, false).backend));
+// Without the ARM extension (Qualcomm's native GLES driver, native IMG GLES drivers) EXT/PLS.
+static_assert(DecideGLFramebufferFetch(false, true, true, false, false).backend == GSFramebufferFetchBackend::EXT);
+static_assert(!DecideGLFramebufferFetch(false, false, true, false, false).enabled);
+// The user's setting wins over the extension preference.
+static_assert(!DecideGLFramebufferFetch(true, true, false, false, true).enabled);
 
 // ---------------------------------------------------------------------------------------------
 // The Vulkan spelling: rasterization-order attachment access, read in tile memory through

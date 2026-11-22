@@ -6,8 +6,8 @@
 // printed, so what a step changed is visible line by line.
 //
 // Pure: no device, no GL/Vulkan context. Policy functions that live in headers are called
-// directly. Decisions that are inline expressions in GSDeviceVK.cpp / GSDeviceOGL.cpp (provoking
-// vertex, D32 DATE fallback, cached stream rings, warmup worker limit, GL Qualcomm checks, vendor
+// directly. Decisions that are inline expressions in GSDeviceVK.cpp / GSDeviceOGL.cpp (D32 DATE
+// fallback, cached stream rings, warmup worker limit, GL Qualcomm checks, vendor
 // hint) are mirrored here with the source line they copy; when a refactor moves them behind a
 // policy function, repoint the mirror at that function and the golden must stay identical.
 //
@@ -348,15 +348,15 @@ static void DumpFixture(std::string& out, const Fixture& fx)
 			{"broken_mad_deinterlace", rules.broken_mad_deinterlace},
 			{"prefer_coherent_readback", rules.prefer_coherent_readback},
 			{"no_ps2_z_quantization", rules.no_ps2_z_quantization}}) + "\n";
-	// Inline rules in GSDeviceVK.cpp: provoking vertex (FinalizeDriverCapabilities), D32 DATE fallback,
-	// PreferCachedStreamRings, WarmupWorkerLimit, IsDevicePowerVR / IsWarmupBlocklisted (static part),
+	// Inline rules in GSDeviceVK.cpp: D32 DATE fallback,
+	// PreferCachedStreamRings, WarmupWorkerLimit, IsWarmupBlocklisted (static part, Imagination proprietary only),
 	// broken_blend_constant (CheckFeatures), swapchain MaliSX2 rule (VKSwapChain.cpp).
-	const bool provoking_off = fx.vendor == 0x5143 && fx.driver_props && fx.driver_id == VK_DRIVER_ID_QUALCOMM_PROPRIETARY;
+	const bool provoking_off = rules.broken_provoking_vertex_last; // GSVulkanDevicePolicy rule, applied in FinalizeDriverCapabilities
 	const bool d32_date = raw_facts.adreno && raw_facts.driver == GSVulkanRoad::Driver::Turnip &&
 		(fx.version == 0 || fx.version < VK_MAKE_VERSION(26, 2, 0));
 	const bool cached_rings = raw_facts.adreno && raw_facts.model == 610 && raw_facts.driver == GSVulkanRoad::Driver::Turnip;
 	out += Fmt("vk.inline provoking_vertex_disabled=%d d32_date_fallback=%d prefer_cached_stream_rings=%d warmup_workers=%u warmup_blocklisted_static=%d broken_blend_constant=%d swapchain_present_modes=%d\n",
-		provoking_off, d32_date, cached_rings, fx.vendor == 0x5143 ? 2u : 1u, fx.vendor == 0x1010,
+		provoking_off, d32_date, cached_rings, fx.vendor == 0x5143 ? 2u : 1u, raw_facts.driver == GSVulkanRoad::Driver::Imagination,
 		GSBlendConstantPolicy::DeviceDefect(true, raw_facts.adreno, raw_facts.driver == GSVulkanRoad::Driver::Turnip),
 		Vulkan::ShouldUseSwapchainPresentModes(true, IsMaliSX2DriverInfo(fx.driver_props ? fx.info : "")));
 
@@ -368,12 +368,11 @@ static void DumpFixture(std::string& out, const Fixture& fx)
 		GpuProfileDetector::RuntimeProfileToString(profile), GpuProfileDetector::ParseAdrenoGeneration(renderer),
 		GLQualcommProprietary(vendor, renderer, version), GLSingleRGBA8EXTFetch(vendor, renderer, version),
 		GLUsesPerPrimitiveFbCopy(false, true));
-	const bool mobile = profile == RuntimeGpuProfile::Mobile;
 	for (const auto ext : {std::pair{true, false}, std::pair{false, true}, std::pair{true, true}, std::pair{false, false}})
 	{
-		const auto d = DecideGLFramebufferFetch(ext.first, ext.second, false, false, false, mobile);
-		out += Fmt("gl.fetch arm=%d ext=%d enabled=%d backend=%s veto=%s demote_mali_to_powervr=%d overlap_ordered=%d\n",
-			ext.first, ext.second, d.enabled, BackendName(d.backend), VetoName(d.veto), d.demote_mali_to_powervr,
+		const auto d = DecideGLFramebufferFetch(ext.first, ext.second, false, false, false);
+		out += Fmt("gl.fetch arm=%d ext=%d enabled=%d backend=%s veto=%s overlap_ordered=%d\n",
+			ext.first, ext.second, d.enabled, BackendName(d.backend), VetoName(d.veto),
 			FbFetchOrdersOverlappingPrims(d.backend));
 	}
 
@@ -400,6 +399,50 @@ static void DumpFixture(std::string& out, const Fixture& fx)
 	}
 }
 
+// Mirror of IsArmOrImaginationProprietaryGLDriver in GSDeviceOGL.cpp.
+static bool GLArmOrImaginationProprietary(const std::string& vendor, const std::string& renderer, const std::string& version)
+{
+	const std::string hints = GSVulkanRoad::Lower(vendor + " " + renderer + " " + version);
+	if (hints.find("mesa") != std::string::npos || hints.find("panfrost") != std::string::npos)
+		return false;
+	return GpuProfileDetector::Detect(vendor, renderer) == RuntimeGpuProfile::Mobile;
+}
+
+// Facts the profile-to-fact refactor (steps 2 and 3) derives. Kept in their own trailing section so the
+// per-fixture sections above stay comparable with older goldens.
+static void DumpDerived(std::string& out, const Fixture& fx)
+{
+	const auto identity = MakeIdentity(fx);
+	const auto raw_facts = GSVulkanRoad::ResolveFacts(identity, false, 0);
+	const auto rules = GSVulkanDevicePolicy::Resolve({fx.vendor, fx.device_id, fx.version,
+		static_cast<u32>(fx.driver_id), fx.name, raw_facts.driver == GSVulkanRoad::Driver::Arm});
+	out += Fmt("%s vk.shader_workarounds scalarize_vector_bitwise_and=%d store_bitwise_negation_in_temporary=%d gl.shader_workarounds=%d adreno_generation_unified=%u\n",
+		fx.id, rules.scalarize_vector_bitwise_and, rules.store_bitwise_negation_in_temporary,
+		GLArmOrImaginationProprietary(fx.gl_vendor, fx.gl_renderer, fx.gl_version), GSVulkanRoad::AdrenoGeneration(identity));
+	// GSDeviceVK::UseGeneralAttachmentLayout = framebuffer_fetch || texture_barrier || feedback-loop layout
+	// (the last implies texture_barrier), per capability set.
+	for (const CapSet& c : kCapSets)
+	{
+		const auto facts = GSVulkanRoad::ResolveFacts(identity, c.roaa, c.max_push);
+		GSVulkanRoad::Capabilities caps;
+		caps.roaa = c.roaa; caps.layout = c.layout; caps.dynamic_state = c.dynamic_state;
+		caps.dynamic_command = c.dynamic_command; caps.push_descriptors = c.push; caps.max_push_descriptors = c.max_push;
+		caps.texture_barriers = c.barriers; caps.disable_fetch = c.disable_fetch; caps.android = true;
+		const auto sel = GSVulkanRoad::ResolveSelection(facts, caps);
+		out += Fmt("%s vk.general_attachment_layout[%s]=%d\n", fx.id, c.name, sel.road.in_tile_read || sel.road.texture_barrier);
+	}
+	if (fx.log_caps)
+	{
+		const CapSet logged{"device-log", fx.log_roaa, false, false, false, fx.log_push != 0, fx.log_push, -1, false};
+		const auto facts = GSVulkanRoad::ResolveFacts(identity, logged.roaa, logged.max_push);
+		GSVulkanRoad::Capabilities caps;
+		caps.roaa = logged.roaa; caps.push_descriptors = logged.push; caps.max_push_descriptors = logged.max_push;
+		caps.android = true;
+		const auto sel = GSVulkanRoad::ResolveSelection(facts, caps);
+		out += Fmt("%s vk.general_attachment_layout[device-log]=%d\n", fx.id, sel.road.in_tile_read || sel.road.texture_barrier);
+	}
+}
+
 static std::string BuildSnapshot()
 {
 	std::string out;
@@ -413,6 +456,9 @@ static std::string BuildSnapshot()
 			out += Fmt("gl.per_primitive_fb_copy(barrier=%d tiler=%d)=%d\n", barrier, tiler, GLUsesPerPrimitiveFbCopy(barrier, tiler));
 	for (const Fixture& fx : kFixtures)
 		DumpFixture(out, fx);
+	out += "[derived]\n";
+	for (const Fixture& fx : kFixtures)
+		DumpDerived(out, fx);
 	return out;
 }
 

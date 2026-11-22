@@ -10,8 +10,12 @@ namespace Vulkan
 {
 inline bool ShouldUseSwapchainPresentModes(bool maintenance_enabled, bool mali_sx2)
 {
-	// MaliSX2 must use the ordinary create path from the first attempt. Keep
-	// maintenance1 enabled for present fences and releasing acquired images.
+	// NAMED DRIVER-BUG RULE: the MaliSX2 custom Mali driver (identified by "malisx2" in
+	// VkPhysicalDeviceDriverProperties::driverInfo, e.g. "malisx2-0.5.1-308fe121c7") must use the
+	// ordinary create path from the first attempt. It applies to every MaliSX2 build: no build that
+	// accepts the swapchain present-modes list has been recorded, so there is no version bound; add
+	// one here (driverInfo build string) once a fixed build is verified. Keep maintenance1
+	// enabled for present fences and releasing acquired images.
 	return maintenance_enabled && !mali_sx2;
 }
 

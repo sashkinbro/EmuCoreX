@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "GS/Renderers/Common/GSGPUProfile.h"
+#include "GS/Renderers/Common/GSVulkanRoadDevicePolicy.h"
 
 #include <array>
 #include <cctype>
@@ -82,29 +83,9 @@ RuntimeGpuProfile GpuProfileDetector::Detect(std::string_view gpu_vendor, std::s
 
 u32 GpuProfileDetector::ParseAdrenoGeneration(std::string_view gpu_renderer_or_name)
 {
-	const std::string lowered = ToLowerASCII(gpu_renderer_or_name);
-	const size_t position = lowered.find("adreno");
-	if (position == std::string::npos)
-		return 0;
-
-	// Device names look like "Adreno (TM) 740" or "Adreno X1-85". Walk to the first digit,
-	// resolving the X-series (9th generation) along the way.
-	size_t index = position + 6;
-	while (index < lowered.size())
-	{
-		const char ch = lowered[index];
-		if (ch == 'x')
-			return 9;
-		if (std::isdigit(static_cast<unsigned char>(ch)))
-			break;
-		index++;
-	}
-
-	u32 model = 0;
-	for (; index < lowered.size() && std::isdigit(static_cast<unsigned char>(lowered[index])); index++)
-		model = model * 10 + static_cast<u32>(lowered[index] - '0');
-
-	return (model >= 200) ? (model / 100) : 0;
+	// Device names look like "Adreno (TM) 740", "Adreno X1-85" or "Qualcomm(R) Adreno(TM) X1-85 GPU".
+	// One parser serves every consumer (GSVulkanRoad::AdrenoGeneration).
+	return GSVulkanRoad::AdrenoGeneration({.name = gpu_renderer_or_name});
 }
 
 bool GpuProfileDetector::LooksLikeMediaTekSoC(std::string_view hints)

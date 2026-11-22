@@ -76,10 +76,27 @@ inline u32 Model(std::string_view name, std::string_view prefix)
 // Exact model-name/Qualcomm chip-ID precedence from GSGPUProfileAdreno.
 // Only listed parts may be inferred from a chip ID; seven-series IDs no
 // longer spell a decimal model and must never enable ordering by guessing.
+// Lower-cased identity text with the trademark marks ("Adreno(TM)", "Qualcomm(R)") dropped and
+// blank runs collapsed, so "Qualcomm(R) Adreno(TM) X1-85 GPU" and "Adreno (TM) X1-85" both read
+// "adreno x1-85" and no parser has to know about the marks.
+inline std::string AdrenoHints(const Identity& id)
+{
+    const auto raw = Lower(std::string(id.name) + " " + std::string(id.driver_name) + " " +
+        std::string(id.info) + " " + std::string(id.platform));
+    std::string out;
+    out.reserve(raw.size());
+    for (size_t i = 0; i < raw.size();)
+    {
+        if (raw.compare(i, 4, "(tm)") == 0) { i += 4; continue; }
+        if (raw.compare(i, 3, "(r)") == 0) { i += 3; continue; }
+        if (raw[i] == ' ' && !out.empty() && out.back() == ' ') { ++i; continue; }
+        out.push_back(raw[i++]);
+    }
+    return out;
+}
 inline u32 AdrenoModel(const Identity& id)
 {
-    const auto hints = Lower(std::string(id.name) + " " + std::string(id.driver_name) + " " +
-        std::string(id.info) + " " + std::string(id.platform));
+    const auto hints = AdrenoHints(id);
     static constexpr u16 listed[] = {
         200,203,205,220,225,302,303,304,305,306,308,320,330,405,418,420,430,
         505,506,508,509,510,512,530,540,605,608,610,612,613,615,616,618,619,
@@ -120,6 +137,23 @@ inline u32 AdrenoModel(const Identity& id)
         if (is_listed(chip)) return chip;
     }
     return named ? model : 0;
+}
+// The one Adreno generation parser (7 for 7xx, 8 for 8xx, 9 for the X laptop series, 0 when the
+// identity is not a recognisable Adreno part), shared by the Vulkan road facts, the frame-generation
+// capability and GpuProfileDetector::ParseAdrenoGeneration so they cannot disagree on a name.
+inline u32 AdrenoGeneration(const Identity& id)
+{
+    const auto hints = AdrenoHints(id);
+    const auto adreno = hints.find("adreno");
+    if (adreno != std::string::npos)
+    {
+        size_t p = adreno + 6;
+        while (p < hints.size() && !std::isalnum(static_cast<unsigned char>(hints[p]))) ++p;
+        if (p + 1 < hints.size() && hints[p] == 'x' && std::isdigit(static_cast<unsigned char>(hints[p + 1])))
+            return 9;
+    }
+    const u32 model = AdrenoModel(id);
+    return model >= 200 ? model / 100 : 0;
 }
 // Exact strict axfl tag grammar from ParseFixGeneration: token boundary,
 // nonzero decimal generation (at most four digits), trailing hyphen.

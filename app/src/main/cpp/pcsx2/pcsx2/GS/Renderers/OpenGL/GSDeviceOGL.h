@@ -171,6 +171,8 @@ private:
 	struct
 	{
 		bool rewrite_boolean_negation : 1; ///< Qualcomm proprietary GL compiler negated-boolean workaround
+		bool scalarize_vector_bitwise_and : 1; ///< ARM/Imagination proprietary GL compiler miscompiles vector bitwise AND
+		bool store_bitwise_negation_in_temporary : 1; ///< ARM/Imagination proprietary GL compiler needs ~x stored in a temporary
 		bool buggy_pbo              : 1; ///< Avoid PBOs and just use glTextureSubImage2D with immediate data
 		bool broken_blend_coherency : 1; ///< Issue on Nvidia GPUs where some blend modes don't seem to be properly coherent, see comment in RenderHW
 	} m_bugs;

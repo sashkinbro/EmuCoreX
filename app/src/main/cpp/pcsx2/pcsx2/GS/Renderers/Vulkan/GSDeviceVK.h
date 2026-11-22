@@ -173,6 +173,19 @@ public:
 			(m_force_feedback_loop_layout || !m_optional_extensions.vk_ext_rasterization_order_attachment_access);
 	}
 
+	/// True when attachments may be read back inside the pass (an in-tile read, a texture barrier or the
+	/// feedback-loop layout). Those attachments stay in GENERAL for the whole frame, so alternating
+	/// feedback and non-feedback passes needs no layout transition (and, on a tiler, no tile flush).
+	/// A device on the copy road never reads an attachment in the pass and keeps the optimal layouts.
+	__fi bool UseGeneralAttachmentLayout() const
+	{
+		return m_features.framebuffer_fetch || m_features.texture_barrier || UseFeedbackLoopLayout();
+	}
+
+	/// The shader-source workarounds for the ARM and Imagination proprietary compilers
+	/// (GSVulkanDevicePolicy::Rules::scalarize_vector_bitwise_and).
+	__fi bool ScalarizeVectorBitwiseAnd() const { return m_platform_rules.scalarize_vector_bitwise_and; }
+
 	__fi bool UsesInputAttachmentFeedbackPath() const
 	{
 		return (GetFeedbackPath() == VulkanFeedbackPath::InputAttachment);

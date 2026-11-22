@@ -1053,7 +1053,7 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 
 #if defined(__ANDROID__)
 	u32 lsfg_generation=0;
-	if(IsAdrenoGPUProfile())
+	if(m_device_properties.vendorID==0x5143)
 	{
 		lsfg_generation=GpuProfileDetector::ParseAdrenoGeneration(m_name);
 		if(lsfg_generation==6 && m_device_driver_properties.driverID!=VK_DRIVER_ID_MESA_TURNIP)lsfg_generation=0;
@@ -2491,7 +2491,7 @@ VkRenderPass GSDeviceVK::CreateCachedRenderPass(RenderPassCacheKey key)
 		const VkImageLayout layout =
 			key.color_feedback_loop ? (UseFeedbackLoopLayout() ? VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT :
 																 VK_IMAGE_LAYOUT_GENERAL) :
-									  (IsMobileGPUProfile() ? VK_IMAGE_LAYOUT_GENERAL :
+									  (UseGeneralAttachmentLayout() ? VK_IMAGE_LAYOUT_GENERAL :
 															  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		attachments[num_attachments] = {0, static_cast<VkFormat>(key.color_format), VK_SAMPLE_COUNT_1_BIT,
 			static_cast<VkAttachmentLoadOp>(key.color_load_op), static_cast<VkAttachmentStoreOp>(key.color_store_op),
@@ -2538,7 +2538,7 @@ VkRenderPass GSDeviceVK::CreateCachedRenderPass(RenderPassCacheKey key)
 				((m_features.depth_feedback != DepthFeedbackSupport::None && UseFeedbackLoopLayout()) ?
 					VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT :
 					VK_IMAGE_LAYOUT_GENERAL) :
-				(IsMobileGPUProfile() ? VK_IMAGE_LAYOUT_GENERAL :
+				(UseGeneralAttachmentLayout() ? VK_IMAGE_LAYOUT_GENERAL :
 										VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 		attachments[num_attachments] = {0, static_cast<VkFormat>(key.depth_format), VK_SAMPLE_COUNT_1_BIT,
 			static_cast<VkAttachmentLoadOp>(key.depth_load_op), static_cast<VkAttachmentStoreOp>(key.depth_store_op),
@@ -3895,7 +3895,9 @@ bool GSDeviceVK::CreateDeviceAndSwapChain()
 
 void GSDeviceVK::FinalizeDriverCapabilities(bool depth_ready)
 {
-    static_assert(VK_DRIVER_ID_MESA_TURNIP == 18);
+    static_assert(VK_DRIVER_ID_MESA_TURNIP == GSVulkanDevicePolicy::kDriverMesaTurnip);
+    static_assert(VK_DRIVER_ID_QUALCOMM_PROPRIETARY == GSVulkanDevicePolicy::kDriverQualcommProprietary);
+    static_assert(VK_DRIVER_ID_IMAGINATION_PROPRIETARY == GSVulkanDevicePolicy::kDriverImaginationProprietary);
     // Resolve once at capability finalization, not in the readback hot path.
     const auto identity = GetRoadIdentity();
     const auto facts = GSVulkanRoad::ResolveFacts(identity, false, 0);
@@ -3908,10 +3910,9 @@ void GSDeviceVK::FinalizeDriverCapabilities(bool depth_ready)
     if (m_platform_rules.broken_timestamps)
         m_gpu_timing_supported = m_spinning_supported = false;
 
-	// Adapted from the exact GSGPUDriverProfile Vulkan rules. The provoking
-	// defect follows the raw proprietary ID, while Turnip allows resolved hints.
-	if (m_device_properties.vendorID == 0x5143 && m_optional_extensions.vk_khr_driver_properties &&
-		m_device_driver_properties.driverID == VK_DRIVER_ID_QUALCOMM_PROPRIETARY)
+	// Named driver-bug rule (GSVulkanDevicePolicy::Rules::broken_provoking_vertex_last): the
+	// defect follows the raw Qualcomm proprietary driver ID, Turnip keeps the extension.
+	if (m_platform_rules.broken_provoking_vertex_last)
 		m_optional_extensions.vk_ext_provoking_vertex = false;
 
 	// Older/unknown Turnip can hang on discarding DATE draws using D32S8.
@@ -5368,7 +5369,7 @@ void GSDeviceVK::OMSetRenderTargets(
 			}
 			else
 			{
-				vkRt->TransitionToLayout(IsMobileGPUProfile() ? GSTextureVK::Layout::FeedbackLoop :
+				vkRt->TransitionToLayout(UseGeneralAttachmentLayout() ? GSTextureVK::Layout::FeedbackLoop :
 																GSTextureVK::Layout::ColorAttachment);
 			}
 		}
@@ -5407,7 +5408,7 @@ void GSDeviceVK::OMSetRenderTargets(
 			}
 			else
 			{
-				vkDs->TransitionToLayout(IsMobileGPUProfile() ? GSTextureVK::Layout::FeedbackLoop :
+				vkDs->TransitionToLayout(UseGeneralAttachmentLayout() ? GSTextureVK::Layout::FeedbackLoop :
 																GSTextureVK::Layout::DepthStencilAttachment);
 			}
 		}
@@ -5496,8 +5497,9 @@ static void AddShaderHeader(std::stringstream& ss, const GSDeviceVK::TFXShaderSo
 	if (capabilities.texture_barrier && capabilities.feedback_loop_layout)
 		ss << "#define HAS_FEEDBACK_LOOP_LAYOUT 1\n";
 
-	// Some ARM proprietary drivers miscompile vector bitwise AND in shaders. Scalarize it on
-	// the whole mobile path rather than tracking individual driver versions.
+	// Some ARM proprietary drivers miscompile vector bitwise AND in shaders. Scalarize it on the
+	// ARM and Imagination proprietary drivers (GSVulkanDevicePolicy::Rules) rather than tracking
+	// individual driver versions.
 	AddMacro(ss, "DRIVER_SCALARIZE_VECTOR_BITWISE_AND", capabilities.scalarize_vector_bitwise_and ? 1 : 0);
 	ss << R"(
 #if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
@@ -5536,7 +5538,7 @@ static void AddShaderHeader(std::stringstream& ss)
 		features.rov,
 		features.texture_barrier,
 		features.texture_barrier && dev->UseFeedbackLoopLayout(),
-		dev->HasMobileGPUProfile(),
+		dev->ScalarizeVectorBitwiseAnd(),
 		features.provoking_vertex_last, dev->GetDeviceProperties().vendorID == 0x13b5};
 	AddShaderHeader(ss, capabilities);
 }
@@ -6810,7 +6812,7 @@ VkShaderModule GSDeviceVK::GetTFXVertexShader(GSHWDrawConfig::VSSelector sel)
 		m_features.rov,
 		m_features.texture_barrier,
 		m_features.texture_barrier && UseFeedbackLoopLayout(),
-		HasMobileGPUProfile(),
+		ScalarizeVectorBitwiseAnd(),
 		m_features.provoking_vertex_last, m_device_properties.vendorID == 0x13b5};
 	VkShaderModule mod = g_vulkan_shader_cache->GetVertexShader(
 		BuildTFXVertexShaderSource(m_tfx_source, sel, capabilities));
@@ -6843,7 +6845,7 @@ VkShaderModule GSDeviceVK::GetTFXFragmentShader(const GSHWDrawConfig::PSSelector
 		m_features.rov,
 		m_features.texture_barrier,
 		m_features.texture_barrier && UseFeedbackLoopLayout(),
-		HasMobileGPUProfile(),
+		ScalarizeVectorBitwiseAnd(),
 		m_features.provoking_vertex_last, m_device_properties.vendorID == 0x13b5};
 	VkShaderModule mod = g_vulkan_shader_cache->GetFragmentShader(
 		BuildTFXFragmentShaderSource(m_tfx_source, sel, capabilities));
@@ -7045,7 +7047,7 @@ VkPipeline GSDeviceVK::CreateTFXPipelineWithCache(
 
 #if defined(__ANDROID__)
 	// If the PowerVR driver aborts inside vkCreateGraphicsPipelines, the crash handler
-	// reports this selector so the exact failing variant can be identified.
+	// reports this selector so the exact failing variant can be identified. Diagnostic only.
 	if (IsDevicePowerVR() && EmuCoreXRecordTFXCompileSelector)
 		EmuCoreXRecordTFXCompileSelector(p.vs.key, p.ps.key_hi, p.ps.key_lo);
 #endif
@@ -7474,7 +7476,7 @@ std::string GSDeviceVK::GetTFXPreparationIdentity(std::string_view driver_identi
 {
 	const TFXShaderSourceCapabilities capabilities = {
 		m_features.rov, m_features.texture_barrier, m_features.texture_barrier && UseFeedbackLoopLayout(),
-		HasMobileGPUProfile(), m_features.provoking_vertex_last, m_device_properties.vendorID == 0x13b5};
+		ScalarizeVectorBitwiseAnd(), m_features.provoking_vertex_last, m_device_properties.vendorID == 0x13b5};
 	return BuildTFXPreparationIdentity(m_tfx_source, capabilities, m_device_properties,
 		m_features.vs_expand, VKShaderCache::GetTFXPreparationCacheVersion(), driver_identity);
 }
@@ -8986,8 +8988,11 @@ std::string GSDeviceVK::GetWarmupIdentity() const
 
 bool GSDeviceVK::IsWarmupBlocklisted() const
 {
-	// PowerVR's compiler aborts inside vkCreateGraphicsPipelines during the warmup.
-	if (IsDevicePowerVR())
+	// Named driver-bug rule (diagnostic only: TFX warmup is compiled out of release builds, see
+	// EMUCOREX_ENABLE_TFX_PREPARATION): Imagination's proprietary compiler aborts inside
+	// vkCreateGraphicsPipelines during the warmup. Mesa's PowerVR driver is a different compiler and
+	// is not blocked.
+	if (m_road_facts.driver == GSVulkanRoad::Driver::Imagination)
 		return true;
 	return WarmupDisabledByHistory(GetWarmupIdentity());
 }
@@ -8996,7 +9001,8 @@ u32 GSDeviceVK::WarmupWorkerLimit() const
 {
 	// Adreno compiles two at a time without trouble; Mali/Immortalis (also every Pixel/Tensor part)
 	// and anything unrecognised get a single worker, since their compilers hold most of the memory
-	// and the device is already busy running the game.
+	// and the device is already busy running the game. Diagnostic only (warmup is compiled out of
+	// release builds); a tuning of the worker count, not a correctness rule.
 	return (m_device_properties.vendorID == 0x5143) ? 2u : 1u;
 }
 
@@ -11019,7 +11025,8 @@ void GSDeviceVK::DoRenderHW(GSHWDrawConfig& config)
 		ExecuteCommandBuffer(false);
 	}
 	else if (!m_last_submit_failed &&
-		(readback_offer || (!HasMobileGPUProfile() && m_draws_in_command_buffer >= 4000)))
+		(readback_offer || (m_device_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
+							   m_draws_in_command_buffer >= 4000)))
 	{
 		// Android Adreno vkQueueSubmit can sleep in the driver; frequent submits
 		// can also lower the GS thread's governor clock. Keep the pass cadence and
@@ -11986,7 +11993,7 @@ std::string GSDeviceVK::GetTFXPipelineKeyFingerprint() const
 		ss << static_cast<u32>(LookupNativeFormat(fmt)) << ' ';
 	}
 	const TFXShaderSourceCapabilities caps = {m_features.rov, m_features.texture_barrier,
-		m_features.texture_barrier && UseFeedbackLoopLayout(), HasMobileGPUProfile(), m_features.provoking_vertex_last, m_device_properties.vendorID == 0x13b5};
+		m_features.texture_barrier && UseFeedbackLoopLayout(), ScalarizeVectorBitwiseAnd(), m_features.provoking_vertex_last, m_device_properties.vendorID == 0x13b5};
 	AddShaderHeader(ss, caps);
 	return ss.str();
 }

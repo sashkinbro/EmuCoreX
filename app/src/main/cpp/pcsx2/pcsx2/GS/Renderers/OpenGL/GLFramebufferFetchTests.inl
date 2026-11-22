@@ -173,10 +173,10 @@ void GSDeviceOGL::TestFramebufferFetch(void (*check)(bool, const char*))
 
     bool featureAgreement = true, directives = true, ordering = true, veto = true;
     u32 structuralCases = 0;
-    struct Identity { const char* vendor; const char* renderer; bool mobile; };
-    constexpr Identity identities[] = {{"ARM", "Mali-G57", true},
-        {"Imagination Technologies", "PowerVR Rogue", true},
-        {"Qualcomm", "Adreno (TM) 740", false}, {"Mesa", "llvmpipe", false}};
+    struct Identity { const char* vendor; const char* renderer; };
+    constexpr Identity identities[] = {{"ARM", "Mali-G57"},
+        {"Imagination Technologies", "PowerVR Rogue"},
+        {"Qualcomm", "Adreno (TM) 740"}, {"Mesa", "llvmpipe"}};
     for (const auto& identity : identities)
     for (bool arm : {false, true})
     for (bool ext : {false, true})
@@ -195,7 +195,7 @@ void GSDeviceOGL::TestFramebufferFetch(void (*check)(bool, const char*))
         GSConfig.DepthFeedbackMode = depth;
         device.m_features = {};
         const bool initialized = device.CheckFeatures();
-        const auto expected = DecideGLFramebufferFetch(arm, ext, false, false, disabled, identity.mobile);
+        const auto expected = DecideGLFramebufferFetch(arm, ext, false, false, disabled);
         const std::string header = device.GenGlslHeader("main", GL_FRAGMENT_SHADER, "");
         featureAgreement &= initialized && device.m_features.framebuffer_fetch == expected.enabled;
         ordering &= device.m_features.framebuffer_fetch_orders_overlap == FbFetchOrdersOverlappingPrims(expected.backend);

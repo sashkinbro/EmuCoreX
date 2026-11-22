@@ -90,6 +90,22 @@ static bool IsQualcommProprietaryGLDriver(const char* vendor, const char* render
 	return GpuProfileDetector::Detect(vendor, renderer) == RuntimeGpuProfile::Adreno;
 }
 
+// The ARM (Mali, Immortalis) and Imagination (PowerVR) proprietary GL compilers need the scalarized
+// vector bitwise AND and the stored bitwise negation (m_bugs.scalarize_vector_bitwise_and /
+// store_bitwise_negation_in_temporary). The vendor/renderer name only says which silicon vendor
+// is below; Mesa (panfrost, PVR Mesa) is a different compiler and keeps the plain expressions, as
+// do Qualcomm and unknown drivers. ANGLE is kept: it compiles through the proprietary Vulkan driver.
+static bool IsArmOrImaginationProprietaryGLDriver(const char* vendor, const char* renderer, const char* version)
+{
+	std::string hints = std::string(vendor) + " " + renderer + " " + version;
+	std::transform(hints.begin(), hints.end(), hints.begin(), [](unsigned char c) {
+		return (c >= 'A' && c <= 'Z') ? static_cast<char>(c + ('a' - 'A')) : static_cast<char>(c);
+	});
+	if (hints.find("mesa") != std::string::npos || hints.find("panfrost") != std::string::npos)
+		return false;
+	return GpuProfileDetector::Detect(vendor, renderer) == RuntimeGpuProfile::Mobile;
+}
+
 // Device pixel controls on this exact native driver reproduce stale EXT MRT
 // colour and zero RGBA16 fetches, including standalone highp shaders. Keep
 // other models/builds on their existing path until separately measured.
@@ -990,6 +1006,8 @@ bool GSDeviceOGL::CheckFeatures()
 	const char* renderer_str = renderer ? renderer : "";
 	const char* version_str = version ? version : "";
 	m_bugs.rewrite_boolean_negation = IsQualcommProprietaryGLDriver(vendor_str, renderer_str, version_str);
+	m_bugs.scalarize_vector_bitwise_and = IsArmOrImaginationProprietaryGLDriver(vendor_str, renderer_str, version_str);
+	m_bugs.store_bitwise_negation_in_temporary = m_bugs.scalarize_vector_bitwise_and;
 	if (std::strstr(vendor_str, "Advanced Micro Devices") || std::strstr(vendor_str, "ATI Technologies Inc.") ||
 		std::strstr(vendor_str, "ATI"))
 	{
@@ -1011,7 +1029,6 @@ bool GSDeviceOGL::CheckFeatures()
 	Console.WriteLn("GL: GPU profile '%s' (renderer: %s%s).",
 		GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()), renderer_str,
 		IsMediaTekSoC() ? ", MediaTek SoC" : "");
-	const bool gpu_profile_mobile = IsMobileGPUProfile();
 	const bool gpu_profile_adreno = IsAdrenoGPUProfile();
 
 	GLint major_gl = 0;
@@ -1140,7 +1157,7 @@ bool GSDeviceOGL::CheckFeatures()
 		disable_framebuffer_fetch = true;
 #endif
 	const auto fetch = DecideGLFramebufferFetch(has_arm_framebuffer_fetch, has_ext_framebuffer_fetch,
-		false, false, disable_framebuffer_fetch, gpu_profile_mobile);
+		false, false, disable_framebuffer_fetch);
 	const bool framebuffer_fetch = fetch.enabled;
 	if (fetch.veto == GSFramebufferFetchVeto::UserSetting)
 	{
@@ -1159,7 +1176,7 @@ bool GSDeviceOGL::CheckFeatures()
 	m_features.dxt_textures = GLAD_GL_EXT_texture_compression_s3tc;
 	m_features.bptc_textures =
 		GLAD_GL_VERSION_4_2 || GLAD_GL_ARB_texture_compression_bptc || GLAD_GL_EXT_texture_compression_bptc;
-	m_features.prefer_new_textures = m_is_gles || gpu_profile_mobile || gpu_profile_adreno;
+	m_features.prefer_new_textures = m_is_gles;
 	m_features.stencil_buffer = true;
 	m_features.rgba16_unorm = !m_is_gles || GLAD_GL_EXT_texture_norm16;
 
@@ -1253,7 +1270,7 @@ bool GSDeviceOGL::CheckFeatures()
 #ifdef __ANDROID__
 	const bool prefer_vertex_expansion_for_mobile = true;
 #else
-	const bool prefer_vertex_expansion_for_mobile = gpu_profile_mobile;
+	const bool prefer_vertex_expansion_for_mobile = m_is_gles;
 #endif
 	if (prefer_vertex_expansion_for_mobile)
 	{
@@ -2053,12 +2070,11 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type
 	header += fmt::format("#define HAS_EXT_SHADER_FRAMEBUFFER_FETCH {}\n", GLAD_GL_EXT_shader_framebuffer_fetch ? 1 : 0);
 	header += fmt::format("#define HAS_ARM_SHADER_FRAMEBUFFER_FETCH {}\n", GLAD_GL_ARM_shader_framebuffer_fetch ? 1 : 0);
 	header += fmt::format("#define HAS_EXT_SHADER_PIXEL_LOCAL_STORAGE {}\n", GLAD_GL_EXT_shader_pixel_local_storage ? 1 : 0);
-	// Uniform mobile shader defines: some ARM drivers miscompile vector bitwise AND, and some
-	// PowerVR GLSL compilers need the negated result stored in a temporary. Both are cheap
-	// and applied to the whole mobile path instead of individual driver rules.
-	const bool mobile_shader_defines = HasMobileGPUProfile();
-	header += fmt::format("#define DRIVER_SCALARIZE_VECTOR_BITWISE_AND {}\n", mobile_shader_defines ? 1 : 0);
-	header += fmt::format("#define DRIVER_STORE_BITWISE_NEGATION_IN_TEMPORARY {}\n", mobile_shader_defines ? 1 : 0);
+	// Some ARM drivers miscompile vector bitwise AND, and some PowerVR GLSL compilers need the
+	// negated result stored in a temporary. Both are cheap and applied to those proprietary
+	// drivers only (see IsArmOrImaginationProprietaryGLDriver).
+	header += fmt::format("#define DRIVER_SCALARIZE_VECTOR_BITWISE_AND {}\n", m_bugs.scalarize_vector_bitwise_and ? 1 : 0);
+	header += fmt::format("#define DRIVER_STORE_BITWISE_NEGATION_IN_TEMPORARY {}\n", m_bugs.store_bitwise_negation_in_temporary ? 1 : 0);
 	header += fmt::format("#define DRIVER_REWRITE_BOOLEAN_NEGATION {}\n", m_bugs.rewrite_boolean_negation ? 1 : 0);
 	header += R"(
 bool gpu_boolean_not(bool value)

@@ -106,6 +106,15 @@ namespace GSBlendConstantPolicy
 // the exact device/renderer path rather than a duplicate decision.
 namespace GSBlendConstantPolicy
 {
+    // NAMED DRIVER-BUG RULE: Mesa Turnip applies ONE_MINUS_CONSTANT_COLOR as if the constant were
+    // zero (Katamari Damacy ball saturating to white). `turnip` is the RESOLVED driver (raw
+    // VK_DRIVER_ID_MESA_TURNIP, or the driverName/driverInfo hint when the ID is unmapped); the
+    // Qualcomm proprietary driver on the same hardware is correct, so the vendor is not enough.
+    // There is deliberately no Mesa version bound: the failure depends on run history, not on the
+    // draw, so a "fixed in" build cannot be established from one capture. The routing is
+    // bit-identical when the constant works (same fixed-function multiply), so applying it to a
+    // fixed Turnip costs nothing but a shader selector bit. Add a version bound only together with
+    // a Turnip build that was run through the Katamari capture.
     inline bool DeviceDefect(bool vulkan, bool adreno, bool turnip)
     {
         return vulkan && adreno && turnip;
