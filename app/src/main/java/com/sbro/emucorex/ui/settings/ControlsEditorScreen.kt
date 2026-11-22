@@ -3,6 +3,9 @@ package com.sbro.emucorex.ui.settings
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
@@ -800,9 +803,21 @@ fun ControlsEditorScreen(
         LaunchedEffect(activity) {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         }
+        // The standalone editor must lay controls out on the same canvas as the game,
+        // which runs with the system bars hidden. With the navigation bar showing, its
+        // inset pulled right-anchored controls (R1/R2, action pad) inward while
+        // left-anchored ones kept their place, so a layout arranged here came out
+        // differently in game (e.g. L moved next to R overlapped it in the editor).
         DisposableEffect(activity) {
+            val window = activity?.window
+            val controller = window?.let { WindowCompat.getInsetsController(it, it.decorView) }
+            controller?.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller?.hide(WindowInsetsCompat.Type.systemBars())
             onDispose {
                 activity?.requestedOrientation = originalOrientation
+                // The app shell keeps the status bar hidden and the navigation bar shown.
+                controller?.show(WindowInsetsCompat.Type.navigationBars())
             }
         }
     }
