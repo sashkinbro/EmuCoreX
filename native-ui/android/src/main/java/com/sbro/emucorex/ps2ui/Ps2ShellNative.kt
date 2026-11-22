@@ -129,4 +129,7 @@ object Ps2ShellNative {
     external fun nativeSetState(screen: Int, mainIndex: Int, gameIndex: Int, saveIndex: Int)
 
     external fun nativeSelectGameByPath(path: String)
+
+    /** Parses the user's PS2 BIOS ROM image and keeps the boot-intro textures (thread-safe). */
+    external fun nativeLoadBiosAssets(rom: ByteArray): Boolean
 }

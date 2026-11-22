@@ -72,6 +72,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -331,15 +333,12 @@ private fun CompactAdaptiveShell(
         else -> 0.74f
     }
     val selectedDrawerItemFocusRequester = remember { FocusRequester() }
-    // A drawer should never be restored as open after a configuration change.
-    // This is especially important for back-only destinations such as Feedback and Settings.
-    val drawerState = remember(
-        selected,
-        configuration.screenWidthDp,
-        configuration.screenHeightDp
-    ) {
-        DrawerState(initialValue = DrawerValue.Closed)
-    }
+    // Keep ONE DrawerState for the lifetime of the shell. Re-creating it on rotation (or when the
+    // PS2 shell rotates the screen back on exit) handed ModalNavigationDrawer a state with no
+    // anchors yet, so the sheet rendered open for a frame before the snapTo(Closed) below ran.
+    // Configuration/destination changes still close it via the LaunchedEffect further down.
+    val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
+
     var destinationSettled by remember(
         selected,
         configuration.screenWidthDp,
@@ -453,15 +452,30 @@ private fun CompactAdaptiveShell(
         return
     }
 
+    // Material3 draws the first frame of a freshly created drawer before it has measured the
+    // sheet, which shows it open for a frame (seen when leaving the PS2 shell, which also
+    // rotates the screen). Keep the sheet and scrim invisible for the first two frames.
+    var drawerReady by remember(useModalDrawer, configuration.screenWidthDp, configuration.screenHeightDp) {
+        mutableStateOf(false)
+    }
+    LaunchedEffect(drawerReady) {
+        if (!drawerReady) {
+            withFrameNanos { }
+            withFrameNanos { }
+            drawerReady = true
+        }
+    }
+
     ModalNavigationDrawer(
         modifier = Modifier.testTag("adaptive_shell_modal_drawer"),
         drawerState = drawerState,
         gesturesEnabled = drawerInteractionEnabled,
-        scrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.42f),
+        scrimColor = if (drawerReady) MaterialTheme.colorScheme.scrim.copy(alpha = 0.42f) else Color.Transparent,
         drawerContent = {
             ModalDrawerSheet(
                 modifier = Modifier
                     .testTag("adaptive_shell_drawer_sheet")
+                    .alpha(if (drawerReady) 1f else 0f)
                     .fillMaxHeight()
                     .fillMaxWidth(drawerWidthFraction)
                     .widthIn(min = 292.dp, max = if (isTabletClass) 360.dp else 320.dp),

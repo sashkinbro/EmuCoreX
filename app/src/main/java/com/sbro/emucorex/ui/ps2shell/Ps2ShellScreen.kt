@@ -22,6 +22,8 @@ import android.os.StatFs
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.Surface
+import android.view.SurfaceHolder
 import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
@@ -46,6 +48,7 @@ import com.sbro.emucorex.BuildConfig
 import com.sbro.emucorex.MainActivity
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.BiosValidator
+import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.UiSoundManager
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.CoverArtRepository
@@ -110,6 +113,9 @@ private data class Ps2SystemSnapshot(
 )
 
 private object Ps2ShellSessionCache {
+    @Volatile
+    var biosAssetsLoaded: Boolean = false
+
     @Volatile
     var lastResolvedGames: List<Ps2ResolvedGame> = emptyList()
 
@@ -645,6 +651,26 @@ fun Ps2ShellScreen(
     }
     val currentBiosValid = rememberUpdatedState(biosValidState)
 
+    // Boot-intro textures come from the user's own BIOS file (read as a plain file, no emulator
+    // involved). Without a BIOS the shell keeps its procedural intro.
+    LaunchedEffect(Unit) {
+        if (Ps2ShellSessionCache.biosAssetsLoaded) return@LaunchedEffect
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val path = appPreferences.biosPath.first()
+                val selection = DocumentPathResolver.prepareBiosSelection(context, path) ?: return@runCatching
+                val name = selection.fileName ?: return@runCatching
+                val rom = File(selection.directoryPath, name)
+                if (!rom.isFile || rom.length() < 4L * 1024 * 1024 || rom.length() > 8L * 1024 * 1024) {
+                    return@runCatching
+                }
+                if (Ps2ShellNative.nativeLoadBiosAssets(rom.readBytes())) {
+                    Ps2ShellSessionCache.biosAssetsLoaded = true
+                }
+            }
+        }
+    }
+
     fun applyHostSettings(
         keyTone: Boolean,
         ambientSound: Boolean,
@@ -733,11 +759,12 @@ fun Ps2ShellScreen(
 
     remember(context) {
         runCatching {
-            val base = ResourcesCompat.getFont(context, R.font.exo2_variable)
+            // Rubik: soft rounded sans, the closest bundled match to the PS2 OSD font (Cyrillic-safe).
+            val base = ResourcesCompat.getFont(context, R.font.rubik_variable)
             if (base != null) {
-                val light = Typeface.create(base, 350, false)
-                val regular = Typeface.create(base, 450, false)
-                val bold = Typeface.create(base, 650, false)
+                val light = Typeface.create(base, 400, false)
+                val regular = Typeface.create(base, 400, false)
+                val bold = Typeface.create(base, 600, false)
                 Ps2TextRasterizer.setCustomTypefaces(light, regular, bold)
             }
         }
@@ -795,6 +822,19 @@ fun Ps2ShellScreen(
                 }
             )
             renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+            // The shell's animations are tuned for 60 fps; on 90/120/144 Hz panels ask the
+            // compositor for 60 so the GPU isn't drawing 2x the frames for no visible gain.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                holder.addCallback(object : SurfaceHolder.Callback {
+                    override fun surfaceCreated(holder: SurfaceHolder) {
+                        runCatching {
+                            holder.surface.setFrameRate(60f, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+                        }
+                    }
+                    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = Unit
+                    override fun surfaceDestroyed(holder: SurfaceHolder) = Unit
+                })
+            }
             isFocusable = true
             isFocusableInTouchMode = true
             defaultFocusHighlightEnabled = false
@@ -882,7 +922,7 @@ fun Ps2ShellScreen(
             ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         )
         onDispose {
-            mainActivity?.clearOrientationOverride(orientationToken)
+            mainActivity?.clearOrientationOverrideDeferred(orientationToken)
         }
     }
 
@@ -1064,11 +1104,22 @@ fun Ps2ShellScreen(
             }
         }
 
+        Ps2ShellHost.setNavigationListener { state ->
+            if (state.size >= 4) {
+                shellPrefs.edit()
+                    .putInt("screen", state[0])
+                    .putInt("main_index", state[1])
+                    .putInt("game_index", state[2])
+                    .putInt("save_index", state[3])
+                    .apply()
+            }
+        }
+
         Ps2ShellHost.setExitListener {
             saveShellNavigationState()
             Ps2ShellAudio.pauseAudio()
             UiSoundManager.setNativeShellActive(false)
-            mainActivity?.clearOrientationOverride(orientationToken)
+            mainActivity?.clearOrientationOverrideDeferred(orientationToken)
             currentExit.value()
         }
 
@@ -1118,6 +1169,7 @@ fun Ps2ShellScreen(
             Ps2ShellHost.setOpenGameSettingsListener(null)
             Ps2ShellHost.setSettingsListener(null)
             Ps2ShellHost.setExitListener(null)
+            Ps2ShellHost.setNavigationListener(null)
             Ps2ShellHost.setKeyListener(null)
         }
     }

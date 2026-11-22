@@ -75,8 +75,8 @@ void main() {
     // Pure #000000 OLED black void; localized cloud glow only when u_mist_strength > 0
     vec3 bg = vec3(0.0);
     if (u_mist_strength > 0.001) {
-        vec3 mistDeep = vec3(0.015, 0.065, 0.24);
-        vec3 mistBright = vec3(0.10, 0.36, 0.92);
+        vec3 mistDeep = vec3(0.05, 0.07, 0.26);
+        vec3 mistBright = vec3(0.16, 0.24, 0.62);
         if (u_theme == 1) {
             mistDeep = vec3(0.04, 0.05, 0.08);
             mistBright = vec3(0.24, 0.30, 0.42);
@@ -94,16 +94,27 @@ void main() {
             mistBright = vec3(0.48, 0.32, 0.08);
         }
 
-        vec2 dM = (px - u_mist_center) / vec2(max(u_screen.y * 0.78, 1.0), max(u_screen.y * 0.56, 1.0));
-        float r2 = dot(dM, dM);
-        float radial = exp(-r2 * 1.25);
-
-        float nx = px.x / max(u_screen.x, 1.0);
-        float ny = px.y / max(u_screen.y, 1.0);
-        float swirlA = 0.5 + 0.5 * sin(nx * 5.6 + u_time * 0.32 + cos(ny * 4.1 - u_time * 0.22));
-        float swirlB = 0.5 + 0.5 * cos(nx * 3.9 - u_time * 0.25 + ny * 5.1);
-        float cloud = radial * (0.42 + 0.58 * swirlA * swirlB) * u_mist_strength;
-        bg = mix(mistDeep, mistBright, smoothstep(0.15, 0.95, radial) * 0.58) * cloud;
+        // PS2 BIOS boot nebula: smoky fBm clouds inside a soft radial falloff.
+        vec2 dM = (px - u_mist_center) / vec2(max(u_screen.y * 0.62, 1.0), max(u_screen.y * 0.50, 1.0));
+        float radial = exp(-dot(dM, dM) * 1.5);
+        vec2 q = mat2(0.80, -0.60, 0.60, 0.80) * (px / max(u_screen.y, 1.0) * 3.4) + vec2(u_time * 0.035, -u_time * 0.02);
+        float n = 0.0;
+        float amp = 0.55;
+        for (int o = 0; o < 4; ++o) {
+            vec2 i = floor(q);
+            vec2 f = fract(q);
+            f = f * f * (3.0 - 2.0 * f);
+            float a = hash21(i);
+            float b = hash21(i + vec2(1.0, 0.0));
+            float c = hash21(i + vec2(0.0, 1.0));
+            float d = hash21(i + vec2(1.0, 1.0));
+            n += amp * mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+            q = mat2(0.80, -0.60, 0.60, 0.80) * q * 2.03 + vec2(17.1, 9.3);
+            amp *= 0.5;
+        }
+        float smoke = smoothstep(0.30, 0.85, n);
+        float cloud = radial * (0.10 + 1.25 * smoke) * u_mist_strength;
+        bg = mix(mistDeep, mistBright, smoke * 0.55) * cloud;
     }
 
     float dither = (hash21(gl_FragCoord.xy) - 0.5) / 255.0;
@@ -189,6 +200,75 @@ void main() {
 }
 )";
 
+// PS2 BIOS boot: dark translucent glass cubes, each face shaded, no bright outlines
+// (reuses kTowerVertexShader; v_h = face-edge factor).
+inline constexpr const char* kBootCubeFragmentShader = R"(#version 300 es
+precision highp float;
+
+in vec3 v_world_pos;
+in vec3 v_normal;
+in float v_h;
+in vec4 v_color;
+
+uniform vec3 u_cam_pos;
+uniform float u_alpha;
+uniform sampler2D u_refl;
+uniform float u_has_refl;
+uniform float u_glass;
+uniform sampler2D u_scene;
+uniform vec4 u_view;
+uniform sampler2D u_noise;
+uniform float u_time;
+uniform sampler2D u_smoke;
+
+out vec4 o_color;
+
+void main() {
+    // BIOS boot cubes: dark, smoky, see-through tinted glass. No outlines; the shape reads from
+    // per-face shading and a soft fresnel sheen. Fades into the haze with distance.
+    vec3 N = normalize(v_normal);
+    vec3 toCam = u_cam_pos - v_world_pos;
+    float dist = length(toCam);
+    vec3 V = toCam / max(dist, 0.001);
+    float fresnel = pow(1.0 - abs(dot(N, V)), 2.5);
+    vec3 L = normalize(vec3(-0.35, 0.75, 0.55));
+    float lit = 0.35 + 0.65 * max(0.0, dot(N, L));
+    float spec = pow(max(dot(reflect(-V, N), L), 0.0), 20.0);
+    vec3 col = vec3(0.09, 0.10, 0.17) * lit + vec3(0.16, 0.20, 0.36) * fresnel + vec3(0.35, 0.40, 0.55) * spec;
+    float haze = clamp(exp(-dist * 0.035), 0.0, 1.0);
+    float a = (0.20 + 0.28 * fresnel + 0.25 * spec) * u_alpha * haze;
+    if (u_has_refl > 0.5) {
+        // BIOS glass: the cube faces reflect TEXOREF (sphere-mapped by the reflection vector).
+        vec3 Rv = reflect(-V, N);
+        vec2 uv = Rv.xy / (2.0 * sqrt(Rv.x * Rv.x + Rv.y * Rv.y + (Rv.z + 1.0) * (Rv.z + 1.0)) + 1e-4) + 0.5;
+        vec3 env = texture(u_refl, uv).rgb;
+        // Neutral smoky grey like the BIOS: low-contrast reflection, no blue cast.
+        vec3 envSoft = mix(vec3(dot(env, vec3(0.333))), env, 0.25) * 0.70 + 0.05;
+        col = envSoft * vec3(0.40, 0.42, 0.55) * (0.55 + 0.45 * lit) + vec3(0.06, 0.08, 0.18) * fresnel;
+        a = (0.42 + 0.25 * fresnel) * u_alpha * haze;
+    }
+    if (u_glass > 0.5) {
+        // BIOS glass cube, pass for pass from a GS dump of the real intro:
+        //  1) face = copy of the rendered frame, shifted per face (refraction), x (108,108,122)/128
+        //  2) TEXOBLP smoke written into dest alpha (face UV 0..1)
+        //  3) + TEXOREF reflection * vertex colour (~(7..15)/128 over the two composites) * dest alpha
+        // i.e. the "smoke inside the glass" is the reflection seen through the smoke mask.
+        vec2 suv = (gl_FragCoord.xy - u_view.xy) / max(u_view.zw, vec2(1.0));
+        vec2 shift = vec2(N.x, N.y) * 0.045 + vec2(N.z * 0.022, -N.z * 0.012);
+        vec3 behind = texture(u_scene, clamp(suv + shift, vec2(0.002), vec2(0.998))).rgb;
+        float smoke = texture(u_smoke, v_color.gb).a;
+        vec3 Rv = reflect(-V, N);
+        vec2 envUv = Rv.xy * 0.5 + 0.5;
+        vec3 env = (u_has_refl > 0.5) ? texture(u_refl, envUv).rgb : vec3(0.3);
+        // Two REF passes (~10/128 and ~13/128) times dest alpha that reaches ~1.7 (PS2 alpha 0x80 = 1.0)
+        // -> about 0.55 of the reflection where the smoke is densest.
+        col = behind * vec3(0.844, 0.844, 0.953) + env * vec3(0.55, 0.55, 0.62) * smoke;
+        a = u_alpha;
+    }
+    o_color = vec4(col, clamp(a, 0.0, 0.6));
+}
+)";
+
 // Curved 3D Plasma Ribbon Trail Shader (Additive Blending)
 inline constexpr const char* kOrbRibbonVertexShader = R"(#version 300 es
 layout(location = 0) in vec2 a_pos;
@@ -230,7 +310,7 @@ void main() {
 }
 )";
 
-// Luminous 4-Point Optical Star Orb Sprite Shader (Additive Blending)
+// PS2 BIOS Orb Sprite Shader (Additive Blending)
 inline constexpr const char* kOrbSpriteFragmentShader = R"(#version 300 es
 precision highp float;
 
@@ -244,15 +324,11 @@ void main() {
     float r2 = dot(p, p);
     if (r2 >= 1.0) discard;
 
-    float aura = exp(-r2 * 4.5) * 0.55;
-    float halo = exp(-r2 * 11.0) * 0.72;
-    float core = exp(-r2 * 30.0) * 1.15;
-    float flareH = exp(-abs(p.y) * 22.0) * exp(-abs(p.x) * 4.2);
-    float flareV = exp(-abs(p.x) * 22.0) * exp(-abs(p.y) * 4.2);
-    float flare = (flareH + flareV) * 0.28;
-
-    vec3 col = v_color.rgb * (aura * 1.15 + halo * 0.78 + flare * 0.75) + vec3(0.95, 0.98, 1.0) * (core * 1.05 + halo * 0.28 + flare * 0.25);
-    float a = (aura + halo + core + flare) * v_color.a;
+    // PS2 BIOS orb: small white-hot core inside a soft round coloured glow (no flares).
+    float glow = exp(-r2 * 5.0);
+    float core = exp(-r2 * 60.0);
+    vec3 col = v_color.rgb * glow * 0.95 + vec3(0.92, 0.96, 1.0) * core * 1.35;
+    float a = (glow * 0.95 + core) * v_color.a;
     o_color = vec4(col * v_color.a, clamp(a, 0.0, 1.0));
 }
 )";

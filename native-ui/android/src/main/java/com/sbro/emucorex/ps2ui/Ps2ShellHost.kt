@@ -66,6 +66,9 @@ object Ps2ShellHost {
     private var keyListener: ((Int) -> Unit)? = null
 
     @Volatile
+    private var navigationListener: ((IntArray) -> Unit)? = null
+
+    @Volatile
     var swapConfirmButton: Boolean = false
 
     private var lastKeyRepeatTimeMs = 0L
@@ -101,6 +104,10 @@ object Ps2ShellHost {
 
     fun setExitListener(listener: (() -> Unit)?) {
         exitListener = listener
+    }
+
+    fun setNavigationListener(listener: ((IntArray) -> Unit)?) {
+        navigationListener = listener
     }
 
     fun setKeyListener(listener: ((Int) -> Unit)?) {
@@ -140,6 +147,12 @@ object Ps2ShellHost {
     fun onSettingsChanged(settings: IntArray) {
         val copy = settings.copyOf()
         mainHandler.post { settingsListener?.invoke(copy) }
+    }
+
+    @JvmStatic
+    fun onNavigationChanged(screen: Int, mainIndex: Int, gameIndex: Int, saveIndex: Int) {
+        val state = intArrayOf(screen, mainIndex, gameIndex, saveIndex)
+        mainHandler.post { navigationListener?.invoke(state) }
     }
 
     @JvmStatic

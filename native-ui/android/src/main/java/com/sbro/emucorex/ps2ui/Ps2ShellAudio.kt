@@ -52,6 +52,8 @@ object Ps2ShellAudio {
     private var pool: SoundPool? = null
     private val soundIds = IntArray(6)
     private val readyIds = HashSet<Int>()
+    // Recently started SFX streams, so they can be faded out and stopped when the shell is left.
+    private val activeStreams = ArrayDeque<Int>()
 
     private var ambientThread: Thread? = null
 
@@ -120,11 +122,34 @@ object Ps2ShellAudio {
             SFX_DISC_LAUNCH -> 0.64f
             else -> 0.48f
         }
-        sp.play(id, vol, vol, 1, 0, 1.0f)
+        val streamId = sp.play(id, vol, vol, 1, 0, 1.0f)
+        if (streamId != 0) {
+            synchronized(lock) {
+                activeStreams.addLast(streamId)
+                while (activeStreams.size > 8) activeStreams.removeFirst()
+            }
+        }
+    }
+
+    /** Fades every still-playing SFX out over ~200 ms and stops it (off the caller's thread). */
+    private fun fadeOutSfx() {
+        val sp = pool ?: return
+        val streams = synchronized(lock) { activeStreams.toList().also { activeStreams.clear() } }
+        if (streams.isEmpty()) return
+        thread(start = true, isDaemon = true, name = "Ps2SfxFade") {
+            val steps = 8
+            for (step in steps - 1 downTo 0) {
+                val v = 0.6f * step / steps
+                streams.forEach { runCatching { sp.setVolume(it, v, v) } }
+                runCatching { Thread.sleep(25) }
+            }
+            streams.forEach { runCatching { sp.stop(it) } }
+        }
     }
 
     fun pauseAudio() {
         hostVisible = false
+        fadeOutSfx()
     }
 
     fun resumeAudio() {
@@ -153,7 +178,11 @@ object Ps2ShellAudio {
 
     private fun startAmbientThread() {
         synchronized(lock) {
-            if (ambientThread?.isAlive == true) return
+            if (ambientThread?.isAlive == true) {
+                // Still fading out: cancel the stop and keep playing.
+                ambientStopRequested = false
+                return
+            }
             ambientStopRequested = false
             ambientThread = thread(start = true, isDaemon = true, name = "Ps2CosmicAmbient") {
                 runAmbientLoop()
@@ -162,16 +191,8 @@ object Ps2ShellAudio {
     }
 
     private fun stopAmbientThread() {
+        // The audio thread fades itself out and drops its buffer; no blocking on the caller.
         ambientStopRequested = true
-        val t = synchronized(lock) { ambientThread }
-        if (t != null && t !== Thread.currentThread()) {
-            runCatching { t.join(250) }
-        }
-        synchronized(lock) {
-            if (ambientThread === t) {
-                ambientThread = null
-            }
-        }
     }
 
     // Authentic PS2 deep subterranean oceanic wind + eerie abyssal drone (no musical triad loop!)
@@ -207,6 +228,8 @@ object Ps2ShellAudio {
         var lp1 = 0.0
         var lp2 = 0.0
         var fadeGain = 0.0
+        var outGain = 1.0
+        val outStep = 1.0 / (SAMPLE_RATE * 0.12)
         var lfoPhase = 0.0
         var tidePhase = 0.8
         var phase1 = 0.0
@@ -219,7 +242,9 @@ object Ps2ShellAudio {
 
         try {
             track.play()
-            while (!ambientStopRequested) {
+            while (true) {
+                val stopping = ambientStopRequested
+                if (!stopping) outGain = 1.0
                 for (i in chunk.indices) {
                     // Calm, resonant-free 2-pole filtered brown air/surf cushion
                     rng = rng * 1664525u + 1013904223u
@@ -234,7 +259,8 @@ object Ps2ShellAudio {
                     val pad = 0.055 * sin(phase1) + 0.025 * sin(phase2)
 
                     fadeGain = (fadeGain + 1.0 / (SAMPLE_RATE * 1.6)).coerceAtMost(1.0)
-                    val mix = (lp2 * 1.45 * tide + pad * tide) * 0.11 * fadeGain
+                    if (stopping) outGain = (outGain - outStep).coerceAtLeast(0.0)
+                    val mix = (lp2 * 1.45 * tide + pad * tide) * 0.11 * fadeGain * outGain
                     val s = tanh(mix)
                     chunk[i] = (s * 32767.0).roundToInt().coerceIn(-32767, 32767).toShort()
 
@@ -248,13 +274,22 @@ object Ps2ShellAudio {
                     if (phase2 >= twoPi) phase2 -= twoPi
                 }
                 track.write(chunk, 0, chunk.size)
+                if (stopping && outGain <= 0.0) break
             }
         } catch (_: Throwable) {
         } finally {
             runCatching {
+                // Drop whatever is still buffered so nothing keeps playing after the fade.
+                track.pause()
+                track.flush()
                 track.stop()
                 track.release()
             }
+            synchronized(lock) {
+                if (ambientThread === Thread.currentThread()) ambientThread = null
+            }
+            // Shell came back while we were fading out: start a fresh ambient stream.
+            if (!ambientStopRequested) syncAmbientPlayback()
         }
     }
 

@@ -10,6 +10,7 @@ option(PS2UI_DISABLE_LOGS "Disable all native Android logging in Release builds"
 add_library(emucorex_ps2ui SHARED
     ps2_jni.cpp
     ps2_renderer.cpp
+    ps2_bios_assets.cpp
 )
 
 target_compile_features(emucorex_ps2ui PRIVATE cxx_std_17)

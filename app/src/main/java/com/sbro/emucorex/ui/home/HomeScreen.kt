@@ -536,7 +536,9 @@ fun HomeScreen(
                 onSaveSelected = onSaveSelected,
                 onManageGame = onManageGameClick,
                 onExitShell = {
-                    onShelfModeChanged(false)
+                    // Only switch the mode here. The drawer is re-enabled by
+                    // LaunchedEffect(isShelfView) once the shell is really gone; enabling
+                    // it first made the drawer flash over the still-visible shell.
                     viewModel.toggleShelfMode()
                 },
                 modifier = Modifier.fillMaxSize()

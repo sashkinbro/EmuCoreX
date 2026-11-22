@@ -1,6 +1,7 @@
 #pragma once
 
 #include <GLES3/gl3.h>
+#include "ps2_bios_assets.h"
 #include <chrono>
 #include <cstdint>
 #include <ctime>
@@ -15,6 +16,8 @@ namespace ps2ui {
 
 // Host bridge callbacks implemented in ps2_jni.cpp
 void HostNotifyGameLaunch(const std::string& gamePath);
+// Screen/selection changed: lets the host persist "where the user is" immediately.
+void HostNotifyNavigation(int screen, int mainIndex, int gameIndex, int saveIndex);
 void HostNotifySaveLaunch(const std::string& gamePath, int slot);
 void HostNotifyDeleteSave(int saveIndex);
 void HostNotifyMemoryCardAction(int action, int slot, int cardIndex, int sizeMb);
@@ -275,6 +278,7 @@ private:
         GLuint tex = 0;
         float logW = 0.0f;
         float logH = 0.0f;
+        size_t bytes = 0;
         std::list<std::string>::iterator lruIt{};
     };
 
@@ -445,6 +449,8 @@ private:
     // Screen Drawing
     LayoutMetrics ComputeMetrics() const;
     void DrawBootIntro(float alpha);
+    void UpdateBiosTextures();
+    bool EnsureSceneCopyTexture();
     void DrawStatusBar(float alpha);
     void DrawBottomBar(float alpha);
     void DrawMainMenu(float alpha);
@@ -499,6 +505,8 @@ private:
     bool gl_ready_ = false;
     GLuint vao_ = 0;
     GLuint vbo_ = 0;
+    GLuint orb_vao_ = 0;
+    GLuint orb_vbo_ = 0;
     GLuint fs_vao_ = 0;
     GLuint fs_vbo_ = 0;
     GLuint tower_vao_ = 0;
@@ -527,6 +535,32 @@ private:
     GLint twr_u_alpha_ = -1;
     GLint twr_u_silhouette_ = -1;
     GLint twr_u_time_ = -1;
+    GLuint prog_boot_cube_ = 0;
+    GLint bcube_u_mvp_ = -1;
+    GLint bcube_u_cam_pos_ = -1;
+    GLint bcube_u_alpha_ = -1;
+    GLint bcube_u_refl_ = -1;
+    GLint bcube_u_has_refl_ = -1;
+    GLint bcube_u_glass_ = -1;
+    GLint bcube_u_scene_ = -1;
+    GLint bcube_u_view_ = -1;
+    GLint bcube_u_noise_ = -1;
+    GLint bcube_u_time_ = -1;
+    GLint bcube_u_smoke_ = -1;
+    GLuint scene_copy_tex_ = 0;
+    int scene_copy_w_ = 0;
+    int scene_copy_h_ = 0;
+    GLuint boot_prev_tex_ = 0;
+    int boot_prev_w_ = 0;
+    int boot_prev_h_ = 0;
+    bool boot_prev_valid_ = false;
+    GLuint bios_fog_tex_ = 0;
+    GLuint bios_refl_tex_ = 0;
+    GLuint bios_glow_tex_ = 0;
+    GLuint bios_noise_tex_ = 0;
+    GLuint bios_cloud_tex_[3] = {0, 0, 0};
+    GLuint bios_smoke_tex_ = 0;
+    uint32_t bios_assets_gen_ = 0;
 
     GLuint prog_ribbon_ = 0;
     GLint rib_u_screen_ = -1;
@@ -624,13 +658,12 @@ private:
     int orb_swoop_dir_ = 1;
     float orb_flash_t_ = 0.0f;
     double orb_phase_acc_ = 0.0;
-    double orb_rot_time_ = 0.0;
     float mist_strength_cur_ = 0.16f;
     bool orb_pos_init_ = false;
 
     bool boot_active_ = false;
     float boot_t_ = 0.0f;
-    float boot_duration_ = 3.8f;
+    float boot_duration_ = 5.5f;
     bool boot_sfx_played_ = false;
 
     bool launching_ = false;
@@ -718,6 +751,7 @@ private:
     bool image_cache_dirty_ = false;
     std::unordered_set<std::string> dirty_image_paths_;
     int image_decodes_this_frame_ = 0;
+    double text_raster_ms_this_frame_ = 0.0;
 
     // Cached once-per-second status bar string
     std::time_t cached_status_sec_ = 0;
@@ -729,6 +763,7 @@ private:
 
     // LRU Texture Caches (GL thread only)
     std::unordered_map<std::string, TextCacheEntry> text_cache_;
+    size_t text_cache_bytes_ = 0;
     std::list<std::string> text_lru_;
     std::unordered_map<std::string, ImageCacheEntry> image_cache_;
     std::list<std::string> image_lru_;

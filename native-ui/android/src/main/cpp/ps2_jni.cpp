@@ -1,4 +1,5 @@
 #include "ps2_renderer.h"
+#include "ps2_bios_assets.h"
 
 #include <algorithm>
 #include <cstring>
@@ -26,6 +27,7 @@ jmethodID g_on_mc_action = nullptr;
 jmethodID g_on_open_game_settings = nullptr;
 jmethodID g_on_settings_changed = nullptr;
 jmethodID g_on_exit_requested = nullptr;
+jmethodID g_on_navigation = nullptr;
 
 jclass g_text_cls = nullptr;
 jmethodID g_rasterize_text = nullptr;
@@ -231,6 +233,13 @@ void HostNotifySettingsChanged(const int32_t* values, int count) {
     env->DeleteLocalRef(jarr);
 }
 
+void HostNotifyNavigation(int screen, int mainIndex, int gameIndex, int saveIndex) {
+    JNIEnv* env = GetEnv();
+    if (!env || !g_host_cls || !g_on_navigation) return;
+    env->CallStaticVoidMethod(g_host_cls, g_on_navigation, static_cast<jint>(screen), static_cast<jint>(mainIndex),
+                              static_cast<jint>(gameIndex), static_cast<jint>(saveIndex));
+}
+
 void HostNotifyExitRequested() {
     JNIEnv* env = GetEnv();
     if (!env || !g_host_cls || !g_on_exit_requested) return;
@@ -278,21 +287,22 @@ bool HostRasterizeText(
         return false;
     }
 
-    std::vector<uint8_t> buf(static_cast<size_t>(len));
-    env->GetByteArrayRegion(bytes, 0, len, reinterpret_cast<jbyte*>(buf.data()));
-    env->DeleteLocalRef(bytes);
-
+    // Header first, then copy the pixels straight into outRgba (single copy out of the Java array).
     int32_t hdr[4] = {};
-    std::memcpy(hdr, buf.data(), 16);
+    env->GetByteArrayRegion(bytes, 0, 16, reinterpret_cast<jbyte*>(hdr));
     outTexW = hdr[0];
     outTexH = hdr[1];
     outLogW = static_cast<float>(hdr[2]) / 100.0f;
     outLogH = static_cast<float>(hdr[3]) / 100.0f;
 
-    const size_t expected = 16 + static_cast<size_t>(outTexW) * static_cast<size_t>(outTexH) * 4;
-    if (outTexW <= 0 || outTexH <= 0 || buf.size() < expected) return false;
-
-    outRgba.assign(buf.begin() + 16, buf.begin() + static_cast<ptrdiff_t>(expected));
+    const size_t pixelBytes = static_cast<size_t>(std::max(0, outTexW)) * static_cast<size_t>(std::max(0, outTexH)) * 4;
+    if (outTexW <= 0 || outTexH <= 0 || static_cast<size_t>(len) < 16 + pixelBytes) {
+        env->DeleteLocalRef(bytes);
+        return false;
+    }
+    outRgba.resize(pixelBytes);
+    env->GetByteArrayRegion(bytes, 16, static_cast<jsize>(pixelBytes), reinterpret_cast<jbyte*>(outRgba.data()));
+    env->DeleteLocalRef(bytes);
     return true;
 }
 
@@ -362,6 +372,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
         g_on_open_game_settings = env->GetStaticMethodID(g_host_cls, "onOpenGameSettings", "(I)V");
         g_on_settings_changed = env->GetStaticMethodID(g_host_cls, "onSettingsChanged", "([I)V");
         g_on_exit_requested = env->GetStaticMethodID(g_host_cls, "onExitRequested", "()V");
+        g_on_navigation = env->GetStaticMethodID(g_host_cls, "onNavigationChanged", "(IIII)V");
+        if (env->ExceptionCheck()) { env->ExceptionClear(); g_on_navigation = nullptr; }
     }
 
     g_text_cls = cacheClass("com/sbro/emucorex/ps2ui/Ps2TextRasterizer");
@@ -768,6 +780,18 @@ JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_ps2ui_Ps2ShellNative_nativeSelectGameByPath(
     JNIEnv* env, jobject /*thiz*/, jstring path) {
     if (g_renderer) g_renderer->SelectGameByPath(JstringToUtf8(env, path));
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_sbro_emucorex_ps2ui_Ps2ShellNative_nativeLoadBiosAssets(
+    JNIEnv* env, jobject /*thiz*/, jbyteArray rom) {
+    if (!rom) return JNI_FALSE;
+    const jsize len = env->GetArrayLength(rom);
+    jbyte* bytes = env->GetByteArrayElements(rom, nullptr);
+    if (!bytes) return JNI_FALSE;
+    const bool ok = ps2ui::LoadBiosAssets(reinterpret_cast<const uint8_t*>(bytes), static_cast<size_t>(len));
+    env->ReleaseByteArrayElements(rom, bytes, JNI_ABORT);
+    return ok ? JNI_TRUE : JNI_FALSE;
 }
 
 } // extern "C"
