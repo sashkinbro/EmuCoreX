@@ -351,6 +351,7 @@ tasks.matching { it.name == "mergeReleaseJniLibFolders" || it.name == "mergeDebu
 }
 
 dependencies {
+    implementation(project(":native-ui:android"))
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.google.identity)
