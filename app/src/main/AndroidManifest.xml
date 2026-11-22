@@ -35,6 +35,13 @@
     <uses-feature
         android:name="android.hardware.bluetooth"
         android:required="false" />
+    <!-- TvActivity is landscape-only; without this Play treats landscape as required. -->
+    <uses-feature
+        android:name="android.hardware.screen.landscape"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.screen.portrait"
+        android:required="false" />
 
     <!-- Android 11+ package visibility hides other apps from queryIntentActivities unless the
          queried intents are declared here. Without these entries the TV storage picker cannot
