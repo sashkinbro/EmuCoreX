@@ -1274,6 +1274,8 @@ namespace vuaot
 			{
 				eBitPass1(branch);
 				needFlagFinalize_ = true;
+				if (!isVU1())
+					regs_.needExactMatch |= 7; // microVU_Compile.inl:713-717
 			}
 
 			if ((curI() & kMbit) && !isVU1())
