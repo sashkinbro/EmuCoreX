@@ -65,17 +65,21 @@ endif()
 set(EMUCOREX_RUST_TOOLCHAIN "" CACHE STRING
 	"rustup toolchain for librashader's host build scripts. Empty = auto-detect.")
 set(_lrs_rustup_env "")
+set(_lrs_active_host_triple "")
 set(_lrs_cargo_path "")
 set(_lrs_probe_dir "${CMAKE_CURRENT_BINARY_DIR}/host-linker-probe")
 set(_lrs_probe_error "")
+
+if(CMAKE_HOST_WIN32)
+	get_filename_component(_lrs_cargo_bin_dir "${CARGO_EXECUTABLE}" DIRECTORY)
+	find_program(RUSTC_EXECUTABLE rustc HINTS "${_lrs_cargo_bin_dir}" "$ENV{USERPROFILE}/.cargo/bin")
+	find_program(RUSTUP_EXECUTABLE rustup HINTS "${_lrs_cargo_bin_dir}" "$ENV{USERPROFILE}/.cargo/bin")
+endif()
 
 if(EMUCOREX_RUST_TOOLCHAIN)
 	set(_lrs_rustup_env "RUSTUP_TOOLCHAIN=${EMUCOREX_RUST_TOOLCHAIN}")
 	message(STATUS "librashader: host Rust toolchain pinned to ${EMUCOREX_RUST_TOOLCHAIN}")
 elseif(CMAKE_HOST_WIN32)
-	get_filename_component(_lrs_cargo_bin_dir "${CARGO_EXECUTABLE}" DIRECTORY)
-	find_program(RUSTC_EXECUTABLE rustc HINTS "${_lrs_cargo_bin_dir}" "$ENV{USERPROFILE}/.cargo/bin")
-	find_program(RUSTUP_EXECUTABLE rustup HINTS "${_lrs_cargo_bin_dir}" "$ENV{USERPROFILE}/.cargo/bin")
 
 	if(NOT RUSTC_EXECUTABLE)
 		message(FATAL_ERROR "librashader: cargo was found at ${CARGO_EXECUTABLE} but rustc was "
@@ -174,6 +178,18 @@ elseif(CMAKE_HOST_WIN32)
 	endif()
 endif()
 
+if(CMAKE_HOST_WIN32 AND RUSTC_EXECUTABLE)
+	execute_process(
+		COMMAND "${CMAKE_COMMAND}" -E env ${_lrs_rustup_env} "${RUSTC_EXECUTABLE}" -vV
+		OUTPUT_VARIABLE _lrs_active_rustc_version
+		ERROR_QUIET
+	)
+	string(REGEX MATCH "host: ([A-Za-z0-9_.-]+)" _lrs_active_host_match "${_lrs_active_rustc_version}")
+	if(_lrs_active_host_match)
+		set(_lrs_active_host_triple "${CMAKE_MATCH_1}")
+	endif()
+endif()
+
 # ---- NDK toolchain paths for cargo's linker/cc ------------------------------------
 # cargo drives its own linker, so hand it the same NDK clang CMake is using.
 if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
@@ -234,7 +250,7 @@ string(REPLACE "-" "_" _lrs_target_under "${_lrs_rust_target}")
 # The NDK already carries a self-contained equivalent (llvm-dlltool), so stage it under
 # the name rustc looks for, next to the libwinpthread it is linked against, and prepend
 # that directory to cargo's PATH. Only GNU hosts need this.
-if(CMAKE_HOST_WIN32 AND _lrs_rustup_env MATCHES "gnu")
+if(CMAKE_HOST_WIN32 AND (_lrs_rustup_env MATCHES "gnu" OR _lrs_active_host_triple MATCHES "gnu"))
 	set(_lrs_host_tools_dir "${CMAKE_CURRENT_BINARY_DIR}/host-tools")
 	set(_lrs_dlltool_shim "${_lrs_host_tools_dir}/dlltool.exe")
 	file(MAKE_DIRECTORY "${_lrs_host_tools_dir}")
