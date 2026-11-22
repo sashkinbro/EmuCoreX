@@ -779,6 +779,8 @@ adreno840-qcom-oneplus-CPH2747 vk.general_attachment_layout[layout-no-roaa]=0
 adreno840-qcom-oneplus-CPH2747 vk.general_attachment_layout[barriers-forced-on]=1
 adreno840-qcom-oneplus-CPH2747 vk.general_attachment_layout[barriers-forced-off]=0
 adreno840-qcom-oneplus-CPH2747 vk.general_attachment_layout[fetch-user-disabled]=0
+adreno840-qcom-oneplus-CPH2747 vk.fetch_probe[passed all-ext] road=Copy in_tile_read=0 texture_barrier=0 carry=None
+adreno840-qcom-oneplus-CPH2747 vk.fetch_probe[failed all-ext] road=Copy in_tile_read=0 texture_barrier=0 carry=None
 adreno840-qcom-oneplus-CPH2747 vk.general_attachment_layout[device-log]=0
 adreno750-qcom-lenovo-TB710FU vk.shader_workarounds scalarize_vector_bitwise_and=0 store_bitwise_negation_in_temporary=0 gl.shader_workarounds=0 adreno_generation_unified=7
 adreno750-qcom-lenovo-TB710FU vk.general_attachment_layout[all-ext]=0
@@ -787,6 +789,8 @@ adreno750-qcom-lenovo-TB710FU vk.general_attachment_layout[layout-no-roaa]=0
 adreno750-qcom-lenovo-TB710FU vk.general_attachment_layout[barriers-forced-on]=1
 adreno750-qcom-lenovo-TB710FU vk.general_attachment_layout[barriers-forced-off]=0
 adreno750-qcom-lenovo-TB710FU vk.general_attachment_layout[fetch-user-disabled]=0
+adreno750-qcom-lenovo-TB710FU vk.fetch_probe[passed all-ext] road=Copy in_tile_read=0 texture_barrier=0 carry=None
+adreno750-qcom-lenovo-TB710FU vk.fetch_probe[failed all-ext] road=Copy in_tile_read=0 texture_barrier=0 carry=None
 adreno750-qcom-lenovo-TB710FU vk.general_attachment_layout[device-log]=0
 mali-g57-r40p0-arm-anbernic-RG556 vk.shader_workarounds scalarize_vector_bitwise_and=1 store_bitwise_negation_in_temporary=1 gl.shader_workarounds=1 adreno_generation_unified=0
 mali-g57-r40p0-arm-anbernic-RG556 vk.general_attachment_layout[all-ext]=1
@@ -795,6 +799,8 @@ mali-g57-r40p0-arm-anbernic-RG556 vk.general_attachment_layout[layout-no-roaa]=1
 mali-g57-r40p0-arm-anbernic-RG556 vk.general_attachment_layout[barriers-forced-on]=1
 mali-g57-r40p0-arm-anbernic-RG556 vk.general_attachment_layout[barriers-forced-off]=0
 mali-g57-r40p0-arm-anbernic-RG556 vk.general_attachment_layout[fetch-user-disabled]=1
+mali-g57-r40p0-arm-anbernic-RG556 vk.fetch_probe[passed all-ext] road=InPassOrdered in_tile_read=1 texture_barrier=1 carry=NonReaders
+mali-g57-r40p0-arm-anbernic-RG556 vk.fetch_probe[failed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=None
 mali-g57-r40p0-arm-anbernic-RG556 vk.general_attachment_layout[device-log]=1
 adreno730-turnip-axfl2 vk.shader_workarounds scalarize_vector_bitwise_and=0 store_bitwise_negation_in_temporary=0 gl.shader_workarounds=0 adreno_generation_unified=7
 adreno730-turnip-axfl2 vk.general_attachment_layout[all-ext]=1
@@ -803,6 +809,8 @@ adreno730-turnip-axfl2 vk.general_attachment_layout[layout-no-roaa]=1
 adreno730-turnip-axfl2 vk.general_attachment_layout[barriers-forced-on]=1
 adreno730-turnip-axfl2 vk.general_attachment_layout[barriers-forced-off]=0
 adreno730-turnip-axfl2 vk.general_attachment_layout[fetch-user-disabled]=1
+adreno730-turnip-axfl2 vk.fetch_probe[passed all-ext] road=InPassOrdered in_tile_read=0 texture_barrier=1 carry=NonReaders
+adreno730-turnip-axfl2 vk.fetch_probe[failed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=NonReaders
 adreno730-turnip-plain vk.shader_workarounds scalarize_vector_bitwise_and=0 store_bitwise_negation_in_temporary=0 gl.shader_workarounds=0 adreno_generation_unified=7
 adreno730-turnip-plain vk.general_attachment_layout[all-ext]=1
 adreno730-turnip-plain vk.general_attachment_layout[no-ext]=0
@@ -810,6 +818,8 @@ adreno730-turnip-plain vk.general_attachment_layout[layout-no-roaa]=1
 adreno730-turnip-plain vk.general_attachment_layout[barriers-forced-on]=1
 adreno730-turnip-plain vk.general_attachment_layout[barriers-forced-off]=0
 adreno730-turnip-plain vk.general_attachment_layout[fetch-user-disabled]=1
+adreno730-turnip-plain vk.fetch_probe[passed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=NonReaders
+adreno730-turnip-plain vk.fetch_probe[failed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=NonReaders
 adreno740-turnip-axfl1 vk.shader_workarounds scalarize_vector_bitwise_and=0 store_bitwise_negation_in_temporary=0 gl.shader_workarounds=0 adreno_generation_unified=7
 adreno740-turnip-axfl1 vk.general_attachment_layout[all-ext]=1
 adreno740-turnip-axfl1 vk.general_attachment_layout[no-ext]=0
@@ -817,6 +827,8 @@ adreno740-turnip-axfl1 vk.general_attachment_layout[layout-no-roaa]=1
 adreno740-turnip-axfl1 vk.general_attachment_layout[barriers-forced-on]=1
 adreno740-turnip-axfl1 vk.general_attachment_layout[barriers-forced-off]=0
 adreno740-turnip-axfl1 vk.general_attachment_layout[fetch-user-disabled]=1
+adreno740-turnip-axfl1 vk.fetch_probe[passed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=NonReaders
+adreno740-turnip-axfl1 vk.fetch_probe[failed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=NonReaders
 adreno650-turnip-axfl1 vk.shader_workarounds scalarize_vector_bitwise_and=0 store_bitwise_negation_in_temporary=0 gl.shader_workarounds=0 adreno_generation_unified=6
 adreno650-turnip-axfl1 vk.general_attachment_layout[all-ext]=1
 adreno650-turnip-axfl1 vk.general_attachment_layout[no-ext]=0
@@ -824,6 +836,8 @@ adreno650-turnip-axfl1 vk.general_attachment_layout[layout-no-roaa]=1
 adreno650-turnip-axfl1 vk.general_attachment_layout[barriers-forced-on]=1
 adreno650-turnip-axfl1 vk.general_attachment_layout[barriers-forced-off]=0
 adreno650-turnip-axfl1 vk.general_attachment_layout[fetch-user-disabled]=1
+adreno650-turnip-axfl1 vk.fetch_probe[passed all-ext] road=InPassOrdered in_tile_read=0 texture_barrier=1 carry=NonReaders
+adreno650-turnip-axfl1 vk.fetch_probe[failed all-ext] road=InPassOrdered in_tile_read=0 texture_barrier=1 carry=NonReaders
 adreno650-turnip-plain vk.shader_workarounds scalarize_vector_bitwise_and=0 store_bitwise_negation_in_temporary=0 gl.shader_workarounds=0 adreno_generation_unified=6
 adreno650-turnip-plain vk.general_attachment_layout[all-ext]=0
 adreno650-turnip-plain vk.general_attachment_layout[no-ext]=0
@@ -831,6 +845,8 @@ adreno650-turnip-plain vk.general_attachment_layout[layout-no-roaa]=0
 adreno650-turnip-plain vk.general_attachment_layout[barriers-forced-on]=1
 adreno650-turnip-plain vk.general_attachment_layout[barriers-forced-off]=0
 adreno650-turnip-plain vk.general_attachment_layout[fetch-user-disabled]=0
+adreno650-turnip-plain vk.fetch_probe[passed all-ext] road=Copy in_tile_read=0 texture_barrier=0 carry=None
+adreno650-turnip-plain vk.fetch_probe[failed all-ext] road=Copy in_tile_read=0 texture_barrier=0 carry=None
 adreno650-turnip-unmapped-driver-id vk.shader_workarounds scalarize_vector_bitwise_and=0 store_bitwise_negation_in_temporary=0 gl.shader_workarounds=0 adreno_generation_unified=6
 adreno650-turnip-unmapped-driver-id vk.general_attachment_layout[all-ext]=0
 adreno650-turnip-unmapped-driver-id vk.general_attachment_layout[no-ext]=0
@@ -838,6 +854,8 @@ adreno650-turnip-unmapped-driver-id vk.general_attachment_layout[layout-no-roaa]
 adreno650-turnip-unmapped-driver-id vk.general_attachment_layout[barriers-forced-on]=1
 adreno650-turnip-unmapped-driver-id vk.general_attachment_layout[barriers-forced-off]=0
 adreno650-turnip-unmapped-driver-id vk.general_attachment_layout[fetch-user-disabled]=0
+adreno650-turnip-unmapped-driver-id vk.fetch_probe[passed all-ext] road=Copy in_tile_read=0 texture_barrier=0 carry=None
+adreno650-turnip-unmapped-driver-id vk.fetch_probe[failed all-ext] road=Copy in_tile_read=0 texture_barrier=0 carry=None
 adreno610-turnip vk.shader_workarounds scalarize_vector_bitwise_and=0 store_bitwise_negation_in_temporary=0 gl.shader_workarounds=0 adreno_generation_unified=6
 adreno610-turnip vk.general_attachment_layout[all-ext]=0
 adreno610-turnip vk.general_attachment_layout[no-ext]=0
@@ -845,6 +863,8 @@ adreno610-turnip vk.general_attachment_layout[layout-no-roaa]=0
 adreno610-turnip vk.general_attachment_layout[barriers-forced-on]=1
 adreno610-turnip vk.general_attachment_layout[barriers-forced-off]=0
 adreno610-turnip vk.general_attachment_layout[fetch-user-disabled]=0
+adreno610-turnip vk.fetch_probe[passed all-ext] road=Copy in_tile_read=0 texture_barrier=0 carry=None
+adreno610-turnip vk.fetch_probe[failed all-ext] road=Copy in_tile_read=0 texture_barrier=0 carry=None
 adreno840-qcom-no-driver-properties vk.shader_workarounds scalarize_vector_bitwise_and=0 store_bitwise_negation_in_temporary=0 gl.shader_workarounds=0 adreno_generation_unified=8
 adreno840-qcom-no-driver-properties vk.general_attachment_layout[all-ext]=0
 adreno840-qcom-no-driver-properties vk.general_attachment_layout[no-ext]=0
@@ -852,6 +872,8 @@ adreno840-qcom-no-driver-properties vk.general_attachment_layout[layout-no-roaa]
 adreno840-qcom-no-driver-properties vk.general_attachment_layout[barriers-forced-on]=1
 adreno840-qcom-no-driver-properties vk.general_attachment_layout[barriers-forced-off]=0
 adreno840-qcom-no-driver-properties vk.general_attachment_layout[fetch-user-disabled]=0
+adreno840-qcom-no-driver-properties vk.fetch_probe[passed all-ext] road=Copy in_tile_read=0 texture_barrier=0 carry=None
+adreno840-qcom-no-driver-properties vk.fetch_probe[failed all-ext] road=Copy in_tile_read=0 texture_barrier=0 carry=None
 adreno-chipid-only-650 vk.shader_workarounds scalarize_vector_bitwise_and=0 store_bitwise_negation_in_temporary=0 gl.shader_workarounds=0 adreno_generation_unified=6
 adreno-chipid-only-650 vk.general_attachment_layout[all-ext]=0
 adreno-chipid-only-650 vk.general_attachment_layout[no-ext]=0
@@ -859,6 +881,8 @@ adreno-chipid-only-650 vk.general_attachment_layout[layout-no-roaa]=0
 adreno-chipid-only-650 vk.general_attachment_layout[barriers-forced-on]=1
 adreno-chipid-only-650 vk.general_attachment_layout[barriers-forced-off]=0
 adreno-chipid-only-650 vk.general_attachment_layout[fetch-user-disabled]=0
+adreno-chipid-only-650 vk.fetch_probe[passed all-ext] road=Copy in_tile_read=0 texture_barrier=0 carry=None
+adreno-chipid-only-650 vk.fetch_probe[failed all-ext] road=Copy in_tile_read=0 texture_barrier=0 carry=None
 adreno-x1-85-windows-arm vk.shader_workarounds scalarize_vector_bitwise_and=0 store_bitwise_negation_in_temporary=0 gl.shader_workarounds=0 adreno_generation_unified=9
 adreno-x1-85-windows-arm vk.general_attachment_layout[all-ext]=0
 adreno-x1-85-windows-arm vk.general_attachment_layout[no-ext]=0
@@ -866,6 +890,8 @@ adreno-x1-85-windows-arm vk.general_attachment_layout[layout-no-roaa]=0
 adreno-x1-85-windows-arm vk.general_attachment_layout[barriers-forced-on]=1
 adreno-x1-85-windows-arm vk.general_attachment_layout[barriers-forced-off]=0
 adreno-x1-85-windows-arm vk.general_attachment_layout[fetch-user-disabled]=0
+adreno-x1-85-windows-arm vk.fetch_probe[passed all-ext] road=Copy in_tile_read=0 texture_barrier=0 carry=None
+adreno-x1-85-windows-arm vk.fetch_probe[failed all-ext] road=Copy in_tile_read=0 texture_barrier=0 carry=None
 mali-g57-r44p1-arm vk.shader_workarounds scalarize_vector_bitwise_and=1 store_bitwise_negation_in_temporary=1 gl.shader_workarounds=1 adreno_generation_unified=0
 mali-g57-r44p1-arm vk.general_attachment_layout[all-ext]=0
 mali-g57-r44p1-arm vk.general_attachment_layout[no-ext]=0
@@ -873,6 +899,8 @@ mali-g57-r44p1-arm vk.general_attachment_layout[layout-no-roaa]=0
 mali-g57-r44p1-arm vk.general_attachment_layout[barriers-forced-on]=1
 mali-g57-r44p1-arm vk.general_attachment_layout[barriers-forced-off]=0
 mali-g57-r44p1-arm vk.general_attachment_layout[fetch-user-disabled]=0
+mali-g57-r44p1-arm vk.fetch_probe[passed all-ext] road=Copy in_tile_read=0 texture_barrier=0 carry=None
+mali-g57-r44p1-arm vk.fetch_probe[failed all-ext] road=Copy in_tile_read=0 texture_barrier=0 carry=None
 mali-g57-malisx2-0.5.1 vk.shader_workarounds scalarize_vector_bitwise_and=1 store_bitwise_negation_in_temporary=1 gl.shader_workarounds=1 adreno_generation_unified=0
 mali-g57-malisx2-0.5.1 vk.general_attachment_layout[all-ext]=1
 mali-g57-malisx2-0.5.1 vk.general_attachment_layout[no-ext]=1
@@ -880,6 +908,8 @@ mali-g57-malisx2-0.5.1 vk.general_attachment_layout[layout-no-roaa]=1
 mali-g57-malisx2-0.5.1 vk.general_attachment_layout[barriers-forced-on]=1
 mali-g57-malisx2-0.5.1 vk.general_attachment_layout[barriers-forced-off]=0
 mali-g57-malisx2-0.5.1 vk.general_attachment_layout[fetch-user-disabled]=1
+mali-g57-malisx2-0.5.1 vk.fetch_probe[passed all-ext] road=InPassOrdered in_tile_read=1 texture_barrier=1 carry=NonReaders
+mali-g57-malisx2-0.5.1 vk.fetch_probe[failed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=None
 mali-g720-mediatek-mt6989 vk.shader_workarounds scalarize_vector_bitwise_and=1 store_bitwise_negation_in_temporary=1 gl.shader_workarounds=1 adreno_generation_unified=0
 mali-g720-mediatek-mt6989 vk.general_attachment_layout[all-ext]=1
 mali-g720-mediatek-mt6989 vk.general_attachment_layout[no-ext]=1
@@ -887,6 +917,8 @@ mali-g720-mediatek-mt6989 vk.general_attachment_layout[layout-no-roaa]=1
 mali-g720-mediatek-mt6989 vk.general_attachment_layout[barriers-forced-on]=1
 mali-g720-mediatek-mt6989 vk.general_attachment_layout[barriers-forced-off]=0
 mali-g720-mediatek-mt6989 vk.general_attachment_layout[fetch-user-disabled]=1
+mali-g720-mediatek-mt6989 vk.fetch_probe[passed all-ext] road=InPassOrdered in_tile_read=1 texture_barrier=1 carry=NonReaders
+mali-g720-mediatek-mt6989 vk.fetch_probe[failed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=None
 mali-g615-mediatek-mt6897 vk.shader_workarounds scalarize_vector_bitwise_and=1 store_bitwise_negation_in_temporary=1 gl.shader_workarounds=1 adreno_generation_unified=0
 mali-g615-mediatek-mt6897 vk.general_attachment_layout[all-ext]=1
 mali-g615-mediatek-mt6897 vk.general_attachment_layout[no-ext]=1
@@ -894,6 +926,8 @@ mali-g615-mediatek-mt6897 vk.general_attachment_layout[layout-no-roaa]=1
 mali-g615-mediatek-mt6897 vk.general_attachment_layout[barriers-forced-on]=1
 mali-g615-mediatek-mt6897 vk.general_attachment_layout[barriers-forced-off]=0
 mali-g615-mediatek-mt6897 vk.general_attachment_layout[fetch-user-disabled]=1
+mali-g615-mediatek-mt6897 vk.fetch_probe[passed all-ext] road=InPassOrdered in_tile_read=1 texture_barrier=1 carry=NonReaders
+mali-g615-mediatek-mt6897 vk.fetch_probe[failed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=None
 mali-g715-tensor-google vk.shader_workarounds scalarize_vector_bitwise_and=1 store_bitwise_negation_in_temporary=1 gl.shader_workarounds=1 adreno_generation_unified=0
 mali-g715-tensor-google vk.general_attachment_layout[all-ext]=1
 mali-g715-tensor-google vk.general_attachment_layout[no-ext]=1
@@ -901,6 +935,8 @@ mali-g715-tensor-google vk.general_attachment_layout[layout-no-roaa]=1
 mali-g715-tensor-google vk.general_attachment_layout[barriers-forced-on]=1
 mali-g715-tensor-google vk.general_attachment_layout[barriers-forced-off]=0
 mali-g715-tensor-google vk.general_attachment_layout[fetch-user-disabled]=1
+mali-g715-tensor-google vk.fetch_probe[passed all-ext] road=InPassOrdered in_tile_read=1 texture_barrier=1 carry=NonReaders
+mali-g715-tensor-google vk.fetch_probe[failed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=None
 mali-g610-panvk-mesa vk.shader_workarounds scalarize_vector_bitwise_and=0 store_bitwise_negation_in_temporary=0 gl.shader_workarounds=0 adreno_generation_unified=0
 mali-g610-panvk-mesa vk.general_attachment_layout[all-ext]=1
 mali-g610-panvk-mesa vk.general_attachment_layout[no-ext]=1
@@ -908,6 +944,8 @@ mali-g610-panvk-mesa vk.general_attachment_layout[layout-no-roaa]=1
 mali-g610-panvk-mesa vk.general_attachment_layout[barriers-forced-on]=1
 mali-g610-panvk-mesa vk.general_attachment_layout[barriers-forced-off]=0
 mali-g610-panvk-mesa vk.general_attachment_layout[fetch-user-disabled]=1
+mali-g610-panvk-mesa vk.fetch_probe[passed all-ext] road=InPassOrdered in_tile_read=1 texture_barrier=1 carry=NonReaders
+mali-g610-panvk-mesa vk.fetch_probe[failed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=None
 xclipse940-samsung vk.shader_workarounds scalarize_vector_bitwise_and=0 store_bitwise_negation_in_temporary=0 gl.shader_workarounds=0 adreno_generation_unified=0
 xclipse940-samsung vk.general_attachment_layout[all-ext]=1
 xclipse940-samsung vk.general_attachment_layout[no-ext]=1
@@ -915,6 +953,8 @@ xclipse940-samsung vk.general_attachment_layout[layout-no-roaa]=1
 xclipse940-samsung vk.general_attachment_layout[barriers-forced-on]=1
 xclipse940-samsung vk.general_attachment_layout[barriers-forced-off]=0
 xclipse940-samsung vk.general_attachment_layout[fetch-user-disabled]=1
+xclipse940-samsung vk.fetch_probe[passed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=None
+xclipse940-samsung vk.fetch_probe[failed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=None
 powervr-bxm-8-256-imagination vk.shader_workarounds scalarize_vector_bitwise_and=1 store_bitwise_negation_in_temporary=1 gl.shader_workarounds=1 adreno_generation_unified=0
 powervr-bxm-8-256-imagination vk.general_attachment_layout[all-ext]=1
 powervr-bxm-8-256-imagination vk.general_attachment_layout[no-ext]=1
@@ -922,6 +962,8 @@ powervr-bxm-8-256-imagination vk.general_attachment_layout[layout-no-roaa]=1
 powervr-bxm-8-256-imagination vk.general_attachment_layout[barriers-forced-on]=1
 powervr-bxm-8-256-imagination vk.general_attachment_layout[barriers-forced-off]=0
 powervr-bxm-8-256-imagination vk.general_attachment_layout[fetch-user-disabled]=1
+powervr-bxm-8-256-imagination vk.fetch_probe[passed all-ext] road=InPassOrdered in_tile_read=1 texture_barrier=1 carry=NonReaders
+powervr-bxm-8-256-imagination vk.fetch_probe[failed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=None
 powervr-bxm-8-256-mesa vk.shader_workarounds scalarize_vector_bitwise_and=0 store_bitwise_negation_in_temporary=0 gl.shader_workarounds=0 adreno_generation_unified=0
 powervr-bxm-8-256-mesa vk.general_attachment_layout[all-ext]=1
 powervr-bxm-8-256-mesa vk.general_attachment_layout[no-ext]=1
@@ -929,6 +971,8 @@ powervr-bxm-8-256-mesa vk.general_attachment_layout[layout-no-roaa]=1
 powervr-bxm-8-256-mesa vk.general_attachment_layout[barriers-forced-on]=1
 powervr-bxm-8-256-mesa vk.general_attachment_layout[barriers-forced-off]=0
 powervr-bxm-8-256-mesa vk.general_attachment_layout[fetch-user-disabled]=1
+powervr-bxm-8-256-mesa vk.fetch_probe[passed all-ext] road=InPassOrdered in_tile_read=1 texture_barrier=1 carry=None
+powervr-bxm-8-256-mesa vk.fetch_probe[failed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=None
 powervr-dxt-48-1536-pixel10-angle vk.shader_workarounds scalarize_vector_bitwise_and=1 store_bitwise_negation_in_temporary=1 gl.shader_workarounds=1 adreno_generation_unified=0
 powervr-dxt-48-1536-pixel10-angle vk.general_attachment_layout[all-ext]=1
 powervr-dxt-48-1536-pixel10-angle vk.general_attachment_layout[no-ext]=1
@@ -936,6 +980,8 @@ powervr-dxt-48-1536-pixel10-angle vk.general_attachment_layout[layout-no-roaa]=1
 powervr-dxt-48-1536-pixel10-angle vk.general_attachment_layout[barriers-forced-on]=1
 powervr-dxt-48-1536-pixel10-angle vk.general_attachment_layout[barriers-forced-off]=0
 powervr-dxt-48-1536-pixel10-angle vk.general_attachment_layout[fetch-user-disabled]=1
+powervr-dxt-48-1536-pixel10-angle vk.fetch_probe[passed all-ext] road=InPassOrdered in_tile_read=1 texture_barrier=1 carry=NonReaders
+powervr-dxt-48-1536-pixel10-angle vk.fetch_probe[failed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=None
 apple-m2-honeykrisp vk.shader_workarounds scalarize_vector_bitwise_and=0 store_bitwise_negation_in_temporary=0 gl.shader_workarounds=0 adreno_generation_unified=0
 apple-m2-honeykrisp vk.general_attachment_layout[all-ext]=1
 apple-m2-honeykrisp vk.general_attachment_layout[no-ext]=1
@@ -943,6 +989,8 @@ apple-m2-honeykrisp vk.general_attachment_layout[layout-no-roaa]=1
 apple-m2-honeykrisp vk.general_attachment_layout[barriers-forced-on]=1
 apple-m2-honeykrisp vk.general_attachment_layout[barriers-forced-off]=0
 apple-m2-honeykrisp vk.general_attachment_layout[fetch-user-disabled]=1
+apple-m2-honeykrisp vk.fetch_probe[passed all-ext] road=InPassOrdered in_tile_read=1 texture_barrier=1 carry=None
+apple-m2-honeykrisp vk.fetch_probe[failed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=NonReaders
 broadcom-v3d-v3dv vk.shader_workarounds scalarize_vector_bitwise_and=0 store_bitwise_negation_in_temporary=0 gl.shader_workarounds=0 adreno_generation_unified=0
 broadcom-v3d-v3dv vk.general_attachment_layout[all-ext]=1
 broadcom-v3d-v3dv vk.general_attachment_layout[no-ext]=1
@@ -950,6 +998,8 @@ broadcom-v3d-v3dv vk.general_attachment_layout[layout-no-roaa]=1
 broadcom-v3d-v3dv vk.general_attachment_layout[barriers-forced-on]=1
 broadcom-v3d-v3dv vk.general_attachment_layout[barriers-forced-off]=0
 broadcom-v3d-v3dv vk.general_attachment_layout[fetch-user-disabled]=1
+broadcom-v3d-v3dv vk.fetch_probe[passed all-ext] road=InPassOrdered in_tile_read=1 texture_barrier=1 carry=All
+broadcom-v3d-v3dv vk.fetch_probe[failed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=All
 unknown-vendor vk.shader_workarounds scalarize_vector_bitwise_and=0 store_bitwise_negation_in_temporary=0 gl.shader_workarounds=0 adreno_generation_unified=0
 unknown-vendor vk.general_attachment_layout[all-ext]=1
 unknown-vendor vk.general_attachment_layout[no-ext]=1
@@ -957,4 +1007,6 @@ unknown-vendor vk.general_attachment_layout[layout-no-roaa]=1
 unknown-vendor vk.general_attachment_layout[barriers-forced-on]=1
 unknown-vendor vk.general_attachment_layout[barriers-forced-off]=0
 unknown-vendor vk.general_attachment_layout[fetch-user-disabled]=1
+unknown-vendor vk.fetch_probe[passed all-ext] road=InPassOrdered in_tile_read=1 texture_barrier=1 carry=None
+unknown-vendor vk.fetch_probe[failed all-ext] road=InPassBarrier in_tile_read=0 texture_barrier=1 carry=None
 )GOLDEN"

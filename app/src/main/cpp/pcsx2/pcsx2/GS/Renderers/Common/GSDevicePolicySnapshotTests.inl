@@ -431,6 +431,22 @@ static void DumpDerived(std::string& out, const Fixture& fx)
 		const auto sel = GSVulkanRoad::ResolveSelection(facts, caps);
 		out += Fmt("%s vk.general_attachment_layout[%s]=%d\n", fx.id, c.name, sel.road.in_tile_read || sel.road.texture_barrier);
 	}
+	// The startup fetch overlap self-test (GSDeviceVK::RunFetchOverlapProbe) on the all-ext capability set:
+	// Passed lifts the name-keyed denials, Failed turns fetch off. NotRun is the all-ext line above.
+	for (const auto probe : {GSFetchOverlapProbe::Passed, GSFetchOverlapProbe::Failed})
+	{
+		const CapSet& c = kCapSets[0];
+		const auto facts = GSVulkanRoad::ResolveFacts(identity, c.roaa, c.max_push);
+		GSVulkanRoad::Capabilities caps;
+		caps.roaa = c.roaa; caps.layout = c.layout; caps.dynamic_state = c.dynamic_state;
+		caps.dynamic_command = c.dynamic_command; caps.push_descriptors = c.push; caps.max_push_descriptors = c.max_push;
+		caps.texture_barriers = c.barriers; caps.disable_fetch = c.disable_fetch; caps.android = true;
+		caps.overlap_probe = probe;
+		const auto sel = GSVulkanRoad::ResolveSelection(facts, caps);
+		out += Fmt("%s vk.fetch_probe[%s all-ext] road=%s in_tile_read=%d texture_barrier=%d carry=%s\n", fx.id,
+			probe == GSFetchOverlapProbe::Passed ? "passed" : "failed", RoadName(sel.road.road), sel.road.in_tile_read,
+			sel.road.texture_barrier, CarryName(sel.carry));
+	}
 	if (fx.log_caps)
 	{
 		const CapSet logged{"device-log", fx.log_roaa, false, false, false, fx.log_push != 0, fx.log_push, -1, false};

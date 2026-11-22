@@ -6,6 +6,7 @@
 #include "GS/Renderers/OpenGL/GLState.h"
 #include "GS/Renderers/OpenGL/GLTextureStorage.h"
 #include "GS/Renderers/Common/GSGPUProfile.h"
+#include "GS/GSCacheFile.h"
 #include "GS/GSState.h"
 #include "GS/GSGL.h"
 #include "GS/GSPerfMon.h"
@@ -32,6 +33,7 @@
 #endif
 
 #include <algorithm>
+#include <chrono>
 #include <cinttypes>
 #include <cstring>
 #include <fstream>
@@ -993,6 +995,216 @@ bool GSDeviceOGL::CreateTextureFX()
 	return true;
 }
 
+// Startup self-test for a GLES framebuffer-fetch backend (GSDeviceOGL::CheckFeatures).
+//
+// Whether a fetch spelling orders overlapping primitives of ONE draw used to be decided by extension
+// name alone (FbFetchOrdersOverlappingPrims). This measures it: a single glDrawArrays of many fully
+// overlapping quads whose fragment shader reads the destination through the selected backend
+// (gl_LastFragColorARM, or the EXT `inout` colour output) and writes back what it read plus one.
+// Three draws over a cleared target must leave every pixel at clear + quads * draws, because every
+// quad has to see the previous quad's write.
+//
+// Passed: the backend orders overlap. Failed: it does not (the renderer then keeps its per-primitive
+// ordering for draws that read the destination). Inconclusive: the measurement itself could not be
+// built or ran into a GL error (a shader that will not compile, an incomplete framebuffer); the caller
+// keeps the extension-based answer, because a probe that cannot run says nothing about the hardware.
+enum class GLFetchOverlapProbeResult { Inconclusive, Passed, Failed };
+
+static GLFetchOverlapProbeResult RunGLFetchOverlapProbe(GSFramebufferFetchBackend backend, const char* backend_name)
+{
+	constexpr GLsizei size = 64, quads = 64, draws = 3;
+	constexpr u8 clear_value[4] = {0, 16, 32, 0};
+	static_assert(32 + quads * draws < 256);
+
+	const auto start = std::chrono::steady_clock::now();
+	const auto elapsed_ms = [&]() {
+		return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+	};
+	if (backend != GSFramebufferFetchBackend::ARM && backend != GSFramebufferFetchBackend::EXT)
+		return GLFetchOverlapProbeResult::Inconclusive;
+
+	while (glGetError() != GL_NO_ERROR)
+	{
+	}
+
+	// Everything the probe touches is queried here and put back below, so the device's state is as
+	// CheckFeatures found it.
+	GLint prev_draw_fbo = 0, prev_read_fbo = 0, prev_program = 0, prev_vao = 0, prev_texture = 0, prev_viewport[4] = {};
+	GLfloat prev_clear[4] = {};
+	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prev_draw_fbo);
+	glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prev_read_fbo);
+	glGetIntegerv(GL_CURRENT_PROGRAM, &prev_program);
+	glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prev_vao);
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev_texture);
+	glGetIntegerv(GL_VIEWPORT, prev_viewport);
+	glGetFloatv(GL_COLOR_CLEAR_VALUE, prev_clear);
+	const GLboolean was_scissor = glIsEnabled(GL_SCISSOR_TEST), was_blend = glIsEnabled(GL_BLEND),
+		was_depth = glIsEnabled(GL_DEPTH_TEST), was_stencil = glIsEnabled(GL_STENCIL_TEST),
+		was_dither = glIsEnabled(GL_DITHER);
+
+	GLuint texture = 0, fbo = 0, vao = 0, vs = 0, fs = 0, program = 0;
+	const char* failure = nullptr;
+	char detail[128] = {};
+	bool mismatch = false;
+
+	const auto compile = [&](GLenum type, const std::string& source) -> GLuint {
+		const GLuint shader = glCreateShader(type);
+		const char* text = source.c_str();
+		glShaderSource(shader, 1, &text, nullptr);
+		glCompileShader(shader);
+		GLint ok = GL_FALSE;
+		glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
+		if (ok)
+			return shader;
+		glDeleteShader(shader);
+		return 0;
+	};
+
+	[&]() {
+		const char* version = GLAD_GL_ES_VERSION_3_2 ? "#version 320 es\n" :
+		                      GLAD_GL_ES_VERSION_3_1 ? "#version 310 es\n" : "#version 300 es\n";
+		const std::string vertex_source = std::string(version) + R"(precision highp float;
+const vec2 corners[6] = vec2[6](vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(-1.0, 1.0),
+	vec2(-1.0, 1.0), vec2(1.0, -1.0), vec2(1.0, 1.0));
+void main() { gl_Position = vec4(corners[gl_VertexID % 6], 0.0, 1.0); }
+)";
+		std::string fragment_source = version;
+		if (backend == GSFramebufferFetchBackend::ARM)
+			fragment_source += R"(#extension GL_ARM_shader_framebuffer_fetch : require
+precision highp float;
+highp vec4 gl_LastFragColorARM;
+layout(location = 0) out vec4 o_col0;
+void main() { o_col0 = gl_LastFragColorARM + vec4(1.0 / 255.0); }
+)";
+		else
+			fragment_source += R"(#extension GL_EXT_shader_framebuffer_fetch : require
+precision highp float;
+layout(location = 0) inout vec4 o_col0;
+void main() { o_col0 = o_col0 + vec4(1.0 / 255.0); }
+)";
+		vs = compile(GL_VERTEX_SHADER, vertex_source);
+		fs = compile(GL_FRAGMENT_SHADER, fragment_source);
+		if (!vs || !fs)
+		{
+			failure = "shader compile";
+			return;
+		}
+		program = glCreateProgram();
+		glAttachShader(program, vs);
+		glAttachShader(program, fs);
+		glLinkProgram(program);
+		GLint linked = GL_FALSE;
+		glGetProgramiv(program, GL_LINK_STATUS, &linked);
+		if (!linked)
+		{
+			failure = "program link";
+			return;
+		}
+
+		glGenTextures(1, &texture);
+		glBindTexture(GL_TEXTURE_2D, texture);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+		glGenFramebuffers(1, &fbo);
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		{
+			failure = "framebuffer incomplete";
+			return;
+		}
+		glGenVertexArrays(1, &vao);
+		glBindVertexArray(vao);
+
+		glViewport(0, 0, size, size);
+		glDisable(GL_SCISSOR_TEST);
+		glDisable(GL_BLEND);
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_STENCIL_TEST);
+		glDisable(GL_DITHER);
+		glClearColor(clear_value[0] / 255.0f, clear_value[1] / 255.0f, clear_value[2] / 255.0f, clear_value[3] / 255.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+		glUseProgram(program);
+		for (GLsizei i = 0; i < draws; i++)
+			glDrawArrays(GL_TRIANGLES, 0, quads * 6);
+
+		std::vector<u8> pixels(static_cast<size_t>(size) * size * 4);
+		glReadPixels(0, 0, size, size, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+		if (glGetError() != GL_NO_ERROR)
+		{
+			failure = "GL error";
+			return;
+		}
+		u32 bad = 0;
+		u8 first_bad[4] = {};
+		for (GLsizei i = 0; i < size * size; i++)
+		{
+			bool exact = true;
+			for (u32 c = 0; c < 4; c++)
+				exact &= pixels[static_cast<size_t>(i) * 4 + c] == clear_value[c] + quads * draws;
+			if (!exact && bad++ == 0)
+				std::memcpy(first_bad, &pixels[static_cast<size_t>(i) * 4], 4);
+		}
+		if (bad)
+		{
+			mismatch = true;
+			std::snprintf(detail, sizeof(detail), "%u/%d pixels wrong, first %u,%u,%u,%u, expected %u,%u,%u,%u", bad,
+				size * size, first_bad[0], first_bad[1], first_bad[2], first_bad[3], clear_value[0] + quads * draws,
+				clear_value[1] + quads * draws, clear_value[2] + quads * draws, clear_value[3] + quads * draws);
+		}
+	}();
+
+	glUseProgram(static_cast<GLuint>(prev_program));
+	glBindVertexArray(static_cast<GLuint>(prev_vao));
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, static_cast<GLuint>(prev_draw_fbo));
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, static_cast<GLuint>(prev_read_fbo));
+	glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(prev_texture));
+	glViewport(prev_viewport[0], prev_viewport[1], prev_viewport[2], prev_viewport[3]);
+	glClearColor(prev_clear[0], prev_clear[1], prev_clear[2], prev_clear[3]);
+	const auto restore = [](GLenum cap, GLboolean on) { on ? glEnable(cap) : glDisable(cap); };
+	restore(GL_SCISSOR_TEST, was_scissor);
+	restore(GL_BLEND, was_blend);
+	restore(GL_DEPTH_TEST, was_depth);
+	restore(GL_STENCIL_TEST, was_stencil);
+	restore(GL_DITHER, was_dither);
+	if (vao)
+		glDeleteVertexArrays(1, &vao);
+	if (fbo)
+		glDeleteFramebuffers(1, &fbo);
+	if (texture)
+		glDeleteTextures(1, &texture);
+	if (program)
+		glDeleteProgram(program);
+	if (vs)
+		glDeleteShader(vs);
+	if (fs)
+		glDeleteShader(fs);
+	while (glGetError() != GL_NO_ERROR)
+	{
+	}
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+	std::fprintf(stderr, "GL_FETCH_OVERLAP_PROBE backend=%s result=%s ms=%.2f %s%s\n", backend_name,
+		failure ? "inconclusive" : mismatch ? "failed" : "passed", elapsed_ms(), failure ? failure : "", mismatch ? detail : "");
+#endif
+	if (failure)
+	{
+		Console.Warning("GL: fetch overlap self-test (%s) inconclusive: %s in %.2f ms, keeping the extension-based ordering.",
+			backend_name, failure, elapsed_ms());
+		return GLFetchOverlapProbeResult::Inconclusive;
+	}
+	if (mismatch)
+	{
+		Console.Warning("GL: fetch overlap self-test (%s) FAILED: overlapping reads were not ordered (%s) in %.2f ms.",
+			backend_name, detail, elapsed_ms());
+		return GLFetchOverlapProbeResult::Failed;
+	}
+	Console.WriteLn("GL: fetch overlap self-test (%s) PASSED in %.2f ms (%dx%d, %d overlapping quads x %d draws).",
+		backend_name, elapsed_ms(), size, size, quads, draws);
+	return GLFetchOverlapProbeResult::Passed;
+}
+
 bool GSDeviceOGL::CheckFeatures()
 {
 	bool vendor_id_nvidia = false;
@@ -1188,7 +1400,46 @@ bool GSDeviceOGL::CheckFeatures()
 		m_features.texture_barrier = has_texture_barrier_extension;
 
 	m_features.framebuffer_fetch = framebuffer_fetch;
-	m_features.framebuffer_fetch_orders_overlap = FbFetchOrdersOverlappingPrims(fetch.backend);
+	// Whether the selected fetch backend orders overlapping primitives of one draw: the extension-based
+	// answer, demoted (never promoted) by a startup measurement. Only a backend the extensions already call
+	// ordered (ARM) is probed: a pass is probabilistic, so it must not upgrade EXT, which stays unordered (only
+	// full-barrier draws drop it, see DoRenderHW). A failed ARM backend loses the barrier-free
+	// treatment too. The result is cached on disk per GL identity and build.
+	bool fetch_orders_overlap = FbFetchOrdersOverlappingPrims(fetch.backend);
+	if (fetch_orders_overlap && m_is_gles && fetch.enabled)
+	{
+		GSCacheFile::Stamp stamp;
+		stamp.Add("probe", "gl-fetch-overlap-1");
+		stamp.Add("build", GSCacheFile::GetBuildId());
+		stamp.Add("vendor", vendor_str);
+		stamp.Add("renderer", renderer_str);
+		stamp.Add("version", version_str);
+		stamp.Add("backend", static_cast<u64>(fetch.backend));
+		const std::string probe_path =
+			EmuFolders::Cache.empty() ? std::string() : Path::Combine(EmuFolders::Cache, "fetch_overlap_probe_gl.bin");
+		std::vector<u8> stored;
+		GLFetchOverlapProbeResult result;
+		if (!probe_path.empty() &&
+			GSCacheFile::ReadFramedFile(probe_path, GSCacheFile::KIND_FETCH_PROBE, stamp, &stored) ==
+				GSCacheFile::ReadResult::Ok &&
+			stored.size() == 1 && (stored[0] == 1 || stored[0] == 2))
+		{
+			result = stored[0] == 1 ? GLFetchOverlapProbeResult::Passed : GLFetchOverlapProbeResult::Failed;
+			Console.WriteLn("GL: fetch overlap self-test cached %s", stored[0] == 1 ? "PASSED" : "FAILED");
+		}
+		else
+		{
+			result = RunGLFetchOverlapProbe(fetch.backend, "ARM");
+			if (!probe_path.empty() && result != GLFetchOverlapProbeResult::Inconclusive)
+			{
+				const u8 value = result == GLFetchOverlapProbeResult::Passed ? 1 : 2;
+				GSCacheFile::WriteFramedFile(probe_path, GSCacheFile::KIND_FETCH_PROBE, stamp, &value, 1);
+			}
+		}
+		if (result == GLFetchOverlapProbeResult::Failed)
+			fetch_orders_overlap = false;
+	}
+	m_features.framebuffer_fetch_orders_overlap = fetch_orders_overlap;
 	// Framebuffer fetch only reads the current pixel. Sampling another location in an
 	// attached texture still needs a snapshot when native texture barriers are unavailable.
 	// Same-pixel tex-is-fb draws retain the framebuffer-fetch path in HandleTextureHazards.

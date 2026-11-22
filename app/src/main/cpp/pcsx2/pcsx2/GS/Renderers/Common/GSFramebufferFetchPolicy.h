@@ -153,8 +153,20 @@ static_assert(!DecideGLFramebufferFetch(true, true, false, false, true).enabled)
 //   * the parts the driver-bug database marks BrokenRoaaDestinationRead (MediaTek Mali,
 //     Mali-G57), which return zero or stale destination colour.
 //
-// Only the third is liftable, and only on Mali, via EmuCore/GS/ForceMaliFramebufferFetch for a
-// user whose driver has been fixed. The first two are hardware facts; no setting reaches them.
+// The last two are name-keyed suspicions, and a measurement outranks them: at device creation the
+// backend runs a startup self-test (GSDeviceVK::RunFetchOverlapProbe) that draws many fully
+// overlapping primitives in one draw call, each adding one to what the in-tile read returns, and
+// requires the exact sum. A device that passes lifts both denials; a device that fails loses fetch
+// whatever its name says. No probe (NotRun) keeps the name-keyed answer exactly. Xclipse stays a
+// hard gate (never probed), and the user's setting still outranks everything. The Mali force key
+// remains the way past BrokenRoaaDestinationRead for a user whose driver has been fixed.
+enum class GSFetchOverlapProbe : unsigned char
+{
+	NotRun, // no measurement (no extension, user disabled, hard gate, or not taken yet)
+	Passed, // overlapping primitives in one draw read each other's writes in order
+	Failed, // the measurement was not exact, or could not be completed
+};
+
 struct GSVulkanFramebufferFetchInputs
 {
 	/// VK_EXT_rasterization_order_attachment_access is present. Without it there is no in-tile read.
@@ -190,6 +202,10 @@ struct GSVulkanFramebufferFetchInputs
 	/// driver). Stands in for roaa_available only; every deny above still applies. The caller sets
 	/// it only where the read is spelled as an input attachment.
 	bool ordered_without_roaa = false;
+
+	/// Result of the startup overlap self-test. Passed lifts the two name-keyed denials
+	/// (is_adreno8xx_proprietary, broken_destination_read); Failed turns fetch off on any device.
+	GSFetchOverlapProbe overlap_probe = GSFetchOverlapProbe::NotRun;
 };
 
 struct GSVulkanFramebufferFetchDecision
@@ -212,13 +228,17 @@ constexpr GSVulkanFramebufferFetchDecision DecideVulkanFramebufferFetch(
 	decision.force_key_ignored = in.force_mali_fetch_key && !in.is_mali;
 
 	const bool force_applies = in.force_mali_fetch_key && in.is_mali;
-	const bool denied_destination_read = in.broken_destination_read && !force_applies;
+	const bool probe_passed = in.overlap_probe == GSFetchOverlapProbe::Passed;
+	const bool probe_failed = in.overlap_probe == GSFetchOverlapProbe::Failed;
+	const bool denied_destination_read = in.broken_destination_read && !force_applies && !probe_passed;
+	const bool denied_adreno8xx = in.is_adreno8xx_proprietary && !probe_passed;
 
 	const bool vendor_allows =
-		!denied_destination_read && !in.is_xclipse && !in.is_adreno8xx_proprietary &&
+		!denied_destination_read && !in.is_xclipse && !denied_adreno8xx &&
 		(in.is_mali || in.is_adreno || in.any_vendor_trusted);
 
-	decision.enabled = vendor_allows && (in.roaa_available || in.ordered_without_roaa) && !in.user_disabled;
+	decision.enabled = vendor_allows && !probe_failed && (in.roaa_available || in.ordered_without_roaa) &&
+		!in.user_disabled;
 	return decision;
 }
 
@@ -281,3 +301,53 @@ static_assert(!DecideVulkanFramebufferFetch({.roaa_available = true, .is_mali = 
 // per-primitive barrier path.
 static_assert(DecideVulkanFramebufferFetch({.roaa_available = true, .any_vendor_trusted = true}).enabled);
 static_assert(!DecideVulkanFramebufferFetch({.roaa_available = true}).enabled);
+
+// The overlap self-test outranks the name-keyed denials, in both directions.
+// Passed lifts the Adreno 8xx proprietary and BrokenRoaaDestinationRead denials ...
+static_assert(DecideVulkanFramebufferFetch({.roaa_available = true, .is_adreno = true,
+	.is_adreno8xx_proprietary = true, .overlap_probe = GSFetchOverlapProbe::Passed})
+				  .enabled);
+static_assert(DecideVulkanFramebufferFetch({.roaa_available = true, .is_mali = true,
+	.broken_destination_read = true, .overlap_probe = GSFetchOverlapProbe::Passed})
+				  .enabled);
+static_assert(DecideVulkanFramebufferFetch({.roaa_available = true, .is_adreno = true,
+	.is_adreno8xx_proprietary = true, .broken_destination_read = true,
+	.overlap_probe = GSFetchOverlapProbe::Passed})
+				  .enabled);
+// ... NotRun keeps them exactly ...
+static_assert(!DecideVulkanFramebufferFetch({.roaa_available = true, .is_adreno = true,
+	.is_adreno8xx_proprietary = true, .overlap_probe = GSFetchOverlapProbe::NotRun})
+				   .enabled);
+static_assert(!DecideVulkanFramebufferFetch({.roaa_available = true, .is_mali = true,
+	.broken_destination_read = true, .overlap_probe = GSFetchOverlapProbe::NotRun})
+				   .enabled);
+// ... and Failed turns fetch off on a device nothing denied (Mali, Adreno, an unnamed vendor).
+static_assert(!DecideVulkanFramebufferFetch({.roaa_available = true, .is_mali = true,
+	.overlap_probe = GSFetchOverlapProbe::Failed})
+				   .enabled);
+static_assert(!DecideVulkanFramebufferFetch({.roaa_available = true, .is_adreno = true,
+	.overlap_probe = GSFetchOverlapProbe::Failed})
+				   .enabled);
+static_assert(!DecideVulkanFramebufferFetch({.roaa_available = true, .any_vendor_trusted = true,
+	.overlap_probe = GSFetchOverlapProbe::Failed})
+				   .enabled);
+static_assert(!DecideVulkanFramebufferFetch({.is_mali = true, .any_vendor_trusted = true,
+	.ordered_without_roaa = true, .overlap_probe = GSFetchOverlapProbe::Failed})
+				   .enabled);
+// Passed never lifts the hard gate, the user's setting, a missing extension, or Android trust.
+static_assert(!DecideVulkanFramebufferFetch({.roaa_available = true, .is_xclipse = true,
+	.overlap_probe = GSFetchOverlapProbe::Passed})
+				   .enabled);
+static_assert(!DecideVulkanFramebufferFetch({.roaa_available = true, .user_disabled = true,
+	.is_mali = true, .overlap_probe = GSFetchOverlapProbe::Passed})
+				   .enabled);
+static_assert(!DecideVulkanFramebufferFetch({.is_adreno = true, .is_adreno8xx_proprietary = true,
+	.overlap_probe = GSFetchOverlapProbe::Passed})
+				   .enabled);
+static_assert(!DecideVulkanFramebufferFetch({.roaa_available = true,
+	.overlap_probe = GSFetchOverlapProbe::Passed})
+				   .enabled);
+// A device nothing denied keeps its fetch when the probe passes.
+static_assert(DecideVulkanFramebufferFetch({.roaa_available = true, .is_mali = true,
+	.overlap_probe = GSFetchOverlapProbe::Passed})
+				  .enabled);

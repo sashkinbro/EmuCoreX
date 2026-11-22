@@ -34,6 +34,9 @@ struct Capabilities
     bool android = true;
     // The legacy broad profile is read only by the behavior-neutral RED seam.
     bool mobile_profile = false;
+    // Startup fetch overlap self-test (GSDeviceVK::RunFetchOverlapProbe). NotRun keeps the name-keyed
+    // denials; Passed lifts them; Failed turns the in-tile read and every ROAA-ordered road off.
+    GSFetchOverlapProbe overlap_probe = GSFetchOverlapProbe::NotRun;
 };
 struct Facts
 {
@@ -238,17 +241,19 @@ inline Selection ResolveSelection(const Facts& f, const Capabilities& c)
     Selection out;
     out.avoid_layout = f.avoid_layout;
     const bool layout = c.layout && !out.avoid_layout;
+    // A device whose overlap self-test failed does not order ROAA reads: no road may rely on them.
+    const bool roaa = c.roaa && c.overlap_probe != GSFetchOverlapProbe::Failed;
     const auto fetch = DecideVulkanFramebufferFetch({
-        .roaa_available = c.roaa, .user_disabled = c.disable_fetch,
+        .roaa_available = roaa, .user_disabled = c.disable_fetch,
         .is_mali = f.mali, .is_adreno = f.adreno, .is_xclipse = f.xclipse,
         .is_adreno8xx_proprietary = f.adreno8xx_proprietary,
         .broken_destination_read = f.broken_roaa,
         .any_vendor_trusted = c.android,
-        .ordered_without_roaa = f.ordered_input && !layout});
+        .ordered_without_roaa = f.ordered_input && !layout, .overlap_probe = c.overlap_probe});
     out.road = DecideSelfReadRoad({.in_tile_read_available = fetch.enabled,
-        .layout_road_available = layout, .roaa_available = c.roaa,
+        .layout_road_available = layout, .roaa_available = roaa,
         .rt_self_read_is_broken = f.copy_self_read,
-        .driver_orders_declared_loop = f.driver_orders_loop && (!f.order_on_request || c.roaa),
+        .driver_orders_declared_loop = f.driver_orders_loop && (!f.order_on_request || roaa),
         .driver_prefers_declared_loop_with_barriers = f.prefer_declared_barrier,
         .override_texture_barriers = c.texture_barriers});
     const bool sampler = out.road.spelling == GSSelfReadSpelling::FeedbackLoopLayout;

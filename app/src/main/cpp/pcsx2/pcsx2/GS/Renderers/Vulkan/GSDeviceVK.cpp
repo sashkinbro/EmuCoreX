@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "GS/GS.h"
+#include "GS/GSCacheFile.h"
 #include "GS/GSXXH.h"
 #include "GS/GSGL.h"
 #include "GS/GSPerfMon.h"
@@ -3949,12 +3950,430 @@ void GSDeviceVK::SelectStreamRingMemory(const VkPhysicalDeviceMemoryProperties& 
 	m_stream_ring_memory = GSDecideStreamRingMemory(inputs);
 }
 
+// Startup self-test for the in-tile (rasterization-order attachment access) destination read.
+//
+// The name-keyed denials in GSVulkanRoad::ResolveFacts (Adreno 8xx proprietary, MediaTek Mali) record
+// devices whose in-tile read was seen returning stale destination colour. This measures the property
+// they violate instead: one draw call of many fully overlapping quads, each fragment shader reading the
+// attachment through the same input-attachment spelling the production fetch road uses and writing
+// back what it read plus one, must leave every pixel at clear + quads, because each quad has to see
+// the previous quad's write. Any stale read, lost update or reordering shows up as a smaller sum.
+// Three submissions (clear, then two LOAD passes over the previous result) also cover a read of the
+// previous pass's output.
+//
+// Everything is private to this function (own render passes, pipeline, descriptor pool, command pool,
+// fence), so it can run before any descriptor layout, texture, pass or pipeline of the device exists,
+// and it never depends on TFX warmup. Any failure to complete the measurement (a VkResult error, a
+// missing shader, a fence timeout) is a Failed result: a device that cannot run a 64x64 draw does not
+// get the fast road.
+GSFetchOverlapProbe GSDeviceVK::RunFetchOverlapProbe()
+{
+	constexpr u32 size = 64, quads = 64, rounds = 3;
+	constexpr u64 fence_timeout_ns = 500ull * 1000 * 1000;
+	constexpr VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+	// Per-channel clear value (R, G, B, A); clear + quads * rounds must stay below 256.
+	constexpr u8 clear_value[4] = {0, 16, 32, 0};
+	static_assert(32 + quads * rounds < 256);
+
+	const auto start = std::chrono::steady_clock::now();
+	const auto elapsed_ms = [&]() {
+		return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+	};
+
+	struct Resources
+	{
+		VkDevice device = VK_NULL_HANDLE;
+		VmaAllocator allocator = VK_NULL_HANDLE;
+		VkImage image = VK_NULL_HANDLE;
+		VmaAllocation image_allocation = VK_NULL_HANDLE;
+		VkImageView view = VK_NULL_HANDLE;
+		VkBuffer buffer = VK_NULL_HANDLE;
+		VmaAllocation buffer_allocation = VK_NULL_HANDLE;
+		VkRenderPass pass_clear = VK_NULL_HANDLE, pass_load = VK_NULL_HANDLE;
+		VkFramebuffer framebuffer = VK_NULL_HANDLE;
+		VkDescriptorSetLayout set_layout = VK_NULL_HANDLE;
+		VkDescriptorPool pool = VK_NULL_HANDLE;
+		VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
+		VkShaderModule vertex = VK_NULL_HANDLE, fragment = VK_NULL_HANDLE;
+		VkPipeline pipeline = VK_NULL_HANDLE;
+		VkCommandPool command_pool = VK_NULL_HANDLE;
+		VkFence fence = VK_NULL_HANDLE;
+		// Set when a submission may still be executing: nothing it uses may be destroyed, so the
+		// objects are left to the device teardown instead.
+		bool gpu_may_be_busy = false;
+
+		~Resources()
+		{
+			if (gpu_may_be_busy)
+				return;
+			if (command_pool) vkDestroyCommandPool(device, command_pool, nullptr);
+			if (fence) vkDestroyFence(device, fence, nullptr);
+			if (pipeline) vkDestroyPipeline(device, pipeline, nullptr);
+			if (pipeline_layout) vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
+			if (fragment) vkDestroyShaderModule(device, fragment, nullptr);
+			if (vertex) vkDestroyShaderModule(device, vertex, nullptr);
+			if (pool) vkDestroyDescriptorPool(device, pool, nullptr);
+			if (set_layout) vkDestroyDescriptorSetLayout(device, set_layout, nullptr);
+			if (framebuffer) vkDestroyFramebuffer(device, framebuffer, nullptr);
+			if (pass_load) vkDestroyRenderPass(device, pass_load, nullptr);
+			if (pass_clear) vkDestroyRenderPass(device, pass_clear, nullptr);
+			if (view) vkDestroyImageView(device, view, nullptr);
+			if (image) vmaDestroyImage(allocator, image, image_allocation);
+			if (buffer) vmaDestroyBuffer(allocator, buffer, buffer_allocation);
+		}
+	} r;
+	r.device = m_device;
+	r.allocator = m_allocator;
+
+	double shaders_ms = 0.0, pipeline_ms = 0.0;
+	const char* failure = nullptr;
+	char detail[96] = {};
+	const auto fail = [&](const char* what, VkResult res = VK_SUCCESS) {
+		if (!failure)
+		{
+			failure = what;
+			if (res != VK_SUCCESS)
+				std::snprintf(detail, sizeof(detail), " (VkResult %d)", static_cast<int>(res));
+		}
+		return false;
+	};
+
+	[&]() {
+		if (!m_device || !m_allocator || !m_graphics_queue || !g_vulkan_shader_cache)
+			return fail("device not ready");
+
+		// Render target: also an input attachment, and copied out at the end.
+		VkImageCreateInfo ici = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+		ici.imageType = VK_IMAGE_TYPE_2D;
+		ici.format = format;
+		ici.extent = {size, size, 1};
+		ici.mipLevels = 1;
+		ici.arrayLayers = 1;
+		ici.samples = VK_SAMPLE_COUNT_1_BIT;
+		ici.tiling = VK_IMAGE_TILING_OPTIMAL;
+		ici.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
+		            VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		ici.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		VmaAllocationCreateInfo image_aci = {};
+		image_aci.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+		VkResult res = vmaCreateImage(m_allocator, &ici, &image_aci, &r.image, &r.image_allocation, nullptr);
+		if (res != VK_SUCCESS)
+			return fail("image", res);
+
+		VkImageViewCreateInfo vci = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+		vci.image = r.image;
+		vci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		vci.format = format;
+		vci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+		if ((res = vkCreateImageView(m_device, &vci, nullptr, &r.view)) != VK_SUCCESS)
+			return fail("image view", res);
+
+		VkBufferCreateInfo bci = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+		bci.size = size * size * 4;
+		bci.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		VmaAllocationCreateInfo buffer_aci = {};
+		buffer_aci.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+		buffer_aci.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
+		VmaAllocationInfo buffer_info = {};
+		if ((res = vmaCreateBuffer(m_allocator, &bci, &buffer_aci, &r.buffer, &r.buffer_allocation, &buffer_info)) !=
+			VK_SUCCESS)
+			return fail("readback buffer", res);
+		if (!buffer_info.pMappedData)
+			return fail("readback buffer not mapped");
+
+		// One subpass reading and writing the same attachment, declared like the production fetch road:
+		// input attachment in GENERAL plus the rasterization-order colour access subpass flag.
+		for (const bool clear : {true, false})
+		{
+			VkAttachmentDescription attachment = {};
+			attachment.format = format;
+			attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+			attachment.loadOp = clear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+			attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+			attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			attachment.initialLayout = clear ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_GENERAL;
+			attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+			const VkAttachmentReference reference = {0, VK_IMAGE_LAYOUT_GENERAL};
+			VkSubpassDescription subpass = {};
+			subpass.flags = VK_SUBPASS_DESCRIPTION_RASTERIZATION_ORDER_ATTACHMENT_COLOR_ACCESS_BIT_EXT;
+			subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+			subpass.inputAttachmentCount = 1;
+			subpass.pInputAttachments = &reference;
+			subpass.colorAttachmentCount = 1;
+			subpass.pColorAttachments = &reference;
+			VkSubpassDependency dependencies[2] = {};
+			dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+			dependencies[0].dstSubpass = 0;
+			dependencies[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			dependencies[0].dstStageMask =
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			dependencies[0].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+			                                VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+			dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+			dependencies[1].srcSubpass = 0;
+			dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+			dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			dependencies[1].dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+			dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			dependencies[1].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			VkRenderPassCreateInfo rpci = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
+			rpci.attachmentCount = 1;
+			rpci.pAttachments = &attachment;
+			rpci.subpassCount = 1;
+			rpci.pSubpasses = &subpass;
+			rpci.dependencyCount = 2;
+			rpci.pDependencies = dependencies;
+			if ((res = vkCreateRenderPass(m_device, &rpci, nullptr, clear ? &r.pass_clear : &r.pass_load)) != VK_SUCCESS)
+				return fail("render pass", res);
+		}
+
+		VkFramebufferCreateInfo fci = {VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
+		fci.renderPass = r.pass_clear;
+		fci.attachmentCount = 1;
+		fci.pAttachments = &r.view;
+		fci.width = size;
+		fci.height = size;
+		fci.layers = 1;
+		if ((res = vkCreateFramebuffer(m_device, &fci, nullptr, &r.framebuffer)) != VK_SUCCESS)
+			return fail("framebuffer", res);
+
+		Vulkan::DescriptorSetLayoutBuilder dslb;
+		dslb.AddBinding(0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
+		if ((r.set_layout = dslb.Create(m_device)) == VK_NULL_HANDLE)
+			return fail("descriptor set layout");
+		const VkDescriptorPoolSize pool_size = {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1};
+		VkDescriptorPoolCreateInfo dpci = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+		dpci.maxSets = 1;
+		dpci.poolSizeCount = 1;
+		dpci.pPoolSizes = &pool_size;
+		if ((res = vkCreateDescriptorPool(m_device, &dpci, nullptr, &r.pool)) != VK_SUCCESS)
+			return fail("descriptor pool", res);
+		VkDescriptorSet set = VK_NULL_HANDLE;
+		VkDescriptorSetAllocateInfo dsai = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+		dsai.descriptorPool = r.pool;
+		dsai.descriptorSetCount = 1;
+		dsai.pSetLayouts = &r.set_layout;
+		if ((res = vkAllocateDescriptorSets(m_device, &dsai, &set)) != VK_SUCCESS)
+			return fail("descriptor set", res);
+		const VkDescriptorImageInfo image_info = {VK_NULL_HANDLE, r.view, VK_IMAGE_LAYOUT_GENERAL};
+		VkWriteDescriptorSet write = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+		write.dstSet = set;
+		write.dstBinding = 0;
+		write.descriptorCount = 1;
+		write.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		write.pImageInfo = &image_info;
+		vkUpdateDescriptorSets(m_device, 1, &write, 0, nullptr);
+
+		Vulkan::PipelineLayoutBuilder plb;
+		plb.AddDescriptorSet(r.set_layout);
+		if ((r.pipeline_layout = plb.Create(m_device)) == VK_NULL_HANDLE)
+			return fail("pipeline layout");
+
+		r.vertex = g_vulkan_shader_cache->GetVertexShader(R"(#version 450
+const vec2 corners[6] = vec2[](vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(-1.0, 1.0),
+	vec2(-1.0, 1.0), vec2(1.0, -1.0), vec2(1.0, 1.0));
+void main() { gl_Position = vec4(corners[gl_VertexIndex % 6], 0.0, 1.0); }
+)");
+		r.fragment = g_vulkan_shader_cache->GetFragmentShader(R"(#version 450
+layout(input_attachment_index = 0, set = 0, binding = 0) uniform subpassInput destination;
+layout(location = 0) out vec4 color;
+void main() { color = subpassLoad(destination) + vec4(1.0 / 255.0); }
+)");
+		if (!r.vertex || !r.fragment)
+			return fail("shader compile");
+		shaders_ms = elapsed_ms();
+
+		Vulkan::GraphicsPipelineBuilder gpb;
+		gpb.SetVertexShader(r.vertex);
+		gpb.SetFragmentShader(r.fragment);
+		gpb.SetPrimitiveTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+		gpb.SetNoCullRasterizationState();
+		gpb.SetNoDepthTestState();
+		gpb.SetNoStencilState();
+		gpb.SetNoBlendingState();
+		gpb.AddBlendFlags(VK_PIPELINE_COLOR_BLEND_STATE_CREATE_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_BIT_EXT);
+		gpb.SetDynamicViewportAndScissorState();
+		gpb.SetPipelineLayout(r.pipeline_layout);
+		gpb.SetRenderPass(r.pass_clear, 0);
+		if ((r.pipeline = gpb.Create(m_device)) == VK_NULL_HANDLE)
+			return fail("pipeline");
+		pipeline_ms = elapsed_ms();
+
+		VkCommandPoolCreateInfo cpci = {VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+		cpci.queueFamilyIndex = m_graphics_queue_family_index;
+		if ((res = vkCreateCommandPool(m_device, &cpci, nullptr, &r.command_pool)) != VK_SUCCESS)
+			return fail("command pool", res);
+		VkCommandBuffer commands[rounds] = {};
+		VkCommandBufferAllocateInfo cbai = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+		cbai.commandPool = r.command_pool;
+		cbai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		cbai.commandBufferCount = rounds;
+		if ((res = vkAllocateCommandBuffers(m_device, &cbai, commands)) != VK_SUCCESS)
+			return fail("command buffers", res);
+		const VkFenceCreateInfo fence_info = {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+		if ((res = vkCreateFence(m_device, &fence_info, nullptr, &r.fence)) != VK_SUCCESS)
+			return fail("fence", res);
+
+		const VkViewport viewport = {0.0f, 0.0f, static_cast<float>(size), static_cast<float>(size), 0.0f, 1.0f};
+		const VkRect2D rect = {{0, 0}, {size, size}};
+		VkClearValue clear_color = {};
+		for (u32 i = 0; i < 4; i++)
+			clear_color.color.float32[i] = static_cast<float>(clear_value[i]) / 255.0f;
+
+		for (u32 round = 0; round < rounds; round++)
+		{
+			const VkCommandBufferBeginInfo begin = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, nullptr,
+				VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
+			if ((res = vkBeginCommandBuffer(commands[round], &begin)) != VK_SUCCESS)
+				return fail("begin command buffer", res);
+			VkRenderPassBeginInfo rpbi = {VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+			rpbi.renderPass = round == 0 ? r.pass_clear : r.pass_load;
+			rpbi.framebuffer = r.framebuffer;
+			rpbi.renderArea = rect;
+			rpbi.clearValueCount = round == 0 ? 1 : 0;
+			rpbi.pClearValues = round == 0 ? &clear_color : nullptr;
+			vkCmdBeginRenderPass(commands[round], &rpbi, VK_SUBPASS_CONTENTS_INLINE);
+			vkCmdBindPipeline(commands[round], VK_PIPELINE_BIND_POINT_GRAPHICS, r.pipeline);
+			vkCmdBindDescriptorSets(
+				commands[round], VK_PIPELINE_BIND_POINT_GRAPHICS, r.pipeline_layout, 0, 1, &set, 0, nullptr);
+			vkCmdSetViewport(commands[round], 0, 1, &viewport);
+			vkCmdSetScissor(commands[round], 0, 1, &rect);
+			// One draw call: `quads` full-target quads, every one reading what the previous one wrote.
+			vkCmdDraw(commands[round], quads * 6, 1, 0, 0);
+			vkCmdEndRenderPass(commands[round]);
+			if (round + 1 == rounds)
+			{
+				const VkBufferImageCopy copy = {0, 0, 0, {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, {0, 0, 0}, {size, size, 1}};
+				vkCmdCopyImageToBuffer(
+					commands[round], r.image, VK_IMAGE_LAYOUT_GENERAL, r.buffer, 1, &copy);
+				VkBufferMemoryBarrier barrier = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
+				barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+				barrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+				barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.buffer = r.buffer;
+				barrier.offset = 0;
+				barrier.size = VK_WHOLE_SIZE;
+				vkCmdPipelineBarrier(commands[round], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0,
+					0, nullptr, 1, &barrier, 0, nullptr);
+			}
+			if ((res = vkEndCommandBuffer(commands[round])) != VK_SUCCESS)
+				return fail("end command buffer", res);
+
+			VkSubmitInfo submit = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+			submit.commandBufferCount = 1;
+			submit.pCommandBuffers = &commands[round];
+			if ((res = vkQueueSubmit(m_graphics_queue, 1, &submit, r.fence)) != VK_SUCCESS)
+				return fail("queue submit", res);
+			r.gpu_may_be_busy = true;
+			res = vkWaitForFences(m_device, 1, &r.fence, VK_TRUE, fence_timeout_ns);
+			if (res == VK_TIMEOUT)
+				return fail("fence timeout");
+			if (res != VK_SUCCESS)
+				return fail("fence wait", res);
+			r.gpu_may_be_busy = false;
+			if ((res = vkResetFences(m_device, 1, &r.fence)) != VK_SUCCESS)
+				return fail("fence reset", res);
+		}
+
+		vmaInvalidateAllocation(m_allocator, r.buffer_allocation, 0, VK_WHOLE_SIZE);
+		const u8* pixels = static_cast<const u8*>(buffer_info.pMappedData);
+		u32 bad = 0;
+		u8 first_bad[4] = {};
+		for (u32 i = 0; i < size * size; i++)
+		{
+			bool exact = true;
+			for (u32 c = 0; c < 4; c++)
+				exact &= pixels[i * 4 + c] == clear_value[c] + quads * rounds;
+			if (!exact && bad++ == 0)
+				std::memcpy(first_bad, pixels + i * 4, 4);
+		}
+		if (bad)
+		{
+			std::snprintf(detail, sizeof(detail), " (%u/%u pixels wrong, first %u,%u,%u,%u, expected %u,%u,%u,%u)", bad,
+				size * size, first_bad[0], first_bad[1], first_bad[2], first_bad[3], clear_value[0] + quads * rounds,
+				clear_value[1] + quads * rounds, clear_value[2] + quads * rounds, clear_value[3] + quads * rounds);
+			failure = "overlapping reads were not ordered";
+			return false;
+		}
+		return true;
+	}();
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+	std::fprintf(stderr, "VK_FETCH_OVERLAP_PROBE result=%s ms=%.2f%s%s%s\n", failure ? "failed" : "passed", elapsed_ms(),
+		failure ? " reason=" : "", failure ? failure : "", failure ? detail : "");
+#endif
+	if (failure)
+	{
+		Console.Warning("VK: fetch overlap self-test FAILED: %s%s in %.2f ms%s", failure, detail, elapsed_ms(),
+			r.gpu_may_be_busy ? " (probe objects left to device teardown)" : "");
+		return GSFetchOverlapProbe::Failed;
+	}
+	Console.WriteLn("VK: fetch overlap self-test PASSED in %.2f ms (shaders %.2f ms, pipeline %.2f ms; %ux%u, %u overlapping quads x %u submissions)",
+		elapsed_ms(), shaders_ms, pipeline_ms - shaders_ms, size, size, quads, rounds);
+	return GSFetchOverlapProbe::Passed;
+}
+
 bool GSDeviceVK::CheckFeatures()
 {
 	const VkPhysicalDeviceLimits& limits = m_device_properties.limits;
 	m_features.sub_texel_precision_bits = static_cast<u8>(std::min<u32>(limits.subTexelPrecisionBits, 16));
 
 	const bool has_framebuffer_fetch_extension = m_optional_extensions.vk_ext_rasterization_order_attachment_access;
+	// Measure the in-tile read before the road is selected. Runs once, on its own objects, after the
+	// device, allocator and shader cache exist and before any descriptor layout, texture, pass or
+	// pipeline of this device is built. Xclipse is a hard gate and the user's setting wins, so neither
+	// is probed.
+	if (!m_fetch_overlap_probe_taken)
+	{
+		m_fetch_overlap_probe_taken = true;
+		if (has_framebuffer_fetch_extension && !GSConfig.DisableFramebufferFetch && !m_road_facts.xclipse)
+		{
+			// The result depends only on the device, its driver and this build, so it is kept on disk beside the
+			// pipeline cache: the probe costs a pipeline compile and a few submissions, too much to pay on every
+			// device creation. Failed is stored too (a hanging driver is not retried every boot). A missing,
+			// stale or corrupt file just runs the probe again.
+			const auto& props = m_device_properties;
+			GSCacheFile::Stamp stamp;
+			stamp.Add("probe", "vk-fetch-overlap-1");
+			stamp.Add("build", GSCacheFile::GetBuildId());
+			stamp.Add("vendor", props.vendorID);
+			stamp.Add("device", props.deviceID);
+			stamp.Add("driver_version", props.driverVersion);
+			stamp.Add("driver_id", static_cast<u64>(m_device_driver_properties.driverID));
+			stamp.AddHex("pipeline_cache_uuid", props.pipelineCacheUUID, VK_UUID_SIZE);
+			const std::string probe_path =
+				EmuFolders::Cache.empty() ? std::string() : Path::Combine(EmuFolders::Cache, "fetch_overlap_probe_vk.bin");
+			std::vector<u8> stored;
+			if (!probe_path.empty() &&
+				GSCacheFile::ReadFramedFile(probe_path, GSCacheFile::KIND_FETCH_PROBE, stamp, &stored) ==
+					GSCacheFile::ReadResult::Ok &&
+				stored.size() == 1 && (stored[0] == 1 || stored[0] == 2))
+			{
+				m_fetch_overlap_probe = stored[0] == 1 ? GSFetchOverlapProbe::Passed : GSFetchOverlapProbe::Failed;
+				Console.WriteLn("VK: fetch overlap self-test cached %s", stored[0] == 1 ? "PASSED" : "FAILED");
+			}
+			else
+			{
+				m_fetch_overlap_probe = RunFetchOverlapProbe();
+				if (!probe_path.empty())
+				{
+					const u8 value = m_fetch_overlap_probe == GSFetchOverlapProbe::Passed ? 1 : 2;
+					GSCacheFile::WriteFramedFile(probe_path, GSCacheFile::KIND_FETCH_PROBE, stamp, &value, 1);
+				}
+			}
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS) && !defined(NDEBUG)
+			// Debug experiment knob: EMUCOREX_GS_FORCE_ROAA re-tests fetch whatever the probe measured.
+			if (std::getenv("EMUCOREX_GS_FORCE_ROAA"))
+			{
+				Console.Warning("VK: EMUCOREX_GS_FORCE_ROAA set, ignoring the fetch overlap self-test result.");
+				m_fetch_overlap_probe = GSFetchOverlapProbe::NotRun;
+			}
+#endif
+		}
+	}
 	const std::string_view driver_info = m_optional_extensions.vk_khr_driver_properties ?
 		std::string_view(m_device_driver_properties.driverInfo) : std::string_view{};
 	const auto road = GSVulkanRoad::ResolveSelection(m_road_facts, GetRoadCapabilities());
@@ -11722,7 +12141,7 @@ GSVulkanRoad::Capabilities GSDeviceVK::GetRoadCapabilities(u32 push_count) const
 #else
         .android = false,
 #endif
-        .mobile_profile = IsMobileGPUProfile()};
+        .mobile_profile = IsMobileGPUProfile(), .overlap_probe = m_fetch_overlap_probe};
 }
 
 void GSDeviceVK::ConfigureTFXFeedbackPipeline(Vulkan::GraphicsPipelineBuilder& gpb, const PipelineSelector& p) const

@@ -903,6 +903,7 @@ private:
 	bool CreateVulkanInstanceAndDevice(bool force_surfaceless, VkSurfaceKHR* surface,
 		bool enable_debug_utils, bool enable_validation_layer);
 	bool CheckFeatures();
+	GSFetchOverlapProbe RunFetchOverlapProbe();
 	bool PreferCachedStreamRings() const;
 	void SelectStreamRingMemory(const VkPhysicalDeviceMemoryProperties& properties);
 	void ResolveDepthSamplingFeatures();
@@ -1136,6 +1137,10 @@ public:
 	bool DateCopyLive(const GSHWDrawConfig& config);
 	bool m_broken_colormask_with_depth = false;
 	GSVulkanRoad::Facts m_road_facts;
+	/// Startup fetch overlap self-test (RunFetchOverlapProbe), taken once in CheckFeatures. NotRun when the
+	/// device has no ROAA, the user disabled fetch, or the vendor is a hard gate.
+	GSFetchOverlapProbe m_fetch_overlap_probe = GSFetchOverlapProbe::NotRun;
+	bool m_fetch_overlap_probe_taken = false;
 	u32 m_max_push_descriptors = 0;
 	std::string m_road_platform_hints;
 	bool m_force_feedback_loop_layout = false;

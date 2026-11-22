@@ -81,6 +81,7 @@ namespace GSCacheFile
 		KIND_VK_PIPELINE_KEYS = 0x59454B31, // "1KEY"
 		KIND_GL_PROGRAMS = 0x474C5031, // "1PLG"
 		KIND_LSFG_SPIRV = 0x47465331, // "1SFG"
+		KIND_FETCH_PROBE = 0x31425046, // "FPB1": startup framebuffer-fetch overlap self-test result
 		KIND_TEST = 0x54534554, // "TEST"
 	};
 
