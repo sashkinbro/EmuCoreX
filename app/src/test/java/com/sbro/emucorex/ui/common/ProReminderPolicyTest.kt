@@ -55,4 +55,15 @@ class ProReminderPolicyTest {
         assertFalse(show(review = now - 60_000L))
         assertTrue(show(review = now - 10 * 60_000L))
     }
+
+    @Test
+    fun backoffRepeatsEveryFifthDismissal() {
+        val h = 60L * 60 * 1000
+        assertEquals(3 * h, ProReminderPolicy.intervalMs(1))
+        assertEquals(3 * h, ProReminderPolicy.intervalMs(4))
+        assertEquals(12 * h, ProReminderPolicy.intervalMs(5))
+        assertEquals(3 * h, ProReminderPolicy.intervalMs(6))
+        assertEquals(3 * h, ProReminderPolicy.intervalMs(9))
+        assertEquals(12 * h, ProReminderPolicy.intervalMs(10))
+    }
 }

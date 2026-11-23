@@ -77,8 +77,10 @@ object ProReminderPolicy {
     const val BACKOFF_AFTER_DISMISSALS = 5
     const val REVIEW_COOLDOWN_MS = 5L * 60 * 1000
 
+    /** Repeating cycle: every 5th consecutive dismissal pauses for 12 h, all others for 3 h. */
     fun intervalMs(dismissStreak: Int): Long =
-        if (dismissStreak >= BACKOFF_AFTER_DISMISSALS) BACKOFF_INTERVAL_MS else REMINDER_INTERVAL_MS
+        if (dismissStreak > 0 && dismissStreak % BACKOFF_AFTER_DISMISSALS == 0) BACKOFF_INTERVAL_MS
+        else REMINDER_INTERVAL_MS
 
     fun shouldShow(
         nowMs: Long,
