@@ -47,7 +47,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
+import com.sbro.emucorex.ui.common.SyncedSlider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -1041,7 +1041,7 @@ private fun RgbSlider(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("$label  $value", modifier = Modifier.size(width = 58.dp, height = 24.dp))
-        Slider(
+        SyncedSlider(
             value = value.toFloat(),
             onValueChange = { onValueChange(it.roundToInt().coerceIn(0, 255)) },
             enabled = enabled,
@@ -1068,7 +1068,7 @@ private fun CornerSlider(
                 fontWeight = FontWeight.SemiBold
             )
         }
-        Slider(
+        SyncedSlider(
             value = value,
             onValueChange = onValueChange,
             enabled = enabled,

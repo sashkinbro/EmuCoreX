@@ -110,7 +110,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
+import com.sbro.emucorex.ui.common.SyncedSlider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -169,7 +169,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import com.sbro.emucorex.ui.common.SyncedOutlinedSecureTextField
 import com.sbro.emucorex.core.utils.RetroAchievementsStateManager
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -7543,7 +7543,7 @@ private fun OverlayAchievementsLoginDialog(onDismiss: () -> Unit) {
             leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
             label = { Text(stringResource(R.string.settings_ra_username)) }
         )
-        OutlinedTextField(
+        SyncedOutlinedSecureTextField(
             value = password,
             onValueChange = {
                 password = it
@@ -7551,10 +7551,8 @@ private fun OverlayAchievementsLoginDialog(onDismiss: () -> Unit) {
             },
             modifier = Modifier.fillMaxWidth(),
             shape = neonShape(16.dp),
-            singleLine = true,
             leadingIcon = { Icon(Icons.Rounded.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
             label = { Text(stringResource(R.string.settings_ra_password)) },
-            visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
         )
         Row(
@@ -8608,7 +8606,7 @@ private fun LiveSliderRow(
             )
         }
         Box(modifier = Modifier.then(resetModifier)) {
-            Slider(
+            SyncedSlider(
                 value = sliderValue,
                 onValueChange = { sliderValue = it },
                 onValueChangeFinished = {

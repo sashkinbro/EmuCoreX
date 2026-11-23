@@ -29,6 +29,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.layout.ContentScale
@@ -141,9 +142,17 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
             }
             if (settings.lastBackupMs > 0) {
                 Surface(shape = neonShape(18.dp), border = profileCardBorder()) {
-                ListItem(headlineContent = { Text(stringResource(R.string.drive_last_backup)) },
+                // Pins the pre-1.5 (non-expressive) ListItem look: square shape, 16/8 dp padding,
+                // 16 dp icon gap (12 dp built in + 4 dp), 72 dp two-line min height, centered.
+                ListItem(
+                    modifier = Modifier.heightIn(min = 72.dp),
                     supportingContent = { Text("${date(settings.lastBackupMs)} · ${Formatter.formatFileSize(context, settings.lastSize)}") },
-                    leadingContent = { Icon(Icons.Default.CloudDone, null) })
+                    leadingContent = { Box(Modifier.padding(end = 4.dp)) { Icon(Icons.Default.CloudDone, null) } },
+                    verticalAlignment = Alignment.CenterVertically,
+                    shapes = ListItemDefaults.shapes(shape = RectangleShape),
+                    elevation = ListItemDefaults.elevation(0.dp, 0.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                ) { Text(stringResource(R.string.drive_last_backup)) }
                 }
             }
             if (state.queued || state.operation.phase.isNotBlank()) {

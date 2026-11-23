@@ -91,7 +91,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import com.sbro.emucorex.ui.common.SyncedOutlinedSecureTextField
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -1310,12 +1310,11 @@ private fun AchievementAccountCard(
                         unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
                     )
                 )
-                OutlinedTextField(
+                SyncedOutlinedSecureTextField(
                     value = password,
                     onValueChange = onPasswordChange,
                     modifier = Modifier.fillMaxWidth(),
                     shape = neonShape(16.dp),
-                    singleLine = true,
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Rounded.Lock,
@@ -1324,7 +1323,6 @@ private fun AchievementAccountCard(
                         )
                     },
                     label = { Text(androidx.compose.ui.res.stringResource(R.string.settings_ra_password)) },
-                    visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,

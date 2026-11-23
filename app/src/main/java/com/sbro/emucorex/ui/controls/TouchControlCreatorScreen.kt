@@ -43,7 +43,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
+import com.sbro.emucorex.ui.common.SyncedSlider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -1198,7 +1198,7 @@ private fun CreatorColorEditor(
 private fun ColorChannelSlider(label: String, value: Int, onValueChange: (Int) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("$label  $value", modifier = Modifier.width(58.dp))
-        Slider(
+        SyncedSlider(
             value = value.toFloat(),
             onValueChange = { onValueChange(it.roundToInt().coerceIn(0, 255)) },
             valueRange = 0f..255f,
@@ -1217,7 +1217,7 @@ private fun IntCreatorSlider(
 ) {
     Column {
         CreatorSliderHeader(title, "$value$suffix")
-        Slider(
+        SyncedSlider(
             value = value.toFloat(),
             onValueChange = { onValueChange(it.roundToInt().coerceIn(range)) },
             valueRange = range.first.toFloat()..range.last.toFloat()
@@ -1235,7 +1235,7 @@ private fun FloatCreatorSlider(
 ) {
     Column {
         CreatorSliderHeader(title, "${"%.1f".format(value)}$suffix")
-        Slider(value = value, onValueChange = onValueChange, valueRange = range)
+        SyncedSlider(value = value, onValueChange = onValueChange, valueRange = range)
     }
 }
 

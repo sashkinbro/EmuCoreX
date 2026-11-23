@@ -121,7 +121,7 @@ import androidx.core.content.ContextCompat
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import com.sbro.emucorex.ui.common.SyncedOutlinedSecureTextField
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -760,14 +760,12 @@ private fun AuthContent(
                         label = { Text(stringResource(R.string.profile_email)) },
                         leadingIcon = { Icon(Icons.Rounded.Email, contentDescription = null) }
                     )
-                    OutlinedTextField(
+                    SyncedOutlinedSecureTextField(
                         value = password,
                         onValueChange = { password = it },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
                         shape = neonShape(20.dp),
                         label = { Text(stringResource(R.string.profile_password)) },
-                        visualTransformation = PasswordVisualTransformation(),
                         leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Login, contentDescription = null) }
                     )
                     Button(
