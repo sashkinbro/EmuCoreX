@@ -1167,9 +1167,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun purchasePro(
         activity: Activity,
-        tier: ProPurchaseTier = ProPurchaseTier.BASE
+        tier: ProPurchaseTier = ProPurchaseTier.BASE,
+        source: String = "other"
     ) {
-        proPurchaseManager.purchase(activity, tier)
+        proPurchaseManager.purchase(activity, tier, source)
     }
 
     fun restoreProPurchases() { proPurchaseManager.restorePurchases(showMessage = true) }

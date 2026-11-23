@@ -97,6 +97,9 @@ class ProPurchaseManager private constructor(context: Context) : PurchasesUpdate
     private val preferences = AppPreferences(appContext)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var productDetailsById: Map<String, ProductDetails> = emptyMap()
+    private var pendingSource: String? = null
+    private var pendingTier: ProPurchaseTier? = null
+    private var pendingResultLogged: String? = null
 
     private val billingClient = BillingClient.newBuilder(appContext)
         .setListener(this)
@@ -149,7 +152,8 @@ class ProPurchaseManager private constructor(context: Context) : PurchasesUpdate
 
     fun purchase(
         activity: Activity,
-        tier: ProPurchaseTier = ProPurchaseTier.BASE
+        tier: ProPurchaseTier = ProPurchaseTier.BASE,
+        source: String = "other"
     ) {
         val currentState = _state.value
         if (currentState.isPurchaseInProgress) return
@@ -190,8 +194,12 @@ class ProPurchaseManager private constructor(context: Context) : PurchasesUpdate
             purchaseProductId = tier.productId,
             messageResId = null
         )
+        pendingSource = source
+        pendingTier = tier
+        pendingResultLogged = null
         val result = billingClient.launchBillingFlow(activity, flowParams)
         if (result.responseCode != BillingClient.BillingResponseCode.OK) {
+            logPendingPurchaseResult("failed")
             _state.value = _state.value.copy(
                 isPurchaseInProgress = false,
                 purchaseProductId = null,
@@ -254,16 +262,23 @@ class ProPurchaseManager private constructor(context: Context) : PurchasesUpdate
         when (billingResult.responseCode) {
             BillingClient.BillingResponseCode.OK -> {
                 if (!purchases.isNullOrEmpty()) {
+                    if (purchases.none(::isActiveProPurchase) &&
+                        purchases.any { it.purchaseState == Purchase.PurchaseState.PENDING }
+                    ) {
+                        logPendingPurchaseResult("pending", clear = false)
+                    }
                     handlePurchases(purchases, showUnlockMessage = true)
                 }
             }
             BillingClient.BillingResponseCode.USER_CANCELED -> {
+                logPendingPurchaseResult("canceled")
                 _state.value = _state.value.copy(
                     isPurchaseInProgress = false,
                     purchaseProductId = null
                 )
             }
             else -> {
+                logPendingPurchaseResult("failed")
                 _state.value = _state.value.copy(
                     isPurchaseInProgress = false,
                     purchaseProductId = null,
@@ -271,6 +286,20 @@ class ProPurchaseManager private constructor(context: Context) : PurchasesUpdate
                 )
             }
         }
+    }
+
+    /** Logs the outcome of a purchase started via [purchase] (no-op for restores of purchases it did not start). */
+    private fun logPendingPurchaseResult(result: String, clear: Boolean = true) {
+        val source = pendingSource ?: return
+        val tier = pendingTier ?: return
+        if (clear) {
+            pendingSource = null
+            pendingTier = null
+        } else {
+            if (pendingResultLogged == result) return
+            pendingResultLogged = result
+        }
+        AppAnalytics.logProPurchaseResult(source, tier.name.lowercase(), result)
     }
 
     private fun queryProductDetails(showMessage: Boolean) {
@@ -372,6 +401,9 @@ class ProPurchaseManager private constructor(context: Context) : PurchasesUpdate
         val ownedProductIds = activePurchases
             .flatMap { it.products }
             .filterTo(linkedSetOf(), ProPurchaseTier.productIds::contains)
+        pendingTier?.let { tier ->
+            if (tier.productId in ownedProductIds) logPendingPurchaseResult("completed")
+        }
         _state.value = _state.value.copy(ownedProductIds = ownedProductIds)
 
         activePurchases.forEach { purchase ->

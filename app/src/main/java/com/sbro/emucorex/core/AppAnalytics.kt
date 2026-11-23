@@ -116,6 +116,41 @@ object AppAnalytics {
         }
     }
 
+    fun logProPromoImpression(placement: String) {
+        logEvent("pro_promo_impression") {
+            putString("placement", placement)
+        }
+    }
+
+    fun logProPromoAction(placement: String, action: String, dismissStreak: Int) {
+        logEvent("pro_promo_action") {
+            putString("placement", placement)
+            putString("action", action)
+            putLong("dismiss_streak", dismissStreak.coerceIn(0, 99).toLong())
+        }
+    }
+
+    fun logProReminderShown(dismissStreak: Int) {
+        logEvent("pro_reminder_shown") {
+            putLong("dismiss_streak", dismissStreak.coerceIn(0, 99).toLong())
+        }
+    }
+
+    fun logProReminderAction(action: String, dismissStreak: Int) {
+        logEvent("pro_reminder_action") {
+            putString("action", action)
+            putLong("dismiss_streak", dismissStreak.coerceIn(0, 99).toLong())
+        }
+    }
+
+    fun logProPurchaseResult(source: String, tier: String, result: String) {
+        logEvent("pro_purchase_result") {
+            putString("source", source)
+            putString("tier", tier)
+            putString("result", result)
+        }
+    }
+
     private inline fun logEvent(name: String, buildParams: Bundle.() -> Unit) {
         if (!ready.get()) return
         val analytics = firebaseAnalytics ?: return

@@ -1419,7 +1419,7 @@ private fun SettingsContent(
                                 )
                             },
                             onProLockedSelected = {
-                                (context as? Activity)?.let(viewModel::purchasePro)
+                                (context as? Activity)?.let { viewModel.purchasePro(it, source = "settings") }
                             }
                         )
                         SettingsItem(
@@ -3666,10 +3666,10 @@ private fun SettingsContent(
                 SettingsTab.Pro -> {
                     ProSettingsTab(
                         uiState = uiState,
-                        onPurchase = { (context as? Activity)?.let(viewModel::purchasePro) },
+                        onPurchase = { (context as? Activity)?.let { viewModel.purchasePro(it, source = "settings") } },
                         onPurchaseTier = { tier ->
                             (context as? Activity)?.let { activity ->
-                                viewModel.purchasePro(activity, tier)
+                                viewModel.purchasePro(activity, tier, "settings")
                             }
                         },
                         onRestore = viewModel::restoreProPurchases,
