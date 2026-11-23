@@ -73,7 +73,7 @@ import kotlinx.coroutines.launch
 /** Timing rules for the recurring Pro reminder dialog. Pure so it can be unit tested. */
 object ProReminderPolicy {
     const val REMINDER_INTERVAL_MS = 3L * 60 * 60 * 1000
-    const val BACKOFF_INTERVAL_MS = 24L * 60 * 60 * 1000
+    const val BACKOFF_INTERVAL_MS = 12L * 60 * 60 * 1000
     const val BACKOFF_AFTER_DISMISSALS = 3
     const val REVIEW_COOLDOWN_MS = 5L * 60 * 1000
 
