@@ -1727,7 +1727,7 @@ void Ps2Renderer::DrawBottomBar(float alpha) {
             btns.push_back({"□", TextOr("ps2ui_btn_continue", "Continue"), KEY_SECONDARY, {0.86f, 0.60f, 1.0f, alpha}});
         }
         btns.push_back({"△", TextOr("ps2ui_btn_options", "Options"), KEY_OPTIONS, {0.36f, 0.94f, 0.68f, alpha}});
-        if (has_arcade_games_) {
+        if (GameTabsShown()) {
             btns.push_back({"L1/R1", TextOr("ps2ui_hint_tab", "Tab"), KEY_NEXT_TAB, SecondaryTextColor(alpha)});
         }
         btns.push_back({backSym, TextOr("ps2ui_hint_back", "Back"), KEY_BACK, backCol});
@@ -2400,11 +2400,13 @@ void Ps2Renderer::DrawGamesScreen(float alpha) {
     DrawHeaderBar(TextOr("ps2ui_menu_games", "Games"), alpha);
 
     std::vector<GameEntry> gamesCopy;
+    std::vector<int> recentCopy;
     bool isLoading = false;
     bool hasArcade = false;
     {
         std::lock_guard<std::mutex> lock(data_mutex_);
         gamesCopy = games_;
+        recentCopy = recent_indices_;
         isLoading = games_loading_;
         hasArcade = has_arcade_games_;
     }
@@ -2418,28 +2420,38 @@ void Ps2Renderer::DrawGamesScreen(float alpha) {
     }
 
     float listTop = m.bodyTop + 38.0f;
-    if (hasArcade && !gamesCopy.empty()) {
+    const std::vector<int> tabs = VisibleGameTabsFor(!recentCopy.empty(), hasArcade);
+    if (!tabs.empty() && !gamesCopy.empty()) {
         const float tabY = m.bodyTop + 36.0f;
         const float tabH = 30.0f;
-        const float tabW = 196.0f;
         const float tabGap = 12.0f;
+        const int tabCount = static_cast<int>(tabs.size());
+        const float tabW = std::min(196.0f,
+            (screen_width_ - m.padX * 2.0f - tabGap * static_cast<float>(tabCount - 1)) /
+                static_cast<float>(tabCount));
 
-        char lbl0[96];
-        std::snprintf(lbl0, sizeof(lbl0), "%s (%d)",
-                      TextOr("ps2ui_games_tab_ps2", "PlayStation 2").c_str(), ps2Count);
-        char lbl1[96];
-        std::snprintf(lbl1, sizeof(lbl1), "%s (%d)",
-                      TextOr("ps2ui_games_tab_arcade", "Namco Arcade").c_str(), arcadeCount);
-        const std::string tabLabels[2] = {lbl0, lbl1};
-
-        for (int t = 0; t < 2; ++t) {
+        for (int t = 0; t < tabCount; ++t) {
+            const int kind = tabs[t];
+            char lbl[128];
+            if (kind == GAME_TAB_RECENT) {
+                std::snprintf(lbl, sizeof(lbl), "%s (%d)",
+                              TextOr("ps2ui_games_tab_recent", "Recent").c_str(),
+                              static_cast<int>(recentCopy.size()));
+            } else if (kind == GAME_TAB_ARCADE) {
+                std::snprintf(lbl, sizeof(lbl), "%s (%d)",
+                              TextOr("ps2ui_games_tab_arcade", "Namco Arcade").c_str(), arcadeCount);
+            } else {
+                std::snprintf(lbl, sizeof(lbl), "%s (%d)",
+                              TextOr("ps2ui_games_tab_ps2", "PlayStation 2").c_str(),
+                              hasArcade ? ps2Count : static_cast<int>(gamesCopy.size()));
+            }
             const float tx = m.padX + static_cast<float>(t) * (tabW + tabGap);
-            const bool active = (game_tab_ == t);
+            const bool active = (game_tab_ == kind);
             if (active) {
                 DrawFocusBeam(tx, tabY, tabW, tabH, acc, alpha * 0.65f);
             }
             BeginQuadBatch();
-            DrawText(tabLabels[t], tx + 4.0f, tabY + 5.0f, 14.5f,
+            DrawText(lbl, tx + 4.0f, tabY + 5.0f, 14.5f,
                      active ? STYLE_BODY_BOLD : STYLE_BODY,
                      active ? PrimaryTextColor(alpha) : SecondaryTextColor(alpha * 0.68f),
                      tabW - 8.0f, 1, 1, tabW - 8.0f);
@@ -2448,7 +2460,7 @@ void Ps2Renderer::DrawGamesScreen(float alpha) {
             }
             FlushQuadBatch();
             if (overlay_ == OVERLAY_NONE) {
-                RegisterHit(tx, tabY, tabW, tabH, HIT_GAME_TAB, t);
+                RegisterHit(tx, tabY, tabW, tabH, HIT_GAME_TAB, kind);
             }
         }
         listTop = tabY + tabH + 8.0f;
@@ -2459,13 +2471,7 @@ void Ps2Renderer::DrawGamesScreen(float alpha) {
     const float rightX = m.padX + leftW + 28.0f;
     const float rightW = screen_width_ - rightX - m.padX;
 
-    std::vector<int> filtered;
-    filtered.reserve(gamesCopy.size());
-    for (int i = 0; i < static_cast<int>(gamesCopy.size()); ++i) {
-        if (!hasArcade || gamesCopy[i].isArcade == (game_tab_ == 1)) {
-            filtered.push_back(i);
-        }
-    }
+    const std::vector<int> filtered = BuildGameFilter(gamesCopy, recentCopy, hasArcade, game_tab_);
 
     if (gamesCopy.empty() || filtered.empty()) {
         BeginQuadBatch();
@@ -3992,16 +3998,101 @@ void Ps2Renderer::CycleSetting(int row, int delta) {
     }
 }
 
-std::vector<int> Ps2Renderer::FilteredGameIndices() const {
-    std::lock_guard<std::mutex> lock(data_mutex_);
+std::vector<int> Ps2Renderer::BuildGameFilter(const std::vector<GameEntry>& games,
+                                              const std::vector<int>& recentIndices,
+                                              bool hasArcade, int tab) {
     std::vector<int> out;
-    out.reserve(games_.size());
-    for (int i = 0; i < static_cast<int>(games_.size()); ++i) {
-        if (!has_arcade_games_ || games_[i].isArcade == (game_tab_ == 1)) {
+    if (tab == GAME_TAB_RECENT && !recentIndices.empty()) {
+        out.reserve(recentIndices.size());
+        for (int idx : recentIndices) {
+            if (idx >= 0 && idx < static_cast<int>(games.size())) out.push_back(idx);
+        }
+        if (!out.empty()) return out;
+    }
+    // PS2 tab (or a Recent tab with nothing left in it): PS2 titles when arcade games split
+    // the library, otherwise the whole library.
+    out.reserve(games.size());
+    for (int i = 0; i < static_cast<int>(games.size()); ++i) {
+        if (!hasArcade || games[i].isArcade == (tab == GAME_TAB_ARCADE)) {
             out.push_back(i);
         }
     }
     return out;
+}
+
+std::vector<int> Ps2Renderer::FilteredGameIndices() const {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    return BuildGameFilter(games_, recent_indices_, has_arcade_games_, game_tab_);
+}
+
+std::vector<int> Ps2Renderer::VisibleGameTabsFor(bool hasRecent, bool hasArcade) {
+    std::vector<int> tabs;
+    if (!hasRecent && !hasArcade) return tabs;
+    if (hasRecent) tabs.push_back(GAME_TAB_RECENT);
+    tabs.push_back(GAME_TAB_PS2);
+    if (hasArcade) tabs.push_back(GAME_TAB_ARCADE);
+    return tabs;
+}
+
+std::vector<int> Ps2Renderer::VisibleGameTabs() const {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    return VisibleGameTabsFor(!recent_indices_.empty(), has_arcade_games_);
+}
+
+void Ps2Renderer::SelectGameTab(int tab) {
+    game_tab_ = tab;
+    game_index_ = 0;
+    game_scroll_target_y_ = 0.0f;
+    last_disc_game_idx_ = -1;
+    cursor_pos_init_ = false;
+}
+
+void Ps2Renderer::RebuildRecentIndicesLocked() {
+    recent_indices_.clear();
+    if (recent_paths_.empty() || games_.empty()) return;
+    std::unordered_map<std::string, int> byPath;
+    byPath.reserve(games_.size());
+    for (int i = 0; i < static_cast<int>(games_.size()); ++i) {
+        byPath.emplace(games_[i].path, i);
+    }
+    for (const auto& p : recent_paths_) {
+        auto it = byPath.find(p);
+        if (it != byPath.end() &&
+            std::find(recent_indices_.begin(), recent_indices_.end(), it->second) == recent_indices_.end()) {
+            recent_indices_.push_back(it->second);
+        }
+    }
+}
+
+void Ps2Renderer::NormalizeGameTabLocked() {
+    if (game_tab_ == GAME_TAB_RECENT && !recent_indices_.empty()) return;
+    if (game_tab_ == GAME_TAB_ARCADE && has_arcade_games_) return;
+    if (game_tab_ == GAME_TAB_PS2 && (has_ps2_games_ || !has_arcade_games_)) return;
+    game_tab_ = (has_arcade_games_ && !has_ps2_games_) ? GAME_TAB_ARCADE : GAME_TAB_PS2;
+}
+
+bool Ps2Renderer::LocateGameInCurrentTab(const std::string& path) {
+    if (path.empty()) return false;
+    std::vector<int> filtered;
+    int masterIdx = -1;
+    {
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        filtered = BuildGameFilter(games_, recent_indices_, has_arcade_games_, game_tab_);
+        for (int i = 0; i < static_cast<int>(games_.size()); ++i) {
+            if (games_[i].path == path) {
+                masterIdx = i;
+                break;
+            }
+        }
+    }
+    if (masterIdx < 0) return false;
+    for (int fi = 0; fi < static_cast<int>(filtered.size()); ++fi) {
+        if (filtered[fi] == masterIdx) {
+            game_index_ = fi;
+            return true;
+        }
+    }
+    return false;
 }
 
 int Ps2Renderer::SelectedMasterGameIndex() const {
@@ -4061,7 +4152,7 @@ void Ps2Renderer::SnapGameScrollToSelected() {
     }
     game_index_ = std::clamp(game_index_, 0, static_cast<int>(filtered.size()) - 1);
     const float rowStep = 60.0f;
-    const float viewH = std::max(120.0f, ComputeMetrics().bodyH - (has_arcade_games_ ? 80.0f : 42.0f));
+    const float viewH = std::max(120.0f, ComputeMetrics().bodyH - (GameTabsShown() ? 80.0f : 42.0f));
     const float maxScroll = std::max(0.0f, static_cast<float>(filtered.size()) * rowStep - (viewH - 12.0f));
     const float target = std::clamp(static_cast<float>(game_index_) * rowStep - viewH * 0.35f, 0.0f, maxScroll);
     game_scroll_target_y_ = target;
@@ -4262,6 +4353,16 @@ void Ps2Renderer::OnKey(int key) {
             HostPlaySfx(SFX_CONFIRM);
             return_screen_ = SCREEN_MAIN_MENU;
             if (main_index_ == 0) {
+                // The games screen opens on Recent once at least one game has been played.
+                bool hasRecent = false;
+                {
+                    std::lock_guard<std::mutex> lock(data_mutex_);
+                    hasRecent = !recent_indices_.empty();
+                }
+                if (hasRecent) {
+                    SelectGameTab(GAME_TAB_RECENT);
+                    SnapGameScrollToSelected();
+                }
                 SwitchScreen(SCREEN_GAMES);
             } else if (main_index_ == 1) {
                 mc_tab_ = 0; // Restore Quick Saves as default Browser tab
@@ -4289,15 +4390,17 @@ void Ps2Renderer::OnKey(int key) {
             HostPlaySfx(SFX_CANCEL);
             return;
         }
-        if (has_arcade_games_ &&
-            (key == KEY_PREV_TAB || key == KEY_NEXT_TAB || key == KEY_LEFT || key == KEY_RIGHT)) {
-            game_tab_ = 1 - game_tab_;
-            game_index_ = 0;
-            game_scroll_target_y_ = 0.0f;
-            last_disc_game_idx_ = -1;
-            cursor_pos_init_ = false;
-            HostPlaySfx(SFX_MOVE);
-            return;
+        if (key == KEY_PREV_TAB || key == KEY_NEXT_TAB || key == KEY_LEFT || key == KEY_RIGHT) {
+            const std::vector<int> tabs = VisibleGameTabs();
+            if (tabs.size() >= 2) {
+                const int count = static_cast<int>(tabs.size());
+                int pos = static_cast<int>(std::find(tabs.begin(), tabs.end(), game_tab_) - tabs.begin());
+                if (pos >= count) pos = 0;
+                const int dir = (key == KEY_PREV_TAB || key == KEY_LEFT) ? -1 : 1;
+                SelectGameTab(tabs[(pos + dir + count) % count]);
+                HostPlaySfx(SFX_MOVE);
+                return;
+            }
         }
         const std::vector<int> filtered = FilteredGameIndices();
         const int n = static_cast<int>(filtered.size());
@@ -4315,7 +4418,7 @@ void Ps2Renderer::OnKey(int key) {
 
         auto ensureGameVisible = [&]() {
             const float rowStep = 60.0f;
-            const float viewH = ComputeMetrics().bodyH - (has_arcade_games_ ? 80.0f : 42.0f);
+            const float viewH = ComputeMetrics().bodyH - (GameTabsShown() ? 80.0f : 42.0f);
             const float itemTop = static_cast<float>(game_index_) * rowStep;
             const float itemBot = itemTop + 54.0f;
             if (itemTop < game_scroll_target_y_) game_scroll_target_y_ = itemTop;
@@ -4667,12 +4770,11 @@ void Ps2Renderer::OnTouchUp(float normX, float normY) {
 
         case HIT_GAME_TAB:
             if (game_tab_ != hit->index) {
-                game_tab_ = std::clamp(hit->index, 0, 1);
-                game_index_ = 0;
-                game_scroll_target_y_ = 0.0f;
-                last_disc_game_idx_ = -1;
-                cursor_pos_init_ = false;
-                HostPlaySfx(SFX_MOVE);
+                const std::vector<int> tabs = VisibleGameTabs();
+                if (std::find(tabs.begin(), tabs.end(), hit->index) != tabs.end()) {
+                    SelectGameTab(hit->index);
+                    HostPlaySfx(SFX_MOVE);
+                }
             }
             break;
 
@@ -4955,9 +5057,13 @@ void Ps2Renderer::SetGames(std::vector<GameEntry> games) {
             if (!g.coverPath.empty()) dirty_image_paths_.insert(g.coverPath);
         }
         has_arcade_games_ = hasArcade;
-        if (!hasArcade) game_tab_ = 0;
-        else if (!hasPs2) game_tab_ = 1;
+        has_ps2_games_ = hasPs2;
         games_ = std::move(games);
+        const bool hadRecent = !recent_indices_.empty();
+        RebuildRecentIndicesLocked();
+        // Recent tab just became available (library loaded after the recent list): open it.
+        if (!hadRecent && !recent_indices_.empty()) game_tab_ = GAME_TAB_RECENT;
+        NormalizeGameTabLocked();
         if (!dirty_image_paths_.empty()) image_cache_dirty_ = true;
 
         if (!targetPath.empty()) {
@@ -4972,15 +5078,11 @@ void Ps2Renderer::SetGames(std::vector<GameEntry> games) {
     }
 
     if (matchedMasterIdx >= 0) {
-        if (hasArcade) {
-            game_tab_ = matchedIsArcade ? 1 : 0;
-        }
-        const std::vector<int> filtered = FilteredGameIndices();
-        for (int fi = 0; fi < static_cast<int>(filtered.size()); ++fi) {
-            if (filtered[fi] == matchedMasterIdx) {
-                game_index_ = fi;
-                break;
-            }
+        // Keep the current tab when it still lists the game (a library refresh must not jump
+        // tabs); otherwise move to the tab that owns it.
+        if (!LocateGameInCurrentTab(targetPath)) {
+            game_tab_ = (hasArcade && matchedIsArcade) ? GAME_TAB_ARCADE : GAME_TAB_PS2;
+            LocateGameInCurrentTab(targetPath);
         }
         selected_game_path_ = targetPath;
         pending_restore_game_path_.clear();
@@ -5113,6 +5215,7 @@ void Ps2Renderer::SelectGameByPath(const std::string& path) {
     int masterIdx = -1;
     bool isArcade = false;
     bool hasArcade = false;
+    bool inRecent = false;
     {
         std::lock_guard<std::mutex> lock(data_mutex_);
         hasArcade = has_arcade_games_;
@@ -5123,23 +5226,54 @@ void Ps2Renderer::SelectGameByPath(const std::string& path) {
                 break;
             }
         }
+        inRecent = masterIdx >= 0 &&
+            std::find(recent_indices_.begin(), recent_indices_.end(), masterIdx) != recent_indices_.end();
     }
     if (masterIdx >= 0) {
-        if (hasArcade) {
-            game_tab_ = isArcade ? 1 : 0;
+        // The games screen opens on Recent whenever it lists the game (e.g. back from a game).
+        if (inRecent) {
+            game_tab_ = GAME_TAB_RECENT;
+        } else {
+            game_tab_ = (hasArcade && isArcade) ? GAME_TAB_ARCADE : GAME_TAB_PS2;
         }
-        const std::vector<int> filtered = FilteredGameIndices();
-        for (int fi = 0; fi < static_cast<int>(filtered.size()); ++fi) {
-            if (filtered[fi] == masterIdx) {
-                game_index_ = fi;
-                break;
-            }
-        }
+        LocateGameInCurrentTab(path);
         pending_restore_game_path_.clear();
         pending_restore_game_index_ = -1;
         last_disc_game_idx_ = -1;
         SnapGameScrollToSelected();
     }
+}
+
+void Ps2Renderer::SetRecentGames(std::vector<std::string> paths) {
+    std::string selectedPath;
+    {
+        const int curMaster = SelectedMasterGameIndex();
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        if (curMaster >= 0 && curMaster < static_cast<int>(games_.size())) {
+            selectedPath = games_[curMaster].path;
+        }
+    }
+    if (selectedPath.empty()) selectedPath = selected_game_path_;
+
+    bool hadRecent = false;
+    bool hasRecent = false;
+    {
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        if (paths == recent_paths_) return;
+        hadRecent = !recent_indices_.empty();
+        recent_paths_ = std::move(paths);
+        RebuildRecentIndicesLocked();
+        hasRecent = !recent_indices_.empty();
+        // The tab appears with the first played game: open it right away.
+        if (!hadRecent && hasRecent) game_tab_ = GAME_TAB_RECENT;
+        NormalizeGameTabLocked();
+    }
+    if (!LocateGameInCurrentTab(selectedPath)) {
+        game_index_ = 0;
+    }
+    last_disc_game_idx_ = -1;
+    ClampSelectionIndices();
+    SnapGameScrollToSelected();
 }
 
 } // namespace ps2ui

@@ -28,6 +28,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -67,7 +68,9 @@ import com.sbro.emucorex.ps2ui.Ps2ShellNative
 import com.sbro.emucorex.ps2ui.Ps2ShellSurfaceRenderer
 import com.sbro.emucorex.ps2ui.Ps2TextRasterizer
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -142,6 +145,9 @@ private object Ps2ShellSessionCache {
 
     @Volatile
     var slot2Contents: Ps2McContents? = null
+
+    @Volatile
+    var lastRecentPaths: List<String> = emptyList()
 }
 
 private val PS2_STRING_BINDINGS: List<Pair<String, Int>> = listOf(
@@ -271,6 +277,7 @@ private val PS2_STRING_BINDINGS: List<Pair<String, Int>> = listOf(
     "ps2ui_mc_no_data" to R.string.ps2ui_mc_no_data,
     "ps2ui_games_tab_ps2" to R.string.home_platform_ps2,
     "ps2ui_games_tab_arcade" to R.string.home_platform_arcade,
+    "ps2ui_games_tab_recent" to R.string.ps2ui_games_tab_recent,
 )
 
 private fun normalizeSerialKey(raw: String?): String? {
@@ -610,6 +617,14 @@ fun Ps2ShellScreen(
     }
     val currentResolvedGames = rememberUpdatedState(resolvedGames)
 
+    // Recently played games (most recent first) feed the shell's "Recent" games tab.
+    val recentPaths by remember(appPreferences) {
+        appPreferences.recentGames
+            .map { entries -> entries.map { it.path }.filter { it.isNotBlank() } }
+            .distinctUntilChanged()
+    }.collectAsState(initial = Ps2ShellSessionCache.lastRecentPaths)
+    val currentRecentPaths = rememberUpdatedState(recentPaths)
+
     val memoryCardBundle by produceState(initialValue = Ps2MemoryCardBundle(), savesRevision, context) {
         value = withContext(Dispatchers.IO) {
             val assignments = runCatching { cardRepo.ensureDefaultCardsAssigned() }.getOrNull()
@@ -796,6 +811,7 @@ fun Ps2ShellScreen(
                     val savesSnap = currentSaves.value
                     Ps2ShellNative.nativeSetGamesLoading(currentLoadingGames.value && gamesSnap.isEmpty())
                     Ps2ShellNative.nativeSetSavesLoading(!Ps2ShellSessionCache.hasLoadedSaves && savesSnap.isEmpty())
+                    Ps2ShellNative.nativeSetRecentGames(currentRecentPaths.value.toTypedArray())
                     pushGamesToNative(gamesSnap)
                     pushSavesToNative(context, savesSnap)
                     pushMemoryCardsToNative(context, currentCardBundle.value)
@@ -1191,6 +1207,14 @@ fun Ps2ShellScreen(
         surface.queueEvent {
             Ps2ShellNative.nativeSetGamesLoading(loading)
             pushGamesToNative(snap)
+        }
+    }
+
+    LaunchedEffect(recentPaths) {
+        val paths = recentPaths
+        Ps2ShellSessionCache.lastRecentPaths = paths
+        surface.queueEvent {
+            Ps2ShellNative.nativeSetRecentGames(paths.toTypedArray())
         }
     }
 

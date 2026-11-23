@@ -3336,4 +3336,5 @@
     <string name="ps2ui_slot_fmt">Slot %1$d</string>
     <string name="ps2ui_mc_open_card">Otevřít kartu</string>
     <string name="ps2ui_mc_no_data">Žádná data.</string>
+    <string name="ps2ui_games_tab_recent">Nedávné</string>
 </resources>

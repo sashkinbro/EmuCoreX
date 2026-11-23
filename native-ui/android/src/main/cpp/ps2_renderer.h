@@ -133,6 +133,12 @@ enum ScreenId {
     SCREEN_SETTINGS = 3
 };
 
+enum GameTabKind {
+    GAME_TAB_PS2 = 0,
+    GAME_TAB_ARCADE = 1,
+    GAME_TAB_RECENT = 2
+};
+
 enum OverlayId {
     OVERLAY_NONE = 0,
     OVERLAY_EXIT_CONFIRM = 1,
@@ -242,6 +248,8 @@ public:
     std::vector<int> GetState() const;
     void SetState(int screen, int mainIndex, int gameIndex, int saveIndex);
     void SelectGameByPath(const std::string& path);
+    // Recently played game paths, most recent first. Drives the "Recent" games tab.
+    void SetRecentGames(std::vector<std::string> paths);
 
 private:
     struct Vertex {
@@ -485,6 +493,19 @@ private:
     void CycleSetting(int row, int delta);
     void PushSettingsToHost();
     std::vector<int> FilteredGameIndices() const;
+    // Builds the filtered master-index list for a tab; caller holds data_mutex_ or owns copies.
+    static std::vector<int> BuildGameFilter(const std::vector<GameEntry>& games,
+                                            const std::vector<int>& recentIndices,
+                                            bool hasArcade, int tab);
+    // Tabs shown above the game list, in display order. Empty when only one list exists.
+    std::vector<int> VisibleGameTabs() const;
+    static std::vector<int> VisibleGameTabsFor(bool hasRecent, bool hasArcade);
+    bool GameTabsShown() const { return !VisibleGameTabs().empty(); }
+    void SelectGameTab(int tab);
+    void RebuildRecentIndicesLocked();
+    void NormalizeGameTabLocked();
+    // Moves game_index_ onto `path` inside the current tab; false if the tab does not list it.
+    bool LocateGameInCurrentTab(const std::string& path);
     int SelectedMasterGameIndex() const;
     std::vector<int> FilteredSaveIndices() const;
     void ClampSelectionIndices();
@@ -683,8 +704,13 @@ private:
     int overlay_ = OVERLAY_NONE;
     int main_index_ = 0;
     int game_index_ = 0;
-    int game_tab_ = 0;        // 0 = PlayStation 2, 1 = Namco Arcade
+    // Game list tab kind (not a position): GAME_TAB_PS2, GAME_TAB_ARCADE or GAME_TAB_RECENT.
+    // Starts on Recent; NormalizeGameTabLocked() falls back when that tab is not available.
+    int game_tab_ = GAME_TAB_RECENT;
     bool has_arcade_games_ = false;
+    bool has_ps2_games_ = false;
+    std::vector<std::string> recent_paths_;   // most recent first (guarded by data_mutex_)
+    std::vector<int> recent_indices_;         // games_ indices of recent_paths_ in order (data_mutex_)
     float game_scroll_y_ = 0.0f;
     float game_scroll_target_y_ = 0.0f;
     int pending_restore_game_index_ = -1;

@@ -3316,4 +3316,5 @@
     <string name="ps2ui_slot_fmt">Slot %1$d</string>
     <string name="ps2ui_mc_open_card">Apri scheda</string>
     <string name="ps2ui_mc_no_data">Nessun dato presente.</string>
+    <string name="ps2ui_games_tab_recent">Recenti</string>
 </resources>

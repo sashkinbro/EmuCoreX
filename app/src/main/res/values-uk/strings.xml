@@ -3326,4 +3326,5 @@
     <string name="ps2ui_slot_fmt">Слот %1$d</string>
     <string name="ps2ui_mc_open_card">Відкрити карту</string>
     <string name="ps2ui_mc_no_data">Немає даних.</string>
+    <string name="ps2ui_games_tab_recent">Недавні</string>
 </resources>

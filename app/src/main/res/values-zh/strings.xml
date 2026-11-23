@@ -3317,4 +3317,5 @@
     <string name="ps2ui_slot_fmt">插槽 %1$d</string>
     <string name="ps2ui_mc_open_card">打开记忆卡</string>
     <string name="ps2ui_mc_no_data">没有数据。</string>
+    <string name="ps2ui_games_tab_recent">最近</string>
 </resources>

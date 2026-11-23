@@ -782,6 +782,12 @@ Java_com_sbro_emucorex_ps2ui_Ps2ShellNative_nativeSelectGameByPath(
     if (g_renderer) g_renderer->SelectGameByPath(JstringToUtf8(env, path));
 }
 
+JNIEXPORT void JNICALL
+Java_com_sbro_emucorex_ps2ui_Ps2ShellNative_nativeSetRecentGames(
+    JNIEnv* env, jobject /*thiz*/, jobjectArray paths) {
+    if (g_renderer) g_renderer->SetRecentGames(ReadStringArray(env, paths));
+}
+
 JNIEXPORT jboolean JNICALL
 Java_com_sbro_emucorex_ps2ui_Ps2ShellNative_nativeLoadBiosAssets(
     JNIEnv* env, jobject /*thiz*/, jbyteArray rom) {

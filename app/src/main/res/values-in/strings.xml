@@ -3330,4 +3330,5 @@
     <string name="ps2ui_slot_fmt">Slot %1$d</string>
     <string name="ps2ui_mc_open_card">Buka Kartu</string>
     <string name="ps2ui_mc_no_data">Tidak ada data.</string>
+    <string name="ps2ui_games_tab_recent">Terbaru</string>
 </resources>

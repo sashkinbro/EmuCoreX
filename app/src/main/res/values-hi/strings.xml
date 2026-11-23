@@ -3316,4 +3316,5 @@
     <string name="ps2ui_slot_fmt">स्लॉट %1$d</string>
     <string name="ps2ui_mc_open_card">कार्ड खोलें</string>
     <string name="ps2ui_mc_no_data">कोई डेटा नहीं है।</string>
+    <string name="ps2ui_games_tab_recent">हाल के</string>
 </resources>

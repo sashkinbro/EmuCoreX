@@ -130,6 +130,9 @@ object Ps2ShellNative {
 
     external fun nativeSelectGameByPath(path: String)
 
+    /** Recently played game paths, most recent first; drives the shell's "Recent" games tab. */
+    external fun nativeSetRecentGames(paths: Array<String>)
+
     /** Parses the user's PS2 BIOS ROM image and keeps the boot-intro textures (thread-safe). */
     external fun nativeLoadBiosAssets(rom: ByteArray): Boolean
 }

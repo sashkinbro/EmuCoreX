@@ -3315,4 +3315,5 @@
     <string name="ps2ui_slot_fmt">슬롯 %1$d</string>
     <string name="ps2ui_mc_open_card">카드 열기</string>
     <string name="ps2ui_mc_no_data">데이터가 없습니다.</string>
+    <string name="ps2ui_games_tab_recent">최근</string>
 </resources>

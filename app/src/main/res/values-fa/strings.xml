@@ -3331,4 +3331,5 @@
     <string name="ps2ui_slot_fmt">شیار %1$d</string>
     <string name="ps2ui_mc_open_card">باز کردن کارت</string>
     <string name="ps2ui_mc_no_data">داده‌ای وجود ندارد.</string>
+    <string name="ps2ui_games_tab_recent">اخیر</string>
 </resources>
