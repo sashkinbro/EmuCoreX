@@ -36,10 +36,18 @@ class ProReminderPolicyTest {
 
     @Test
     fun backoffAfterRepeatedDismissals() {
-        assertEquals(ProReminderPolicy.REMINDER_INTERVAL_MS, ProReminderPolicy.intervalMs(2))
-        assertEquals(ProReminderPolicy.BACKOFF_INTERVAL_MS, ProReminderPolicy.intervalMs(3))
-        assertFalse(show(streak = 3, last = now - 4 * hour))
-        assertTrue(show(streak = 3, last = now - 25 * hour))
+        assertEquals(3 * hour, ProReminderPolicy.intervalMs(4))
+        assertEquals(12 * hour, ProReminderPolicy.intervalMs(5))
+        assertFalse(show(streak = 5, last = now - 4 * hour))
+        assertTrue(show(streak = 5, last = now - 13 * hour))
+        assertTrue(show(streak = 4, last = now - 4 * hour))
+    }
+
+    @Test
+    fun cardHideFollowsReminderRhythm() {
+        assertEquals(3 * hour, promoCardHideMs(1))
+        assertEquals(3 * hour, promoCardHideMs(4))
+        assertEquals(12 * hour, promoCardHideMs(5))
     }
 
     @Test

@@ -693,6 +693,7 @@ class AppPreferences(private val context: Context) {
         private val PRO_REMINDER_LAST_SHOWN_AT_MS = longPreferencesKey("pro_reminder_last_shown_at_ms")
         private val PRO_REMINDER_DISMISS_STREAK = intPreferencesKey("pro_reminder_dismiss_streak")
         private fun proPromoHiddenUntilKey(id: String) = longPreferencesKey("pro_promo_hidden_until_" + id)
+        private fun proPromoDismissStreakKey(id: String) = intPreferencesKey("pro_promo_dismiss_streak_" + id)
         private val RENDERER = intPreferencesKey("renderer")
         private val UPSCALE = floatPreferencesKey("upscale_multiplier_v2")
         private val UPSCALE_LEGACY = intPreferencesKey("upscale_multiplier")
@@ -1510,6 +1511,20 @@ class AppPreferences(private val context: Context) {
 
     suspend fun hideProPromo(id: String, untilMs: Long) {
         context.dataStore.edit { prefs -> prefs[proPromoHiddenUntilKey(id)] = untilMs }
+    }
+
+    /** Counts one more X on promo card [id] and returns the new consecutive-dismissal streak. */
+    suspend fun incrementProPromoDismissStreak(id: String): Int {
+        var streak = 0
+        context.dataStore.edit { prefs ->
+            streak = (prefs[proPromoDismissStreakKey(id)] ?: 0) + 1
+            prefs[proPromoDismissStreakKey(id)] = streak
+        }
+        return streak
+    }
+
+    suspend fun resetProPromoDismissStreak(id: String) {
+        context.dataStore.edit { prefs -> prefs.remove(proPromoDismissStreakKey(id)) }
     }
 
     suspend fun setWelcomeDialogShown(shown: Boolean) {

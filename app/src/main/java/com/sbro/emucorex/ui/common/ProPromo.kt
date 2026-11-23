@@ -74,7 +74,7 @@ import kotlinx.coroutines.launch
 object ProReminderPolicy {
     const val REMINDER_INTERVAL_MS = 3L * 60 * 60 * 1000
     const val BACKOFF_INTERVAL_MS = 12L * 60 * 60 * 1000
-    const val BACKOFF_AFTER_DISMISSALS = 3
+    const val BACKOFF_AFTER_DISMISSALS = 5
     const val REVIEW_COOLDOWN_MS = 5L * 60 * 1000
 
     fun intervalMs(dismissStreak: Int): Long =
@@ -95,7 +95,8 @@ object ProReminderPolicy {
     }
 }
 
-const val PROMO_CARD_HIDE_MS = 3L * 24 * 60 * 60 * 1000
+/** How long the card's X hides it: same rhythm as the reminder (3 h, 12 h after 5 X in a row). */
+fun promoCardHideMs(dismissStreak: Int): Long = ProReminderPolicy.intervalMs(dismissStreak)
 
 /** AppPreferences.homeLibraryViewMode value of the PS2 shell (3D carousel) home. */
 private const val HOME_VIEW_MODE_SHELL = 2
@@ -205,7 +206,10 @@ fun ProPromoCard(
             shape = neonShape(16.dp),
             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
             enabled = !state.isPurchaseInProgress,
-            onClick = { context.findActivity()?.let { manager.purchase(it, ProPurchaseTier.BASE) } }
+            onClick = {
+                scope.launch { preferences.resetProPromoDismissStreak(variant.id) }
+                context.findActivity()?.let { manager.purchase(it, ProPurchaseTier.BASE) }
+            }
         ) {
             Icon(
                 imageVector = Icons.Rounded.Star,
@@ -226,7 +230,8 @@ fun ProPromoCard(
         IconButton(
             onClick = {
                 scope.launch {
-                    preferences.hideProPromo(variant.id, System.currentTimeMillis() + PROMO_CARD_HIDE_MS)
+                    val streak = preferences.incrementProPromoDismissStreak(variant.id)
+                    preferences.hideProPromo(variant.id, System.currentTimeMillis() + promoCardHideMs(streak))
                 }
             },
             modifier = Modifier.size(28.dp)
