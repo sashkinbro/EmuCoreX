@@ -4116,7 +4116,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             canUseGameScope = gameKey != null,
             globalPath = globalPath,
             gameOverride = owns,
-            gamePath = if (owns && profile?.gpuDriverType == 1) {
+            gamePath = if (owns && profile.gpuDriverType == 1) {
                 profile.customDriverPath?.takeIf { it.isNotBlank() }
             } else {
                 null

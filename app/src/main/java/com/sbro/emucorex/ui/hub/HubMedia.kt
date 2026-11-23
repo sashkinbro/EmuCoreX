@@ -56,7 +56,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -220,7 +220,7 @@ private fun ZoomableHubImage(spec: HubImageSpec) {
     var scale by remember(spec.url) { mutableFloatStateOf(1f) }
     var offsetX by remember(spec.url) { mutableFloatStateOf(0f) }
     var offsetY by remember(spec.url) { mutableFloatStateOf(0f) }
-    val transformState = rememberTransformableState { zoomChange, panChange, _ ->
+    val transformState = rememberTransformableState { _, zoomChange, panChange, _ ->
         scale = (scale * zoomChange).coerceIn(1f, 5f)
         if (scale <= 1.01f) {
             offsetX = 0f

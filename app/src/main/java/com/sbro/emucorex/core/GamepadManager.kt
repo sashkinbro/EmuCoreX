@@ -1041,7 +1041,7 @@ private const val MAX_PAD_SLOTS = 2
         if (pressed && event.repeatCount == 0) {
             playGamepadButtonHaptic()
         }
-        if (selectedActionId != null && isTurboAction(selectedActionId) && padKey !in ANALOG_STICK_DIRECTION_KEYS) {
+        if (isTurboAction(selectedActionId) && padKey !in ANALOG_STICK_DIRECTION_KEYS) {
             if (pressed && event.repeatCount == 0) startTurbo(physicalKey, padIndex, padKey)
             return true
         }

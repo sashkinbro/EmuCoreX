@@ -364,7 +364,7 @@ object ImageConversionManager {
         if (dataTrack != null) {
             val sectorBytes = dataTrack.sectorBytes()
             val startOffset = dataTrack.startFrame * sectorBytes
-            val endOffset = dataBlock?.trackEndFrame(dataTrack)?.times(sectorBytes)
+            val endOffset = dataBlock.trackEndFrame(dataTrack)?.times(sectorBytes)
             skipFully(source, startOffset)
             val skippedAudioSectors = if (sectorBytes == ISO_SECTOR_BYTES) {
                 copyPlainRange(source, output, startOffset, endOffset, totalBytes, checkCancelled, onProgress)

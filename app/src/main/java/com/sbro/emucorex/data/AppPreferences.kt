@@ -1309,7 +1309,7 @@ class AppPreferences(private val context: Context) {
             val importedName = entry?.optString("customName")?.trim()?.takeIf(String::isNotEmpty)
             if (importedName != null) prefs[uiSoundCustomNameKey(kind)] = importedName else prefs.remove(uiSoundCustomNameKey(kind))
             // Backups made before presets existed have no "preset" field: fall back to the default.
-            prefs[uiSoundPresetKey(kind)] = UiSoundPresets.sanitizeId(kind, entry?.optString("preset", null))
+            prefs[uiSoundPresetKey(kind)] = UiSoundPresets.sanitizeId(kind, entry?.takeIf { it.has("preset") }?.optString("preset"))
             val importedCustom = entry?.optBoolean("custom", importedName != null) ?: false
             if (importedCustom) prefs[uiSoundCustomKey(kind)] = true else prefs.remove(uiSoundCustomKey(kind))
             prefs[uiSoundRevisionKey(kind)] = (prefs[uiSoundRevisionKey(kind)] ?: 0) + 1
