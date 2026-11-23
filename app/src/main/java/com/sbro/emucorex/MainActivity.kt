@@ -73,14 +73,22 @@ open class MainActivity : ComponentActivity() {
     private val orientationOverrides = LinkedHashMap<String, Int>()
     private val pendingOrientationClears = HashMap<String, Runnable>()
     private var lastAppliedOrientation: Int = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    // Matches android:screenOrientation="landscape" of TvActivity in the manifest.
+    private val tvBaseOrientation: Int = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocaleManager.wrap(newBase))
     }
 
     private fun resolveAndApplyOrientation() {
-        if (launchedFromTv) return
         val override = orientationOverrides.values.lastOrNull()
+        if (launchedFromTv) {
+            // TV keeps its manifest orientation unless a screen (emulation) explicitly asks.
+            val target = override ?: tvBaseOrientation
+            requestedOrientation = target
+            lastAppliedOrientation = target
+            return
+        }
         val target = override ?: when (currentOrientationLock) {
             AppPreferences.ORIENTATION_LOCK_PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             AppPreferences.ORIENTATION_LOCK_LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE

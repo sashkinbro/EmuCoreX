@@ -319,6 +319,7 @@ private object PadKey {
     const val SERVICE = 130
 }
 
+private const val EMULATION_ORIENTATION_TOKEN = "emulation"
 private const val TRANSPORT_HOLD_DELAY_MS = 360L
 private const val LIGHT_GUN_STICK_AIM_SPEED = 0.95f
 
@@ -761,9 +762,17 @@ fun EmulationScreen(
     val originalRequestedOrientation = remember(activity) {
         activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     }
+    // Route the game orientation through MainActivity's override stack. Writing
+    // requestedOrientation directly lost to the PS2 shell's deferred override release, which
+    // reset the activity to the global lock (auto) a moment after a game started from the shell.
+    val hostActivity = activity as? com.sbro.emucorex.MainActivity
     val restoreHostUi = remember(activity, originalRequestedOrientation) {
         {
-            activity?.requestedOrientation = originalRequestedOrientation
+            if (hostActivity != null) {
+                hostActivity.clearOrientationOverrideDeferred(EMULATION_ORIENTATION_TOKEN)
+            } else {
+                activity?.requestedOrientation = originalRequestedOrientation
+            }
             activity?.window?.let { window ->
                 val controller = WindowCompat.getInsetsController(window, window.decorView)
                 controller.show(WindowInsetsCompat.Type.navigationBars())
@@ -1197,7 +1206,11 @@ fun EmulationScreen(
 
     if (emulationOrientation != null) {
         DisposableEffect(activity, originalRequestedOrientation, emulationOrientation) {
-            activity?.requestedOrientation = emulationOrientation
+            if (hostActivity != null) {
+                hostActivity.setOrientationOverride(EMULATION_ORIENTATION_TOKEN, emulationOrientation)
+            } else {
+                activity?.requestedOrientation = emulationOrientation
+            }
             activity?.window?.let { window ->
                 val controller = WindowCompat.getInsetsController(window, window.decorView)
                 controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
