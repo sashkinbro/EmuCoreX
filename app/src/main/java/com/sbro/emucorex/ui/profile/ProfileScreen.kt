@@ -153,6 +153,8 @@ import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.premiumFilterChipColors
 import com.sbro.emucorex.ui.common.shimmer
 import com.sbro.emucorex.ui.common.tvGamepadFocusableCard
+import com.sbro.emucorex.ui.common.ProPromoCard
+import com.sbro.emucorex.ui.common.ProPromoVariant
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import java.text.DateFormat
 import java.text.SimpleDateFormat
@@ -184,6 +186,7 @@ private enum class StatsActivityState {
 fun ProfileScreen(
     onBackClick: () -> Unit,
     onOpenGameDetails: (Long) -> Unit,
+    onOpenProSettings: (() -> Unit)? = null,
     viewModel: ProfileViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -380,6 +383,12 @@ fun ProfileScreen(
                         }
                         when (tabs[selectedTab.intValue]) {
                             ProfileTab.Overview -> {
+                                item {
+                                    ProPromoCard(
+                                        variant = ProPromoVariant.PROFILE,
+                                        onLearnMore = onOpenProSettings
+                                    )
+                                }
                                 item {
                                     RevealOnEnter(revealKey = "overview-${uiState.account?.uid}") {
                                         ProfileOverview(

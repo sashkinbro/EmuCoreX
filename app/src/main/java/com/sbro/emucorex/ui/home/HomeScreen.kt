@@ -158,6 +158,8 @@ import com.sbro.emucorex.data.LibraryPlatform
 import com.sbro.emucorex.ui.common.GameCoverArt
 import com.sbro.emucorex.ui.common.GameCoverAspectRatio
 import com.sbro.emucorex.ui.common.PremiumLoadingAnimation
+import com.sbro.emucorex.ui.common.ProPromoCard
+import com.sbro.emucorex.ui.common.ProPromoVariant
 import com.sbro.emucorex.ui.common.ProSupportOptionsDialog
 import com.sbro.emucorex.ui.common.TvStoragePickerHost
 import com.sbro.emucorex.ui.common.TvStorageRequest
@@ -209,6 +211,7 @@ fun HomeScreen(
     onSaveSelected: (gamePath: String, slot: Int) -> Unit = { _, _ -> },
     onMenuClick: (() -> Unit)? = null,
     onShelfModeChanged: (Boolean) -> Unit = {},
+    onOpenProSettings: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -582,6 +585,14 @@ fun HomeScreen(
                                     },
                                     onToggleLibraryViewMode = viewModel::toggleLibraryViewMode,
                                     onMenuClick = onMenuClick
+                                )
+                            }
+
+                            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                                ProPromoCard(
+                                    variant = ProPromoVariant.LIBRARY,
+                                    modifier = Modifier.padding(horizontal = horizontalInset),
+                                    onLearnMore = onOpenProSettings
                                 )
                             }
 

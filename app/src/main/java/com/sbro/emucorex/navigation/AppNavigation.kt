@@ -75,6 +75,7 @@ import com.sbro.emucorex.ui.hub.HubScreen
 import com.sbro.emucorex.ui.hub.detail.HubDetailScreen
 import com.sbro.emucorex.ui.memorycards.MemoryCardManagerScreen
 import com.sbro.emucorex.ui.onboarding.OnboardingScreen
+import com.sbro.emucorex.ui.common.ProReminderHost
 import com.sbro.emucorex.ui.profile.ProfileScreen
 import com.sbro.emucorex.ui.saves.SaveManagerScreen
 import com.sbro.emucorex.ui.settings.LanguageSettingsScreen
@@ -447,6 +448,9 @@ fun AppNavigation(
                 }
             }
         )
+        ProReminderHost(
+            isHomeVisible = currentBackStackEntry?.destination?.hasRoute<HomeRoute>() == true
+        )
         NavHost(
             navController = navController,
             startDestination = startDestination,
@@ -570,6 +574,11 @@ fun AppNavigation(
                             }
                         },
                         onMenuClick = openDrawer,
+                        onOpenProSettings = {
+                            navController.navigate(SettingsRoute(tab = "pro")) {
+                                launchSingleTop = true
+                            }
+                        },
                         onShelfModeChanged = { isShelfMode ->
                             homeDrawerEnabled = !isShelfMode
                         }
@@ -1266,6 +1275,11 @@ fun AppNavigation(
                 ) {
                     ProfileScreen(
                         onBackClick = { navController.popBackStack() },
+                        onOpenProSettings = {
+                            navController.navigate(SettingsRoute(tab = "pro")) {
+                                launchSingleTop = true
+                            }
+                        },
                         onOpenGameDetails = { catalogGameId ->
                             navController.navigate(GameDetailRoute(catalogGameId = catalogGameId)) {
                                 launchSingleTop = true
