@@ -334,7 +334,7 @@ fun HubScreen(
                 }
 
                 when {
-                    storeActive -> storeContent(storeModel, onOpenStoreItem)
+                    storeActive -> storeContent(storeModel, onOpenStoreItem, horizontalPadding)
                     minimumSkeletonVisible -> {
                         items(6, key = { "hub-minimum-skeleton-$it" }) {
                             HubSkeletonCard(compact = compact)
@@ -626,7 +626,7 @@ private fun HubTabRow(
     )
 }
 
-private fun Modifier.expandIntoHorizontalPadding(horizontalPadding: androidx.compose.ui.unit.Dp): Modifier =
+internal fun Modifier.expandIntoHorizontalPadding(horizontalPadding: androidx.compose.ui.unit.Dp): Modifier =
     layout { measurable, constraints ->
         if (!constraints.hasBoundedWidth) {
             val placeable = measurable.measure(constraints)

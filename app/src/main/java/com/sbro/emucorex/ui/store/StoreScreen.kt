@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
+import com.sbro.emucorex.ui.hub.expandIntoHorizontalPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
@@ -231,13 +232,17 @@ fun rememberStoreContentModel(
 }
 
 /** Store body (sub-tabs, offline banner, carousel, filters, grid) emitted into a host grid; no header of its own. */
-fun LazyGridScope.storeContent(model: StoreContentModel, onOpenItem: (String) -> Unit) {
+fun LazyGridScope.storeContent(
+    model: StoreContentModel,
+    onOpenItem: (String) -> Unit,
+    horizontalPadding: androidx.compose.ui.unit.Dp = 0.dp
+) {
     val filters = model.filters
     val tab = filters.tab
     val snapshot = model.snapshot
     val locale = model.viewModel.locale
     item(key = "store-tabs", span = { GridItemSpan(maxLineSpan) }) {
-        StoreTabRow(selected = tab, onSelected = filters::selectTab)
+        StoreTabRow(selected = tab, onSelected = filters::selectTab, horizontalPadding = horizontalPadding)
     }
     if (model.offline && snapshot != null) {
         item(key = "store-offline", span = { GridItemSpan(maxLineSpan) }) {
@@ -300,7 +305,8 @@ fun LazyGridScope.storeContent(model: StoreContentModel, onOpenItem: (String) ->
                     categories = model.categories,
                     categoryId = filters.categoryId,
                     onCategory = { filters.categoryId = it },
-                    locale = locale
+                    locale = locale,
+                    horizontalPadding = horizontalPadding
                 )
             }
             if (model.visible.isEmpty()) {
@@ -329,9 +335,15 @@ fun LazyGridScope.storeContent(model: StoreContentModel, onOpenItem: (String) ->
 }
 
 @Composable
-private fun StoreTabRow(selected: StoreTab, onSelected: (StoreTab) -> Unit) {
+private fun StoreTabRow(
+    selected: StoreTab,
+    onSelected: (StoreTab) -> Unit,
+    horizontalPadding: androidx.compose.ui.unit.Dp = 0.dp
+) {
+    // Bleed to the screen edges like the Hub tab row: chips scroll edge-to-edge, padding lives inside.
     LazyRow(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().expandIntoHorizontalPadding(horizontalPadding),
+        contentPadding = PaddingValues(horizontal = horizontalPadding),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(StoreTab.entries, key = { it.name }) { tab ->
@@ -355,12 +367,17 @@ private fun StoreFilterBar(
     categories: List<StoreCategory>,
     categoryId: String?,
     onCategory: (String?) -> Unit,
-    locale: String
+    locale: String,
+    horizontalPadding: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.fillMaxWidth().expandIntoHorizontalPadding(horizontalPadding).padding(end = horizontalPadding),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             LazyRow(
                 modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(start = horizontalPadding, end = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(StoreAccessFilter.entries, key = { it.name }) { filter ->
@@ -400,7 +417,11 @@ private fun StoreFilterBar(
             }
         }
         if (categories.isNotEmpty()) {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyRow(
+                modifier = Modifier.fillMaxWidth().expandIntoHorizontalPadding(horizontalPadding),
+                contentPadding = PaddingValues(horizontal = horizontalPadding),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 items(categories, key = { it.id }) { category ->
                     val selected = categoryId == category.id
                     FilterChip(
