@@ -1170,7 +1170,7 @@ private fun AchievementAccountCard(
                 )
                 if (retroState.user != null) {
                     Surface(
-                        shape = RoundedCornerShape(99.dp),
+                        shape = neonShape(99.dp),
                         color = hardcoreStatusColor.copy(alpha = 0.2f)
                     ) {
                         Text(

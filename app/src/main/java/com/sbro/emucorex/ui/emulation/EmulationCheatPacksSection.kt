@@ -343,7 +343,7 @@ private fun CheatPackHeader(
 @Composable
 private fun CheatPackCountBadge(count: Int) {
     Surface(
-        shape = RoundedCornerShape(999.dp),
+        shape = neonShape(999.dp),
         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
         contentColor = MaterialTheme.colorScheme.primary
     ) {

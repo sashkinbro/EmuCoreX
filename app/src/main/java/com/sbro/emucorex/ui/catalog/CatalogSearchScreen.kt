@@ -200,7 +200,7 @@ fun CatalogSearchScreen(
                             trailingIcon = {
                                 if (uiState.query.isNotBlank()) {
                                     val interactionSource = remember { MutableInteractionSource() }
-                                    val shape = RoundedCornerShape(999.dp)
+                                    val shape = neonShape(999.dp)
                                     Surface(
                                         modifier = Modifier.tvGamepadFocusableCard(
                                             shape = shape,
@@ -441,7 +441,7 @@ private fun FilterMenuChip(
     content: @Composable () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(999.dp)
+    val shape = neonShape(999.dp)
     Box {
         Surface(
             modifier = modifier.tvGamepadFocusableCard(

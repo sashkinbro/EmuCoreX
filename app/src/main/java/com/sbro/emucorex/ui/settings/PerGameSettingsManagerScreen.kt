@@ -4178,7 +4178,7 @@ private fun ProfileActionIconButton(
 @Composable
 private fun ProfileBadge(text: String) {
     Surface(
-        shape = RoundedCornerShape(999.dp),
+        shape = neonShape(999.dp),
         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
     ) {
         Text(

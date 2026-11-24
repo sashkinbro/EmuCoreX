@@ -720,7 +720,7 @@ private fun HubCard(item: HubItem, compact: Boolean, onOpen: () -> Unit, onToggl
                 }
                 Surface(
                     modifier = Modifier.align(Alignment.BottomStart).padding(if (compact) 8.dp else 10.dp),
-                    shape = RoundedCornerShape(999.dp),
+                    shape = neonShape(999.dp),
                     color = Color.Black.copy(alpha = 0.55f)
                 ) {
                     Text(

@@ -148,6 +148,10 @@ val LocalNeonTheme = compositionLocalOf { false }
 @Composable
 fun neonShape(size: Dp): Shape {
     val extras = LocalThemeExtras.current
+    // Huge radii (e.g. 999.dp) mean "pill": keep a pill per style instead of a degenerate cut.
+    if (size >= PILL_THRESHOLD) {
+        return if (extras.shapeStyle == ThemeShapeStyle.ROUNDED) RoundedCornerShape(50) else themedControlShape(RoundedCornerShape(50))
+    }
     val scaled = size * extras.shapeScale
     return when (extras.shapeStyle) {
         ThemeShapeStyle.ROUNDED -> RoundedCornerShape(scaled)
@@ -177,6 +181,8 @@ fun neonChipShape(): Shape = themedControlShape(FilterChipDefaults.shape)
 // Button shape: the theme's corner style, stock M3 pill for the default rounded style.
 @Composable
 fun neonButtonShape(): Shape = themedControlShape(ButtonDefaults.shape)
+
+private val PILL_THRESHOLD = 100.dp
 
 @Composable
 private fun themedControlShape(stock: Shape): Shape {

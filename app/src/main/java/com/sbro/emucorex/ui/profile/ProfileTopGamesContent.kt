@@ -445,13 +445,13 @@ internal fun TopGameStatSkeletonRow() {
                             modifier = Modifier
                                 .width(72.dp)
                                 .height(22.dp)
-                                .clip(RoundedCornerShape(999.dp))
+                                .clip(neonShape(999.dp))
                         )
                         SkeletonBlock(
                             modifier = Modifier
                                 .width(64.dp)
                                 .height(22.dp)
-                                .clip(RoundedCornerShape(999.dp))
+                                .clip(neonShape(999.dp))
                         )
                     }
                 }
@@ -463,13 +463,13 @@ internal fun TopGameStatSkeletonRow() {
                         modifier = Modifier
                             .width(86.dp)
                             .height(26.dp)
-                            .clip(RoundedCornerShape(999.dp))
+                            .clip(neonShape(999.dp))
                     )
                     SkeletonBlock(
                         modifier = Modifier
                             .width(66.dp)
                             .height(28.dp)
-                            .clip(RoundedCornerShape(999.dp))
+                            .clip(neonShape(999.dp))
                     )
                 }
             }
@@ -583,7 +583,7 @@ private fun topGameRankColor(rank: Int): Color = when (rank) {
 @Composable
 internal fun TopGameMetaPill(icon: ImageVector, text: String) {
     Surface(
-        shape = RoundedCornerShape(999.dp),
+        shape = neonShape(999.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)
     ) {
         Row(
@@ -610,7 +610,7 @@ internal fun TopGameMetaPill(icon: ImageVector, text: String) {
 internal fun TopGameTimeBadge(text: String, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(999.dp),
+        shape = neonShape(999.dp),
         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
     ) {
@@ -628,7 +628,7 @@ private fun TopGameDevicesBadge(onClick: () -> Unit, modifier: Modifier = Modifi
     Surface(
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(999.dp),
+        shape = neonShape(999.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
     ) {
@@ -836,7 +836,7 @@ private fun DeviceStatRow(
             ) {
                 if (isCurrent) {
                     Surface(
-                        shape = RoundedCornerShape(999.dp),
+                        shape = neonShape(999.dp),
                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
                     ) {
                         Text(

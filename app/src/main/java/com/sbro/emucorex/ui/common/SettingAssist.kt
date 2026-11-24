@@ -64,7 +64,7 @@ fun SettingHelpButton(
     val showDialog = remember(title, description) { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
     val tvUiEnabled = LocalTvUiEnvironment.current.enabled
-    val focusShape = RoundedCornerShape(999.dp)
+    val focusShape = neonShape(999.dp)
 
     Box(
         modifier = modifier

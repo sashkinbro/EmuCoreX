@@ -3,6 +3,7 @@ package com.sbro.emucorex.ui.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
@@ -14,6 +15,7 @@ import com.sbro.emucorex.ui.theme.neon.LocalNeonTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.data.AppFontChoice
 import com.sbro.emucorex.data.AppPreferences
@@ -273,7 +275,31 @@ private fun Typography.withFamily(family: FontFamily): Typography = copy(
     labelSmall = labelSmall.copy(fontFamily = family)
 )
 
-fun CustomThemeConfig.toColorScheme() = if (dark) {
+/**
+ * Full Material scheme for a custom/package theme. Container, dim/bright and inverse roles are
+ * derived from the theme's own surface/background/text colors; leaving them at Material's
+ * baseline would tint cards, menus and dialogs with the default lilac.
+ */
+fun CustomThemeConfig.toColorScheme(): ColorScheme = baseColorScheme().withDerivedRoles(dark)
+
+private fun ColorScheme.withDerivedRoles(dark: Boolean): ColorScheme {
+    val toward = onSurface
+    fun step(amount: Float) = lerp(surface, toward, amount)
+    return copy(
+        surfaceDim = if (dark) lerp(background, Color.Black, 0.25f) else lerp(surface, toward, 0.10f),
+        surfaceBright = if (dark) step(0.12f) else lerp(surface, Color.White, 0.6f),
+        surfaceContainerLowest = if (dark) lerp(background, Color.Black, 0.35f) else lerp(surface, Color.White, 0.7f),
+        surfaceContainerLow = if (dark) lerp(background, surface, 0.6f) else lerp(surface, Color.White, 0.35f),
+        surfaceContainer = surface,
+        surfaceContainerHigh = step(if (dark) 0.05f else 0.04f),
+        surfaceContainerHighest = surfaceVariant,
+        inverseSurface = onSurface,
+        inverseOnSurface = surface,
+        inversePrimary = lerp(primary, if (dark) Color.Black else Color.White, 0.35f)
+    )
+}
+
+private fun CustomThemeConfig.baseColorScheme() = if (dark) {
     darkColorScheme(
         primary = Color(primary),
         onPrimary = Color(onPrimary),

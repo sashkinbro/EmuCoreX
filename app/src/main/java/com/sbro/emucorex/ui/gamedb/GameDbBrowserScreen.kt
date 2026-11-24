@@ -820,14 +820,14 @@ private fun GameDbValueBadge(
     }
     val modifier = if (onEditValue != null) {
         Modifier
-            .clip(RoundedCornerShape(999.dp))
+            .clip(neonShape(999.dp))
             .clickable(onClick = onEditValue)
     } else {
         Modifier
     }
     Surface(
         modifier = modifier.widthIn(max = if (compact) 128.dp else 210.dp),
-        shape = RoundedCornerShape(999.dp),
+        shape = neonShape(999.dp),
         color = container,
         border = if (enabled) null else BorderStroke(
             1.dp,
@@ -871,7 +871,7 @@ private fun GameDbTagBadge(
     content: androidx.compose.ui.graphics.Color
 ) {
     Surface(
-        shape = RoundedCornerShape(999.dp),
+        shape = neonShape(999.dp),
         color = container
     ) {
         Text(
@@ -1081,7 +1081,7 @@ private fun GameDbChoiceRow(
 @Composable
 private fun GameDbCountBadge(text: String, accent: Boolean) {
     Surface(
-        shape = RoundedCornerShape(999.dp),
+        shape = neonShape(999.dp),
         color = if (accent) {
             MaterialTheme.colorScheme.primaryContainer
         } else {

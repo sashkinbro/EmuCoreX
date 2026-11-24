@@ -274,7 +274,7 @@ private fun HubArticleContent(
                                     modifier = Modifier
                                         .align(Alignment.BottomStart)
                                         .padding(14.dp),
-                                    shape = RoundedCornerShape(999.dp),
+                                    shape = neonShape(999.dp),
                                     color = Color.Black.copy(alpha = 0.62f),
                                     contentColor = Color.White
                                 ) {
@@ -626,7 +626,7 @@ private fun HubArticleBlock(
 @Composable
 private fun HubTag(text: String) {
     Surface(
-        shape = RoundedCornerShape(999.dp),
+        shape = neonShape(999.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         Text(text, modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp), style = MaterialTheme.typography.labelMedium)
@@ -665,7 +665,7 @@ private fun HubArticleMetaRow(item: HubItem, readingMinutes: Int) {
 @Composable
 private fun HubMetaPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
     Surface(
-        shape = RoundedCornerShape(999.dp),
+        shape = neonShape(999.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant
     ) {

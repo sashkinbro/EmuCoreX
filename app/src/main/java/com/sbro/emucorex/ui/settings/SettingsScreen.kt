@@ -8048,7 +8048,7 @@ private fun LanguageOptionCard(
                 Box(
                     modifier = Modifier
                         .size(10.dp)
-                        .clip(RoundedCornerShape(999.dp))
+                        .clip(neonShape(999.dp))
                         .background(MaterialTheme.colorScheme.primary)
                 )
             }

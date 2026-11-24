@@ -2948,7 +2948,7 @@ private fun LocalMultiplayerTouchZone(
                 .align(Alignment.TopStart)
                 .padding(8.dp)
                 .zIndex(30f),
-            shape = RoundedCornerShape(999.dp),
+            shape = neonShape(999.dp),
             color = Color.Black.copy(alpha = 0.56f),
             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.20f))
         ) {
@@ -4401,7 +4401,7 @@ private fun EmulationSidebarMenu(
                                 horizontalArrangement = Arrangement.End
                             ) {
                                 Surface(
-                                    shape = RoundedCornerShape(999.dp),
+                                    shape = neonShape(999.dp),
                                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
                                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
                                 ) {
@@ -8201,12 +8201,12 @@ private fun SimpleFpsCounter(
     val safeScale = fontScale.coerceIn(0.75f, 2f)
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(999.dp))
+            .clip(neonShape(999.dp))
             .background(Color.Black.copy(alpha = 0.42f))
             .border(
                 width = 1.dp,
                 color = Color.White.copy(alpha = 0.08f),
-                shape = RoundedCornerShape(999.dp)
+                shape = neonShape(999.dp)
             )
             .padding(horizontal = 10.dp * safeScale, vertical = 5.dp * safeScale)
     ) {
@@ -8776,7 +8776,7 @@ private fun SaveSlotPreview(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(10.dp),
-            shape = RoundedCornerShape(999.dp),
+            shape = neonShape(999.dp),
             color = Color.Black.copy(alpha = 0.58f)
         ) {
             Text(

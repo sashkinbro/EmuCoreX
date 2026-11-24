@@ -230,7 +230,7 @@ fun ProPromoCard(
                 // The gold app icon brings its own round badge, so it gets no backing tile.
                 .then(
                     if (variant.image == null) {
-                        Modifier.clip(RoundedCornerShape(12.dp)).background(Brush.linearGradient(listOf(primary.copy(alpha = 0.38f), primary.copy(alpha = 0.10f))))
+                        Modifier.clip(neonShape(12.dp)).background(Brush.linearGradient(listOf(primary.copy(alpha = 0.38f), primary.copy(alpha = 0.10f))))
                     } else {
                         Modifier
                     }
