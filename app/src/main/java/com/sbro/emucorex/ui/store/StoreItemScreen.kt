@@ -513,7 +513,7 @@ private fun StoreFontSample(installed: InstalledStoreItem) {
     val context = LocalContext.current
     val family = remember(installed.id, installed.version, installed.directory) {
         StoreFontPacks.file(context, installed.id)?.let { file ->
-            runCatching { FontFamily(android.graphics.Typeface.createFromFile(file)) }.getOrNull()
+            runCatching { com.sbro.emucorex.ui.theme.fileFontFamily(file) }.getOrNull()
         }
     } ?: return
     Surface(

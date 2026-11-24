@@ -148,7 +148,7 @@ fun typographyFor(
         AppFontChoice.EXO_2 -> Exo2FontFamily
         AppFontChoice.CUSTOM -> customFontFile
             ?.takeIf { it.isFile && it.length() > 0L }
-            ?.let { file -> runCatching { FontFamily(android.graphics.Typeface.createFromFile(file)) }.getOrNull() }
+            ?.let { file -> runCatching { fileFontFamily(file) }.getOrNull() }
             ?: FontFamily.Default
     }
     val safeScale = fontScale.coerceAtLeast(0.01f)
@@ -209,3 +209,15 @@ fun Typography.withTitleLetterSpacing(extraSp: Float): Typography = if (extraSp 
 
 private fun TextStyle.spaced(extraSp: Float): TextStyle =
     copy(letterSpacing = (if (letterSpacing == TextUnit.Unspecified) 0f else letterSpacing.value).plus(extraSp).sp)
+
+/**
+ * Family for a user/Store font file. Declaring real weights makes variable fonts load at wght 400/500/600/700
+ * (their default instance is often Thin or Light, e.g. Montserrat, Manrope, Raleway); static fonts ignore the
+ * variation settings and keep synthesized bold.
+ */
+fun fileFontFamily(file: File): FontFamily = FontFamily(
+    Font(file, FontWeight.Normal),
+    Font(file, FontWeight.Medium),
+    Font(file, FontWeight.SemiBold),
+    Font(file, FontWeight.Bold)
+)
