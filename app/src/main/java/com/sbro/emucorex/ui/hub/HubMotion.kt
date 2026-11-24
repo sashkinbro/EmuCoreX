@@ -118,12 +118,17 @@ internal fun SegmentedSwitch(
     val motion = rememberMotionEnabled()
     val gap = 4.dp
     val indicatorShape = neonShape(18.dp)
+    // Styled themes (Classic, Luna, S60...) get a real panel track in the theme's own look, otherwise a bare outline
+    // floats on saturated backgrounds. Standard/Neon keep the light outline (a gray slab looked heavy there).
+    val style = com.sbro.emucorex.ui.theme.LocalThemeExtras.current.uiStyle
+    val panelTrack = style != com.sbro.emucorex.data.theme.UiStyle.STANDARD && style != com.sbro.emucorex.data.theme.UiStyle.NEON
+    val idleContent = if (panelTrack) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onBackground
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = neonShape(22.dp),
-        // No gray slab: an outline like the Settings tab chips, the indicator is the only fill.
-        color = Color.Transparent,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        color = if (panelTrack) MaterialTheme.colorScheme.surface else Color.Transparent,
+        border = if (panelTrack) null
+        else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.28f))
     ) {
         BoxWithConstraints(modifier = Modifier.padding(4.dp)) {
             val segmentWidth = (maxWidth - gap * (count - 1)) / count
@@ -137,7 +142,7 @@ internal fun SegmentedSwitch(
                     .offset { IntOffset(x.value.roundToPx(), 0) }
                     .width(segmentWidth)
                     .height(segmentHeight)
-                    .background(MaterialTheme.colorScheme.primaryContainer, indicatorShape)
+                    .background(MaterialTheme.colorScheme.primary, indicatorShape)
             )
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
                 repeat(count) { index ->
@@ -145,8 +150,10 @@ internal fun SegmentedSwitch(
                     val interactionSource = remember { MutableInteractionSource() }
                     val shape = neonShape(18.dp)
                     val contentColor by animateColorAsState(
-                        targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                        else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.78f),
+                        // Solid primary indicator + onBackground labels/outline: readable on any theme background
+                        // (primaryContainer and outlineVariant vanished on saturated backgrounds like Ninety-Five).
+                        targetValue = if (selected) MaterialTheme.colorScheme.onPrimary
+                        else idleContent,
                         animationSpec = if (motion) tween(200) else snap(),
                         label = "switch-content"
                     )
