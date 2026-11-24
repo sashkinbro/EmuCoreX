@@ -447,7 +447,7 @@ class StorePackageInstaller private constructor(context: Context) {
         internal val FONT_FILES = setOf("font.ttf", "font.otf")
         internal const val FONT_LICENSE = "LICENSE.txt"
         private val FONT_LICENSES = setOf("OFL-1.1", "Apache-2.0")
-        private val FONT_SCRIPT = Regex("[a-z]{2,16}")
+        private val FONT_SCRIPT = Regex("[a-z][a-z-]{1,23}") // e.g. "latin-ext"
         private val FONT_JSON_OUT = Json {
             encodeDefaults = true
             explicitNulls = false

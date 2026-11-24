@@ -368,7 +368,7 @@ private fun StoreDetails(
             if (scripts.isNotEmpty()) {
                 StoreChipGroup(
                     heading = stringResource(R.string.store_font_supports),
-                    labels = scripts.map { scriptLabel(it) }
+                    labels = scripts.filterNot { it == "latin-ext" }.map { scriptLabel(it) }
                 )
             }
             if (installed != null) StoreFontSample(installed)

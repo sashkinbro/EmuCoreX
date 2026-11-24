@@ -643,8 +643,11 @@ private fun StoreFeaturedCarousel(
                                 .fillMaxSize()
                                 .background(
                                     Brush.verticalGradient(
-                                        0.4f to Color.Transparent,
-                                        1f to Color.Black.copy(alpha = 0.78f)
+                                        // The cover art carries its own text (theme mock-ups, font samples), so the
+                                        // name needs a solid band behind it rather than a light fade.
+                                        0.35f to Color.Transparent,
+                                        0.62f to Color.Black.copy(alpha = 0.72f),
+                                        1f to Color.Black.copy(alpha = 0.92f)
                                     )
                                 )
                         )
