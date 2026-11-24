@@ -113,7 +113,7 @@ fun OurProjectsScreen(onBackClick: () -> Unit) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .widthIn(max = 1000.dp)
-                        .padding(top = 12.dp, bottom = 2.dp),
+                        .padding(bottom = 2.dp),
                     titleMaxLines = 2
                 )
             }
