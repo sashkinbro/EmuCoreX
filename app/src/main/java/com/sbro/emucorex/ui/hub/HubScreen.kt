@@ -119,6 +119,7 @@ import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.store.StoreViewModel
 import com.sbro.emucorex.ui.store.rememberStoreContentModel
 import com.sbro.emucorex.ui.store.rememberStoreFilters
+import com.sbro.emucorex.ui.store.shelfTitle
 import com.sbro.emucorex.ui.store.storeContent
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.delay
@@ -160,7 +161,17 @@ fun HubScreen(
     }
     // Back closes an open section / Saved list first; the detail overlay (backEnabled = false) keeps priority.
     BackHandler(enabled = backEnabled && section != null) { viewModel.closeSection() }
+    // Inside a Store "See all" grid, back returns to the Store home.
+    BackHandler(enabled = backEnabled && storeActive && storeFilters.shelf != null) { storeFilters.closeShelf() }
     val discoverFeed = remember(uiState.items) { buildDiscoverFeed(uiState.items) }
+    // Where the user is, as an ordered key: forward navigation slides content in from the end, back from the start.
+    val navKey = if (storeActive) 100 + storeFilters.tab.ordinal * 10 + (if (storeFilters.shelf != null) 5 else 0)
+    else if (section != null) 1 else 0
+    val previousNavKey = remember { intArrayOf(navKey) }
+    val navDirection = remember(navKey) { (if (navKey >= previousNavKey[0]) 1 else -1).also { previousNavKey[0] = navKey } }
+    val motionEnabled = rememberMotionEnabled()
+    val shownKeys = remember(navKey) { HashSet<String>() }
+    val motionState = remember(motionEnabled, navDirection, shownKeys) { HubMotionState(motionEnabled, navDirection, shownKeys) }
     val storeShelfItems = remember(storeModel.snapshot) {
         storeModel.snapshot?.catalog?.items.orEmpty().sortedByDescending { it.publishedAt }.take(12)
     }
@@ -227,6 +238,7 @@ fun HubScreen(
             onRefresh = refreshAll,
             modifier = Modifier.fillMaxSize()
         ) {
+            androidx.compose.runtime.CompositionLocalProvider(LocalHubMotion provides motionState) {
             LazyVerticalGrid(
                 columns = if (storeActive) {
                     GridCells.Fixed(
@@ -248,9 +260,9 @@ fun HubScreen(
                 item(key = "hub-header", span = { GridItemSpan(maxLineSpan) }) {
                     Column {
                         HubTopBar(
-                            title = section?.title() ?: stringResource(R.string.hub_title),
+                            title = section?.title() ?: storeModel.shelfTitle().takeIf { storeActive } ?: stringResource(R.string.hub_title),
                             topInset = (topInset - stickyTabInset).coerceAtLeast(0.dp),
-                            onBackClick = { if (!viewModel.closeSection()) onBackClick() },
+                            onBackClick = { if (!(storeActive && storeFilters.closeShelf()) && !viewModel.closeSection()) onBackClick() },
                             onSearchClick = {
                                 searchVisible = !searchVisible
                                 if (!searchVisible) viewModel.clearSearch()
@@ -402,18 +414,21 @@ fun HubScreen(
                     }
                     else -> {
                         items(items = uiState.visibleItems, key = HubItem::id) { item ->
-                            HubCard(
-                                item = item,
-                                compact = compact,
-                                onOpen = {
-                                    if (item.kind == HubKind.VIDEOS && item.providerId != null) playingVideo = item
-                                    else onOpenArticle(item.id)
-                                },
-                                onToggleFavorite = { viewModel.toggleFavorite(item) }
-                            )
+                            Box(Modifier.animateItem().enterRise("hub-card-${item.id}")) {
+                                HubCard(
+                                    item = item,
+                                    compact = compact,
+                                    onOpen = {
+                                        if (item.kind == HubKind.VIDEOS && item.providerId != null) playingVideo = item
+                                        else onOpenArticle(item.id)
+                                    },
+                                    onToggleFavorite = { viewModel.toggleFavorite(item) }
+                                )
+                            }
                         }
                     }
                 }
+            }
             }
 
             HubScrollToTopButton(
@@ -680,6 +695,7 @@ private fun HubCard(item: HubItem, compact: Boolean, onOpen: () -> Unit, onToggl
         modifier = Modifier
             .fillMaxWidth()
             .widthIn(max = 560.dp)
+            .pressScale(interactionSource)
             .gamepadFocusableCard(shape = shape, interactionSource = interactionSource, addFocusTarget = false),
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerLow,

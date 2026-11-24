@@ -3390,6 +3390,9 @@
     <string name="store_search_hint">Назва або тег</string>
     <string name="store_featured">Рекомендовані</string>
     <string name="store_sort">Сортування</string>
+    <string name="store_shelf_new">Нове</string>
+    <string name="store_shelf_pro_picks">Вибір Pro</string>
+    <string name="store_filter">Фільтр</string>
     <string name="store_sort_featured">Рекомендовані</string>
     <string name="store_sort_newest">Найновіші</string>
     <string name="store_sort_name">За назвою</string>

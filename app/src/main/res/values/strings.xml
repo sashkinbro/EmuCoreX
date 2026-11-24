@@ -3406,6 +3406,9 @@
     <string name="store_search_hint">Name or tag</string>
     <string name="store_featured">Featured</string>
     <string name="store_sort">Sort</string>
+    <string name="store_shelf_new">New</string>
+    <string name="store_shelf_pro_picks">Pro picks</string>
+    <string name="store_filter">Filter</string>
     <string name="store_sort_featured">Featured</string>
     <string name="store_sort_newest">Newest</string>
     <string name="store_sort_name">Name</string>

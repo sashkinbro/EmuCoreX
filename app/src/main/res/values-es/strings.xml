@@ -3382,6 +3382,9 @@
     <string name="store_search_hint">Nombre o etiqueta</string>
     <string name="store_featured">Destacados</string>
     <string name="store_sort">Ordenar</string>
+    <string name="store_shelf_new">Novedades</string>
+    <string name="store_shelf_pro_picks">Selección Pro</string>
+    <string name="store_filter">Filtrar</string>
     <string name="store_sort_featured">Destacados</string>
     <string name="store_sort_newest">Más recientes</string>
     <string name="store_sort_name">Nombre</string>

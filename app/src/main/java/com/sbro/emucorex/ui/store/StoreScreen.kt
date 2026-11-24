@@ -18,11 +18,25 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import com.sbro.emucorex.ui.hub.SegmentedSwitch
+import com.sbro.emucorex.ui.hub.ShelfHeader
+import com.sbro.emucorex.ui.hub.enterRise
+import com.sbro.emucorex.ui.hub.pressScale
+import com.sbro.emucorex.ui.hub.rememberMotionEnabled
 import com.sbro.emucorex.ui.hub.expandIntoHorizontalPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -39,6 +53,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.Palette
@@ -48,7 +63,6 @@ import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -88,11 +102,9 @@ import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.common.tvFocusGroup
 import com.sbro.emucorex.ui.theme.neon.neonButtonShape
-import com.sbro.emucorex.ui.theme.neon.neonChipShape
 import com.sbro.emucorex.ui.theme.neon.neonShape
 import com.sbro.emucorex.ui.theme.style.DropdownMenu
 import com.sbro.emucorex.ui.theme.style.FilledTonalButton
-import com.sbro.emucorex.ui.theme.style.FilterChip
 import com.sbro.emucorex.ui.theme.style.Surface
 import com.sbro.emucorex.ui.theme.style.TextButton
 import kotlinx.coroutines.delay
@@ -134,6 +146,11 @@ private fun StoreAccessFilter.label(): String = stringResource(
     }
 )
 
+internal const val STORE_SHELF_NEW = "new"
+internal const val STORE_SHELF_PRO = "pro"
+internal const val STORE_SHELF_FREE = "free"
+internal const val STORE_SHELF_CATEGORY_PREFIX = "cat:"
+
 @Stable
 class StoreFilters(initialTab: StoreTab) {
     var tab by mutableStateOf(initialTab)
@@ -142,45 +159,74 @@ class StoreFilters(initialTab: StoreTab) {
     var sort by mutableStateOf(StoreSort.FEATURED)
     var categoryId by mutableStateOf<String?>(null)
 
+    /** Key of the shelf opened through "See all"; null on the Store home. */
+    var shelf by mutableStateOf<String?>(null)
+        private set
+
     fun selectTab(value: StoreTab) {
         if (value != tab) {
             tab = value
-            categoryId = null
+            clear()
         }
     }
 
-    internal fun restore(access: StoreAccessFilter, sort: StoreSort, categoryId: String?) {
+    internal fun restore(access: StoreAccessFilter, sort: StoreSort, categoryId: String?, shelf: String?) {
         this.access = access
         this.sort = sort
         this.categoryId = categoryId
+        this.shelf = shelf
     }
 
-    val filtersActive: Boolean get() = access != StoreAccessFilter.ALL || categoryId != null
+    /** Opens the full grid of a shelf: its subset becomes the starting filter, adjustable from the control row. */
+    fun openShelf(key: String) {
+        clear()
+        when {
+            key == STORE_SHELF_NEW -> sort = StoreSort.NEWEST
+            key == STORE_SHELF_PRO -> access = StoreAccessFilter.PRO
+            key == STORE_SHELF_FREE -> access = StoreAccessFilter.FREE
+            key.startsWith(STORE_SHELF_CATEGORY_PREFIX) -> categoryId = key.removePrefix(STORE_SHELF_CATEGORY_PREFIX)
+        }
+        shelf = key
+    }
+
+    /** Back from a shelf grid to the Store home; false when no shelf was open. */
+    fun closeShelf(): Boolean {
+        if (shelf == null) return false
+        clear()
+        return true
+    }
 
     fun clear() {
         access = StoreAccessFilter.ALL
+        sort = StoreSort.FEATURED
         categoryId = null
+        shelf = null
     }
 
-    val modeKey: String get() = "${tab.name}:${access.name}:${sort.name}:$categoryId"
+    val modeKey: String get() = "${tab.name}:${access.name}:${sort.name}:$categoryId:$shelf"
 }
 
 @Composable
 fun rememberStoreFilters(initialTab: String?): StoreFilters = rememberSaveable(
     initialTab,
     saver = listSaver(
-        save = { listOf(it.tab.name, it.access.name, it.sort.name, it.categoryId.orEmpty()) },
+        save = { listOf(it.tab.name, it.access.name, it.sort.name, it.categoryId.orEmpty(), it.shelf.orEmpty()) },
         restore = {
             StoreFilters(StoreTab.valueOf(it[0])).apply {
                 restore(
                     StoreAccessFilter.valueOf(it[1]),
                     StoreSort.valueOf(it[2]),
-                    it[3].ifEmpty { null }
+                    it[3].ifEmpty { null },
+                    it[4].ifEmpty { null }
                 )
             }
         }
     )
 ) { StoreFilters(StoreTab.fromKey(initialTab)) }
+
+/** One horizontal shelf of the Store home: [key] is a STORE_SHELF_* constant or a category key. */
+@Stable
+class StoreShelfData internal constructor(val key: String, val items: List<StoreItem>)
 
 @Stable
 class StoreContentModel internal constructor(
@@ -195,8 +241,12 @@ class StoreContentModel internal constructor(
     val tabItems: List<StoreItem>,
     val visible: List<StoreItem>,
     val categories: List<StoreCategory>,
-    val featured: List<StoreItem>
-)
+    val featured: List<StoreItem>,
+    val shelves: List<StoreShelfData>
+) {
+    /** The full grid replaces the home shelves while searching or inside a "See all" shelf. */
+    val showGrid: Boolean get() = query.isNotBlank() || filters.shelf != null
+}
 
 @Composable
 fun rememberStoreContentModel(
@@ -225,13 +275,47 @@ fun rememberStoreContentModel(
         snapshot?.catalog?.categories.orEmpty().filter { it.kind == tab.kind && it.id in used }
     }
     val featured = remember(tabItems) { tabItems.filter { it.featured }.take(6) }
+    val shelves = remember(tabItems, categories) {
+        val featuredFirst = compareByDescending<StoreItem> { it.featured }
+            .thenByDescending { it.publishedAt }
+            .thenBy { it.id }
+        buildList {
+            add(StoreShelfData(STORE_SHELF_NEW, tabItems.sortedWith(compareByDescending<StoreItem> { it.publishedAt }.thenBy { it.id })))
+            add(StoreShelfData(STORE_SHELF_PRO, tabItems.filter { it.requiresPro }.sortedWith(featuredFirst)))
+            add(StoreShelfData(STORE_SHELF_FREE, tabItems.filter { !it.requiresPro }.sortedWith(featuredFirst)))
+            categories.forEach { category ->
+                add(
+                    StoreShelfData(
+                        STORE_SHELF_CATEGORY_PREFIX + category.id,
+                        tabItems.filter { category.id in it.categories }.sortedWith(featuredFirst)
+                    )
+                )
+            }
+        }.filter { it.items.isNotEmpty() }
+    }
     return StoreContentModel(
         viewModel, filters, query, snapshot, installed, applied, refreshing, offline,
-        tabItems, visible, categories, featured
+        tabItems, visible, categories, featured, shelves
     )
 }
 
-/** Store body (sub-tabs, offline banner, carousel, filters, grid) emitted into a host grid; no header of its own. */
+@Composable
+private fun storeShelfTitle(key: String, categories: List<StoreCategory>, locale: String): String = when (key) {
+    STORE_SHELF_NEW -> stringResource(R.string.store_shelf_new)
+    STORE_SHELF_PRO -> stringResource(R.string.store_shelf_pro_picks)
+    STORE_SHELF_FREE -> stringResource(R.string.hub_theme_filter_free)
+    else -> categories.firstOrNull { STORE_SHELF_CATEGORY_PREFIX + it.id == key }?.label(locale)
+        ?: stringResource(R.string.store_title)
+}
+
+/** Name of the opened "See all" shelf for the host header; null on the Store home. */
+@Composable
+fun StoreContentModel.shelfTitle(): String? =
+    filters.shelf?.let { storeShelfTitle(it, categories, viewModel.locale) }
+
+private const val STORE_SHELF_LIMIT = 12
+
+/** Store body (kind switch, offline banner, carousel and shelves, or the shelf grid) emitted into a host grid; no header of its own. */
 fun LazyGridScope.storeContent(
     model: StoreContentModel,
     onOpenItem: (String) -> Unit,
@@ -241,8 +325,10 @@ fun LazyGridScope.storeContent(
     val tab = filters.tab
     val snapshot = model.snapshot
     val locale = model.viewModel.locale
-    item(key = "store-tabs", span = { GridItemSpan(maxLineSpan) }) {
-        StoreTabRow(selected = tab, onSelected = filters::selectTab, horizontalPadding = horizontalPadding)
+    if (filters.shelf == null) {
+        item(key = "store-tabs", span = { GridItemSpan(maxLineSpan) }) {
+            StoreKindSwitch(selected = tab, onSelected = filters::selectTab)
+        }
     }
     if (model.offline && snapshot != null) {
         item(key = "store-offline", span = { GridItemSpan(maxLineSpan) }) {
@@ -285,29 +371,61 @@ fun LazyGridScope.storeContent(
                 )
             }
         }
-        else -> {
-            if (model.featured.isNotEmpty() && model.query.isBlank() && !filters.filtersActive) {
+        !model.showGrid -> {
+            if (model.featured.isNotEmpty()) {
                 item(key = "store-featured-${tab.key}", span = { GridItemSpan(maxLineSpan) }) {
-                    StoreFeaturedCarousel(
-                        items = model.featured,
-                        snapshot = snapshot,
-                        locale = locale,
-                        onOpen = { onOpenItem(it.id) }
-                    )
+                    Box(Modifier.animateItem().enterRise("store-featured-${tab.key}")) {
+                        StoreFeaturedCarousel(
+                            items = model.featured,
+                            snapshot = snapshot,
+                            locale = locale,
+                            onOpen = { onOpenItem(it.id) }
+                        )
+                    }
                 }
             }
-            item(key = "store-filters", span = { GridItemSpan(maxLineSpan) }) {
-                StoreFilterBar(
-                    access = filters.access,
-                    onAccess = { filters.access = it },
-                    sort = filters.sort,
-                    onSort = { filters.sort = it },
-                    categories = model.categories,
-                    categoryId = filters.categoryId,
-                    onCategory = { filters.categoryId = it },
-                    locale = locale,
-                    horizontalPadding = horizontalPadding
-                )
+            val tall = tab == StoreTab.THEMES || tab == StoreTab.WALLPAPERS
+            model.shelves.forEachIndexed { shelfIndex, shelf ->
+                item(key = "store-shelf-${tab.key}-${shelf.key}-header", span = { GridItemSpan(maxLineSpan) }) {
+                    Box(Modifier.animateItem().enterRise("store-shelf-${tab.key}-${shelf.key}-header", shelfIndex + 1)) {
+                        ShelfHeader(
+                            title = storeShelfTitle(shelf.key, model.categories, locale),
+                            onSeeAll = { filters.openShelf(shelf.key) }
+                        )
+                    }
+                }
+                item(key = "store-shelf-${tab.key}-${shelf.key}-row", span = { GridItemSpan(maxLineSpan) }) {
+                    LazyRow(
+                        modifier = Modifier.animateItem().fillMaxWidth().expandIntoHorizontalPadding(horizontalPadding)
+                            .enterRise("store-shelf-${tab.key}-${shelf.key}-row", shelfIndex + 1),
+                        contentPadding = PaddingValues(horizontal = horizontalPadding),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(shelf.items.take(STORE_SHELF_LIMIT), key = { it.id }) { item ->
+                            StoreShelfCard(
+                                item = item,
+                                snapshot = snapshot,
+                                locale = locale,
+                                onClick = { onOpenItem(item.id) },
+                                modifier = Modifier.animateItem().width(if (tall) 130.dp else 200.dp),
+                                coverRatio = if (tall) 9f / 16f else 16f / 9f,
+                                status = model.viewModel.status(item, model.installed, model.applied)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        else -> {
+            item(key = "store-controls", span = { GridItemSpan(maxLineSpan) }) {
+                Box(Modifier.animateItem().enterRise("store-controls")) {
+                    StoreControlsRow(
+                        access = filters.access,
+                        onAccess = { filters.access = it },
+                        sort = filters.sort,
+                        onSort = { filters.sort = it }
+                    )
+                }
             }
             if (model.visible.isEmpty()) {
                 item(key = "store-no-results", span = { GridItemSpan(maxLineSpan) }) {
@@ -326,7 +444,8 @@ fun LazyGridScope.storeContent(
                         snapshot = snapshot,
                         status = model.viewModel.status(item, model.installed, model.applied),
                         locale = locale,
-                        onClick = { onOpenItem(item.id) }
+                        onClick = { onOpenItem(item.id) },
+                        modifier = Modifier.animateItem().enterRise("store-${item.id}")
                     )
                 }
             }
@@ -334,103 +453,91 @@ fun LazyGridScope.storeContent(
     }
 }
 
+/** Four equal segments, icon above label, sharing the Hub's sliding-indicator switch. */
 @Composable
-private fun StoreTabRow(
-    selected: StoreTab,
-    onSelected: (StoreTab) -> Unit,
-    horizontalPadding: androidx.compose.ui.unit.Dp = 0.dp
-) {
-    // Bleed to the screen edges like the Hub tab row: chips scroll edge-to-edge, padding lives inside.
-    LazyRow(
-        modifier = Modifier.fillMaxWidth().expandIntoHorizontalPadding(horizontalPadding),
-        contentPadding = PaddingValues(horizontal = horizontalPadding),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(StoreTab.entries, key = { it.name }) { tab ->
-            FilterChip(
-                selected = tab == selected,
-                onClick = { onSelected(tab) },
-                label = { Text(tab.label(), maxLines = 1) },
-                leadingIcon = { Icon(tab.icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                shape = neonChipShape()
+private fun StoreKindSwitch(selected: StoreTab, onSelected: (StoreTab) -> Unit) {
+    SegmentedSwitch(
+        count = StoreTab.entries.size,
+        selectedIndex = selected.ordinal,
+        onSelected = { onSelected(StoreTab.entries[it]) },
+        segmentHeight = 56.dp
+    ) { index, isSelected ->
+        val entry = StoreTab.entries[index]
+        Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(entry.icon, contentDescription = null, modifier = Modifier.size(20.dp))
+            Text(
+                text = entry.label(),
+                modifier = Modifier.padding(top = 2.dp),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
 }
 
+/** The single control row of a shelf grid: a Filter menu and a Sort menu as icon + label text buttons. */
 @Composable
-private fun StoreFilterBar(
+private fun StoreControlsRow(
     access: StoreAccessFilter,
     onAccess: (StoreAccessFilter) -> Unit,
     sort: StoreSort,
-    onSort: (StoreSort) -> Unit,
-    categories: List<StoreCategory>,
-    categoryId: String?,
-    onCategory: (String?) -> Unit,
-    locale: String,
-    horizontalPadding: androidx.compose.ui.unit.Dp = 0.dp
+    onSort: (StoreSort) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().expandIntoHorizontalPadding(horizontalPadding).padding(end = horizontalPadding),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            LazyRow(
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(start = horizontalPadding, end = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(StoreAccessFilter.entries, key = { it.name }) { filter ->
-                    FilterChip(
-                        selected = access == filter,
-                        onClick = { onAccess(filter) },
-                        label = { Text(filter.label(), maxLines = 1) },
-                        shape = neonChipShape()
-                    )
-                }
-            }
-            var menuOpen by remember { mutableStateOf(false) }
-            Box {
-                IconButton(onClick = { menuOpen = true }) {
-                    Icon(
-                        Icons.AutoMirrored.Rounded.Sort,
-                        contentDescription = stringResource(R.string.store_sort),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    StoreSort.entries.forEach { option ->
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    option.label(),
-                                    fontWeight = if (option == sort) FontWeight.Bold else FontWeight.Normal
-                                )
-                            },
-                            onClick = {
-                                menuOpen = false
-                                onSort(option)
-                            }
-                        )
-                    }
-                }
-            }
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        StoreMenuButton(
+            icon = Icons.Rounded.FilterList,
+            label = stringResource(R.string.store_filter),
+            options = StoreAccessFilter.entries,
+            selected = access,
+            optionLabel = { it.label() },
+            onSelect = onAccess
+        )
+        StoreMenuButton(
+            icon = Icons.AutoMirrored.Rounded.Sort,
+            label = stringResource(R.string.store_sort),
+            options = StoreSort.entries,
+            selected = sort,
+            optionLabel = { it.label() },
+            onSelect = onSort
+        )
+    }
+}
+
+@Composable
+private fun <T> StoreMenuButton(
+    icon: ImageVector,
+    label: String,
+    options: List<T>,
+    selected: T,
+    optionLabel: @Composable (T) -> String,
+    onSelect: (T) -> Unit
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { open = true }) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(label, modifier = Modifier.padding(start = 6.dp), maxLines = 1)
         }
-        if (categories.isNotEmpty()) {
-            LazyRow(
-                modifier = Modifier.fillMaxWidth().expandIntoHorizontalPadding(horizontalPadding),
-                contentPadding = PaddingValues(horizontal = horizontalPadding),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(categories, key = { it.id }) { category ->
-                    val selected = categoryId == category.id
-                    FilterChip(
-                        selected = selected,
-                        onClick = { onCategory(if (selected) null else category.id) },
-                        label = { Text(category.label(locale), maxLines = 1) },
-                        shape = neonChipShape()
-                    )
-                }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            optionLabel(option),
+                            fontWeight = if (option == selected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    },
+                    onClick = {
+                        open = false
+                        onSelect(option)
+                    }
+                )
             }
         }
     }
@@ -444,12 +551,17 @@ private fun StoreFeaturedCarousel(
     onOpen: (StoreItem) -> Unit
 ) {
     val pagerState: PagerState = rememberPagerState(pageCount = { items.size })
-    LaunchedEffect(items.size) {
+    val motion = rememberMotionEnabled()
+    // Auto-advance pauses while a finger is down on the carousel.
+    var held by remember { mutableStateOf(false) }
+    LaunchedEffect(items.size, motion) {
         if (items.size > 1) {
             while (true) {
                 delay(5000)
-                if (!pagerState.isScrollInProgress) {
-                    pagerState.animateScrollToPage((pagerState.currentPage + 1) % items.size)
+                if (!held && !pagerState.isScrollInProgress) {
+                    val next = (pagerState.currentPage + 1) % items.size
+                    if (motion) pagerState.animateScrollToPage(next, animationSpec = tween(650, easing = FastOutSlowInEasing))
+                    else pagerState.scrollToPage(next)
                 }
             }
         }
@@ -461,7 +573,16 @@ private fun StoreFeaturedCarousel(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
-        Box {
+        Box(
+            Modifier.pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        held = event.changes.any { it.pressed }
+                    }
+                }
+            }
+        ) {
             HorizontalPager(
                 state = pagerState,
                 pageSpacing = 10.dp,
@@ -477,6 +598,7 @@ private fun StoreFeaturedCarousel(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(16f / 8f)
+                        .pressScale(interactionSource)
                         .gamepadFocusableCard(shape = shape, interactionSource = interactionSource, addFocusTarget = false),
                     shape = shape,
                     color = MaterialTheme.colorScheme.surfaceContainerLow
@@ -531,11 +653,21 @@ private fun StoreFeaturedCarousel(
                 ) {
                     repeat(items.size) { index ->
                         val current = pagerState.currentPage == index
+                        val dotWidth by animateDpAsState(
+                            targetValue = if (current) 18.dp else 6.dp,
+                            animationSpec = if (motion) tween(220) else snap(),
+                            label = "dot-width"
+                        )
+                        val dotColor by animateColorAsState(
+                            targetValue = Color.White.copy(alpha = if (current) 0.95f else 0.5f),
+                            animationSpec = if (motion) tween(220) else snap(),
+                            label = "dot-color"
+                        )
                         Box(
                             Modifier
-                                .size(if (current) 8.dp else 6.dp)
+                                .size(width = dotWidth, height = 6.dp)
                                 .clip(CircleShape)
-                                .background(Color.White.copy(alpha = if (current) 0.95f else 0.5f))
+                                .background(dotColor)
                         )
                     }
                 }

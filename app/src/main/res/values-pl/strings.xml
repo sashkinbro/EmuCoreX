@@ -3402,6 +3402,9 @@
     <string name="store_search_hint">Nazwa lub tag</string>
     <string name="store_featured">Polecane</string>
     <string name="store_sort">Sortuj</string>
+    <string name="store_shelf_new">Nowości</string>
+    <string name="store_shelf_pro_picks">Wybór Pro</string>
+    <string name="store_filter">Filtr</string>
     <string name="store_sort_featured">Polecane</string>
     <string name="store_sort_newest">Najnowsze</string>
     <string name="store_sort_name">Nazwa</string>

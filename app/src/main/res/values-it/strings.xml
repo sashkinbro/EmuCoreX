@@ -3380,6 +3380,9 @@
     <string name="store_search_hint">Nome o tag</string>
     <string name="store_featured">In evidenza</string>
     <string name="store_sort">Ordina</string>
+    <string name="store_shelf_new">Novità</string>
+    <string name="store_shelf_pro_picks">Selezione Pro</string>
+    <string name="store_filter">Filtra</string>
     <string name="store_sort_featured">In evidenza</string>
     <string name="store_sort_newest">Più recenti</string>
     <string name="store_sort_name">Nome</string>

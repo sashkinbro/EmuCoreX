@@ -3381,6 +3381,9 @@
     <string name="store_search_hint">名称或标签</string>
     <string name="store_featured">精选</string>
     <string name="store_sort">排序</string>
+    <string name="store_shelf_new">最新</string>
+    <string name="store_shelf_pro_picks">Pro 精选</string>
+    <string name="store_filter">筛选</string>
     <string name="store_sort_featured">精选</string>
     <string name="store_sort_newest">最新</string>
     <string name="store_sort_name">名称</string>

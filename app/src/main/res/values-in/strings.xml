@@ -3394,6 +3394,9 @@
     <string name="store_search_hint">Nama atau tag</string>
     <string name="store_featured">Unggulan</string>
     <string name="store_sort">Urutkan</string>
+    <string name="store_shelf_new">Baru</string>
+    <string name="store_shelf_pro_picks">Pilihan Pro</string>
+    <string name="store_filter">Filter</string>
     <string name="store_sort_featured">Unggulan</string>
     <string name="store_sort_newest">Terbaru</string>
     <string name="store_sort_name">Nama</string>

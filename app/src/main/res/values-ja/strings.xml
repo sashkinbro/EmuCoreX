@@ -3379,6 +3379,9 @@
     <string name="store_search_hint">名前またはタグ</string>
     <string name="store_featured">おすすめ</string>
     <string name="store_sort">並べ替え</string>
+    <string name="store_shelf_new">新着</string>
+    <string name="store_shelf_pro_picks">Pro セレクト</string>
+    <string name="store_filter">フィルター</string>
     <string name="store_sort_featured">おすすめ</string>
     <string name="store_sort_newest">新着順</string>
     <string name="store_sort_name">名前順</string>

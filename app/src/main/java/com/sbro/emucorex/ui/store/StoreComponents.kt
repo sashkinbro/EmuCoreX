@@ -55,6 +55,7 @@ import com.sbro.emucorex.data.store.StoreSnapshot
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.hub.HubImageSpec
+import com.sbro.emucorex.ui.hub.pressScale
 import com.sbro.emucorex.ui.theme.LocalThemeExtras
 import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 import com.sbro.emucorex.ui.theme.neon.neonShape
@@ -196,6 +197,7 @@ internal fun StoreItemCard(
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .pressScale(interactionSource)
             .gamepadFocusableCard(shape = shape, interactionSource = interactionSource, addFocusTarget = false),
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -256,20 +258,23 @@ internal fun StoreItemCard(
     }
 }
 
-/** Compact cover + name card for the Discover "New in Store" shelf. */
+/** Compact cover + name card for shelves; [coverRatio] is width/height of the cover, [status] adds the installed/applied line. */
 @Composable
 internal fun StoreShelfCard(
     item: StoreItem,
     snapshot: StoreSnapshot?,
     locale: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    coverRatio: Float = 1f,
+    status: StoreItemStatus = StoreItemStatus.NONE
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val shape = neonShape(16.dp)
     val open = rememberDebouncedClick(onClick = onClick)
     Surface(
         modifier = modifier
+            .pressScale(interactionSource)
             .gamepadFocusableCard(shape = shape, interactionSource = interactionSource, addFocusTarget = false),
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -284,21 +289,45 @@ internal fun StoreShelfCard(
                     file = item.cover,
                     snapshot = snapshot,
                     swatch = item.swatch,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                    modifier = Modifier.fillMaxWidth().aspectRatio(coverRatio),
                     alignment = Alignment.TopCenter
                 )
                 if (item.requiresPro) {
                     ProBadge(Modifier.align(Alignment.TopStart).padding(6.dp))
                 }
             }
-            Text(
-                item.displayName(locale),
+            Column(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    item.displayName(locale),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                status.label()?.let { label ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        if (status == StoreItemStatus.APPLIED) {
+                            Icon(
+                                Icons.Rounded.CheckCircle,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (status == StoreItemStatus.NEEDS_NEWER_APP) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
         }
     }
 }

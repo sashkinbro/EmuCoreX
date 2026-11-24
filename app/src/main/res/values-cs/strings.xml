@@ -3400,6 +3400,9 @@
     <string name="store_search_hint">Název nebo štítek</string>
     <string name="store_featured">Doporučené</string>
     <string name="store_sort">Řadit</string>
+    <string name="store_shelf_new">Novinky</string>
+    <string name="store_shelf_pro_picks">Výběr Pro</string>
+    <string name="store_filter">Filtr</string>
     <string name="store_sort_featured">Doporučené</string>
     <string name="store_sort_newest">Nejnovější</string>
     <string name="store_sort_name">Název</string>

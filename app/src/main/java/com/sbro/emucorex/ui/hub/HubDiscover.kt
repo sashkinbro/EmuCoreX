@@ -106,53 +106,33 @@ internal fun HubModeSwitch(
     selectedFocusRequester: FocusRequester,
     horizontalPadding: Dp
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = horizontalPadding, vertical = 8.dp),
-        // Outer and inner radii are concentric (inner = outer - padding) so corners line up in every style.
-        shape = neonShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
-    ) {
-        Row(modifier = Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            HubMode.entries.forEach { entry ->
-                val selected = entry == mode
-                val interactionSource = remember { MutableInteractionSource() }
-                val shape = neonShape(18.dp)
-                Surface(
-                    onClick = { onSelected(entry) },
-                    interactionSource = interactionSource,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(40.dp)
-                        .then(if (selected) Modifier.focusRequester(selectedFocusRequester) else Modifier)
-                        .gamepadFocusableCard(shape = shape, interactionSource = interactionSource, addFocusTarget = false),
-                    shape = shape,
-                    color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                    contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = if (entry == HubMode.DISCOVER) Icons.Rounded.Explore else Icons.Rounded.Storefront,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = stringResource(if (entry == HubMode.DISCOVER) R.string.hub_mode_discover else R.string.store_title),
-                            modifier = Modifier.padding(start = 8.dp),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
+    SegmentedSwitch(
+        count = HubMode.entries.size,
+        selectedIndex = mode.ordinal,
+        onSelected = { onSelected(HubMode.entries[it]) },
+        segmentHeight = 40.dp,
+        modifier = Modifier.padding(horizontal = horizontalPadding, vertical = 8.dp),
+        selectedFocusRequester = selectedFocusRequester
+    ) { index, selected ->
+        val entry = HubMode.entries[index]
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (entry == HubMode.DISCOVER) Icons.Rounded.Explore else Icons.Rounded.Storefront,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                text = stringResource(if (entry == HubMode.DISCOVER) R.string.hub_mode_discover else R.string.store_title),
+                modifier = Modifier.padding(start = 8.dp),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -176,7 +156,9 @@ internal fun LazyGridScope.discoverContent(
 ) {
     feed.hero?.let { hero ->
         item(key = "discover-hero", span = { GridItemSpan(maxLineSpan) }) {
-            DiscoverHeroCard(hero, compact, onOpen = { onOpenItem(hero) })
+            Box(Modifier.animateItem().enterRise("discover-hero")) {
+                DiscoverHeroCard(hero, compact, onOpen = { onOpenItem(hero) })
+            }
         }
     }
     shelf(HubSection.NEWS, feed.news, compact, horizontalPadding, onOpenItem, onSeeAll)
@@ -185,11 +167,13 @@ internal fun LazyGridScope.discoverContent(
     shelf(HubSection.MANUALS, feed.manuals, compact, horizontalPadding, onOpenItem, onSeeAll)
     if (storeItems.isNotEmpty()) {
         item(key = "shelf-store-header", span = { GridItemSpan(maxLineSpan) }) {
-            ShelfHeader(stringResource(R.string.hub_new_in_store), onSeeAll = onSeeAllStore)
+            Box(Modifier.animateItem().enterRise("shelf-store-header", 4)) {
+                ShelfHeader(stringResource(R.string.hub_new_in_store), onSeeAll = onSeeAllStore)
+            }
         }
         item(key = "shelf-store-row", span = { GridItemSpan(maxLineSpan) }) {
             LazyRow(
-                modifier = Modifier.fillMaxWidth().expandIntoHorizontalPadding(horizontalPadding),
+                modifier = Modifier.animateItem().fillMaxWidth().expandIntoHorizontalPadding(horizontalPadding).enterRise("shelf-store-row", 4),
                 contentPadding = PaddingValues(horizontal = horizontalPadding),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -217,11 +201,14 @@ private fun LazyGridScope.shelf(
 ) {
     if (items.isEmpty()) return
     item(key = "shelf-${section.name}-header", span = { GridItemSpan(maxLineSpan) }) {
-        ShelfHeader(section.title(), onSeeAll = { onSeeAll(section) })
+        Box(Modifier.animateItem().enterRise("shelf-${section.name}-header", section.ordinal)) {
+            ShelfHeader(section.title(), onSeeAll = { onSeeAll(section) })
+        }
     }
     item(key = "shelf-${section.name}-row", span = { GridItemSpan(maxLineSpan) }) {
         LazyRow(
-            modifier = Modifier.fillMaxWidth().expandIntoHorizontalPadding(horizontalPadding),
+            modifier = Modifier.animateItem().fillMaxWidth().expandIntoHorizontalPadding(horizontalPadding)
+                .enterRise("shelf-${section.name}-row", section.ordinal),
             contentPadding = PaddingValues(horizontal = horizontalPadding),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -237,7 +224,7 @@ private fun LazyGridScope.shelf(
 }
 
 @Composable
-private fun ShelfHeader(title: String, onSeeAll: () -> Unit) {
+internal fun ShelfHeader(title: String, onSeeAll: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -282,6 +269,7 @@ private fun DiscoverHeroCard(item: HubItem, compact: Boolean, onOpen: () -> Unit
         modifier = Modifier
             .fillMaxWidth()
             .widthIn(max = 720.dp)
+            .pressScale(interactionSource)
             .gamepadFocusableCard(shape = shape, interactionSource = interactionSource, addFocusTarget = false),
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -360,6 +348,7 @@ private fun ArticleShelfCard(item: HubItem, onOpen: () -> Unit) {
     Surface(
         modifier = Modifier
             .width(200.dp)
+            .pressScale(interactionSource)
             .gamepadFocusableCard(shape = shape, interactionSource = interactionSource, addFocusTarget = false),
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -401,6 +390,7 @@ private fun VideoShelfCard(item: HubItem, onOpen: () -> Unit) {
     Surface(
         modifier = Modifier
             .width(240.dp)
+            .pressScale(interactionSource)
             .gamepadFocusableCard(shape = shape, interactionSource = interactionSource, addFocusTarget = false),
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerLow,

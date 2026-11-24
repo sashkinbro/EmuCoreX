@@ -3379,6 +3379,9 @@
     <string name="store_search_hint">이름 또는 태그</string>
     <string name="store_featured">추천</string>
     <string name="store_sort">정렬</string>
+    <string name="store_shelf_new">신규</string>
+    <string name="store_shelf_pro_picks">Pro 추천</string>
+    <string name="store_filter">필터</string>
     <string name="store_sort_featured">추천</string>
     <string name="store_sort_newest">최신순</string>
     <string name="store_sort_name">이름순</string>

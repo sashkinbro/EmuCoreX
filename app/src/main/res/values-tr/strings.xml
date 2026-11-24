@@ -3380,6 +3380,9 @@
     <string name="store_search_hint">Ad veya etiket</string>
     <string name="store_featured">Öne çıkanlar</string>
     <string name="store_sort">Sırala</string>
+    <string name="store_shelf_new">Yeni</string>
+    <string name="store_shelf_pro_picks">Pro seçkisi</string>
+    <string name="store_filter">Filtrele</string>
     <string name="store_sort_featured">Öne çıkanlar</string>
     <string name="store_sort_newest">En yeni</string>
     <string name="store_sort_name">Ad</string>

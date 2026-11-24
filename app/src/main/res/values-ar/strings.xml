@@ -3384,6 +3384,9 @@
     <string name="store_search_hint">الاسم أو الوسم</string>
     <string name="store_featured">مميزة</string>
     <string name="store_sort">ترتيب</string>
+    <string name="store_shelf_new">جديد</string>
+    <string name="store_shelf_pro_picks">اختيارات Pro</string>
+    <string name="store_filter">تصفية</string>
     <string name="store_sort_featured">مميزة</string>
     <string name="store_sort_newest">الأحدث</string>
     <string name="store_sort_name">الاسم</string>
