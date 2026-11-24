@@ -93,6 +93,8 @@ fun OurProjectsScreen(onBackClick: () -> Unit) {
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
+        // Text without an explicit color must read on the screen background, not default to black.
+        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
         val columns = if (maxWidth >= 720.dp) 2 else 1
         val rows = remember(projects, columns) { projects.chunked(columns) }
         LazyColumn(
@@ -141,6 +143,7 @@ fun OurProjectsScreen(onBackClick: () -> Unit) {
             item {
                 ProjectsFooter(context = context, failedMessage = failedMessage)
             }
+        }
         }
     }
 }

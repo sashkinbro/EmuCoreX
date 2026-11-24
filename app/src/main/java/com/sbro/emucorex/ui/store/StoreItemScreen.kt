@@ -115,6 +115,8 @@ fun StoreItemScreen(
             .background(MaterialTheme.colorScheme.background)
             .padding(navigationBarsHorizontalPaddingValues())
     ) {
+        // Text without an explicit color must read on the screen background, not default to black.
+        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
         if (item == null) {
             Column(
                 modifier = Modifier.fillMaxSize().padding(top = appScreenTopPadding(), start = 12.dp, end = 12.dp)
@@ -228,6 +230,7 @@ fun StoreItemScreen(
                 .navigationBarsPadding()
                 .padding(12.dp)
         )
+        }
     }
 }
 

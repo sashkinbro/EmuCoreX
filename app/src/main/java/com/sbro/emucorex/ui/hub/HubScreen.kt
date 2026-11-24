@@ -218,6 +218,8 @@ fun HubScreen(
             .background(MaterialTheme.colorScheme.background)
             .padding(navigationBarsHorizontalPaddingValues())
     ) {
+        // Text without an explicit color must read on the screen background, not default to black.
+        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
         val gridState = rememberSaveable(saver = LazyGridState.Saver) { LazyGridState() }
         val hubTabsPinned = rememberStickyTabHeaderPinned(gridState, "hub-tabs")
         val listMode = "${uiState.mode.name}:${section?.name}:${uiState.sortOrder.name}:${uiState.productFilter.name}:${uiState.featuredOnly}:${storeFilters.modeKey}"
@@ -440,6 +442,7 @@ fun HubScreen(
                     scope.launch { gridState.animateScrollToItem(0) }
                 }
             )
+        }
         }
     }
 
