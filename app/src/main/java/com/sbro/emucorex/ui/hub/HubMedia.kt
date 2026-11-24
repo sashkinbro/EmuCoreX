@@ -21,6 +21,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -160,6 +165,12 @@ fun HubImageViewer(
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
                     .background(Color.Black.copy(alpha = 0.56f))
+                    // Keep the title and buttons clear of the camera cutout and status area even
+                    // while the system bars are hidden.
+                    .windowInsetsPadding(
+                        WindowInsets.displayCutout.union(WindowInsets.systemBars)
+                            .only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
+                    )
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -205,7 +216,12 @@ fun HubImageViewer(
                         .clickable(enabled = current.sourceUrl != null) {
                             current.sourceUrl?.let { runCatching { uriHandler.openUri(it) } }
                         }
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .windowInsetsPadding(
+                            WindowInsets.displayCutout.union(WindowInsets.systemBars)
+                                .only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)
+                        )
+                        // Extra room so the caption never runs into rounded screen corners.
+                        .padding(start = 24.dp, end = 24.dp, top = 10.dp, bottom = 18.dp),
                     color = Color.White.copy(alpha = 0.9f),
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 3

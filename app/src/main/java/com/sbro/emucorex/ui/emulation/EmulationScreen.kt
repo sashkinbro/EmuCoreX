@@ -2027,7 +2027,10 @@ fun EmulationScreen(
             // the app's RTL locale. The touch hit boxes use absolute screen coordinates;
             // keeping the visual overlay LTR guarantees that visible and logical buttons
             // stay aligned in Arabic, Persian, and every other RTL language.
-            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides LayoutDirection.Ltr,
+                com.sbro.emucorex.ui.common.LocalControlSkin provides com.sbro.emucorex.ui.common.rememberAppliedControlSkin()
+            ) {
                 if (uiState.localMultiplayerMode == AppPreferences.LOCAL_MULTIPLAYER_OFF) {
                     OnScreenControls(
                     modifier = Modifier

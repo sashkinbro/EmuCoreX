@@ -114,6 +114,7 @@ import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Checkbox
+import com.sbro.emucorex.ui.store.StoreEntryButton
 import com.sbro.emucorex.ui.theme.style.Button
 import androidx.compose.material3.CircularProgressIndicator
 import com.sbro.emucorex.ui.theme.style.DropdownMenu
@@ -1436,6 +1437,7 @@ private fun SettingsContent(
                                 (context as? Activity)?.let { viewModel.purchasePro(it, source = "settings") }
                             }
                         )
+                        StoreEntryButton(tab = "themes")
                         SettingsItem(
                             icon = Icons.Rounded.Palette,
                             label = stringResource(R.string.settings_theme_manager),
@@ -4078,6 +4080,7 @@ private fun CustomizationSettingsTab(
                 }
             }
         }
+        StoreEntryButton(tab = "wallpapers")
         SettingsItem(
             icon = Icons.Rounded.Wallpaper,
             label = stringResource(R.string.settings_customization_background),
@@ -4332,6 +4335,7 @@ private fun CustomizationSettingsTab(
             helpText = stringResource(R.string.settings_customization_touch_controls_help),
             onResetToDefault = { viewModel.setTouchControlVisualStyle(TouchControlVisualStyle.CLASSIC) }
         )
+        StoreEntryButton(tab = "controls")
         ChoiceSection(
             title = stringResource(R.string.settings_customization_touch_press_effect),
             options = listOf(
@@ -4514,6 +4518,7 @@ private fun UiSoundSettingsSection(
             helpText = stringResource(R.string.settings_customization_sound_file_help),
             onResetToDefault = { viewModel.selectUiSoundPreset(kind, UiSoundPresets.DEFAULT_ID) }
         )
+        if (kind == UiSoundKind.BUTTON_CLICK) StoreEntryButton(tab = "sounds")
         if (setting.usesCustom) {
             SettingsItem(
                 icon = Icons.Rounded.FolderOpen,

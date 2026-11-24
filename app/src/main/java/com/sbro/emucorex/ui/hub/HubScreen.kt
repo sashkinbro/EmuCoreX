@@ -148,21 +148,6 @@ fun HubScreen(
     val compact = LocalConfiguration.current.screenWidthDp < 600
     val horizontalPadding = if (compact) 12.dp else ScreenHorizontalPadding
     val scope = rememberCoroutineScope()
-    val themeSnapshot by viewModel.themes.collectAsState()
-    val installedThemes by viewModel.installedThemes.collectAsState()
-    val appliedThemeId by viewModel.appliedThemeId.collectAsState()
-    val themeFilters by viewModel.themeFilters.collectAsState()
-    var openThemeId by rememberSaveable { mutableStateOf<String?>(null) }
-    val themeLocale = remember {
-        com.sbro.emucorex.data.hub.HubLocaleResolver.resolve(
-            java.util.Locale.getDefault().toLanguageTag()
-        )
-    }
-    val installedThemeMap = remember(installedThemes) { installedThemes.associateBy { it.id } }
-    val visibleThemes = remember(themeSnapshot, themeFilters, uiState.searchQuery, installedThemeMap) {
-        filterThemes(themeSnapshot, themeFilters, uiState.searchQuery, installedThemeMap.keys, themeLocale)
-    }
-    val themeColumns = (LocalConfiguration.current.screenWidthDp / 180).coerceIn(2, 6)
 
     LaunchedEffect(viewModel, minimumSkeletonVisible) {
         if (minimumSkeletonVisible) {
@@ -243,7 +228,6 @@ fun HubScreen(
                             productFilter = uiState.productFilter,
                             featuredOnly = uiState.featuredOnly,
                             hasActiveFilters = uiState.hasActiveFilters,
-                            showArticleFilters = uiState.selectedTab != HubTab.THEMES,
                             onSortOrderSelected = viewModel::setSortOrder,
                             onProductFilterSelected = viewModel::setProductFilter,
                             onFeaturedOnlyChanged = viewModel::setFeaturedOnly,
@@ -325,21 +309,6 @@ fun HubScreen(
                 }
 
                 when {
-                    uiState.selectedTab == HubTab.THEMES -> {
-                        hubThemesItems(
-                            snapshot = themeSnapshot,
-                            themes = visibleThemes,
-                            filters = themeFilters,
-                            installed = installedThemeMap,
-                            appliedId = appliedThemeId,
-                            columns = themeColumns,
-                            searchActive = uiState.searchQuery.isNotBlank(),
-                            locale = themeLocale,
-                            onFiltersChange = viewModel::updateThemeFilters,
-                            onClearSearch = viewModel::clearSearch,
-                            onOpen = { openThemeId = it.id }
-                        )
-                    }
                     minimumSkeletonVisible -> {
                         items(6, key = { "hub-minimum-skeleton-$it" }) {
                             HubSkeletonCard(compact = compact)
@@ -394,13 +363,6 @@ fun HubScreen(
         }
     }
 
-    HubThemesOverlay(
-        viewModel = viewModel,
-        openThemeId = openThemeId,
-        locale = themeLocale,
-        onDismiss = { openThemeId = null }
-    )
-
     playingVideo?.let { video ->
         video.providerId?.let { id ->
             HubVideoPlayer(youtubeId = id, title = video.title, onDismiss = { playingVideo = null })
@@ -421,7 +383,6 @@ private fun HubTopBar(
     productFilter: HubProductFilter,
     featuredOnly: Boolean,
     hasActiveFilters: Boolean,
-    showArticleFilters: Boolean,
     onSortOrderSelected: (HubSortOrder) -> Unit,
     onProductFilterSelected: (HubProductFilter) -> Unit,
     onFeaturedOnlyChanged: (Boolean) -> Unit,
@@ -444,7 +405,7 @@ private fun HubTopBar(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (showArticleFilters) HubFilterMenu(
+            HubFilterMenu(
                 sortOrder = sortOrder,
                 productFilter = productFilter,
                 featuredOnly = featuredOnly,
@@ -829,7 +790,6 @@ internal fun HubEmptyState(
         HubTab.VIDEOS -> stringResource(R.string.hub_empty_videos)
         HubTab.HISTORY -> stringResource(R.string.hub_empty_history)
         HubTab.MANUALS -> stringResource(R.string.hub_empty_manuals)
-        HubTab.THEMES -> stringResource(R.string.hub_empty_themes)
         HubTab.FAVORITES -> stringResource(R.string.hub_empty_favorites)
         }
     }
@@ -840,7 +800,6 @@ internal fun HubEmptyState(
         tab == HubTab.VIDEOS -> Icons.Rounded.VideoLibrary
         tab == HubTab.HISTORY -> Icons.Rounded.HistoryEdu
         tab == HubTab.MANUALS -> Icons.AutoMirrored.Rounded.MenuBook
-        tab == HubTab.THEMES -> Icons.Rounded.Palette
         else -> Icons.Rounded.BookmarkBorder
     }
     Surface(
@@ -919,7 +878,6 @@ private fun HubTab.label(): String = when (this) {
     HubTab.VIDEOS -> stringResource(R.string.hub_tab_videos)
     HubTab.HISTORY -> stringResource(R.string.hub_tab_history)
     HubTab.MANUALS -> stringResource(R.string.hub_tab_manuals)
-    HubTab.THEMES -> stringResource(R.string.hub_tab_themes)
     HubTab.FAVORITES -> stringResource(R.string.hub_tab_favorites)
 }
 
@@ -928,7 +886,6 @@ private fun HubTab.icon(): ImageVector = when (this) {
     HubTab.VIDEOS -> Icons.Rounded.VideoLibrary
     HubTab.HISTORY -> Icons.Rounded.HistoryEdu
     HubTab.MANUALS -> Icons.AutoMirrored.Rounded.MenuBook
-    HubTab.THEMES -> Icons.Rounded.Palette
     HubTab.FAVORITES -> Icons.Rounded.Bookmark
 }
 
