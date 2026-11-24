@@ -20,7 +20,8 @@ data class OurProject(
     val websiteUrl: String? = null,
     val gradientStart: Color,
     val gradientEnd: Color,
-    @DrawableRes val iconRes: Int = 0
+    @DrawableRes val iconForeground: Int = 0,
+    @DrawableRes val iconBackground: Int = 0
 ) {
     val monogram: String get() = name.removePrefix("EmuCore").take(1)
     val playUrl: String get() = "https://play.google.com/store/apps/details?id=$packageName"
@@ -42,7 +43,8 @@ val ourProjects: List<OurProject> = listOf(
         websiteUrl = "https://emucorex.web.app",
         gradientStart = Color(0xFF7C4DFF),
         gradientEnd = Color(0xFF2962FF),
-        iconRes = R.drawable.project_icon_x
+        iconForeground = R.drawable.project_icon_x_fo,
+        iconBackground = R.drawable.project_icon_x_ba
     ),
     OurProject(
         packageName = "com.sbro.emucorev",
@@ -54,7 +56,8 @@ val ourProjects: List<OurProject> = listOf(
         websiteUrl = "https://emucorev.web.app",
         gradientStart = Color(0xFF00C853),
         gradientEnd = Color(0xFF0277BD),
-        iconRes = R.drawable.project_icon_v
+        iconForeground = R.drawable.project_icon_v_fo,
+        iconBackground = R.drawable.project_icon_v_ba
     ),
     OurProject(
         packageName = "com.sbro.emucorer",
@@ -66,7 +69,8 @@ val ourProjects: List<OurProject> = listOf(
         websiteUrl = "https://emucorer.web.app",
         gradientStart = Color(0xFF9E9E9E),
         gradientEnd = Color(0xFF37474F),
-        iconRes = R.drawable.project_icon_r
+        iconForeground = R.drawable.project_icon_r_fo,
+        iconBackground = R.drawable.project_icon_r_ba
     ),
     OurProject(
         packageName = "com.sbro.emucorea",
@@ -78,7 +82,8 @@ val ourProjects: List<OurProject> = listOf(
         websiteUrl = "https://emucorea.web.app",
         gradientStart = Color(0xFF00B0FF),
         gradientEnd = Color(0xFF00695C),
-        iconRes = R.drawable.project_icon_a
+        iconForeground = R.drawable.project_icon_a_fo,
+        iconBackground = R.drawable.project_icon_a_ba
     ),
     OurProject(
         packageName = "com.sbro.emucoreh",
@@ -90,7 +95,8 @@ val ourProjects: List<OurProject> = listOf(
         websiteUrl = "https://emucoreh.web.app",
         gradientStart = Color(0xFF1565C0),
         gradientEnd = Color(0xFF00B8D4),
-        iconRes = R.drawable.project_icon_h
+        iconForeground = R.drawable.project_icon_h_fo,
+        iconBackground = R.drawable.project_icon_h_ba
     ),
     OurProject(
         packageName = "com.sbro.emucored",
@@ -102,7 +108,8 @@ val ourProjects: List<OurProject> = listOf(
         websiteUrl = "https://emucored.web.app",
         gradientStart = Color(0xFFFF5252),
         gradientEnd = Color(0xFFC2185B),
-        iconRes = R.drawable.project_icon_d
+        iconForeground = R.drawable.project_icon_d_fo,
+        iconBackground = R.drawable.project_icon_d_ba
     ),
     OurProject(
         packageName = "com.sbro.emucorec",
@@ -114,6 +121,7 @@ val ourProjects: List<OurProject> = listOf(
         websiteUrl = "https://emucorec.web.app",
         gradientStart = Color(0xFF455A64),
         gradientEnd = Color(0xFF1E88E5),
-        iconRes = R.drawable.project_icon_c
+        iconForeground = R.drawable.project_icon_c_fo,
+        iconBackground = R.drawable.project_icon_c_ba
     )
 )

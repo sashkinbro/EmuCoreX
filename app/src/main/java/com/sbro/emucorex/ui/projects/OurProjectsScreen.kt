@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -148,13 +149,18 @@ fun OurProjectsScreen(onBackClick: () -> Unit) {
 
 @Composable
 private fun ProjectIcon(project: OurProject, modifier: Modifier = Modifier) {
-    if (project.iconRes != 0) {
-        // Real launcher artwork of the app (shipped as drawable-nodpi/project_icon_*.webp).
-        androidx.compose.foundation.Image(
-            painter = androidx.compose.ui.res.painterResource(project.iconRes),
-            contentDescription = null,
-            modifier = modifier.size(60.dp).clip(neonShape(16.dp))
-        )
+    if (project.iconForeground != 0) {
+        // The app's real adaptive launcher icon: background + foreground layers (108dp canvas, the
+        // launcher shows the centre 72dp), clipped to the theme's corner style.
+        Box(modifier = modifier.size(60.dp).clip(neonShape(16.dp)), contentAlignment = Alignment.Center) {
+            listOf(project.iconBackground, project.iconForeground).filter { it != 0 }.forEach { layer ->
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(layer),
+                    contentDescription = null,
+                    modifier = Modifier.requiredSize(90.dp)
+                )
+            }
+        }
         return
     }
     Box(
