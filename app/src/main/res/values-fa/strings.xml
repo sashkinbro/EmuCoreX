@@ -3426,6 +3426,9 @@
     <string name="store_retry">تلاش دوباره</string>
     <string name="store_get_more">موارد بیشتر در فروشگاه</string>
     <string name="store_item_not_found">این مورد دیگر در دسترس نیست</string>
+    <string name="store_installed_title">نصب‌شده‌ها</string>
+    <string name="store_installed_empty_title">هنوز چیزی نصب نشده است</string>
+    <string name="store_installed_empty_body">مواردی که از فروشگاه نصب کنید اینجا نمایش داده می‌شوند.</string>
     <string name="store_meta_version">نسخه %1$d</string>
     <string name="store_pro_banner_title">مورد Pro</string>
     <string name="store_pro_banner_body">می‌توانید آن را رایگان نصب کنید. اعمال آن به EmuCoreX Pro نیاز دارد.</string>

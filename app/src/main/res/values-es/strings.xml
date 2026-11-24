@@ -3413,6 +3413,9 @@
     <string name="store_retry">Reintentar</string>
     <string name="store_get_more">Más en la Tienda</string>
     <string name="store_item_not_found">Este elemento ya no está disponible</string>
+    <string name="store_installed_title">Instalados</string>
+    <string name="store_installed_empty_title">Aún no hay nada instalado</string>
+    <string name="store_installed_empty_body">Aquí aparecerán los elementos que instales desde la tienda.</string>
     <string name="store_meta_version">Versión %1$d</string>
     <string name="store_pro_banner_title">Elemento Pro</string>
     <string name="store_pro_banner_body">Puedes instalarlo gratis. Aplicarlo requiere EmuCoreX Pro.</string>

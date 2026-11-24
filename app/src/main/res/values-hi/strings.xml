@@ -3411,6 +3411,9 @@
     <string name="store_retry">फिर कोशिश करें</string>
     <string name="store_get_more">स्टोर में और पाएँ</string>
     <string name="store_item_not_found">यह आइटम अब उपलब्ध नहीं है</string>
+    <string name="store_installed_title">इंस्टॉल किए गए</string>
+    <string name="store_installed_empty_title">अभी तक कुछ इंस्टॉल नहीं किया गया</string>
+    <string name="store_installed_empty_body">स्टोर से इंस्टॉल किए गए आइटम यहाँ दिखाई देंगे।</string>
     <string name="store_meta_version">संस्करण %1$d</string>
     <string name="store_pro_banner_title">Pro आइटम</string>
     <string name="store_pro_banner_body">आप इसे मुफ़्त इंस्टॉल कर सकते हैं। लागू करने के लिए EmuCoreX Pro चाहिए।</string>

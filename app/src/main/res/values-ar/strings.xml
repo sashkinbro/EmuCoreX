@@ -3415,6 +3415,9 @@
     <string name="store_retry">إعادة المحاولة</string>
     <string name="store_get_more">المزيد في المتجر</string>
     <string name="store_item_not_found">هذا العنصر لم يعد متاحًا</string>
+    <string name="store_installed_title">المثبّتة</string>
+    <string name="store_installed_empty_title">لا شيء مثبّت بعد</string>
+    <string name="store_installed_empty_body">ستظهر هنا العناصر التي تثبّتها من المتجر.</string>
     <string name="store_meta_version">الإصدار %1$d</string>
     <string name="store_pro_banner_title">عنصر Pro</string>
     <string name="store_pro_banner_body">يمكنك تثبيته مجانًا. يتطلب تطبيقه EmuCoreX Pro.</string>

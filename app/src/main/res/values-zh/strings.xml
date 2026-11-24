@@ -3412,6 +3412,9 @@
     <string name="store_retry">重试</string>
     <string name="store_get_more">在商店获取更多</string>
     <string name="store_item_not_found">此内容已不再提供</string>
+    <string name="store_installed_title">已安装</string>
+    <string name="store_installed_empty_title">尚未安装任何内容</string>
+    <string name="store_installed_empty_body">你从商店安装的内容会显示在这里。</string>
     <string name="store_meta_version">版本 %1$d</string>
     <string name="store_pro_banner_title">Pro 内容</string>
     <string name="store_pro_banner_body">可免费安装。应用需要 EmuCoreX Pro。</string>

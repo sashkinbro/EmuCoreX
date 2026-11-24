@@ -565,7 +565,7 @@ private fun StoreActionProgress(action: StoreAction) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StoreProSheet(price: String?, onDismiss: () -> Unit, viewModel: StoreViewModel) {
+internal fun StoreProSheet(price: String?, onDismiss: () -> Unit, viewModel: StoreViewModel) {
     val context = LocalContext.current
     val gold = LocalThemeExtras.current.gold
     ModalBottomSheet(

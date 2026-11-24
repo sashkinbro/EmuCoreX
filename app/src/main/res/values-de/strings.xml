@@ -3413,6 +3413,9 @@
     <string name="store_retry">Erneut versuchen</string>
     <string name="store_get_more">Mehr im Store</string>
     <string name="store_item_not_found">Dieser Eintrag ist nicht mehr verfügbar</string>
+    <string name="store_installed_title">Installiert</string>
+    <string name="store_installed_empty_title">Noch nichts installiert</string>
+    <string name="store_installed_empty_body">Hier erscheinen Einträge, die du aus dem Store installierst.</string>
     <string name="store_meta_version">Version %1$d</string>
     <string name="store_pro_banner_title">Pro-Eintrag</string>
     <string name="store_pro_banner_body">Die Installation ist kostenlos. Zum Anwenden wird EmuCoreX Pro benötigt.</string>

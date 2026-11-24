@@ -3410,6 +3410,9 @@
     <string name="store_retry">再試行</string>
     <string name="store_get_more">ストアでさらに入手</string>
     <string name="store_item_not_found">このアイテムは利用できなくなりました</string>
+    <string name="store_installed_title">インストール済み</string>
+    <string name="store_installed_empty_title">まだ何もインストールされていません</string>
+    <string name="store_installed_empty_body">ストアからインストールしたアイテムがここに表示されます。</string>
     <string name="store_meta_version">バージョン %1$d</string>
     <string name="store_pro_banner_title">Pro アイテム</string>
     <string name="store_pro_banner_body">無料でインストールできます。適用には EmuCoreX Pro が必要です。</string>

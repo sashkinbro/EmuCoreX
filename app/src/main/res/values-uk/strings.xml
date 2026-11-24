@@ -3421,6 +3421,9 @@
     <string name="store_retry">Спробувати знову</string>
     <string name="store_get_more">Більше в Магазині</string>
     <string name="store_item_not_found">Цей елемент більше недоступний</string>
+    <string name="store_installed_title">Встановлені</string>
+    <string name="store_installed_empty_title">Поки що нічого не встановлено</string>
+    <string name="store_installed_empty_body">Тут з\'являться елементи, які ви встановите з магазину.</string>
     <string name="store_meta_version">Версія %1$d</string>
     <string name="store_pro_banner_title">Pro-елемент</string>
     <string name="store_pro_banner_body">Установити його можна безкоштовно. Для застосування потрібен EmuCoreX Pro.</string>

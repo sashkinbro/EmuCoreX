@@ -255,9 +255,12 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun remove(item: StoreItem) {
-        runAction(item.id, StoreAction(StoreActionPhase.REMOVING)) {
-            if (applier.remove(item.id)) post(R.string.store_msg_removed)
+    fun remove(item: StoreItem) = remove(item.id)
+
+    /** Removes an installed item by id, also for items that have left the catalog. */
+    fun remove(id: String) {
+        runAction(id, StoreAction(StoreActionPhase.REMOVING)) {
+            if (applier.remove(id)) post(R.string.store_msg_removed)
             else post(R.string.store_msg_apply_failed)
         }
     }

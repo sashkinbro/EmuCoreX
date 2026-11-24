@@ -3431,6 +3431,9 @@
     <string name="store_retry">Zkusit znovu</string>
     <string name="store_get_more">Více v Obchodě</string>
     <string name="store_item_not_found">Tato položka už není k dispozici</string>
+    <string name="store_installed_title">Nainstalované</string>
+    <string name="store_installed_empty_title">Zatím nic nenainstalováno</string>
+    <string name="store_installed_empty_body">Zde se zobrazí položky, které nainstalujete z Obchodu.</string>
     <string name="store_meta_version">Verze %1$d</string>
     <string name="store_pro_banner_title">Položka Pro</string>
     <string name="store_pro_banner_body">Nainstalovat ji můžete zdarma. Použití vyžaduje EmuCoreX Pro.</string>

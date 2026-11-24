@@ -3437,6 +3437,9 @@
     <string name="store_retry">Try again</string>
     <string name="store_get_more">Get more in Store</string>
     <string name="store_item_not_found">This item is no longer available</string>
+    <string name="store_installed_title">Installed</string>
+    <string name="store_installed_empty_title">Nothing installed yet</string>
+    <string name="store_installed_empty_body">Items you install from the Store will appear here.</string>
     <string name="store_meta_version">Version %1$d</string>
     <string name="store_pro_banner_title">Pro item</string>
     <string name="store_pro_banner_body">You can install it for free. Applying it needs EmuCoreX Pro.</string>

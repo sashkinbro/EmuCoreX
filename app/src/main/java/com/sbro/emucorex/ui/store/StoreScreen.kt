@@ -110,7 +110,7 @@ import com.sbro.emucorex.ui.theme.style.Surface
 import com.sbro.emucorex.ui.theme.style.TextButton
 import kotlinx.coroutines.delay
 
-private val StoreTab.icon: ImageVector
+internal val StoreTab.icon: ImageVector
     get() = when (this) {
         StoreTab.THEMES -> Icons.Rounded.Palette
         StoreTab.WALLPAPERS -> Icons.Rounded.Wallpaper
@@ -120,7 +120,7 @@ private val StoreTab.icon: ImageVector
     }
 
 @Composable
-private fun StoreTab.label(): String = stringResource(
+internal fun StoreTab.label(): String = stringResource(
     when (this) {
         StoreTab.THEMES -> R.string.store_tab_themes
         StoreTab.WALLPAPERS -> R.string.store_tab_wallpapers

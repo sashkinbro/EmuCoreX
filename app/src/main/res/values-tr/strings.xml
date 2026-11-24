@@ -3411,6 +3411,9 @@
     <string name="store_retry">Tekrar dene</string>
     <string name="store_get_more">Mağazada daha fazlası</string>
     <string name="store_item_not_found">Bu öğe artık mevcut değil</string>
+    <string name="store_installed_title">Yüklenenler</string>
+    <string name="store_installed_empty_title">Henüz yüklenmiş bir şey yok</string>
+    <string name="store_installed_empty_body">Mağazadan yüklediğiniz öğeler burada görünür.</string>
     <string name="store_meta_version">Sürüm %1$d</string>
     <string name="store_pro_banner_title">Pro öğesi</string>
     <string name="store_pro_banner_body">Ücretsiz yükleyebilirsiniz. Uygulamak için EmuCoreX Pro gerekir.</string>

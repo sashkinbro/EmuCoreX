@@ -3425,6 +3425,9 @@
     <string name="store_retry">Coba lagi</string>
     <string name="store_get_more">Lebih banyak di Toko</string>
     <string name="store_item_not_found">Item ini sudah tidak tersedia</string>
+    <string name="store_installed_title">Terpasang</string>
+    <string name="store_installed_empty_title">Belum ada yang terpasang</string>
+    <string name="store_installed_empty_body">Item yang Anda pasang dari Toko akan muncul di sini.</string>
     <string name="store_meta_version">Versi %1$d</string>
     <string name="store_pro_banner_title">Item Pro</string>
     <string name="store_pro_banner_body">Anda bisa memasangnya gratis. Menerapkannya memerlukan EmuCoreX Pro.</string>

@@ -53,6 +53,7 @@ import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Newspaper
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.VideoLibrary
@@ -139,6 +140,7 @@ fun HubScreen(
     onBackClick: () -> Unit,
     onOpenArticle: (String) -> Unit,
     onOpenStoreItem: (String) -> Unit,
+    onOpenInstalled: () -> Unit,
     initialTab: String? = null,
     initialStoreTab: String? = null,
     backEnabled: Boolean = true,
@@ -270,6 +272,7 @@ fun HubScreen(
                                 if (!searchVisible) viewModel.clearSearch()
                             },
                             onSavedClick = { viewModel.openSection(HubSection.SAVED) },
+                            onInstalledClick = onOpenInstalled.takeIf { storeActive },
                             savedActive = section == HubSection.SAVED,
                             onRefresh = refreshAll,
                             refreshing = uiState.isRefreshing || storeRefreshing,
@@ -462,6 +465,7 @@ private fun HubTopBar(
     onBackClick: () -> Unit,
     onSearchClick: () -> Unit,
     onSavedClick: () -> Unit,
+    onInstalledClick: (() -> Unit)?,
     savedActive: Boolean,
     onRefresh: () -> Unit,
     refreshing: Boolean,
@@ -491,6 +495,15 @@ private fun HubTopBar(
                     contentDescription = stringResource(R.string.hub_search),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+            if (onInstalledClick != null) {
+                IconButton(onClick = onInstalledClick) {
+                    Icon(
+                        Icons.Rounded.Inventory2,
+                        contentDescription = stringResource(R.string.store_installed_title),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             IconButton(onClick = onSavedClick) {
                 Icon(

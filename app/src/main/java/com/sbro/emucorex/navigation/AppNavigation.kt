@@ -72,6 +72,7 @@ import com.sbro.emucorex.ui.formats.SupportedFormatsScreen
 import com.sbro.emucorex.ui.feedback.FeedbackScreen
 import com.sbro.emucorex.ui.projects.OurProjectsScreen
 import com.sbro.emucorex.ui.store.LocalOpenStore
+import com.sbro.emucorex.ui.store.StoreInstalledScreen
 import com.sbro.emucorex.ui.store.StoreItemScreen
 import com.sbro.emucorex.ui.gamedb.GameDbBrowserScreen
 import com.sbro.emucorex.ui.home.HomeScreen
@@ -229,6 +230,9 @@ object ProjectsRoute
 
 @Serializable
 data class StoreItemRoute(val id: String)
+
+@Serializable
+object StoreInstalledRoute
 
 @Serializable
 object AccountUnlockedAchievementsRoute
@@ -744,6 +748,11 @@ fun AppNavigation(
                             onOpenArticle = openDetail,
                             onOpenStoreItem = { id ->
                                 navController.navigate(StoreItemRoute(id)) {
+                                    launchSingleTop = true
+                                }
+                            },
+                            onOpenInstalled = {
+                                navController.navigate(StoreInstalledRoute) {
                                     launchSingleTop = true
                                 }
                             },
@@ -1444,6 +1453,17 @@ fun AppNavigation(
                 ) {
                     OurProjectsScreen(onBackClick = { navController.popBackStack() })
                 }
+            }
+
+            composable<StoreInstalledRoute> {
+                StoreInstalledScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onOpenItem = { id ->
+                        navController.navigate(StoreItemRoute(id)) {
+                            launchSingleTop = true
+                        }
+                    }
+                )
             }
 
             composable<StoreItemRoute> { backStackEntry ->
