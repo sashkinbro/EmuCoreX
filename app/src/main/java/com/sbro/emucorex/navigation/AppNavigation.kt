@@ -748,7 +748,8 @@ fun AppNavigation(
                                 }
                             },
                             initialTab = hubRoute.tab,
-                            initialStoreTab = hubRoute.storeTab
+                            initialStoreTab = hubRoute.storeTab,
+                            backEnabled = detailBackStack.isEmpty()
                         )
                     }
 

@@ -2434,6 +2434,9 @@
     <string name="hub_theme_requires_pro">Для этой темы нужен Pro</string>
     <string name="hub_related_materials">Связанные материалы</string>
     <string name="hub_tab_favorites">Сохраненное</string>
+    <string name="hub_mode_discover">Обзор</string>
+    <string name="hub_see_all">Все</string>
+    <string name="hub_new_in_store">Новое в магазине</string>
     <string name="hub_search">Поиск по Хабу</string>
     <string name="hub_search_hint">Названия, темы, каналы или годы</string>
     <string name="hub_refresh">Обновить</string>

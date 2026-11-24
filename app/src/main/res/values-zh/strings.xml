@@ -2430,6 +2430,9 @@
     <string name="hub_theme_requires_pro">此主题需要 Pro</string>
     <string name="hub_related_materials">相关资料</string>
     <string name="hub_tab_favorites">已保存</string>
+    <string name="hub_mode_discover">发现</string>
+    <string name="hub_see_all">查看全部</string>
+    <string name="hub_new_in_store">商店新品</string>
     <string name="hub_search">搜索枢纽</string>
     <string name="hub_search_hint">标题、主题、频道或年份</string>
     <string name="hub_refresh">刷新</string>

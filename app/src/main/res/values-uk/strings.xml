@@ -2465,6 +2465,9 @@
     <string name="hub_theme_requires_pro">Ця тема потребує Pro</string>
     <string name="hub_related_materials">Пов\'язані матеріали</string>
     <string name="hub_tab_favorites">Збережене</string>
+    <string name="hub_mode_discover">Огляд</string>
+    <string name="hub_see_all">Усі</string>
+    <string name="hub_new_in_store">Нове в магазині</string>
     <string name="hub_search">Пошук у Хабі</string>
     <string name="hub_search_hint">Назви, теми, канали або роки</string>
     <string name="hub_refresh">Оновити</string>

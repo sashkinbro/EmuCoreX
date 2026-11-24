@@ -2433,6 +2433,9 @@
     <string name="hub_theme_requires_pro">تتطلب هذه السمة Pro</string>
     <string name="hub_related_materials">مواد ذات صلة</string>
     <string name="hub_tab_favorites">المحفوظات</string>
+    <string name="hub_mode_discover">استكشاف</string>
+    <string name="hub_see_all">عرض الكل</string>
+    <string name="hub_new_in_store">جديد في المتجر</string>
     <string name="hub_search">البحث في المركز</string>
     <string name="hub_search_hint">عناوين، مواضيع، قنوات، أو سنوات</string>
     <string name="hub_refresh">تحديث</string>

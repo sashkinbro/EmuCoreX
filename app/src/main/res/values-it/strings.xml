@@ -2429,6 +2429,9 @@
     <string name="hub_theme_requires_pro">Questo tema richiede Pro</string>
     <string name="hub_related_materials">Materiali correlati</string>
     <string name="hub_tab_favorites">Salvati</string>
+    <string name="hub_mode_discover">Scopri</string>
+    <string name="hub_see_all">Vedi tutto</string>
+    <string name="hub_new_in_store">Novità nello Store</string>
     <string name="hub_search">Cerca nell\'Hub</string>
     <string name="hub_search_hint">Titoli, argomenti, canali o anni</string>
     <string name="hub_refresh">Aggiorna</string>

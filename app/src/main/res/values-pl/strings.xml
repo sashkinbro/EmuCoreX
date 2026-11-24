@@ -2451,6 +2451,9 @@
     <string name="hub_theme_requires_pro">Ten motyw wymaga Pro</string>
     <string name="hub_related_materials">Powiązane materiały</string>
     <string name="hub_tab_favorites">Zapisane</string>
+    <string name="hub_mode_discover">Odkrywaj</string>
+    <string name="hub_see_all">Zobacz wszystko</string>
+    <string name="hub_new_in_store">Nowości w sklepie</string>
     <string name="hub_search">Szukaj w Hubie</string>
     <string name="hub_search_hint">Tytuły, tematy, kanały lub lata</string>
     <string name="hub_refresh">Odśwież</string>

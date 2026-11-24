@@ -2428,6 +2428,9 @@
     <string name="hub_theme_requires_pro">このテーマにはProが必要です</string>
     <string name="hub_related_materials">関連資料</string>
     <string name="hub_tab_favorites">保存済み</string>
+    <string name="hub_mode_discover">見つける</string>
+    <string name="hub_see_all">すべて表示</string>
+    <string name="hub_new_in_store">ストアの新着</string>
     <string name="hub_search">ハブを検索</string>
     <string name="hub_search_hint">タイトル、トピック、チャンネル、年など</string>
     <string name="hub_refresh">更新</string>

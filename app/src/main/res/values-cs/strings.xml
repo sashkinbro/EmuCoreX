@@ -2449,6 +2449,9 @@
     <string name="hub_theme_requires_pro">Tento motiv vyžaduje Pro</string>
     <string name="hub_related_materials">Související materiály</string>
     <string name="hub_tab_favorites">Uložené</string>
+    <string name="hub_mode_discover">Objevovat</string>
+    <string name="hub_see_all">Zobrazit vše</string>
+    <string name="hub_new_in_store">Novinky v obchodě</string>
     <string name="hub_search">Hledat v Centru</string>
     <string name="hub_search_hint">Názvy, témata, kanály nebo roky</string>
     <string name="hub_refresh">Obnovit</string>

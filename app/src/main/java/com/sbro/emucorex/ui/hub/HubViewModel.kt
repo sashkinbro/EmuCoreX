@@ -18,13 +18,19 @@ import kotlinx.coroutines.launch
 import java.text.Normalizer
 import java.util.Locale
 
-enum class HubTab {
+/** Top-level mode of the Hub: the shelves feed or the Store. */
+enum class HubMode {
+    DISCOVER,
+    STORE
+}
+
+/** Full list a Discover shelf opens with "See all" (null section = the shelves feed). */
+enum class HubSection {
     NEWS,
-    STORE,
     VIDEOS,
     HISTORY,
     MANUALS,
-    FAVORITES
+    SAVED
 }
 
 enum class HubSortOrder {
@@ -43,7 +49,10 @@ enum class HubProductFilter {
 
 data class HubUiState(
     val items: List<HubItem> = emptyList(),
-    val selectedTab: HubTab = HubTab.NEWS,
+    val mode: HubMode = HubMode.DISCOVER,
+    val section: HubSection? = null,
+    /** Mode to return to when the Saved list is closed. */
+    val savedReturnMode: HubMode = HubMode.DISCOVER,
     val searchQuery: String = "",
     val sortOrder: HubSortOrder = HubSortOrder.NEWEST_FIRST,
     val productFilter: HubProductFilter = HubProductFilter.ALL,
@@ -60,13 +69,13 @@ data class HubUiState(
 
     val visibleItems: List<HubItem>
         get() {
-            var selected = when (selectedTab) {
-                HubTab.NEWS -> items.filter { it.kind == HubKind.NEWS }
-                HubTab.VIDEOS -> items.filter { it.kind == HubKind.VIDEOS }
-                HubTab.HISTORY -> items.filter { it.kind == HubKind.HISTORY }
-                HubTab.MANUALS -> items.filter { it.kind == HubKind.MANUALS }
-                HubTab.STORE -> emptyList()
-                HubTab.FAVORITES -> items.filter(HubItem::isFavorite)
+            var selected = when (section) {
+                null -> items
+                HubSection.NEWS -> items.filter { it.kind == HubKind.NEWS }
+                HubSection.VIDEOS -> items.filter { it.kind == HubKind.VIDEOS }
+                HubSection.HISTORY -> items.filter { it.kind == HubKind.HISTORY }
+                HubSection.MANUALS -> items.filter { it.kind == HubKind.MANUALS }
+                HubSection.SAVED -> items.filter(HubItem::isFavorite)
             }
             selected = selected.filter { it.matchesProductFilter(productFilter) }
             if (featuredOnly) selected = selected.filter(HubItem::featured)
@@ -109,14 +118,40 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
         refresh(force = false, showIndicator = false)
     }
 
-    fun selectTab(tab: HubTab) {
-        _uiState.update { it.copy(selectedTab = tab) }
+    fun selectMode(mode: HubMode) {
+        _uiState.update {
+            if (it.mode == mode && it.section == null) it
+            else it.copy(mode = mode, section = null, searchQuery = if (it.mode == mode) it.searchQuery else "")
+        }
     }
 
-    fun selectRelativeTab(offset: Int) {
-        val tabs = HubTab.entries
-        val current = tabs.indexOf(_uiState.value.selectedTab).coerceAtLeast(0)
-        selectTab(tabs[(current + offset + tabs.size) % tabs.size])
+    fun toggleMode() {
+        selectMode(if (_uiState.value.mode == HubMode.DISCOVER) HubMode.STORE else HubMode.DISCOVER)
+    }
+
+    fun openSection(section: HubSection) {
+        _uiState.update {
+            it.copy(
+                mode = HubMode.DISCOVER,
+                section = section,
+                savedReturnMode = if (section == HubSection.SAVED) it.mode else HubMode.DISCOVER,
+                searchQuery = ""
+            )
+        }
+    }
+
+    /** Closes the open section (or Saved list); returns false when there was nothing to close. */
+    fun closeSection(): Boolean {
+        val state = _uiState.value
+        if (state.section == null) return false
+        _uiState.update {
+            it.copy(
+                mode = if (it.section == HubSection.SAVED) it.savedReturnMode else HubMode.DISCOVER,
+                section = null,
+                searchQuery = ""
+            )
+        }
+        return true
     }
 
     fun setSearchQuery(query: String) {

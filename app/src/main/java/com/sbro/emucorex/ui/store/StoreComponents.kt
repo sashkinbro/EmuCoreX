@@ -256,6 +256,53 @@ internal fun StoreItemCard(
     }
 }
 
+/** Compact cover + name card for the Discover "New in Store" shelf. */
+@Composable
+internal fun StoreShelfCard(
+    item: StoreItem,
+    snapshot: StoreSnapshot?,
+    locale: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = neonShape(16.dp)
+    val open = rememberDebouncedClick(onClick = onClick)
+    Surface(
+        modifier = modifier
+            .gamepadFocusableCard(shape = shape, interactionSource = interactionSource, addFocusTarget = false),
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 1.dp,
+        interactionSource = interactionSource,
+        onClick = open
+    ) {
+        Column {
+            Box {
+                StoreImage(
+                    file = item.cover,
+                    snapshot = snapshot,
+                    swatch = item.swatch,
+                    modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                    alignment = Alignment.TopCenter
+                )
+                if (item.requiresPro) {
+                    ProBadge(Modifier.align(Alignment.TopStart).padding(6.dp))
+                }
+            }
+            Text(
+                item.displayName(locale),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
 /** Placeholder card shown while the first catalog sync is running. */
 @Composable
 internal fun StoreSkeletonCard(modifier: Modifier = Modifier) {

@@ -2428,6 +2428,9 @@
     <string name="hub_theme_requires_pro">이 테마는 Pro가 필요합니다</string>
     <string name="hub_related_materials">관련 자료</string>
     <string name="hub_tab_favorites">저장됨</string>
+    <string name="hub_mode_discover">둘러보기</string>
+    <string name="hub_see_all">모두 보기</string>
+    <string name="hub_new_in_store">스토어 신규</string>
     <string name="hub_search">허브 검색</string>
     <string name="hub_search_hint">제목, 주제, 채널 또는 연도</string>
     <string name="hub_refresh">새로고침</string>

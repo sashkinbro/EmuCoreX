@@ -2443,6 +2443,9 @@
     <string name="hub_theme_requires_pro">Tema ini memerlukan Pro</string>
     <string name="hub_related_materials">Materi terkait</string>
     <string name="hub_tab_favorites">Tersimpan</string>
+    <string name="hub_mode_discover">Jelajahi</string>
+    <string name="hub_see_all">Lihat semua</string>
+    <string name="hub_new_in_store">Baru di Toko</string>
     <string name="hub_search">Cari di Hub</string>
     <string name="hub_search_hint">Judul, topik, channel, atau tahun</string>
     <string name="hub_refresh">Segarkan</string>

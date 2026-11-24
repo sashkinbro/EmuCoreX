@@ -2429,6 +2429,9 @@
     <string name="hub_theme_requires_pro">Bu tema için Pro gerekli</string>
     <string name="hub_related_materials">İlgili materyaller</string>
     <string name="hub_tab_favorites">Kaydedilenler</string>
+    <string name="hub_mode_discover">Keşfet</string>
+    <string name="hub_see_all">Tümünü gör</string>
+    <string name="hub_new_in_store">Mağazada yeni</string>
     <string name="hub_search">Merkezde Ara</string>
     <string name="hub_search_hint">Başlıklar, konular, kanallar veya yıllar</string>
     <string name="hub_refresh">Yenile</string>

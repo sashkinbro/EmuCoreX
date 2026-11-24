@@ -2530,6 +2530,9 @@
     <string name="hub_theme_requires_pro">This theme requires Pro</string>
     <string name="hub_related_materials">Related materials</string>
     <string name="hub_tab_favorites">Saved</string>
+    <string name="hub_mode_discover">Discover</string>
+    <string name="hub_see_all">See all</string>
+    <string name="hub_new_in_store">New in Store</string>
     <string name="hub_search">Search Hub</string>
     <string name="hub_search_hint">Titles, topics, channels, or years</string>
     <string name="hub_refresh">Refresh</string>

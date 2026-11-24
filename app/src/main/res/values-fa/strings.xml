@@ -2444,6 +2444,9 @@
     <string name="hub_theme_requires_pro">این پوسته به Pro نیاز دارد</string>
     <string name="hub_related_materials">مطالب مرتبط</string>
     <string name="hub_tab_favorites">ذخیره شده</string>
+    <string name="hub_mode_discover">کاوش</string>
+    <string name="hub_see_all">مشاهده همه</string>
+    <string name="hub_new_in_store">تازه در فروشگاه</string>
     <string name="hub_search">جستجو در هاب</string>
     <string name="hub_search_hint">عناوین، موضوعات، کانال‌ها یا سال‌ها</string>
     <string name="hub_refresh">تازه‌سازی</string>
