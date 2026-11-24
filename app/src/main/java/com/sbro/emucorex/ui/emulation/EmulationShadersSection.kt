@@ -895,7 +895,7 @@ private fun ShaderCategoryCard(
                 overflow = TextOverflow.Ellipsis
             )
             Surface(
-                shape = RoundedCornerShape(50),
+                shape = neonShape(999.dp),
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
                 border = BorderStroke(
                     1.dp,

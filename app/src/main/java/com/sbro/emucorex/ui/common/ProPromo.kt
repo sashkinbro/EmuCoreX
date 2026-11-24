@@ -198,7 +198,7 @@ fun ProPromoCard(
         Row(
             modifier = Modifier
                 .height(22.dp)
-                .clip(if (neon) neonChipShape() else RoundedCornerShape(50))
+                .clip(if (neon) neonChipShape() else neonShape(999.dp))
                 .background(if (neon) Brush.horizontalGradient(listOf(LocalThemeExtras.current.accent1, LocalThemeExtras.current.accent1))
                     else Brush.horizontalGradient(listOf(Color(0xFFF6D06B), Color(0xFFD99A2B))))
                 .padding(horizontal = 8.dp),

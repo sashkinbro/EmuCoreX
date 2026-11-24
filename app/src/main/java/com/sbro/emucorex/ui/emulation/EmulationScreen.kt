@@ -3484,7 +3484,7 @@ private fun RetroAchievementsIndicatorsOverlay(
     ) {
         trackers.forEach { tracker ->
             Surface(
-                shape = RoundedCornerShape(50),
+                shape = neonShape(999.dp),
                 color = pillColor,
                 border = BorderStroke(1.dp, Color(0xFF86D7FF).copy(alpha = 0.5f))
             ) {
@@ -3505,7 +3505,7 @@ private fun RetroAchievementsIndicatorsOverlay(
         }
         progress?.let { item ->
             Surface(
-                shape = RoundedCornerShape(50),
+                shape = neonShape(999.dp),
                 color = pillColor,
                 border = BorderStroke(1.dp, accent.copy(alpha = 0.5f))
             ) {

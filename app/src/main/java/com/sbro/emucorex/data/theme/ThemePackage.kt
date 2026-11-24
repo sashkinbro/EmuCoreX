@@ -205,12 +205,16 @@ private fun isDarkColor(argb: Int): Boolean {
     return (0.299 * r + 0.587 * g + 0.114 * b) < 128
 }
 
+private val SQUARE_NATIVE_STYLES = setOf(UiStyle.CLASSIC, UiStyle.PIXEL, UiStyle.TERMINAL)
+
 fun ThemePackageSpec.toStyleSpec(): ThemeStyleSpec = ThemeStyleSpec(
     shapeStyle = when (shape.style.lowercase()) {
         "cut" -> ThemeShapeStyle.CUT
         "cutdiagonal" -> ThemeShapeStyle.CUT_DIAGONAL
         "square" -> ThemeShapeStyle.SQUARE
-        else -> ThemeShapeStyle.ROUNDED
+        // Square-native looks (9x bevels, pixel art, terminals) never get round corners: a package left on
+        // the default "rounded" would otherwise keep pill badges, chips and sliders inside a square UI.
+        else -> if (UiStyle.fromWire(effects.style) in SQUARE_NATIVE_STYLES) ThemeShapeStyle.SQUARE else ThemeShapeStyle.ROUNDED
     },
     shapeScale = shape.scale.takeIf { it.isFinite() }?.coerceIn(0f, 2f) ?: 1f,
     decor = if (effects.decor.equals("neon", ignoreCase = true)) ThemeDecor.NEON else ThemeDecor.NONE,
