@@ -162,7 +162,8 @@ internal fun ProBadge(modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
         shape = neonShape(8.dp),
-        color = Color.Black.copy(alpha = 0.62f),
+        // Opaque: a translucent black turned gray on light cards and the gold text washed out.
+        color = Color(0xFF17140F),
         contentColor = gold
     ) {
         Text(

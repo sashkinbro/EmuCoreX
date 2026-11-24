@@ -384,7 +384,7 @@ private fun StoreDetails(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    TextButton(onClick = onGetPro) { Text(stringResource(R.string.settings_pro_buy)) }
+                    TextButton(onClick = onGetPro, shape = neonButtonShape()) { Text(stringResource(R.string.settings_pro_buy)) }
                 }
             }
         }
@@ -509,7 +509,7 @@ private fun StoreProSheet(price: String?, onDismiss: () -> Unit, viewModel: Stor
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.pro_reminder_later)) }
+            TextButton(onClick = onDismiss, shape = neonButtonShape()) { Text(stringResource(R.string.pro_reminder_later)) }
             Spacer(Modifier.height(8.dp))
         }
     }

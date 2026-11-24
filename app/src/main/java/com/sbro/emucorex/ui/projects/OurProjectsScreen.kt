@@ -256,19 +256,19 @@ private fun ProjectCard(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (project.onGooglePlay) {
-                    Button(onClick = { openPlay(context, project, failedMessage) }) {
+                    Button(onClick = { openPlay(context, project, failedMessage) }, shape = neonButtonShape()) {
                         Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.size(6.dp))
                         Text(stringResource(R.string.projects_google_play))
                     }
                 }
-                FilledTonalButton(onClick = { openLink(context, project.githubUrl, failedMessage) }, colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
+                FilledTonalButton(onClick = { openLink(context, project.githubUrl, failedMessage) }, shape = neonButtonShape(), colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
                     Icon(Icons.Rounded.Code, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(6.dp))
                     Text(stringResource(R.string.projects_github))
                 }
                 project.websiteUrl?.let { site ->
-                    OutlinedButton(onClick = { openLink(context, site, failedMessage) }) {
+                    OutlinedButton(onClick = { openLink(context, site, failedMessage) }, shape = neonButtonShape()) {
                         Icon(Icons.Rounded.Language, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.size(6.dp))
                         Text(stringResource(R.string.projects_website))
