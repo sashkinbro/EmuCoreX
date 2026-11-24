@@ -20,10 +20,10 @@ import java.util.Locale
 
 enum class HubTab {
     NEWS,
+    STORE,
     VIDEOS,
     HISTORY,
     MANUALS,
-    STORE,
     FAVORITES
 }
 
