@@ -219,21 +219,23 @@ internal fun StoreItemCard(
                         .aspectRatio(item.cover.ratio(default = 9f / 16f)),
                     alignment = Alignment.TopCenter
                 )
-                if (item.requiresPro) {
-                    ProBadge(Modifier.align(Alignment.TopStart).padding(8.dp))
-                }
             }
             Column(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(
-                    item.displayName(locale),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                // PRO sits beside the name: over the cover it collided with the preview's own title bar.
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        item.displayName(locale),
+                        modifier = Modifier.weight(1f, fill = false),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (item.requiresPro) ProBadge()
+                }
                 status.label()?.let { label ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         if (status == StoreItemStatus.APPLIED) {
@@ -293,21 +295,23 @@ internal fun StoreShelfCard(
                     modifier = Modifier.fillMaxWidth().aspectRatio(coverRatio),
                     alignment = Alignment.TopCenter
                 )
-                if (item.requiresPro) {
-                    ProBadge(Modifier.align(Alignment.TopStart).padding(6.dp))
-                }
             }
             Column(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Text(
-                    item.displayName(locale),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                // PRO sits beside the name: over the cover it collided with the preview's own title bar.
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        item.displayName(locale),
+                        modifier = Modifier.weight(1f, fill = false),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (item.requiresPro) ProBadge()
+                }
                 status.label()?.let { label ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         if (status == StoreItemStatus.APPLIED) {

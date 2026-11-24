@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
@@ -145,7 +146,7 @@ internal fun SegmentedSwitch(
                     val shape = neonShape(18.dp)
                     val contentColor by animateColorAsState(
                         targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.78f),
                         animationSpec = if (motion) tween(200) else snap(),
                         label = "switch-content"
                     )
@@ -169,4 +170,13 @@ internal fun SegmentedSwitch(
             }
         }
     }
+}
+
+/** Accent for text links drawn straight on the screen background: primary when it reads (WCAG 3:1), else onBackground. */
+@Composable
+internal fun readableAccentOnBackground(): Color {
+    val scheme = MaterialTheme.colorScheme
+    val a = scheme.primary.luminance() + 0.05f
+    val b = scheme.background.luminance() + 0.05f
+    return if (maxOf(a, b) / minOf(a, b) >= 3f) scheme.primary else scheme.onBackground
 }

@@ -571,7 +571,7 @@ private fun StoreFeaturedCarousel(
             stringResource(R.string.store_featured),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onBackground
         )
         Box(
             Modifier.pointerInput(Unit) {

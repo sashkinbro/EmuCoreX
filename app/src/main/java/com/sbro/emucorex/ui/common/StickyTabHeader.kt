@@ -49,7 +49,8 @@ internal fun StickyTabHeader(
         animationSpec = tween(durationMillis = 180),
         label = "stickyTabDivider"
     )
-    Surface(
+    // Plain Material surface: a full-width strip must not pick up style frames (Classic bevels rectangles).
+    androidx.compose.material3.Surface(
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.background
     ) {

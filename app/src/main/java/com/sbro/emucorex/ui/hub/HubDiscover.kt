@@ -249,12 +249,12 @@ internal fun ShelfHeader(title: String, onSeeAll: () -> Unit) {
             Text(
                 text = stringResource(R.string.hub_see_all),
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary
+                color = readableAccentOnBackground()
             )
             Icon(
                 imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = readableAccentOnBackground(),
                 modifier = Modifier.size(20.dp)
             )
         }

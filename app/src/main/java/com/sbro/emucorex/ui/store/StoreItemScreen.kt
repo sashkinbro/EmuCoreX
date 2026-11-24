@@ -328,7 +328,7 @@ private fun StoreDetails(
             add(stringResource(R.string.store_meta_version, item.version))
             if (item.sizeBytes > 0) add(Formatter.formatShortFileSize(context, item.sizeBytes))
         }.joinToString(" · ")
-        Text(meta, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(meta, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.78f))
         status.label()?.let { label ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (status == StoreItemStatus.APPLIED) {
@@ -357,7 +357,7 @@ private fun StoreDetails(
             }
         }
         item.displayDescription(locale).takeIf { it.isNotBlank() }?.let {
-            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.78f))
         }
         if (locked) {
             val gold = LocalThemeExtras.current.gold
@@ -458,7 +458,7 @@ private fun StoreActionProgress(action: StoreAction) {
             StoreActionPhase.APPLYING -> stringResource(R.string.store_action_applying)
             StoreActionPhase.REMOVING -> stringResource(R.string.store_action_removing)
         }
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.78f))
         if (action.phase == StoreActionPhase.DOWNLOADING && action.progress > 0f) {
             LinearProgressIndicator(progress = { action.progress }, modifier = Modifier.fillMaxWidth())
         } else {
