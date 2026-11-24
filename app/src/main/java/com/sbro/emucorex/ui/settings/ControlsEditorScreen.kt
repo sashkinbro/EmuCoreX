@@ -430,8 +430,84 @@ private fun editorControlAppearance(
 }
 
 @SuppressLint("ConfigurationScreenWidthHeight")
+/**
+ * The editor is a dark overlay drawn over gameplay with its own fixed palette, so it gets a fixed dark color scheme:
+ * theme-aware widgets inside it (chips, buttons, switches) would otherwise take a light theme's dark text and vanish
+ * on the dark panels. Shapes and UI style still follow the active theme.
+ */
 @Composable
 fun ControlsEditorScreen(
+    state: ControlsEditorState,
+    onBackClick: () -> Unit,
+    subtitle: String? = null,
+    manageActivityOrientation: Boolean = true,
+    overlayLeftSafeInset: Dp? = null,
+    overlayRightSafeInset: Dp? = null,
+    overlayTopSafeInset: Dp? = null,
+    overlayBottomSafeInset: Dp? = null,
+    onUpdateControlOffset: (String, Pair<Float, Float>) -> Unit,
+    onUpdateControlOffsets: (Map<String, Pair<Float, Float>>) -> Unit,
+    onUpdateControlScale: (String, Int) -> Unit,
+    onUpdateControlWidthScale: (String, Int) -> Unit,
+    onUpdateControlOpacity: (String, Int) -> Unit,
+    onUpdateControlSecondaryAction: (String, String?) -> Unit,
+    onSetControlVisible: (String, Boolean) -> Unit,
+    onSetStickSurfaceMode: (String, Boolean) -> Unit,
+    onResetLayout: () -> Unit,
+    onCustomControlsChange: (CustomTouchControlLibrary) -> Unit = {}
+) {
+    androidx.compose.material3.MaterialTheme(colorScheme = controlsEditorColorScheme()) {
+        ControlsEditorScreenContent(
+            state = state,
+            onBackClick = onBackClick,
+            subtitle = subtitle,
+            manageActivityOrientation = manageActivityOrientation,
+            overlayLeftSafeInset = overlayLeftSafeInset,
+            overlayRightSafeInset = overlayRightSafeInset,
+            overlayTopSafeInset = overlayTopSafeInset,
+            overlayBottomSafeInset = overlayBottomSafeInset,
+            onUpdateControlOffset = onUpdateControlOffset,
+            onUpdateControlOffsets = onUpdateControlOffsets,
+            onUpdateControlScale = onUpdateControlScale,
+            onUpdateControlWidthScale = onUpdateControlWidthScale,
+            onUpdateControlOpacity = onUpdateControlOpacity,
+            onUpdateControlSecondaryAction = onUpdateControlSecondaryAction,
+            onSetControlVisible = onSetControlVisible,
+            onSetStickSurfaceMode = onSetStickSurfaceMode,
+            onResetLayout = onResetLayout,
+            onCustomControlsChange = onCustomControlsChange
+        )
+    }
+}
+
+private fun controlsEditorColorScheme() = androidx.compose.material3.darkColorScheme(
+    primary = Color(0xFF7C9BFF),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFF3565FF),
+    onPrimaryContainer = Color.White,
+    secondary = Color(0xFF9DB3FF),
+    onSecondary = Color(0xFF0D1424),
+    secondaryContainer = Color(0xFF3565FF),
+    onSecondaryContainer = Color.White,
+    tertiary = Color(0xFF86D7FF),
+    onTertiary = Color(0xFF0D1424),
+    background = Color(0xFF0D1424),
+    onBackground = Color.White,
+    surface = Color(0xFF111827),
+    onSurface = Color.White,
+    surfaceVariant = Color(0xFF1E293B),
+    onSurfaceVariant = Color.White.copy(alpha = 0.74f),
+    surfaceContainerLowest = Color(0xFF0A101C),
+    surfaceContainerLow = Color(0xFF0F1626),
+    surfaceContainer = Color(0xFF141C2E),
+    surfaceContainerHigh = Color(0xFF1A2338),
+    surfaceContainerHighest = Color(0xFF212B42),
+    outline = Color.White.copy(alpha = 0.34f),
+    outlineVariant = Color.White.copy(alpha = 0.18f)
+)
+
+@Composable
+private fun ControlsEditorScreenContent(
     state: ControlsEditorState,
     onBackClick: () -> Unit,
     subtitle: String? = null,
