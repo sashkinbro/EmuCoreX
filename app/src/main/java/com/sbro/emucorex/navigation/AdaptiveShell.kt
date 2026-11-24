@@ -46,7 +46,6 @@ import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Star
-import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Tune
 import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
@@ -109,7 +108,7 @@ import com.sbro.emucorex.ui.theme.neon.neonShape
 import com.sbro.emucorex.ui.theme.neon.neonShapeCorners
 
 enum class PrimaryDestination {
-    Home, Search, Hub, Store, Formats, Achievements, Profile, Discord, Settings, Projects, Feedback
+    Home, Search, Hub, Formats, Achievements, Profile, Discord, Settings, Projects, Feedback
 }
 
 private enum class MobileLeadingAction {
@@ -149,7 +148,6 @@ fun AdaptiveShell(
     onNavigateDiscord: (() -> Unit)? = null,
     onNavigateFeedback: (() -> Unit)? = null,
     onNavigateProjects: (() -> Unit)? = null,
-    onNavigateStore: (() -> Unit)? = null,
     onNavigateGameSettingsManager: (() -> Unit)? = null,
     onNavigateDataTransfer: (() -> Unit)? = null,
     onResetAllSettings: (() -> Unit)? = null,
@@ -190,7 +188,6 @@ fun AdaptiveShell(
             onNavigateDiscord = onNavigateDiscord,
             onNavigateFeedback = onNavigateFeedback,
             onNavigateProjects = onNavigateProjects,
-            onNavigateStore = onNavigateStore,
             onNavigateGameSettingsManager = onNavigateGameSettingsManager,
             onNavigateDataTransfer = onNavigateDataTransfer,
             onResetAllSettings = onResetAllSettings,
@@ -281,7 +278,6 @@ fun AdaptiveShell(
             onNavigateDiscord = onNavigateDiscord,
             onNavigateFeedback = onNavigateFeedback,
             onNavigateProjects = onNavigateProjects,
-            onNavigateStore = onNavigateStore,
             onNavigateGameSettingsManager = onNavigateGameSettingsManager,
             onNavigateDataTransfer = onNavigateDataTransfer,
             onResetAllSettings = onResetAllSettings,
@@ -316,7 +312,6 @@ private fun CompactAdaptiveShell(
     onNavigateDiscord: (() -> Unit)?,
     onNavigateFeedback: (() -> Unit)?,
     onNavigateProjects: (() -> Unit)?,
-    onNavigateStore: (() -> Unit)?,
     onNavigateGameSettingsManager: (() -> Unit)?,
     onNavigateDataTransfer: (() -> Unit)?,
     onResetAllSettings: (() -> Unit)?,
@@ -525,7 +520,6 @@ private fun CompactAdaptiveShell(
                     onNavigateDiscord = onNavigateDiscord,
                     onNavigateFeedback = onNavigateFeedback,
                     onNavigateProjects = onNavigateProjects,
-                    onNavigateStore = onNavigateStore,
                     onNavigateGameSettingsManager = onNavigateGameSettingsManager,
                     onNavigateDataTransfer = onNavigateDataTransfer,
                     onResetAllSettings = onResetAllSettings,
@@ -563,7 +557,6 @@ private fun SideNavigation(
     onNavigateDiscord: (() -> Unit)?,
     onNavigateFeedback: (() -> Unit)?,
     onNavigateProjects: (() -> Unit)?,
-    onNavigateStore: (() -> Unit)?,
     onNavigateGameSettingsManager: (() -> Unit)?,
     onNavigateDataTransfer: (() -> Unit)?,
     onResetAllSettings: (() -> Unit)?,
@@ -619,11 +612,6 @@ private fun SideNavigation(
         }
     }
     val navigateProjects = onNavigateProjects?.let {
-        rememberDebouncedClick {
-            closeDrawerThen(it)
-        }
-    }
-    val navigateStore = onNavigateStore?.let {
         rememberDebouncedClick {
             closeDrawerThen(it)
         }
@@ -772,17 +760,6 @@ private fun SideNavigation(
                         Modifier.focusRequester(selectedItemFocusRequester)
                     } else Modifier,
                     onClick = navigateHub
-                )
-            }
-            if (navigateStore != null) {
-                ShellItem(
-                    icon = Icons.Rounded.Storefront,
-                    label = stringResource(R.string.store_title),
-                    selected = selected == PrimaryDestination.Store,
-                    modifier = if (selected == PrimaryDestination.Store && selectedItemFocusRequester != null) {
-                        Modifier.focusRequester(selectedItemFocusRequester)
-                    } else Modifier,
-                    onClick = navigateStore
                 )
             }
             if (DrawerItemId.ACHIEVEMENTS !in hiddenDrawerItems) {

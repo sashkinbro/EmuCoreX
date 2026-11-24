@@ -146,6 +146,7 @@ fun ScreenTopBar(
         return
     }
 
+    val titleBarHeader = com.sbro.emucorex.ui.theme.style.styledHeaderBrush() != null
     val barSurface: @Composable (Modifier) -> Unit = { surfaceModifier ->
         HeaderSurface(
             modifier = surfaceModifier,
@@ -162,14 +163,17 @@ fun ScreenTopBar(
                 }
             )
         ) {
+            // Title-bar styles paint the header in the theme's primary: the caller's colors were
+            // resolved for a regular surface header, so use the header's own content color here.
+            val onHeader = androidx.compose.material3.LocalContentColor.current
             ScreenTopBarContent(
                 title = styledTitle(title),
                 subtitle = subtitle,
                 onBackClick = onBackClick,
                 backButtonModifier = backButtonModifier,
-                titleColor = titleColor,
-                subtitleColor = subtitleColor,
-                backContentColor = backContentColor,
+                titleColor = if (titleBarHeader) onHeader else titleColor,
+                subtitleColor = if (titleBarHeader) onHeader.copy(alpha = 0.82f) else subtitleColor,
+                backContentColor = if (titleBarHeader) onHeader else backContentColor,
                 titleMaxLines = titleMaxLines,
                 subtitleMaxLines = subtitleMaxLines,
                 actions = actions,

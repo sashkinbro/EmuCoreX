@@ -23,6 +23,7 @@ enum class HubTab {
     VIDEOS,
     HISTORY,
     MANUALS,
+    STORE,
     FAVORITES
 }
 
@@ -64,6 +65,7 @@ data class HubUiState(
                 HubTab.VIDEOS -> items.filter { it.kind == HubKind.VIDEOS }
                 HubTab.HISTORY -> items.filter { it.kind == HubKind.HISTORY }
                 HubTab.MANUALS -> items.filter { it.kind == HubKind.MANUALS }
+                HubTab.STORE -> emptyList()
                 HubTab.FAVORITES -> items.filter(HubItem::isFavorite)
             }
             selected = selected.filter { it.matchesProductFilter(productFilter) }

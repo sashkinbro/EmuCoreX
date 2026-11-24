@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -52,6 +53,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -72,6 +75,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
+import com.sbro.emucorex.data.store.InstalledStoreItem
 import com.sbro.emucorex.data.store.StoreCategory
 import com.sbro.emucorex.data.store.StoreItem
 import com.sbro.emucorex.data.store.StoreSnapshot
@@ -129,26 +133,86 @@ private fun StoreAccessFilter.label(): String = stringResource(
     }
 )
 
+@Stable
+class StoreFilters(initialTab: StoreTab) {
+    var tab by mutableStateOf(initialTab)
+        private set
+    var access by mutableStateOf(StoreAccessFilter.ALL)
+    var sort by mutableStateOf(StoreSort.FEATURED)
+    var categoryId by mutableStateOf<String?>(null)
+
+    fun selectTab(value: StoreTab) {
+        if (value != tab) {
+            tab = value
+            categoryId = null
+        }
+    }
+
+    internal fun restore(access: StoreAccessFilter, sort: StoreSort, categoryId: String?) {
+        this.access = access
+        this.sort = sort
+        this.categoryId = categoryId
+    }
+
+    val filtersActive: Boolean get() = access != StoreAccessFilter.ALL || categoryId != null
+
+    fun clear() {
+        access = StoreAccessFilter.ALL
+        categoryId = null
+    }
+
+    val modeKey: String get() = "${tab.name}:${access.name}:${sort.name}:$categoryId"
+}
+
 @Composable
-fun StoreScreen(
-    initialTab: String?,
-    onBackClick: () -> Unit,
-    onOpenItem: (String) -> Unit,
-    viewModel: StoreViewModel = viewModel()
-) {
+fun rememberStoreFilters(initialTab: String?): StoreFilters = rememberSaveable(
+    initialTab,
+    saver = listSaver(
+        save = { listOf(it.tab.name, it.access.name, it.sort.name, it.categoryId.orEmpty()) },
+        restore = {
+            StoreFilters(StoreTab.valueOf(it[0])).apply {
+                restore(
+                    StoreAccessFilter.valueOf(it[1]),
+                    StoreSort.valueOf(it[2]),
+                    it[3].ifEmpty { null }
+                )
+            }
+        }
+    )
+) { StoreFilters(StoreTab.fromKey(initialTab)) }
+
+@Stable
+class StoreContentModel internal constructor(
+    val viewModel: StoreViewModel,
+    val filters: StoreFilters,
+    val query: String,
+    val snapshot: StoreSnapshot?,
+    val installed: Map<String, InstalledStoreItem>,
+    val applied: Set<String>,
+    val refreshing: Boolean,
+    val offline: Boolean,
+    val tabItems: List<StoreItem>,
+    val visible: List<StoreItem>,
+    val categories: List<StoreCategory>,
+    val featured: List<StoreItem>
+)
+
+@Composable
+fun rememberStoreContentModel(
+    viewModel: StoreViewModel,
+    filters: StoreFilters,
+    query: String
+): StoreContentModel {
     val snapshot by viewModel.catalog.collectAsState()
     val installed by viewModel.installed.collectAsState()
     val applied by viewModel.appliedIds.collectAsState()
     val refreshing by viewModel.refreshing.collectAsState()
     val offline by viewModel.offline.collectAsState()
     val locale = viewModel.locale
-
-    var tab by rememberSaveable(initialTab) { mutableStateOf(StoreTab.fromKey(initialTab)) }
-    var searchVisible by rememberSaveable { mutableStateOf(false) }
-    var query by rememberSaveable { mutableStateOf("") }
-    var access by rememberSaveable { mutableStateOf(StoreAccessFilter.ALL) }
-    var sort by rememberSaveable { mutableStateOf(StoreSort.FEATURED) }
-    var categoryId by rememberSaveable(tab) { mutableStateOf<String?>(null) }
+    val tab = filters.tab
+    val access = filters.access
+    val sort = filters.sort
+    val categoryId = filters.categoryId
 
     val items = snapshot?.catalog?.items.orEmpty()
     val tabItems = remember(items, tab) { items.filter { it.kind == tab.kind } }
@@ -160,189 +224,104 @@ fun StoreScreen(
         snapshot?.catalog?.categories.orEmpty().filter { it.kind == tab.kind && it.id in used }
     }
     val featured = remember(tabItems) { tabItems.filter { it.featured }.take(6) }
-    val filtersActive = access != StoreAccessFilter.ALL || categoryId != null
-
-    val topInset = appScreenTopPadding()
-    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val gridState = rememberLazyGridState()
-    LaunchedEffect(tab, access, categoryId, sort) { gridState.scrollToItem(0) }
-
-    ProvideGamepadShoulderActions(
-        enabled = !searchVisible,
-        onPrevious = { tab = StoreTab.entries[(tab.ordinal + StoreTab.entries.size - 1) % StoreTab.entries.size] },
-        onNext = { tab = StoreTab.entries[(tab.ordinal + 1) % StoreTab.entries.size] }
+    return StoreContentModel(
+        viewModel, filters, query, snapshot, installed, applied, refreshing, offline,
+        tabItems, visible, categories, featured
     )
+}
 
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(navigationBarsHorizontalPaddingValues())
-    ) {
-        val columns = (maxWidth / 180.dp).toInt().coerceIn(2, 6)
-        PullToRefreshBox(
-            isRefreshing = refreshing,
-            onRefresh = { viewModel.refresh(force = true) },
-            modifier = Modifier.fillMaxSize()
-        ) {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(columns),
-                state = gridState,
-                modifier = Modifier.fillMaxSize().tvFocusGroup(),
-                contentPadding = PaddingValues(
-                    start = 12.dp,
-                    top = topInset,
-                    end = 12.dp,
-                    bottom = bottomInset + 18.dp
-                ),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+/** Store body (sub-tabs, offline banner, carousel, filters, grid) emitted into a host grid; no header of its own. */
+fun LazyGridScope.storeContent(model: StoreContentModel, onOpenItem: (String) -> Unit) {
+    val filters = model.filters
+    val tab = filters.tab
+    val snapshot = model.snapshot
+    val locale = model.viewModel.locale
+    item(key = "store-tabs", span = { GridItemSpan(maxLineSpan) }) {
+        StoreTabRow(selected = tab, onSelected = filters::selectTab)
+    }
+    if (model.offline && snapshot != null) {
+        item(key = "store-offline", span = { GridItemSpan(maxLineSpan) }) {
+            Surface(
+                shape = neonShape(12.dp),
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
             ) {
-                item(key = "header", span = { GridItemSpan(maxLineSpan) }) {
-                    Column {
-                        ScreenTopBar(
-                            title = stringResource(R.string.store_title),
-                            subtitle = stringResource(R.string.store_subtitle),
-                            onBackClick = onBackClick,
-                            modifier = Modifier.padding(top = 12.dp, bottom = 2.dp),
-                            subtitleMaxLines = 2,
-                            actions = {
-                                IconButton(onClick = {
-                                    searchVisible = !searchVisible
-                                    if (!searchVisible) query = ""
-                                }) {
-                                    Icon(
-                                        Icons.Rounded.Search,
-                                        contentDescription = stringResource(R.string.store_search),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        )
-                        AnimatedVisibility(
-                            visible = searchVisible,
-                            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-                            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
-                        ) {
-                            OutlinedTextField(
-                                value = query,
-                                onValueChange = { query = it },
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
-                                singleLine = true,
-                                shape = neonShape(18.dp),
-                                label = { Text(stringResource(R.string.store_search)) },
-                                placeholder = { Text(stringResource(R.string.store_search_hint)) },
-                                leadingIcon = {
-                                    Icon(Icons.Rounded.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                },
-                                trailingIcon = {
-                                    if (query.isNotEmpty()) {
-                                        IconButton(onClick = { query = "" }) {
-                                            Icon(
-                                                Icons.Rounded.Close,
-                                                contentDescription = stringResource(R.string.hub_close),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                }
-                            )
-                        }
+                Text(
+                    stringResource(R.string.hub_offline_cached),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.labelMedium
+                )
+            }
+        }
+    }
+    when {
+        snapshot == null && model.refreshing -> {
+            items(6, key = { "store-skeleton-$it" }) { StoreSkeletonCard() }
+        }
+        snapshot == null -> {
+            item(key = "store-unavailable", span = { GridItemSpan(maxLineSpan) }) {
+                StoreMessageState(
+                    icon = Icons.Rounded.CloudOff,
+                    title = stringResource(R.string.store_unavailable_title),
+                    body = stringResource(R.string.store_unavailable_body)
+                ) {
+                    FilledTonalButton(onClick = { model.viewModel.refresh(force = true) }, shape = neonButtonShape()) {
+                        Text(stringResource(R.string.store_retry))
                     }
                 }
-                item(key = "tabs", span = { GridItemSpan(maxLineSpan) }) {
-                    StoreTabRow(selected = tab, onSelected = { tab = it })
+            }
+        }
+        model.tabItems.isEmpty() -> {
+            item(key = "store-coming-soon", span = { GridItemSpan(maxLineSpan) }) {
+                StoreMessageState(
+                    icon = tab.icon,
+                    title = stringResource(R.string.store_coming_soon_title),
+                    body = stringResource(R.string.store_coming_soon_body)
+                )
+            }
+        }
+        else -> {
+            if (model.featured.isNotEmpty() && model.query.isBlank() && !filters.filtersActive) {
+                item(key = "store-featured-${tab.key}", span = { GridItemSpan(maxLineSpan) }) {
+                    StoreFeaturedCarousel(
+                        items = model.featured,
+                        snapshot = snapshot,
+                        locale = locale,
+                        onOpen = { onOpenItem(it.id) }
+                    )
                 }
-                if (offline && snapshot != null) {
-                    item(key = "offline", span = { GridItemSpan(maxLineSpan) }) {
-                        Surface(
-                            shape = neonShape(12.dp),
-                            color = MaterialTheme.colorScheme.tertiaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                        ) {
-                            Text(
-                                stringResource(R.string.hub_offline_cached),
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                        }
+            }
+            item(key = "store-filters", span = { GridItemSpan(maxLineSpan) }) {
+                StoreFilterBar(
+                    access = filters.access,
+                    onAccess = { filters.access = it },
+                    sort = filters.sort,
+                    onSort = { filters.sort = it },
+                    categories = model.categories,
+                    categoryId = filters.categoryId,
+                    onCategory = { filters.categoryId = it },
+                    locale = locale
+                )
+            }
+            if (model.visible.isEmpty()) {
+                item(key = "store-no-results", span = { GridItemSpan(maxLineSpan) }) {
+                    StoreMessageState(
+                        icon = Icons.Rounded.SearchOff,
+                        title = stringResource(R.string.store_no_results),
+                        body = ""
+                    ) {
+                        TextButton(onClick = { filters.clear() }) { Text(stringResource(R.string.store_clear_filters)) }
                     }
                 }
-                when {
-                    snapshot == null && refreshing -> {
-                        items(6, key = { "skeleton-$it" }) { StoreSkeletonCard() }
-                    }
-                    snapshot == null -> {
-                        item(key = "unavailable", span = { GridItemSpan(maxLineSpan) }) {
-                            StoreMessageState(
-                                icon = Icons.Rounded.CloudOff,
-                                title = stringResource(R.string.store_unavailable_title),
-                                body = stringResource(R.string.store_unavailable_body)
-                            ) {
-                                FilledTonalButton(onClick = { viewModel.refresh(force = true) }, shape = neonButtonShape()) {
-                                    Text(stringResource(R.string.store_retry))
-                                }
-                            }
-                        }
-                    }
-                    tabItems.isEmpty() -> {
-                        item(key = "coming-soon", span = { GridItemSpan(maxLineSpan) }) {
-                            StoreMessageState(
-                                icon = tab.icon,
-                                title = stringResource(R.string.store_coming_soon_title),
-                                body = stringResource(R.string.store_coming_soon_body)
-                            )
-                        }
-                    }
-                    else -> {
-                        if (featured.isNotEmpty() && query.isBlank() && !filtersActive) {
-                            item(key = "featured-${tab.key}", span = { GridItemSpan(maxLineSpan) }) {
-                                StoreFeaturedCarousel(
-                                    items = featured,
-                                    snapshot = snapshot,
-                                    locale = locale,
-                                    onOpen = { onOpenItem(it.id) }
-                                )
-                            }
-                        }
-                        item(key = "filters", span = { GridItemSpan(maxLineSpan) }) {
-                            StoreFilterBar(
-                                access = access,
-                                onAccess = { access = it },
-                                sort = sort,
-                                onSort = { sort = it },
-                                categories = categories,
-                                categoryId = categoryId,
-                                onCategory = { categoryId = it },
-                                locale = locale
-                            )
-                        }
-                        if (visible.isEmpty()) {
-                            item(key = "no-results", span = { GridItemSpan(maxLineSpan) }) {
-                                StoreMessageState(
-                                    icon = Icons.Rounded.SearchOff,
-                                    title = stringResource(R.string.store_no_results),
-                                    body = ""
-                                ) {
-                                    TextButton(onClick = {
-                                        query = ""
-                                        access = StoreAccessFilter.ALL
-                                        categoryId = null
-                                    }) { Text(stringResource(R.string.store_clear_filters)) }
-                                }
-                            }
-                        } else {
-                            items(visible, key = { it.id }) { item ->
-                                StoreItemCard(
-                                    item = item,
-                                    snapshot = snapshot,
-                                    status = viewModel.status(item, installed, applied),
-                                    locale = locale,
-                                    onClick = { onOpenItem(item.id) }
-                                )
-                            }
-                        }
-                    }
+            } else {
+                items(model.visible, key = { "store-${it.id}" }) { item ->
+                    StoreItemCard(
+                        item = item,
+                        snapshot = snapshot,
+                        status = model.viewModel.status(item, model.installed, model.applied),
+                        locale = locale,
+                        onClick = { onOpenItem(item.id) }
+                    )
                 }
             }
         }
@@ -351,37 +330,18 @@ fun StoreScreen(
 
 @Composable
 private fun StoreTabRow(selected: StoreTab, onSelected: (StoreTab) -> Unit) {
-    Row(
+    LazyRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        StoreTab.entries.forEach { tab ->
-            val isSelected = tab == selected
-            val click = rememberDebouncedClick(onClick = { onSelected(tab) })
-            Surface(
-                onClick = click,
-                modifier = Modifier.weight(1f),
-                shape = neonShape(16.dp),
-                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                else MaterialTheme.colorScheme.surfaceContainerLow,
-                contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurfaceVariant
-            ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(tab.icon, contentDescription = null, modifier = Modifier.size(22.dp))
-                    Text(
-                        tab.label(),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
+        items(StoreTab.entries, key = { it.name }) { tab ->
+            FilterChip(
+                selected = tab == selected,
+                onClick = { onSelected(tab) },
+                label = { Text(tab.label(), maxLines = 1) },
+                leadingIcon = { Icon(tab.icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                shape = neonChipShape()
+            )
         }
     }
 }

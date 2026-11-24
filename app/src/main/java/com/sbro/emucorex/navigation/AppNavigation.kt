@@ -73,7 +73,6 @@ import com.sbro.emucorex.ui.feedback.FeedbackScreen
 import com.sbro.emucorex.ui.projects.OurProjectsScreen
 import com.sbro.emucorex.ui.store.LocalOpenStore
 import com.sbro.emucorex.ui.store.StoreItemScreen
-import com.sbro.emucorex.ui.store.StoreScreen
 import com.sbro.emucorex.ui.gamedb.GameDbBrowserScreen
 import com.sbro.emucorex.ui.home.HomeScreen
 import com.sbro.emucorex.ui.hub.HubScreen
@@ -180,7 +179,7 @@ object OnboardingRoute
 object CatalogSearchRoute
 
 @Serializable
-object HubRoute
+data class HubRoute(val tab: String? = null, val storeTab: String? = null)
 
 @Serializable
 data class HubDetailRoute(val contentId: String)
@@ -227,9 +226,6 @@ object FeedbackRoute
 
 @Serializable
 object ProjectsRoute
-
-@Serializable
-data class StoreRoute(val tab: String? = null)
 
 @Serializable
 data class StoreItemRoute(val id: String)
@@ -435,12 +431,7 @@ fun AppNavigation(
         }
     }
     val navigateHub: () -> Unit = {
-        navController.navigate(HubRoute) {
-            launchSingleTop = true
-        }
-    }
-    val navigateStore: () -> Unit = {
-        navController.navigate(StoreRoute()) {
+        navController.navigate(HubRoute()) {
             launchSingleTop = true
         }
     }
@@ -528,7 +519,6 @@ fun AppNavigation(
                         onNavigateDiscord = navigateDiscord,
                         onNavigateFeedback = navigateFeedback,
                         onNavigateProjects = navigateProjects,
-                        onNavigateStore = navigateStore,
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -651,7 +641,6 @@ fun AppNavigation(
                     onNavigateDiscord = navigateDiscord,
                     onNavigateFeedback = navigateFeedback,
                     onNavigateProjects = navigateProjects,
-                    onNavigateStore = navigateStore,
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -677,7 +666,8 @@ fun AppNavigation(
                 }
             }
 
-            composable<HubRoute> {
+            composable<HubRoute> { hubBackStackEntry ->
+                val hubRoute = hubBackStackEntry.toRoute<HubRoute>()
                 val detailBackStack = rememberSaveable(
                     saver = listSaver(
                         save = { it.toList() },
@@ -730,7 +720,6 @@ fun AppNavigation(
                     onNavigateDiscord = navigateDiscord,
                     onNavigateFeedback = navigateFeedback,
                     onNavigateProjects = navigateProjects,
-                    onNavigateStore = navigateStore,
                         onNavigateGameSettingsManager = navigateGameSettingsManager,
                         onNavigateDataTransfer = navigateDataTransfer,
                         onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -752,7 +741,14 @@ fun AppNavigation(
                     ) {
                         HubScreen(
                             onBackClick = { navController.popBackStack() },
-                            onOpenArticle = openDetail
+                            onOpenArticle = openDetail,
+                            onOpenStoreItem = { id ->
+                                navController.navigate(StoreItemRoute(id)) {
+                                    launchSingleTop = true
+                                }
+                            },
+                            initialTab = hubRoute.tab,
+                            initialStoreTab = hubRoute.storeTab
                         )
                     }
 
@@ -849,7 +845,6 @@ fun AppNavigation(
                     onNavigateDiscord = navigateDiscord,
                     onNavigateFeedback = navigateFeedback,
                     onNavigateProjects = navigateProjects,
-                    onNavigateStore = navigateStore,
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -897,7 +892,6 @@ fun AppNavigation(
                     onNavigateDiscord = { },
                     onNavigateFeedback = navigateFeedback,
                     onNavigateProjects = navigateProjects,
-                    onNavigateStore = navigateStore,
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -943,7 +937,6 @@ fun AppNavigation(
                     onNavigateDiscord = navigateDiscord,
                     onNavigateFeedback = navigateFeedback,
                     onNavigateProjects = navigateProjects,
-                    onNavigateStore = navigateStore,
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -960,7 +953,7 @@ fun AppNavigation(
                 ) {
                     CompositionLocalProvider(
                         LocalOpenStore provides { tab ->
-                            navController.navigate(StoreRoute(tab)) {
+                            navController.navigate(HubRoute(tab = "store", storeTab = tab)) {
                                 launchSingleTop = true
                             }
                         }
@@ -1240,7 +1233,6 @@ fun AppNavigation(
                     onNavigateDiscord = navigateDiscord,
                     onNavigateFeedback = navigateFeedback,
                     onNavigateProjects = navigateProjects,
-                    onNavigateStore = navigateStore,
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -1306,7 +1298,6 @@ fun AppNavigation(
                     onNavigateDiscord = navigateDiscord,
                     onNavigateFeedback = navigateFeedback,
                     onNavigateProjects = navigateProjects,
-                    onNavigateStore = navigateStore,
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -1383,7 +1374,6 @@ fun AppNavigation(
                     onNavigateDiscord = navigateDiscord,
                     onNavigateFeedback = { },
                     onNavigateProjects = navigateProjects,
-                    onNavigateStore = navigateStore,
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -1437,7 +1427,6 @@ fun AppNavigation(
                     onNavigateDiscord = navigateDiscord,
                     onNavigateFeedback = navigateFeedback,
                     onNavigateProjects = { },
-                    onNavigateStore = navigateStore,
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -1453,69 +1442,6 @@ fun AppNavigation(
                     onLaunchGame = launchGamePickerAction
                 ) {
                     OurProjectsScreen(onBackClick = { navController.popBackStack() })
-                }
-            }
-
-            composable<StoreRoute> { backStackEntry ->
-                val route = backStackEntry.toRoute<StoreRoute>()
-                AdaptiveShell(
-                    selected = PrimaryDestination.Store,
-                    isProUnlocked = settingsUiState.isProUnlocked,
-                    onNavigateHub = navigateHub,
-                    onNavigateHome = {
-                        navController.navigate(HomeRoute) {
-                            launchSingleTop = true
-                            popUpTo(HomeRoute) { inclusive = false }
-                        }
-                    },
-                    onNavigateSearch = {
-                        navController.navigate(CatalogSearchRoute) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onNavigateFormats = {
-                        navController.navigate(SupportedFormatsRoute) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onNavigateSettings = {
-                        navController.navigate(SettingsRoute()) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onNavigateAchievements = {
-                        navController.navigate(AchievementsRoute) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onNavigateProfile = navigateProfile,
-                    onNavigateDiscord = navigateDiscord,
-                    onNavigateFeedback = navigateFeedback,
-                    onNavigateProjects = navigateProjects,
-                    onNavigateStore = { },
-                    onNavigateGameSettingsManager = navigateGameSettingsManager,
-                    onNavigateDataTransfer = navigateDataTransfer,
-                    onResetAllSettings = resetAllSettingsAndOpenOnboarding,
-                    onNavigateSaveManager = {
-                        navController.navigate(SaveManagerRoute()) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onNavigateMemoryCardManager = navigateMemoryCardManager,
-                    onNavigateTextureManager = navigateTextureManager,
-                    onNavigateCheatManager = navigateCheatManager,
-                    onBackClick = { navController.popBackStack() },
-                    onLaunchGame = launchGamePickerAction
-                ) {
-                    StoreScreen(
-                        initialTab = route.tab,
-                        onBackClick = { navController.popBackStack() },
-                        onOpenItem = { id ->
-                            navController.navigate(StoreItemRoute(id)) {
-                                launchSingleTop = true
-                            }
-                        }
-                    )
                 }
             }
 

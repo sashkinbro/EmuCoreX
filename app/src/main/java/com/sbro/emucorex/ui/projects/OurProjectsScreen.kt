@@ -109,14 +109,12 @@ fun OurProjectsScreen(onBackClick: () -> Unit) {
             item {
                 ScreenTopBar(
                     title = stringResource(R.string.projects_title),
-                    subtitle = stringResource(R.string.projects_subtitle),
                     onBackClick = onBackClick,
                     modifier = Modifier
                         .fillMaxWidth()
                         .widthIn(max = 1000.dp)
                         .padding(top = 12.dp, bottom = 2.dp),
-                    titleMaxLines = 2,
-                    subtitleMaxLines = 3
+                    titleMaxLines = 2
                 )
             }
             items(rows) { row ->
