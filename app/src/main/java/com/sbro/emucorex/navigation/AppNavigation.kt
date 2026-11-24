@@ -69,6 +69,7 @@ import com.sbro.emucorex.ui.discord.DiscordScreen
 import com.sbro.emucorex.ui.emulation.EmulationScreen
 import com.sbro.emucorex.ui.formats.SupportedFormatsScreen
 import com.sbro.emucorex.ui.feedback.FeedbackScreen
+import com.sbro.emucorex.ui.projects.OurProjectsScreen
 import com.sbro.emucorex.ui.gamedb.GameDbBrowserScreen
 import com.sbro.emucorex.ui.home.HomeScreen
 import com.sbro.emucorex.ui.hub.HubScreen
@@ -219,6 +220,9 @@ object ProfileRoute
 
 @Serializable
 object FeedbackRoute
+
+@Serializable
+object ProjectsRoute
 
 @Serializable
 object AccountUnlockedAchievementsRoute
@@ -415,6 +419,11 @@ fun AppNavigation(
             launchSingleTop = true
         }
     }
+    val navigateProjects: () -> Unit = {
+        navController.navigate(ProjectsRoute) {
+            launchSingleTop = true
+        }
+    }
     val navigateHub: () -> Unit = {
         navController.navigate(HubRoute) {
             launchSingleTop = true
@@ -503,6 +512,7 @@ fun AppNavigation(
                         onNavigateProfile = navigateProfile,
                         onNavigateDiscord = navigateDiscord,
                         onNavigateFeedback = navigateFeedback,
+                        onNavigateProjects = navigateProjects,
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -624,6 +634,7 @@ fun AppNavigation(
                     onNavigateProfile = navigateProfile,
                     onNavigateDiscord = navigateDiscord,
                     onNavigateFeedback = navigateFeedback,
+                    onNavigateProjects = navigateProjects,
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -701,6 +712,7 @@ fun AppNavigation(
                     onNavigateProfile = navigateProfile,
                     onNavigateDiscord = navigateDiscord,
                     onNavigateFeedback = navigateFeedback,
+                    onNavigateProjects = navigateProjects,
                         onNavigateGameSettingsManager = navigateGameSettingsManager,
                         onNavigateDataTransfer = navigateDataTransfer,
                         onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -818,6 +830,7 @@ fun AppNavigation(
                     onNavigateProfile = navigateProfile,
                     onNavigateDiscord = navigateDiscord,
                     onNavigateFeedback = navigateFeedback,
+                    onNavigateProjects = navigateProjects,
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -864,6 +877,7 @@ fun AppNavigation(
                     onNavigateProfile = navigateProfile,
                     onNavigateDiscord = { },
                     onNavigateFeedback = navigateFeedback,
+                    onNavigateProjects = navigateProjects,
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -908,6 +922,7 @@ fun AppNavigation(
                     onNavigateProfile = navigateProfile,
                     onNavigateDiscord = navigateDiscord,
                     onNavigateFeedback = navigateFeedback,
+                    onNavigateProjects = navigateProjects,
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -1195,6 +1210,7 @@ fun AppNavigation(
                     onNavigateProfile = navigateProfile,
                     onNavigateDiscord = navigateDiscord,
                     onNavigateFeedback = navigateFeedback,
+                    onNavigateProjects = navigateProjects,
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -1259,6 +1275,7 @@ fun AppNavigation(
                     onNavigateProfile = { },
                     onNavigateDiscord = navigateDiscord,
                     onNavigateFeedback = navigateFeedback,
+                    onNavigateProjects = navigateProjects,
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -1334,6 +1351,7 @@ fun AppNavigation(
                     onNavigateProfile = navigateProfile,
                     onNavigateDiscord = navigateDiscord,
                     onNavigateFeedback = { },
+                    onNavigateProjects = navigateProjects,
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndOpenOnboarding,
@@ -1349,6 +1367,59 @@ fun AppNavigation(
                     onLaunchGame = launchGamePickerAction
                 ) {
                     FeedbackScreen(onBackClick = { navController.popBackStack() })
+                }
+            }
+
+            composable<ProjectsRoute> {
+                AdaptiveShell(
+                    selected = PrimaryDestination.Projects,
+                    isProUnlocked = settingsUiState.isProUnlocked,
+                    onNavigateHub = navigateHub,
+                    onNavigateHome = {
+                        navController.navigate(HomeRoute) {
+                            launchSingleTop = true
+                            popUpTo(HomeRoute) { inclusive = false }
+                        }
+                    },
+                    onNavigateSearch = {
+                        navController.navigate(CatalogSearchRoute) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateFormats = {
+                        navController.navigate(SupportedFormatsRoute) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateSettings = {
+                        navController.navigate(SettingsRoute()) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateAchievements = {
+                        navController.navigate(AchievementsRoute) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateProfile = navigateProfile,
+                    onNavigateDiscord = navigateDiscord,
+                    onNavigateFeedback = navigateFeedback,
+                    onNavigateProjects = { },
+                    onNavigateGameSettingsManager = navigateGameSettingsManager,
+                    onNavigateDataTransfer = navigateDataTransfer,
+                    onResetAllSettings = resetAllSettingsAndOpenOnboarding,
+                    onNavigateSaveManager = {
+                        navController.navigate(SaveManagerRoute()) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateMemoryCardManager = navigateMemoryCardManager,
+                    onNavigateTextureManager = navigateTextureManager,
+                    onNavigateCheatManager = navigateCheatManager,
+                    onBackClick = { navController.popBackStack() },
+                    onLaunchGame = launchGamePickerAction
+                ) {
+                    OurProjectsScreen(onBackClick = { navController.popBackStack() })
                 }
             }
 

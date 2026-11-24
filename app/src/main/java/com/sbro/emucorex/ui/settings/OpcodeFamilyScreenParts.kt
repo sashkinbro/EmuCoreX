@@ -27,14 +27,14 @@ import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.FilterChip
+import com.sbro.emucorex.ui.theme.style.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import com.sbro.emucorex.ui.theme.style.OutlinedButton
 import com.sbro.emucorex.ui.theme.style.Surface
-import androidx.compose.material3.Switch
+import com.sbro.emucorex.ui.theme.style.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue

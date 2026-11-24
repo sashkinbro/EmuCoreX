@@ -3350,4 +3350,23 @@
     <string name="ps2ui_mc_open_card">Ouvrir la carte</string>
     <string name="ps2ui_mc_no_data">Aucune donnée.</string>
     <string name="ps2ui_games_tab_recent">Récents</string>
+    <string name="projects_title">Nos autres projets</string>
+    <string name="projects_subtitle">Plus d’émulateurs et d’applications de la famille EmuCore.</string>
+    <string name="projects_badge_on_play">Sur Google Play</string>
+    <string name="projects_badge_coming_to_play">Bientôt sur Google Play</string>
+    <string name="projects_badge_open_source">Open source</string>
+    <string name="projects_google_play">Google Play</string>
+    <string name="projects_github">GitHub</string>
+    <string name="projects_website">Site web</string>
+    <string name="projects_patreon">Soutenir sur Patreon</string>
+    <string name="projects_github_profile">Développeur sur GitHub</string>
+    <string name="projects_footer">Créé par un seul développeur. Votre soutien fait vivre ces projets.</string>
+    <string name="projects_open_failed">Impossible d’ouvrir le lien</string>
+    <string name="projects_desc_x">Bibliothèque, lanceur et émulateur PlayStation 2 avec un cœur basé sur PCSX2 adapté à Android.</string>
+    <string name="projects_desc_a">Bibliothèque, lanceur et émulateur PSP avec cœur PPSSPP intégré et rendu Vulkan ou OpenGL ES.</string>
+    <string name="projects_desc_c">Émulateur PlayStation 3 expérimental avec un cœur basé sur RPCS3, bibliothèque de jeux, installateurs et trophées.</string>
+    <string name="projects_desc_d">Interface pour dix familles de consoles Nintendo : 3DS, DS, N64, GameCube, Wii, Game Boy, GBA, NES et SNES.</string>
+    <string name="projects_desc_h">Interface Sega avec cœurs intégrés pour Dreamcast, arcade, Mega Drive, Master System, Saturn et Model 3.</string>
+    <string name="projects_desc_r">Émulateur et bibliothèque PlayStation 1 avec le cœur ECR, JIT ARM64 et shell BIOS natif.</string>
+    <string name="projects_desc_v">Émulateur PlayStation Vita avec le cœur ECV, bibliothèque, catalogue et installation VPK/PKG.</string>
 </resources>

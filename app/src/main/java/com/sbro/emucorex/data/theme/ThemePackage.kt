@@ -86,7 +86,7 @@ enum class ThemeDecor { NONE, NEON }
 /** Whole-UI drawing style (panels, buttons, headers). Each one is implemented in ui/theme/style. */
 enum class UiStyle(val wire: String) {
     STANDARD("standard"), NEON("neon"), CLASSIC("classic"), LUNA("luna"), S60("s60"), AERO("aero"),
-    METRO("metro"), OSD("osd"), PIXEL("pixel"), TERMINAL("terminal"), PAPER("paper");
+    METRO("metro"), OSD("osd"), PIXEL("pixel"), TERMINAL("terminal"), PAPER("paper"), BUBBLE("bubble");
 
     companion object {
         fun fromWire(value: String?): UiStyle = entries.firstOrNull { it.wire.equals(value, ignoreCase = true) } ?: STANDARD

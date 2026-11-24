@@ -12,7 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Mouse
 import androidx.compose.material.icons.rounded.SettingsSuggest
-import androidx.compose.material3.FilterChip
+import com.sbro.emucorex.ui.theme.style.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import com.sbro.emucorex.ui.common.SyncedSlider

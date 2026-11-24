@@ -105,7 +105,7 @@ import androidx.compose.material.icons.rounded.VisibilityOff
 import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
 import com.sbro.emucorex.ui.theme.style.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
+import com.sbro.emucorex.ui.theme.style.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -113,7 +113,7 @@ import androidx.compose.material3.OutlinedTextField
 import com.sbro.emucorex.ui.common.SyncedSlider
 import androidx.compose.material3.SliderDefaults
 import com.sbro.emucorex.ui.theme.style.Surface
-import androidx.compose.material3.Switch
+import com.sbro.emucorex.ui.theme.style.Switch
 import androidx.compose.material3.Text
 import com.sbro.emucorex.ui.theme.style.TextButton
 import androidx.compose.runtime.Composable

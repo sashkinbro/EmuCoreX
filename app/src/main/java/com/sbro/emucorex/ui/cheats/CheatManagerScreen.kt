@@ -52,7 +52,7 @@ import androidx.compose.material3.MaterialTheme
 import com.sbro.emucorex.ui.theme.style.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import com.sbro.emucorex.ui.theme.style.Surface
-import androidx.compose.material3.Switch
+import com.sbro.emucorex.ui.theme.style.Switch
 import androidx.compose.material3.Text
 import com.sbro.emucorex.ui.theme.style.TextButton
 import androidx.compose.runtime.Composable

@@ -45,7 +45,7 @@ import androidx.compose.material.icons.rounded.Save
 import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
+import com.sbro.emucorex.ui.theme.style.FilterChip
 import com.sbro.emucorex.ui.theme.style.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme

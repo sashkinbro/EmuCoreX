@@ -72,17 +72,17 @@ data class CustomThemeConfig(
             largeCornerDp = largeCornerDp.coerceIn(MIN_CORNER_DP, MAX_LARGE_CORNER_DP)
         )
         return opaque.copy(
-            onPrimary = readableForeground(opaque.onPrimary, opaque.primary),
+            onPrimary = readableForeground(opaque.onPrimary, opaque.primary, MIN_ACCENT_CONTRAST),
             onPrimaryContainer = readableForeground(
                 opaque.onPrimaryContainer,
                 opaque.primaryContainer
             ),
-            onSecondary = readableForeground(opaque.onSecondary, opaque.secondary),
+            onSecondary = readableForeground(opaque.onSecondary, opaque.secondary, MIN_ACCENT_CONTRAST),
             onSecondaryContainer = readableForeground(
                 opaque.onSecondaryContainer,
                 opaque.secondaryContainer
             ),
-            onTertiary = readableForeground(opaque.onTertiary, opaque.tertiary),
+            onTertiary = readableForeground(opaque.onTertiary, opaque.tertiary, MIN_ACCENT_CONTRAST),
             onTertiaryContainer = readableForeground(
                 opaque.onTertiaryContainer,
                 opaque.tertiaryContainer
@@ -93,7 +93,7 @@ data class CustomThemeConfig(
                 opaque.onSurfaceVariant,
                 opaque.surfaceVariant
             ),
-            onError = readableForeground(opaque.onError, opaque.error),
+            onError = readableForeground(opaque.onError, opaque.error, MIN_ACCENT_CONTRAST),
             onErrorContainer = readableForeground(
                 opaque.onErrorContainer,
                 opaque.errorContainer
@@ -130,8 +130,8 @@ data class CustomThemeConfig(
 
 private fun Int.forceOpaque(): Int = this or 0xFF000000.toInt()
 
-private fun readableForeground(foreground: Int, background: Int): Int {
-    if (contrastRatio(foreground, background) >= MIN_TEXT_CONTRAST) return foreground
+private fun readableForeground(foreground: Int, background: Int, minimum: Double = MIN_TEXT_CONTRAST): Int {
+    if (contrastRatio(foreground, background) >= minimum) return foreground
     val dark = 0xFF101216.toInt()
     val light = 0xFFF8F9FF.toInt()
     return if (contrastRatio(dark, background) >= contrastRatio(light, background)) {
@@ -157,6 +157,9 @@ private fun relativeLuminance(color: Int): Double {
 }
 
 private const val MIN_TEXT_CONTRAST = 4.5
+
+// Text/icons on accent fills (buttons, switch thumbs) are bold/large; WCAG large-text contrast is enough.
+private const val MIN_ACCENT_CONTRAST = 3.0
 
 private fun blendArgb(foreground: Int, background: Int, foregroundAmount: Float): Int {
     val amount = foregroundAmount.coerceIn(0f, 1f)

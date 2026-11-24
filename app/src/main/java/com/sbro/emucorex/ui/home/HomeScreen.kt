@@ -1,5 +1,6 @@
 package com.sbro.emucorex.ui.home
 
+import com.sbro.emucorex.ui.theme.style.HeaderSurface
 import com.sbro.emucorex.ui.theme.LocalThemeExtras
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -1079,7 +1080,7 @@ private fun HomeHeader(
         else -> stringResource(R.string.home_view_list)
     }
 
-    Surface(
+    HeaderSurface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(

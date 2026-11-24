@@ -57,10 +57,17 @@ private fun buttonLook(
     )
     return when (style) {
         UiStyle.STANDARD, UiStyle.NEON, UiStyle.METRO, UiStyle.OSD, UiStyle.PAPER -> null
+        UiStyle.BUBBLE -> painted(
+            Brush.verticalGradient(
+                0f to lerp(fill, Color.White, if (pressed) 0.1f else 0.55f),
+                0.5f to lerp(fill, Color.White, 0.12f),
+                1f to fill
+            ),
+            newBorder = BorderStroke(2.dp, lerp(fill, Color.Black, 0.18f))
+        )
         UiStyle.CLASSIC -> painted(
             Brush.verticalGradient(listOf(fill, fill)),
-            Modifier.drawWithContent {
-                drawContent()
+            Modifier.overlayInShape(shape) {
                 drawBevel(Color.White, Color(0xFF404040), Color(0xFF808080), sunken = pressed)
             },
             newBorder = null
@@ -88,14 +95,30 @@ private fun buttonLook(
         )
         UiStyle.PIXEL -> painted(
             Brush.verticalGradient(listOf(fill, fill)),
-            Modifier.drawWithContent {
-                drawContent()
+            Modifier.overlayInShape(shape) {
                 drawPixelFrame(if (pressed) base.contentColor else lerp(fill, Color.Black, 0.5f))
             },
             newBorder = null
         )
         UiStyle.TERMINAL -> if (filled) null else ButtonLook(Modifier, base, BorderStroke(1.dp, base.contentColor.copy(alpha = 0.7f)), false)
     }
+}
+
+/**
+ * Material silently grows buttons/chips to a 48dp touch target. Painted styles draw on the outer
+ * modifier, so that growth would make the painting bigger than the control ("swollen" buttons and a
+ * second button showing behind chips). When a style paints, the expansion is turned off.
+ */
+@Composable
+internal fun StyledTouchTarget(styled: Boolean, content: @Composable () -> Unit) {
+    if (!styled) {
+        content()
+        return
+    }
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.material3.LocalMinimumInteractiveComponentSize provides androidx.compose.ui.unit.Dp.Unspecified,
+        content = content
+    )
 }
 
 private fun Color.compositeWhite(amount: Float) = lerp(this, Color.White.copy(alpha = this.alpha), amount)
@@ -115,8 +138,10 @@ fun Button(
 ) {
     val source = interactionSource ?: remember { MutableInteractionSource() }
     val look = buttonLook(LocalThemeExtras.current.uiStyle, colors, enabled, shape, border, source, filled = true)
-    M3Button(onClick, modifier.then(look?.modifier ?: Modifier), enabled, shape, look?.colors ?: colors,
-        if (look?.flat == true) null else elevation, look?.border ?: border, contentPadding, source, content)
+    StyledTouchTarget(look != null) {
+        M3Button(onClick, modifier.then(look?.modifier ?: Modifier), enabled, shape, look?.colors ?: colors,
+            if (look?.flat == true) null else elevation, look?.border ?: border, contentPadding, source, content)
+    }
 }
 
 @Composable
@@ -134,8 +159,10 @@ fun FilledTonalButton(
 ) {
     val source = interactionSource ?: remember { MutableInteractionSource() }
     val look = buttonLook(LocalThemeExtras.current.uiStyle, colors, enabled, shape, border, source, filled = true)
-    M3FilledTonalButton(onClick, modifier.then(look?.modifier ?: Modifier), enabled, shape, look?.colors ?: colors,
-        if (look?.flat == true) null else elevation, look?.border ?: border, contentPadding, source, content)
+    StyledTouchTarget(look != null) {
+        M3FilledTonalButton(onClick, modifier.then(look?.modifier ?: Modifier), enabled, shape, look?.colors ?: colors,
+            if (look?.flat == true) null else elevation, look?.border ?: border, contentPadding, source, content)
+    }
 }
 
 @Composable
@@ -153,8 +180,10 @@ fun OutlinedButton(
 ) {
     val source = interactionSource ?: remember { MutableInteractionSource() }
     val look = buttonLook(LocalThemeExtras.current.uiStyle, colors, enabled, shape, border, source, filled = false)
-    M3OutlinedButton(onClick, modifier.then(look?.modifier ?: Modifier), enabled, shape, look?.colors ?: colors,
-        elevation, if (look != null) look.border else border, contentPadding, source, content)
+    StyledTouchTarget(look != null) {
+        M3OutlinedButton(onClick, modifier.then(look?.modifier ?: Modifier), enabled, shape, look?.colors ?: colors,
+            elevation, if (look != null) look.border else border, contentPadding, source, content)
+    }
 }
 
 @Composable
@@ -176,6 +205,8 @@ fun TextButton(
     val look = if (style == UiStyle.CLASSIC || style == UiStyle.LUNA || style == UiStyle.PIXEL) {
         buttonLook(style, colors, enabled, shape, border, source, filled = false)
     } else null
-    M3TextButton(onClick, modifier.then(look?.modifier ?: Modifier), enabled, shape, look?.colors ?: colors,
-        elevation, look?.border ?: border, contentPadding, source, content)
+    StyledTouchTarget(look != null) {
+        M3TextButton(onClick, modifier.then(look?.modifier ?: Modifier), enabled, shape, look?.colors ?: colors,
+            elevation, look?.border ?: border, contentPadding, source, content)
+    }
 }

@@ -25,7 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import com.sbro.emucorex.ui.theme.style.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import com.sbro.emucorex.ui.theme.style.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import com.sbro.emucorex.ui.theme.style.OutlinedButton

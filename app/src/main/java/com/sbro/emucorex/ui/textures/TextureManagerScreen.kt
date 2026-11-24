@@ -33,12 +33,12 @@ import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import com.sbro.emucorex.ui.theme.style.FilledTonalButton
-import androidx.compose.material3.FilterChip
+import com.sbro.emucorex.ui.theme.style.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import com.sbro.emucorex.ui.theme.style.OutlinedButton
 import com.sbro.emucorex.ui.theme.style.Surface
-import androidx.compose.material3.Switch
+import com.sbro.emucorex.ui.theme.style.Switch
 import androidx.compose.material3.Text
 import com.sbro.emucorex.ui.theme.style.TextButton
 import androidx.compose.runtime.Composable

@@ -14,7 +14,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.Dp
@@ -28,6 +30,8 @@ import androidx.compose.material3.Surface as M3Surface
  * so the active theme's UI style (bevels, gloss, glass, pixel frames, ...) applies to every panel
  * without touching each call site. With UiStyle.STANDARD / NEON they forward unchanged.
  */
+
+internal fun UiStyle.decorates() = this != UiStyle.STANDARD && this != UiStyle.NEON
 
 /** How a styled panel should be drawn for a given base color. */
 internal class PanelLook(
@@ -50,69 +54,85 @@ internal fun panelLook(
     val extras = LocalThemeExtras.current
     val scheme = MaterialTheme.colorScheme
     val visible = color.alpha > 0.04f
+    val opaque = color.alpha > 0.98f
+    // Full-bleed rectangular containers (tab strips, page backdrops) are backgrounds, not panels:
+    // decorating them puts frames with sharp corners behind the rounded controls they hold.
+    if (shape == androidx.compose.ui.graphics.RectangleShape && extras.uiStyle != UiStyle.CLASSIC) {
+        return PanelLook(Modifier, color, border, shadowElevation, tonalElevation)
+    }
     return when (extras.uiStyle) {
         UiStyle.STANDARD, UiStyle.NEON -> PanelLook(Modifier, color, border, shadowElevation, tonalElevation)
         UiStyle.CLASSIC -> PanelLook(
-            modifier = if (visible) Modifier.drawWithContent {
-                drawContent()
+            modifier = if (visible) Modifier.overlayInShape(shape) {
                 drawBevel(light = Color.White.copy(alpha = 0.95f), dark = Color(0xFF404040), shade = Color(0xFF808080), sunken = pressed)
             } else Modifier,
             color = color, border = null, shadowElevation = 0.dp, tonalElevation = 0.dp
         )
         UiStyle.LUNA -> PanelLook(
             modifier = if (visible) Modifier.background(
-                Brush.verticalGradient(listOf(lerp(color, Color.White, 0.22f), color, lerp(color, Color.Black, 0.04f))), shape
+                Brush.verticalGradient(listOf(lerp(color, Color.White, 0.14f), color)), shape
             ) else Modifier,
             color = if (visible) Color.Transparent else color,
-            border = border ?: BorderStroke(1.dp, lerp(scheme.outline, scheme.primary, 0.35f).copy(alpha = 0.8f)),
-            shadowElevation = maxOf(shadowElevation, 1.dp), tonalElevation = 0.dp
+            border = border ?: if (visible) BorderStroke(1.dp, lerp(scheme.outline, scheme.primary, 0.35f).copy(alpha = 0.8f)) else null,
+            shadowElevation = 0.dp, tonalElevation = 0.dp
         )
         UiStyle.S60 -> PanelLook(
             modifier = if (visible) Modifier.background(
                 Brush.verticalGradient(listOf(lerp(color, Color.White, 0.16f), color)), shape
             ) else Modifier,
             color = if (visible) Color.Transparent else color,
-            border = border ?: BorderStroke(1.dp, scheme.outlineVariant),
+            border = border ?: if (visible) BorderStroke(1.dp, scheme.outlineVariant) else null,
             shadowElevation = 0.dp, tonalElevation = 0.dp
         )
         UiStyle.AERO -> PanelLook(
-            modifier = if (visible) Modifier.drawWithContent {
-                drawContent()
-                drawRect(
-                    Brush.verticalGradient(0f to Color.White.copy(alpha = 0.20f), 0.45f to Color.Transparent),
-                    size = size
-                )
+            modifier = if (visible) Modifier.overlayInShape(shape) {
+                drawRect(Brush.verticalGradient(0f to Color.White.copy(alpha = 0.20f), 0.45f to Color.Transparent))
             } else Modifier,
             color = color.copy(alpha = color.alpha * 0.62f),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.30f)),
+            border = if (visible) BorderStroke(1.dp, Color.White.copy(alpha = 0.30f)) else border,
             shadowElevation = 0.dp, tonalElevation = 0.dp
         )
         UiStyle.METRO -> PanelLook(Modifier, color, null, 0.dp, 0.dp)
         UiStyle.OSD -> PanelLook(
             modifier = Modifier,
             color = color.copy(alpha = color.alpha * 0.66f),
-            border = BorderStroke(1.dp, scheme.primary.copy(alpha = 0.45f)),
+            border = if (visible) BorderStroke(1.dp, scheme.primary.copy(alpha = 0.45f)) else border,
             shadowElevation = 0.dp, tonalElevation = 0.dp
         )
         UiStyle.PIXEL -> PanelLook(
-            modifier = if (visible) Modifier.drawWithContent {
-                drawContent()
+            modifier = if (visible) Modifier.overlayInShape(shape) {
                 drawPixelFrame(if (pressed) scheme.primary else scheme.outline)
             } else Modifier,
             color = color, border = null, shadowElevation = 0.dp, tonalElevation = 0.dp
         )
         UiStyle.TERMINAL -> PanelLook(
-            modifier = if (visible) Modifier.drawWithContent {
-                drawContent()
+            modifier = if (visible) Modifier.overlayInShape(shape) {
                 drawRect(
                     color = scheme.primary.copy(alpha = 0.7f),
-                    style = Stroke(width = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f)))
+                    style = Stroke(width = 2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f)))
                 )
             } else Modifier,
             color = color, border = null, shadowElevation = 0.dp, tonalElevation = 0.dp
         )
-        UiStyle.PAPER -> PanelLook(Modifier, color, null, maxOf(shadowElevation, if (visible) 3.dp else 0.dp), 0.dp)
+        UiStyle.PAPER -> PanelLook(Modifier, color, border, if (opaque) maxOf(shadowElevation, 2.dp) else 0.dp, 0.dp)
+        UiStyle.BUBBLE -> PanelLook(
+            modifier = if (visible) Modifier.background(
+                Brush.verticalGradient(listOf(lerp(color, Color.White, 0.55f), color)), shape
+            ) else Modifier,
+            color = if (visible) Color.Transparent else color,
+            border = if (visible) BorderStroke(2.dp, scheme.primary.copy(alpha = 0.45f)) else border,
+            shadowElevation = 0.dp, tonalElevation = 0.dp
+        )
     }
+}
+
+/** Draws [overlay] above the content, clipped to [shape] so rounded elements never get square corners. */
+internal fun Modifier.overlayInShape(shape: Shape, overlay: DrawScope.() -> Unit): Modifier = drawWithContent {
+    drawContent()
+    val path = androidx.compose.ui.graphics.Path().apply {
+        addOutline(shape.createOutline(size, layoutDirection, this@drawWithContent))
+    }
+    clipPath(path) { overlay() }
 }
 
 /** Win9x 3D frame: light top/left, dark bottom/right (swapped when sunken/pressed). */
@@ -186,7 +206,7 @@ fun Surface(
     content: @Composable () -> Unit
 ) {
     val look = panelLook(shape, color, border, tonalElevation, shadowElevation)
-    M3Surface(
+    StyledTouchTarget(LocalThemeExtras.current.uiStyle.decorates()) { M3Surface(
         onClick = onClick,
         modifier = modifier.then(look.modifier),
         enabled = enabled,
@@ -198,7 +218,7 @@ fun Surface(
         border = look.border,
         interactionSource = interactionSource,
         content = content
-    )
+    ) }
 }
 
 @Composable
@@ -218,7 +238,7 @@ fun Surface(
     content: @Composable () -> Unit
 ) {
     val look = panelLook(shape, color, border, tonalElevation, shadowElevation, pressed = selected)
-    M3Surface(
+    StyledTouchTarget(LocalThemeExtras.current.uiStyle.decorates()) { M3Surface(
         selected = selected,
         onClick = onClick,
         modifier = modifier.then(look.modifier),
@@ -231,7 +251,7 @@ fun Surface(
         border = look.border,
         interactionSource = interactionSource,
         content = content
-    )
+    ) }
 }
 
 /** Shared painters for headers/other files (DrawScope extension helpers are internal). */

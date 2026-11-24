@@ -71,7 +71,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import com.sbro.emucorex.ui.theme.style.Surface
-import androidx.compose.material3.Switch
+import com.sbro.emucorex.ui.theme.style.Switch
 import androidx.compose.material3.Text
 import com.sbro.emucorex.ui.theme.style.TextButton
 import androidx.compose.ui.graphics.Color

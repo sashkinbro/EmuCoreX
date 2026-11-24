@@ -1,5 +1,6 @@
 package com.sbro.emucorex.ui.settings
 
+import com.sbro.emucorex.ui.theme.style.HeaderSurface
 import androidx.compose.ui.platform.LocalConfiguration
 import com.sbro.emucorex.data.theme.ThemePackageRepository
 import com.sbro.emucorex.data.theme.InstalledThemePackage
@@ -118,7 +119,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import com.sbro.emucorex.ui.theme.style.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -129,7 +130,7 @@ import androidx.compose.material3.OutlinedTextField
 import com.sbro.emucorex.ui.common.SyncedSlider
 import androidx.compose.material3.SliderDefaults
 import com.sbro.emucorex.ui.theme.style.Surface
-import androidx.compose.material3.Switch
+import com.sbro.emucorex.ui.theme.style.Switch
 import androidx.compose.material3.Text
 import com.sbro.emucorex.ui.theme.style.TextButton
 import androidx.compose.runtime.Composable
@@ -1157,7 +1158,7 @@ private fun SettingsCompactTopBar(
     onSearchEnabledChange: (Boolean) -> Unit,
     onSearchQueryChange: (String) -> Unit
 ) {
-    Surface(
+    HeaderSurface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(
