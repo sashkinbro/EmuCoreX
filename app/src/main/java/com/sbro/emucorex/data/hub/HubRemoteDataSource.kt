@@ -319,7 +319,7 @@ class HubRemoteDataSource(context: Context) {
         private const val MAX_THEME_CATALOG_BYTES = 2L * 1024L * 1024L
         private const val MAX_THEME_PACKAGE_BYTES = 4L * 1024L * 1024L
         private const val SUPPORTED_THEME_CATALOG_FORMAT = 1
-        private const val MAX_STORE_CATALOG_BYTES = 4L * 1024L * 1024L
+        private const val MAX_STORE_CATALOG_BYTES = 16L * 1024L * 1024L // ~1000 items in 18 locales is already >4 MB
         private const val SUPPORTED_STORE_CATALOG_FORMAT = 1
     }
 }
