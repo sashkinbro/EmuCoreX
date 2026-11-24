@@ -237,6 +237,18 @@ internal fun StoreItemCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+                // Category under the name tells what the item is ("Desktops", "Consoles", "Anime"...).
+                val categoryLabel = snapshot?.catalog?.categories
+                    ?.firstOrNull { it.kind == item.kind && it.id == item.categories.firstOrNull() }?.label(locale)
+                if (status.label() == null && categoryLabel != null) {
+                    Text(
+                        categoryLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 status.label()?.let { label ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         if (status == StoreItemStatus.APPLIED) {
@@ -309,6 +321,18 @@ internal fun StoreShelfCard(
                         modifier = Modifier.weight(1f, fill = false),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                // Category under the name tells what the item is ("Desktops", "Consoles", "Anime"...).
+                val categoryLabel = snapshot?.catalog?.categories
+                    ?.firstOrNull { it.kind == item.kind && it.id == item.categories.firstOrNull() }?.label(locale)
+                if (status.label() == null && categoryLabel != null) {
+                    Text(
+                        categoryLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
