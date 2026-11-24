@@ -115,10 +115,10 @@ class StoreRepository private constructor(context: Context) {
         private const val PINNED_PREFIX = "https://raw.githubusercontent.com/"
         private val SAFE_PATH = Regex("[A-Za-z0-9._/-]+")
 
-        /** Download size cap per kind: themes, sounds and controls 4 MB, wallpapers 8 MB. */
+        /** Download size cap per kind: themes, sounds, controls and fonts 4 MB, wallpapers 8 MB. */
         fun maxPackageBytes(kind: StoreKind): Long = when (kind) {
             StoreKind.WALLPAPER -> 8L * 1024L * 1024L
-            StoreKind.THEME, StoreKind.SOUNDS, StoreKind.CONTROLS -> 4L * 1024L * 1024L
+            StoreKind.THEME, StoreKind.SOUNDS, StoreKind.CONTROLS, StoreKind.FONT -> 4L * 1024L * 1024L
         }
 
         fun extensionOf(kind: StoreKind): String = when (kind) {
@@ -126,6 +126,7 @@ class StoreRepository private constructor(context: Context) {
             StoreKind.WALLPAPER -> "ecxwall"
             StoreKind.SOUNDS -> "ecxsounds"
             StoreKind.CONTROLS -> "ecxcontrols"
+            StoreKind.FONT -> "ecxfont"
         }
 
         internal fun isSafePath(path: String): Boolean =

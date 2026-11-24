@@ -46,6 +46,7 @@ class StoreInstalls private constructor(context: Context) {
         scan(StoreKind.WALLPAPER, WALLPAPER_JSON, found)
         scan(StoreKind.SOUNDS, SOUNDS_JSON, found)
         scan(StoreKind.CONTROLS, CONTROLS_JSON, found)
+        scan(StoreKind.FONT, FONT_JSON, found)
         _installed.value = found
     }
 
@@ -76,18 +77,20 @@ class StoreInstalls private constructor(context: Context) {
         internal const val WALLPAPER_JSON = "wallpaper.json"
         internal const val SOUNDS_JSON = "sounds.json"
         internal const val CONTROLS_JSON = "controls.json"
+        internal const val FONT_JSON = "font.json"
         internal val ID_PATTERN = Regex("[a-z0-9-]{3,48}")
         internal val JSON = Json {
             ignoreUnknownKeys = true
             explicitNulls = false
         }
 
-        /** `filesDir/store/<wallpapers|sounds|controls>`; themes live in ThemePackageRepository's directory. */
+        /** `filesDir/store/<wallpapers|sounds|controls|fonts>`; themes live in ThemePackageRepository's directory. */
         internal fun kindDirectory(context: Context, kind: StoreKind): File {
             val name = when (kind) {
                 StoreKind.WALLPAPER -> "wallpapers"
                 StoreKind.SOUNDS -> "sounds"
                 StoreKind.CONTROLS -> "controls"
+                StoreKind.FONT -> "fonts"
                 StoreKind.THEME -> "themes"
             }
             return File(File(context.applicationContext.filesDir, "store"), name)
@@ -103,12 +106,29 @@ class StoreInstalls private constructor(context: Context) {
 
 /** Resolves the files of an installed Store sound pack; used by UiSoundManager. */
 object StoreSoundPacks {
-    val KEYS = listOf("click", "menu_open", "menu_close", "menu_select", "music")
+    val KEYS = listOf("click", "menu_open", "menu_close", "menu_select", "music", "achievement")
 
     /** [key] is one of [KEYS]. Null when the pack or that sound is not installed. */
     fun file(context: Context, packId: String, key: String): File? {
         if (!StoreInstalls.ID_PATTERN.matches(packId) || key !in KEYS) return null
         val directory = File(StoreInstalls.kindDirectory(context, StoreKind.SOUNDS), packId)
         return listOf("ogg", "wav").map { File(directory, "$key.$it") }.firstOrNull { it.isFile && it.length() > 0L }
+    }
+
+    /** Which parts the installed pack contains: any of "music", "click", "menu", "achievement". */
+    fun contents(context: Context, packId: String): Set<String> = buildSet {
+        if (file(context, packId, "music") != null) add("music")
+        if (file(context, packId, "click") != null) add("click")
+        if (listOf("menu_open", "menu_close", "menu_select").any { file(context, packId, it) != null }) add("menu")
+        if (file(context, packId, "achievement") != null) add("achievement")
+    }
+}
+
+/** Resolves the font file of an installed Store font. */
+object StoreFontPacks {
+    fun file(context: Context, fontId: String): File? {
+        if (!StoreInstalls.ID_PATTERN.matches(fontId)) return null
+        val directory = File(StoreInstalls.kindDirectory(context, StoreKind.FONT), fontId)
+        return listOf("font.ttf", "font.otf").map { File(directory, it) }.firstOrNull { it.isFile && it.length() > 0L }
     }
 }

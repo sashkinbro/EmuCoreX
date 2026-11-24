@@ -4407,6 +4407,7 @@ private fun CustomizationSettingsTab(
             onClick = onPickCustomFont,
             helpText = stringResource(R.string.settings_customization_import_font_help)
         )
+        StoreEntryButton(tab = "fonts")
         if (uiState.customFontName != null) {
             SettingsItem(
                 icon = Icons.Rounded.DeleteOutline,
@@ -4518,7 +4519,7 @@ private fun UiSoundSettingsSection(
             helpText = stringResource(R.string.settings_customization_sound_file_help),
             onResetToDefault = { viewModel.selectUiSoundPreset(kind, UiSoundPresets.DEFAULT_ID) }
         )
-        if (kind == UiSoundKind.BUTTON_CLICK) StoreEntryButton(tab = "sounds")
+        StoreEntryButton(tab = "sounds")
         if (setting.usesCustom) {
             SettingsItem(
                 icon = Icons.Rounded.FolderOpen,

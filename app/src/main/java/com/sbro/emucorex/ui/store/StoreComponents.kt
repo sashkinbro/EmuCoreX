@@ -62,7 +62,7 @@ import com.sbro.emucorex.ui.theme.neon.neonShape
 import com.sbro.emucorex.ui.theme.style.FilledTonalButton
 import com.sbro.emucorex.ui.theme.style.Surface
 
-/** Opens the Store on a tab key ("themes", "wallpapers", "sounds", "controls"); null where there is no Store. */
+/** Opens the Store on a tab key ("themes", "wallpapers", "sounds", "controls", "fonts"); null where there is no Store. */
 val LocalOpenStore = staticCompositionLocalOf<((String?) -> Unit)?> { null }
 
 /** Compact "Get more in Store" button used by the Settings sections; renders nothing without a Store host. */

@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,7 +67,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
 import com.sbro.emucorex.data.store.InstalledStoreItem
+import com.sbro.emucorex.data.store.StoreFontPacks
 import com.sbro.emucorex.data.store.StoreItem
+import com.sbro.emucorex.data.store.StoreKind
+import com.sbro.emucorex.data.store.StoreSoundPacks
 import com.sbro.emucorex.data.store.StoreSnapshot
 import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.appScreenTopPadding
@@ -359,6 +363,29 @@ private fun StoreDetails(
         item.displayDescription(locale).takeIf { it.isNotBlank() }?.let {
             Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.78f))
         }
+        if (item.kind == StoreKind.FONT) {
+            val scripts = item.scripts()
+            if (scripts.isNotEmpty()) {
+                StoreChipGroup(
+                    heading = stringResource(R.string.store_font_supports),
+                    labels = scripts.map { scriptLabel(it) }
+                )
+            }
+            if (installed != null) StoreFontSample(installed)
+        }
+        if (item.kind == StoreKind.SOUNDS) {
+            // What is really in the installed pack; before installing, the catalog's contains:* tags.
+            val parts = remember(installed, item) {
+                installed?.let { StoreSoundPacks.contents(context, it.id) } ?: item.contents().toSet()
+            }
+            val labels = listOf("music", "click", "menu", "achievement").filter { it in parts }
+            if (labels.isNotEmpty()) {
+                StoreChipGroup(
+                    heading = stringResource(R.string.store_pack_contains),
+                    labels = labels.map { soundPartLabel(it) }
+                )
+            }
+        }
         if (locked) {
             val gold = LocalThemeExtras.current.gold
             Surface(
@@ -431,6 +458,75 @@ private fun StoreDetails(
                     enabled = !busy, primary = false, onClick = onRemove
                 )
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun StoreChipGroup(heading: String, labels: List<String>) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            heading,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.78f)
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            labels.forEach { label ->
+                Surface(
+                    shape = neonChipShape(),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                ) {
+                    Text(label, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun scriptLabel(script: String): String = when (script) {
+    "latin" -> stringResource(R.string.store_script_latin)
+    "cyrillic" -> stringResource(R.string.store_script_cyrillic)
+    "greek" -> stringResource(R.string.store_script_greek)
+    "vietnamese" -> stringResource(R.string.store_script_vietnamese)
+    "arabic" -> stringResource(R.string.store_script_arabic)
+    "cjk" -> stringResource(R.string.store_script_cjk)
+    "devanagari" -> stringResource(R.string.store_script_devanagari)
+    else -> script.replaceFirstChar { it.uppercase() }
+}
+
+@Composable
+private fun soundPartLabel(part: String): String = stringResource(
+    when (part) {
+        "music" -> R.string.store_sound_music
+        "click" -> R.string.store_sound_click
+        "menu" -> R.string.store_sound_menu
+        else -> R.string.store_sound_achievement
+    }
+)
+
+/** Live text sample rendered with the installed font file. */
+@Composable
+private fun StoreFontSample(installed: InstalledStoreItem) {
+    val context = LocalContext.current
+    val family = remember(installed.id, installed.version, installed.directory) {
+        StoreFontPacks.file(context, installed.id)?.let { file ->
+            runCatching { FontFamily(android.graphics.Typeface.createFromFile(file)) }.getOrNull()
+        }
+    } ?: return
+    Surface(
+        shape = neonShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text("Aa Bb Cc 0123456789", style = MaterialTheme.typography.headlineSmall, fontFamily = family)
+            Text(stringResource(R.string.store_font_sample), style = MaterialTheme.typography.bodyLarge, fontFamily = family)
         }
     }
 }

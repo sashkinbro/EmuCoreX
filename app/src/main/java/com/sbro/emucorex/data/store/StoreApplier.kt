@@ -4,10 +4,13 @@ import android.content.Context
 import android.graphics.Color
 import com.sbro.emucorex.BuildConfig
 import com.sbro.emucorex.data.AppPreferences
+import com.sbro.emucorex.core.utils.RetroAchievementsStateManager
+import com.sbro.emucorex.data.CustomFontRepository
 import com.sbro.emucorex.data.CustomTouchControlLibrary
 import com.sbro.emucorex.data.HomeBackgroundRepository
 import com.sbro.emucorex.data.HomeBackgroundType
 import com.sbro.emucorex.data.TouchControlPressEffect
+import com.sbro.emucorex.data.UiSoundKind
 import com.sbro.emucorex.data.theme.ThemePackageRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -88,8 +91,9 @@ class StoreApplier(context: Context) {
             when (item.kind) {
                 StoreKind.THEME -> applyTheme(item, installed)
                 StoreKind.WALLPAPER -> applyWallpaper(installed)
-                StoreKind.SOUNDS -> applySounds(installed)
+                StoreKind.SOUNDS -> applySounds(item, installed)
                 StoreKind.CONTROLS -> applyControls(installed)
+                StoreKind.FONT -> applyFont(installed)
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -104,8 +108,9 @@ class StoreApplier(context: Context) {
         when (installed.kind) {
             StoreKind.THEME -> preferences.clearThemePackage(id)
             StoreKind.CONTROLS -> if (preferences.touchControlSkinPack.first() == id) preferences.setTouchControlSkinPack(null)
-            // Sound packs fall back to the default preset by themselves; the wallpaper is an independent copy.
-            StoreKind.SOUNDS, StoreKind.WALLPAPER -> Unit
+            // Sound packs fall back to the default preset by themselves; the wallpaper, an applied font and an
+            // applied achievement sound are independent copies.
+            StoreKind.SOUNDS, StoreKind.WALLPAPER, StoreKind.FONT -> Unit
         }
         return installs.remove(id)
     }
@@ -129,11 +134,38 @@ class StoreApplier(context: Context) {
         return StoreApplyResult.APPLIED
     }
 
-    private suspend fun applySounds(installed: InstalledStoreItem): StoreApplyResult {
-        val hasAny = StoreSoundPacks.KEYS.any { StoreSoundPacks.file(appContext, installed.id, it) != null }
-        if (!hasAny) return StoreApplyResult.NOT_INSTALLED
-        val hasMusic = StoreSoundPacks.file(appContext, installed.id, "music") != null
-        preferences.applyUiSoundPack(installed.id, includeMusic = hasMusic)
+    /** Switches only the sound kinds the pack actually contains; a pack without a kind leaves that kind alone. */
+    private suspend fun applySounds(item: StoreItem, installed: InstalledStoreItem): StoreApplyResult {
+        val contents = StoreSoundPacks.contents(appContext, installed.id)
+        if (contents.isEmpty()) return StoreApplyResult.NOT_INSTALLED
+        val kinds = buildSet {
+            if ("click" in contents) add(UiSoundKind.BUTTON_CLICK)
+            if ("menu" in contents) add(UiSoundKind.GAME_MENU)
+            if ("music" in contents) add(UiSoundKind.BACKGROUND_MUSIC)
+        }
+        if (kinds.isNotEmpty()) preferences.applyUiSoundPack(installed.id, kinds)
+        if ("achievement" in contents) {
+            val source = StoreSoundPacks.file(appContext, installed.id, "achievement")
+                ?: return StoreApplyResult.NOT_INSTALLED
+            // A private copy next to the user-imported unlock sound, so it survives removing the pack.
+            val directory = File(appContext.filesDir, "achievements").apply { mkdirs() }
+            val target = File(directory, "unlock_sound.${source.extension}")
+            File(directory, "unlock_sound.wav").takeIf { it != target }?.delete()
+            File(directory, "unlock_sound.ogg").takeIf { it != target }?.delete()
+            source.copyTo(target, overwrite = true)
+            RetroAchievementsStateManager.setUnlockSound(target.absolutePath, item.displayName("en"))
+        }
+        return StoreApplyResult.APPLIED
+    }
+
+    private suspend fun applyFont(installed: InstalledStoreItem): StoreApplyResult {
+        val manifest = StoreInstalls.JSON.decodeFromString<FontManifest>(
+            File(installed.directory, StoreInstalls.FONT_JSON).readText()
+        )
+        val font = StoreFontPacks.file(appContext, installed.id) ?: return StoreApplyResult.NOT_INSTALLED
+        val result = CustomFontRepository(appContext).installFromFile(font, manifest.family)
+        val custom = result.getOrElse { return StoreApplyResult.FAILED }
+        preferences.setCustomFontInstalled(custom.displayName, storeFontId = installed.id)
         return StoreApplyResult.APPLIED
     }
 

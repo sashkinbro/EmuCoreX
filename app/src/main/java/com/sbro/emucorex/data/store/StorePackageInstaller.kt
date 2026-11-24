@@ -3,6 +3,7 @@ package com.sbro.emucorex.data.store
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.Typeface
 import android.media.MediaMetadataRetriever
 import com.sbro.emucorex.data.CustomTouchControlLibrary
 import com.sbro.emucorex.data.theme.ThemePackageRepository
@@ -10,6 +11,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -34,8 +36,27 @@ internal data class SoundsManifest(
     val formatVersion: Int = 0,
     val id: String = "",
     val version: Int = 1,
-    /** key (click, menu_open, menu_close, menu_select, music) -> archive file name. */
+    /** key (click, menu_open, menu_close, menu_select, music, achievement) -> archive file name. */
     val files: Map<String, String> = emptyMap()
+)
+
+@Serializable
+internal data class FontManifest(
+    val formatVersion: Int = 0,
+    val id: String = "",
+    /** Optional in packages; the installer stores the catalog item's version here. */
+    val version: Int = 1,
+    /** Display name; becomes the custom font name shown in Settings. */
+    val family: String = "",
+    /** font.ttf or font.otf. */
+    val file: String = "",
+    /** OFL-1.1 or Apache-2.0. */
+    val license: String = "",
+    val source: String = "",
+    /** latin, cyrillic, greek, ... */
+    val scripts: List<String> = emptyList(),
+    /** 0.6..1.4; validated and kept in the installed manifest. */
+    val sizeScale: Float = 1f
 )
 
 @Serializable
@@ -103,6 +124,7 @@ class StorePackageInstaller private constructor(context: Context) {
             StoreKind.WALLPAPER -> installWallpaper(item, file)
             StoreKind.SOUNDS -> installSounds(item, file)
             StoreKind.CONTROLS -> installControls(item, file)
+            StoreKind.FONT -> installFont(item, file)
         }
         installs.refresh()
         return installs.find(item.id) ?: throw StorePackageException("Installed package is not readable")
@@ -151,10 +173,14 @@ class StorePackageInstaller private constructor(context: Context) {
 
     private fun installSounds(item: StoreItem, file: File) {
         val allowedNames = StoreSoundPacks.KEYS.flatMap { key -> listOf("$key.ogg", "$key.wav") }.toSet()
-        val entries = readArchive(file, maxEntries = 6, maxTotal = 7L * 1024 * 1024) { name ->
+        val entries = readArchive(file, maxEntries = StoreSoundPacks.KEYS.size + 1, maxTotal = 7L * 1024 * 1024) { name ->
             when {
                 name == StoreInstalls.SOUNDS_JSON -> 16L * 1024
-                name in allowedNames -> if (name.startsWith("music.")) MAX_MUSIC_BYTES else MAX_SHORT_BYTES
+                name in allowedNames -> when {
+                    name.startsWith("music.") -> MAX_MUSIC_BYTES
+                    name.startsWith("achievement.") -> MAX_ACHIEVEMENT_BYTES
+                    else -> MAX_SHORT_BYTES
+                }
                 else -> null
             }
         }
@@ -171,11 +197,18 @@ class StorePackageInstaller private constructor(context: Context) {
         }
         commit(StoreKind.SOUNDS, item.id) { staging ->
             entries.forEach { (name, bytes) -> File(staging, name).writeBytes(bytes) }
-            manifest.files.forEach { (key, name) -> validateAudio(File(staging, name), shortSample = key != "music") }
+            manifest.files.forEach { (key, name) ->
+                val maxDurationMs = when (key) {
+                    "music" -> null
+                    "achievement" -> MAX_ACHIEVEMENT_DURATION_MS
+                    else -> MAX_SHORT_DURATION_MS
+                }
+                validateAudio(File(staging, name), maxDurationMs)
+            }
         }
     }
 
-    private fun validateAudio(file: File, shortSample: Boolean) {
+    private fun validateAudio(file: File, maxDurationMs: Long?) {
         val retriever = MediaMetadataRetriever()
         try {
             retriever.setDataSource(file.absolutePath)
@@ -183,7 +216,7 @@ class StorePackageInstaller private constructor(context: Context) {
                 throw StorePackageException("Sound file has no audio")
             }
             val durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
-            if (shortSample && durationMs != null && durationMs > MAX_SHORT_DURATION_MS) {
+            if (maxDurationMs != null && durationMs != null && durationMs > maxDurationMs) {
                 throw StorePackageException("Sound effect is too long")
             }
         } catch (error: StorePackageException) {
@@ -193,6 +226,58 @@ class StorePackageInstaller private constructor(context: Context) {
         } finally {
             runCatching { retriever.release() }
         }
+    }
+
+    // endregion
+
+    // region Font
+
+    private fun installFont(item: StoreItem, file: File) {
+        val entries = readArchive(file, maxEntries = 3, maxTotal = MAX_FONT_PACKAGE_BYTES) { name ->
+            when (name) {
+                StoreInstalls.FONT_JSON -> 16L * 1024
+                in FONT_FILES -> MAX_FONT_PACKAGE_BYTES
+                FONT_LICENSE -> 256L * 1024
+                else -> null
+            }
+        }
+        val manifest = decode<FontManifest>(entries[StoreInstalls.FONT_JSON], "font.json")
+        requireHeader(item, manifest.formatVersion, manifest.id, item.version)
+        val family = manifest.family.trim()
+        if (family.isEmpty() || family.length > 64 || family.any { it.isISOControl() }) {
+            throw StorePackageException("Invalid font family")
+        }
+        if (manifest.file !in FONT_FILES) throw StorePackageException("Invalid font file name")
+        val fontBytes = entries[manifest.file] ?: throw StorePackageException("Font file is missing")
+        if (entries.keys.count { it in FONT_FILES } != 1) throw StorePackageException("Package must contain exactly one font")
+        if (!entries.containsKey(FONT_LICENSE)) throw StorePackageException("Font license is missing")
+        if (manifest.license !in FONT_LICENSES) throw StorePackageException("Unsupported font license")
+        if (manifest.source.isNotEmpty() && (!manifest.source.startsWith("https://") || manifest.source.length > 300)) {
+            throw StorePackageException("Invalid font source")
+        }
+        if (manifest.scripts.size > 12 || manifest.scripts.any { !FONT_SCRIPT.matches(it) }) {
+            throw StorePackageException("Invalid font scripts")
+        }
+        if (manifest.sizeScale !in 0.6f..1.4f) throw StorePackageException("Invalid font size scale")
+        if (!hasFontSignature(fontBytes)) throw StorePackageException("Not a TrueType or OpenType font")
+        commit(StoreKind.FONT, item.id) { staging ->
+            entries.forEach { (name, bytes) -> if (name != StoreInstalls.FONT_JSON) File(staging, name).writeBytes(bytes) }
+            // Keep the catalog version so updates are detected; defaults must be written for it to survive.
+            File(staging, StoreInstalls.FONT_JSON).writeText(
+                FONT_JSON_OUT.encodeToString(FontManifest.serializer(), manifest.copy(version = item.version))
+            )
+            // Same check the manual custom-font import uses.
+            val loads = runCatching { Typeface.Builder(File(staging, manifest.file)).build() }.getOrNull() != null
+            if (!loads) throw StorePackageException("Font cannot be decoded")
+        }
+    }
+
+    /** TrueType (0x00010000, "true"), OpenType/CFF ("OTTO") or a collection ("ttcf") header. */
+    private fun hasFontSignature(bytes: ByteArray): Boolean {
+        if (bytes.size < 12) return false
+        val tag = String(bytes, 0, 4, Charsets.ISO_8859_1)
+        return tag == "OTTO" || tag == "true" || tag == "ttcf" ||
+            (bytes[0] == 0.toByte() && bytes[1] == 1.toByte() && bytes[2] == 0.toByte() && bytes[3] == 0.toByte())
     }
 
     // endregion
@@ -356,8 +441,21 @@ class StorePackageInstaller private constructor(context: Context) {
         private const val MAX_WALLPAPER_SIDE = 2560
         private const val MAX_SHORT_BYTES = 300L * 1024
         private const val MAX_MUSIC_BYTES = 6L * 1024 * 1024
+        private const val MAX_ACHIEVEMENT_BYTES = 600L * 1024
+        // The whole font package is capped at 4 MB (StoreRepository.maxPackageBytes); a font is most of it.
+        private const val MAX_FONT_PACKAGE_BYTES = 4L * 1024 * 1024
+        internal val FONT_FILES = setOf("font.ttf", "font.otf")
+        internal const val FONT_LICENSE = "LICENSE.txt"
+        private val FONT_LICENSES = setOf("OFL-1.1", "Apache-2.0")
+        private val FONT_SCRIPT = Regex("[a-z]{2,16}")
+        private val FONT_JSON_OUT = Json {
+            encodeDefaults = true
+            explicitNulls = false
+        }
         // README: short sounds are at most 2 s; a little slack for encoder padding.
         private const val MAX_SHORT_DURATION_MS = 2_250L
+        // Achievement jingles may run a little longer than UI clicks.
+        private const val MAX_ACHIEVEMENT_DURATION_MS = 6_000L
 
         @Volatile private var instance: StorePackageInstaller? = null
 

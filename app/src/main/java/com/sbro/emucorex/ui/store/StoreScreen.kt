@@ -60,6 +60,7 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.Storefront
+import androidx.compose.material.icons.rounded.TextFields
 import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -115,6 +116,7 @@ private val StoreTab.icon: ImageVector
         StoreTab.WALLPAPERS -> Icons.Rounded.Wallpaper
         StoreTab.SOUNDS -> Icons.Rounded.GraphicEq
         StoreTab.CONTROLS -> Icons.Rounded.Gamepad
+        StoreTab.FONTS -> Icons.Rounded.TextFields
     }
 
 @Composable
@@ -124,6 +126,7 @@ private fun StoreTab.label(): String = stringResource(
         StoreTab.WALLPAPERS -> R.string.store_tab_wallpapers
         StoreTab.SOUNDS -> R.string.store_tab_sounds
         StoreTab.CONTROLS -> R.string.store_tab_controls
+        StoreTab.FONTS -> R.string.store_tab_fonts
     }
 )
 
@@ -143,6 +146,7 @@ private fun StoreAccessFilter.label(): String = stringResource(
         StoreAccessFilter.FREE -> R.string.hub_theme_filter_free
         StoreAccessFilter.PRO -> R.string.hub_theme_filter_pro
         StoreAccessFilter.INSTALLED -> R.string.hub_theme_installed
+        StoreAccessFilter.LANGUAGE -> R.string.store_filter_my_language
     }
 )
 
@@ -268,7 +272,7 @@ fun rememberStoreContentModel(
     val items = snapshot?.catalog?.items.orEmpty()
     val tabItems = remember(items, tab) { items.filter { it.kind == tab.kind } }
     val visible = remember(items, tab, access, categoryId, query, sort, installed, locale) {
-        filterStoreItems(items, tab.kind, access, categoryId, query, sort, installed.keys, locale)
+        filterStoreItems(items, tab.kind, access, categoryId, query, sort, installed.keys, locale, viewModel.languageScript)
     }
     val categories = remember(snapshot, tab) {
         val used = tabItems.flatMapTo(mutableSetOf()) { it.categories }
@@ -420,6 +424,7 @@ fun LazyGridScope.storeContent(
             item(key = "store-controls", span = { GridItemSpan(maxLineSpan) }) {
                 Box(Modifier.animateItem().enterRise("store-controls")) {
                     StoreControlsRow(
+                        accessOptions = StoreAccessFilter.entries.filter { it != StoreAccessFilter.LANGUAGE || tab == StoreTab.FONTS },
                         access = filters.access,
                         onAccess = { filters.access = it },
                         sort = filters.sort,
@@ -453,7 +458,7 @@ fun LazyGridScope.storeContent(
     }
 }
 
-/** Four equal segments, icon above label, sharing the Hub's sliding-indicator switch. */
+/** One equal segment per Store tab, icon above label, sharing the Hub's sliding-indicator switch. */
 @Composable
 private fun StoreKindSwitch(selected: StoreTab, onSelected: (StoreTab) -> Unit) {
     SegmentedSwitch(
@@ -469,21 +474,42 @@ private fun StoreKindSwitch(selected: StoreTab, onSelected: (StoreTab) -> Unit) 
             verticalArrangement = Arrangement.Center
         ) {
             Icon(entry.icon, contentDescription = null, modifier = Modifier.size(20.dp))
-            Text(
-                text = entry.label(),
-                modifier = Modifier.padding(top = 2.dp),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            StoreTabLabel(entry.label(), bold = isSelected)
         }
     }
 }
 
+/**
+ * Single-line tab label that shrinks (down to [MIN_TAB_LABEL_SCALE]) before it would clip, so five tabs fit on
+ * a 360 dp phone in every locale; only then does it fall back to an ellipsis.
+ */
+@Composable
+private fun StoreTabLabel(text: String, bold: Boolean) {
+    var scale by remember(text) { mutableStateOf(1f) }
+    val base = MaterialTheme.typography.labelSmall
+    Text(
+        text = text,
+        modifier = Modifier.padding(top = 2.dp),
+        style = base,
+        fontSize = base.fontSize * scale,
+        fontWeight = if (bold) FontWeight.Bold else FontWeight.Medium,
+        maxLines = 1,
+        softWrap = false,
+        overflow = if (scale <= MIN_TAB_LABEL_SCALE) TextOverflow.Ellipsis else TextOverflow.Clip,
+        onTextLayout = { layout ->
+            if (layout.didOverflowWidth && scale > MIN_TAB_LABEL_SCALE) {
+                scale = (scale - 0.06f).coerceAtLeast(MIN_TAB_LABEL_SCALE)
+            }
+        }
+    )
+}
+
+private const val MIN_TAB_LABEL_SCALE = 0.7f
+
 /** The single control row of a shelf grid: a Filter menu and a Sort menu as icon + label text buttons. */
 @Composable
 private fun StoreControlsRow(
+    accessOptions: List<StoreAccessFilter>,
     access: StoreAccessFilter,
     onAccess: (StoreAccessFilter) -> Unit,
     sort: StoreSort,
@@ -493,7 +519,7 @@ private fun StoreControlsRow(
         StoreMenuButton(
             icon = Icons.Rounded.FilterList,
             label = stringResource(R.string.store_filter),
-            options = StoreAccessFilter.entries,
+            options = accessOptions,
             selected = access,
             optionLabel = { it.label() },
             onSelect = onAccess

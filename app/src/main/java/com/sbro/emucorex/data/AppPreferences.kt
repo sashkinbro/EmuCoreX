@@ -644,6 +644,7 @@ class AppPreferences(private val context: Context) {
         private val APP_FONT_CHOICE = intPreferencesKey("app_font_choice")
         private val APP_FONT_SCALE = floatPreferencesKey("app_font_scale")
         private val CUSTOM_FONT_NAME = stringPreferencesKey("custom_font_name")
+        private val STORE_FONT_ID = stringPreferencesKey("store_font_id")
         private val CUSTOM_FONT_REVISION = intPreferencesKey("custom_font_revision")
         private fun uiSoundEnabledKey(kind: UiSoundKind) = booleanPreferencesKey("ui_sound_${kind.id}_enabled")
         private fun uiSoundVolumeKey(kind: UiSoundKind) = intPreferencesKey("ui_sound_${kind.id}_volume")
@@ -1077,6 +1078,11 @@ class AppPreferences(private val context: Context) {
         .map { prefs -> prefs[CUSTOM_FONT_NAME]?.takeIf(String::isNotBlank) }
         .distinctUntilChanged()
 
+    /** Id of the Store font that was applied into the custom-font slot; null for a manually imported font. */
+    val storeFontId: Flow<String?> = context.dataStore.data
+        .map { prefs -> prefs[STORE_FONT_ID]?.takeIf(String::isNotBlank) }
+        .distinctUntilChanged()
+
     val customFontRevision: Flow<Int> = context.dataStore.data
         .map { prefs -> (prefs[CUSTOM_FONT_REVISION] ?: 0).coerceAtLeast(0) }
         .distinctUntilChanged()
@@ -1272,10 +1278,11 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { it[APP_FONT_CHOICE] = choice.preferenceValue }
     }
 
-    suspend fun setCustomFontInstalled(displayName: String?) {
+    suspend fun setCustomFontInstalled(displayName: String?, storeFontId: String? = null) {
         context.dataStore.edit { prefs ->
             val cleanName = displayName?.trim()?.takeIf(String::isNotEmpty)
             if (cleanName == null) prefs.remove(CUSTOM_FONT_NAME) else prefs[CUSTOM_FONT_NAME] = cleanName
+            if (storeFontId == null) prefs.remove(STORE_FONT_ID) else prefs[STORE_FONT_ID] = storeFontId
             prefs[CUSTOM_FONT_REVISION] = (prefs[CUSTOM_FONT_REVISION] ?: 0) + 1
             prefs[APP_FONT_CHOICE] = AppFontChoice.CUSTOM.preferenceValue
         }
@@ -1284,6 +1291,7 @@ class AppPreferences(private val context: Context) {
     suspend fun clearCustomFont() {
         context.dataStore.edit { prefs ->
             prefs.remove(CUSTOM_FONT_NAME)
+            prefs.remove(STORE_FONT_ID)
             prefs[CUSTOM_FONT_REVISION] = (prefs[CUSTOM_FONT_REVISION] ?: 0) + 1
             if (AppFontChoice.fromPreference(prefs[APP_FONT_CHOICE]) == AppFontChoice.CUSTOM) {
                 prefs[APP_FONT_CHOICE] = AppFontChoice.SYSTEM.preferenceValue
@@ -1312,17 +1320,12 @@ class AppPreferences(private val context: Context) {
     }
 
     /**
-     * Selects Store sound pack [packId] ("pack:<id>" preset) for the click and game-menu kinds, and for
-     * music when [includeMusic]. Enabled/volume are left as the user set them.
+     * Selects Store sound pack [packId] ("pack:<id>" preset) for exactly the [kinds] the pack contains; the
+     * other kinds keep their current selection. Enabled/volume are left as the user set them.
      */
-    suspend fun applyUiSoundPack(packId: String, includeMusic: Boolean) {
+    suspend fun applyUiSoundPack(packId: String, kinds: Set<UiSoundKind>) {
         val presetId = UiSoundPresets.packPresetId(packId)
         context.dataStore.edit { prefs ->
-            val kinds = buildList {
-                add(UiSoundKind.BUTTON_CLICK)
-                add(UiSoundKind.GAME_MENU)
-                if (includeMusic) add(UiSoundKind.BACKGROUND_MUSIC)
-            }
             kinds.forEach { kind ->
                 prefs[uiSoundPresetKey(kind)] = UiSoundPresets.sanitizeId(kind, presetId)
                 prefs.remove(uiSoundCustomNameKey(kind))

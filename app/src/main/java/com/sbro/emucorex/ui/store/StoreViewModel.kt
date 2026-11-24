@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.sbro.emucorex.BuildConfig
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.ProPurchaseManager
+import com.sbro.emucorex.data.AppFontChoice
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.UiSoundPresets
 import com.sbro.emucorex.data.hub.HubLocaleResolver
@@ -19,6 +20,7 @@ import com.sbro.emucorex.data.store.StoreKind
 import com.sbro.emucorex.data.store.StorePackageInstaller
 import com.sbro.emucorex.data.store.StoreRepository
 import com.sbro.emucorex.data.store.StoreSnapshot
+import com.sbro.emucorex.data.store.storeScriptForLanguage
 import com.sbro.emucorex.ui.theme.ThemeMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -40,14 +42,16 @@ enum class StoreTab(val key: String, val kind: StoreKind) {
     THEMES("themes", StoreKind.THEME),
     WALLPAPERS("wallpapers", StoreKind.WALLPAPER),
     SOUNDS("sounds", StoreKind.SOUNDS),
-    CONTROLS("controls", StoreKind.CONTROLS);
+    CONTROLS("controls", StoreKind.CONTROLS),
+    FONTS("fonts", StoreKind.FONT);
 
     companion object {
         fun fromKey(key: String?): StoreTab = entries.firstOrNull { it.key == key } ?: THEMES
     }
 }
 
-enum class StoreAccessFilter { ALL, FREE, PRO, INSTALLED }
+/** LANGUAGE ("Supports my language") applies to the Fonts tab only. */
+enum class StoreAccessFilter { ALL, FREE, PRO, INSTALLED, LANGUAGE }
 
 enum class StoreSort { FEATURED, NEWEST, NAME }
 
@@ -80,7 +84,8 @@ internal fun filterStoreItems(
     query: String,
     sort: StoreSort,
     installedIds: Set<String>,
-    locale: String
+    locale: String,
+    languageScript: String? = null
 ): List<StoreItem> {
     val normalizedQuery = query.normalizedStoreText()
     val filtered = items.asSequence()
@@ -91,6 +96,7 @@ internal fun filterStoreItems(
                 StoreAccessFilter.FREE -> !it.requiresPro
                 StoreAccessFilter.PRO -> it.requiresPro
                 StoreAccessFilter.INSTALLED -> it.id in installedIds
+                StoreAccessFilter.LANGUAGE -> languageScript != null && languageScript in it.scripts()
             }
         }
         .filter { categoryId == null || categoryId in it.categories }
@@ -133,17 +139,30 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
     val catalog: StateFlow<StoreSnapshot?> = repository.catalog
     val installed: StateFlow<Map<String, InstalledStoreItem>> = installs.installed
 
-    /** Ids of items that are currently in use: the applied theme, controls skin and sound pack. */
+    /** The font script the current app language needs, matched by the Fonts "Supports my language" filter. */
+    val languageScript: String = storeScriptForLanguage(locale)
+
+    /** The Store font sitting in the custom-font slot, while that font is the selected one. */
+    private val appliedFontId = combine(preferences.appFontChoice, preferences.storeFontId) { choice, id ->
+        id.takeIf { choice == AppFontChoice.CUSTOM }
+    }
+
+    /** Ids of items that are currently in use: the applied theme, controls skin, sound pack(s) and font. */
     val appliedIds: StateFlow<Set<String>> = combine(
         preferences.themeMode,
         preferences.themePackageId,
         preferences.touchControlSkinPack,
-        preferences.uiSoundSettings
-    ) { mode, themeId, skinId, sounds ->
+        preferences.uiSoundSettings,
+        appliedFontId
+    ) { mode, themeId, skinId, sounds, fontId ->
         buildSet {
             if (mode == ThemeMode.PACKAGE && themeId != null) add(themeId)
             if (skinId != null) add(skinId)
-            UiSoundPresets.packIdOf(sounds.click.preset)?.takeUnless { sounds.click.usesCustom }?.let(::add)
+            // A pack may cover only some kinds, so any selected kind marks it as in use.
+            listOf(sounds.click, sounds.menu, sounds.music).forEach { setting ->
+                if (!setting.usesCustom) UiSoundPresets.packIdOf(setting.preset)?.let(::add)
+            }
+            if (fontId != null) add(fontId)
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 

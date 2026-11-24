@@ -47,6 +47,28 @@ class CustomFontRepository(context: Context) {
         }
     }
 
+    /** Installs an already validated local font file (a Store font) into the same slot as [install]. */
+    suspend fun installFromFile(source: File, displayName: String): Result<InstalledCustomFont> = withContext(Dispatchers.IO) {
+        runCatching {
+            require(source.isFile && source.length() in 1..MAX_FONT_BYTES) { "Font file is missing or too large" }
+            customizationDirectory.mkdirs()
+
+            val previousModified = fontFile.lastModified()
+            val temporaryFile = File(customizationDirectory, "$FILE_NAME.tmp")
+            temporaryFile.delete()
+            try {
+                source.inputStream().use { copyValidated(it, temporaryFile) }
+                validateFont(temporaryFile)
+                if (fontFile.exists()) check(fontFile.delete()) { "Unable to replace custom font" }
+                check(temporaryFile.renameTo(fontFile)) { "Unable to save custom font" }
+                fontFile.setLastModified(max(System.currentTimeMillis(), previousModified + 1L))
+                InstalledCustomFont(fontFile, displayName.trim().ifBlank { DEFAULT_DISPLAY_NAME })
+            } finally {
+                temporaryFile.delete()
+            }
+        }
+    }
+
     suspend fun restoreFromBackup(input: InputStream): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
             customizationDirectory.mkdirs()

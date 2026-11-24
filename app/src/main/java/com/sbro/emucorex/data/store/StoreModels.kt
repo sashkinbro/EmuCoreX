@@ -1,7 +1,14 @@
 package com.sbro.emucorex.data.store
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonDecoder
 
 /**
  * `catalog/v1/store.json` — the EmuCore Store catalog, referenced by the optional `manifest.store`
@@ -12,16 +19,47 @@ import kotlinx.serialization.Serializable
 data class StoreCatalog(
     val formatVersion: Int,
     val releaseId: String,
+    @Serializable(with = StoreCategoryListSerializer::class)
     val categories: List<StoreCategory> = emptyList(),
+    @Serializable(with = StoreItemListSerializer::class)
     val items: List<StoreItem> = emptyList()
 )
+
+/**
+ * Decodes a JSON array entry by entry and drops the entries this client cannot read, such as an item or
+ * category whose `kind` was added in a newer app version. One unknown entry must not break the whole Store.
+ */
+internal open class SkippingListSerializer<T>(private val element: KSerializer<T>) : KSerializer<List<T>> {
+    private val delegate = ListSerializer(element)
+    override val descriptor: SerialDescriptor = delegate.descriptor
+
+    override fun serialize(encoder: Encoder, value: List<T>) = delegate.serialize(encoder, value)
+
+    override fun deserialize(decoder: Decoder): List<T> {
+        val input = decoder as? JsonDecoder ?: return delegate.deserialize(decoder)
+        val array = input.decodeJsonElement() as? JsonArray ?: throw IllegalArgumentException("Expected a JSON array")
+        return array.mapNotNull { entry ->
+            // SerializationException is an IllegalArgumentException.
+            try {
+                input.json.decodeFromJsonElement(element, entry)
+            } catch (_: IllegalArgumentException) {
+                null
+            }
+        }
+    }
+}
+
+internal object StoreCategoryListSerializer : SkippingListSerializer<StoreCategory>(StoreCategory.serializer())
+
+internal object StoreItemListSerializer : SkippingListSerializer<StoreItem>(StoreItem.serializer())
 
 @Serializable
 enum class StoreKind {
     @SerialName("theme") THEME,
     @SerialName("wallpaper") WALLPAPER,
     @SerialName("sounds") SOUNDS,
-    @SerialName("controls") CONTROLS
+    @SerialName("controls") CONTROLS,
+    @SerialName("font") FONT
 }
 
 @Serializable
@@ -63,6 +101,27 @@ data class StoreItem(
 ) {
     fun displayName(locale: String): String = name.localizedValue(locale) ?: id
     fun displayDescription(locale: String): String = description.localizedValue(locale).orEmpty()
+
+    /** Script coverage of a font item, from the `script:<name>` tags (latin, cyrillic, greek, ...). */
+    fun scripts(): List<String> = tagValues("script:")
+
+    /** What a sound pack contains, from the `contains:<music|click|menu|achievement>` tags. */
+    fun contents(): List<String> = tagValues("contains:")
+
+    private fun tagValues(prefix: String): List<String> =
+        tags.mapNotNull { tag -> tag.takeIf { it.startsWith(prefix) }?.removePrefix(prefix)?.lowercase()?.takeIf(String::isNotBlank) }
+            .distinct()
+}
+
+/** The font script a user of [language] (ISO 639 code) needs covered; unlisted languages are Latin-script. */
+internal fun storeScriptForLanguage(language: String): String = when (language.substringBefore('-').substringBefore('_').lowercase()) {
+    "uk", "ru", "be", "bg", "sr", "mk", "kk" -> "cyrillic"
+    "ar", "fa", "ur" -> "arabic"
+    "hi", "mr", "ne" -> "devanagari"
+    "ja", "ko", "zh" -> "cjk"
+    "el" -> "greek"
+    "vi" -> "vietnamese"
+    else -> "latin"
 }
 
 /** Catalog resolved against the pinned commit base URL of the sync that produced it. */
