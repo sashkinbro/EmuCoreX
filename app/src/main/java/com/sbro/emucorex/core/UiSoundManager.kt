@@ -59,6 +59,7 @@ object UiSoundManager {
     private var emulationActive = false
     private var nativeShellActive = false
     private var gameMenuOpen = false
+    private var storePreviewActive = false
 
     // Short samples.
     private var pool: SoundPool? = null
@@ -128,6 +129,13 @@ object UiSoundManager {
         if (emulationActive == active) return
         emulationActive = active
         if (!active) gameMenuOpen = false
+        syncMusic()
+    }
+
+    /** A Store sound-pack preview is playing: the app's own background music steps aside until it ends. */
+    fun setStorePreviewActive(active: Boolean) {
+        if (storePreviewActive == active) return
+        storePreviewActive = active
         syncMusic()
     }
 
@@ -363,6 +371,11 @@ object UiSoundManager {
 
     private fun syncMusic() {
         val context = appContext ?: return
+        if (storePreviewActive) {
+            mainHandler.removeCallbacks(focusRetry)
+            stopMusic()
+            return
+        }
         val block = musicBlock()
         if (block != lastMusicBlock) {
             lastMusicBlock = block

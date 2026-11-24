@@ -3394,6 +3394,10 @@
     <string name="store_sound_click">Clics</string>
     <string name="store_sound_menu">Menu du jeu</string>
     <string name="store_sound_achievement">Succès</string>
+    <string name="store_preview">Aperçu</string>
+    <string name="store_preview_play">Lire</string>
+    <string name="store_preview_stop">Arrêter</string>
+    <string name="store_msg_preview_failed">Échec de l\'aperçu. Vérifiez votre connexion.</string>
     <string name="store_font_sample">Portez ce vieux whisky au juge blond qui fume. 0123456789</string>
     <string name="store_search">Rechercher dans la Boutique</string>
     <string name="store_search_hint">Nom ou tag</string>

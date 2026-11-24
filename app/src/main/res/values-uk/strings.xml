@@ -3402,6 +3402,10 @@
     <string name="store_sound_click">Кліки</string>
     <string name="store_sound_menu">Меню гри</string>
     <string name="store_sound_achievement">Досягнення</string>
+    <string name="store_preview">Попереднє прослуховування</string>
+    <string name="store_preview_play">Відтворити</string>
+    <string name="store_preview_stop">Зупинити</string>
+    <string name="store_msg_preview_failed">Не вдалося завантажити попередній перегляд. Перевірте з\'єднання.</string>
     <string name="store_font_sample">Чуєш їх, доцю, га? Кумедна ж ти, прощайся без ґольфів! 0123456789</string>
     <string name="store_search">Пошук у Магазині</string>
     <string name="store_search_hint">Назва або тег</string>

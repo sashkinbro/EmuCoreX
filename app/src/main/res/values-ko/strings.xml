@@ -3391,6 +3391,10 @@
     <string name="store_sound_click">클릭음</string>
     <string name="store_sound_menu">게임 메뉴</string>
     <string name="store_sound_achievement">업적</string>
+    <string name="store_preview">미리듣기</string>
+    <string name="store_preview_play">재생</string>
+    <string name="store_preview_stop">정지</string>
+    <string name="store_msg_preview_failed">미리듣기에 실패했습니다. 연결을 확인하세요.</string>
     <string name="store_font_sample">다람쥐 헌 쳇바퀴에 타고파 0123456789</string>
     <string name="store_search">스토어 검색</string>
     <string name="store_search_hint">이름 또는 태그</string>

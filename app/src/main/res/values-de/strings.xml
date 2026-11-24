@@ -3394,6 +3394,10 @@
     <string name="store_sound_click">Klicks</string>
     <string name="store_sound_menu">Spielmenü</string>
     <string name="store_sound_achievement">Erfolg</string>
+    <string name="store_preview">Vorhören</string>
+    <string name="store_preview_play">Abspielen</string>
+    <string name="store_preview_stop">Stopp</string>
+    <string name="store_msg_preview_failed">Vorschau fehlgeschlagen. Überprüfe deine Verbindung.</string>
     <string name="store_font_sample">Zwölf Boxkämpfer jagen Viktor quer über den großen Sylter Deich. 0123456789</string>
     <string name="store_search">Im Store suchen</string>
     <string name="store_search_hint">Name oder Tag</string>

@@ -31,6 +31,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material3.CircularProgressIndicator
@@ -44,6 +46,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -64,6 +67,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
 import com.sbro.emucorex.data.store.InstalledStoreItem
@@ -82,6 +88,7 @@ import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 import com.sbro.emucorex.ui.theme.neon.neonChipShape
 import com.sbro.emucorex.ui.theme.neon.neonShape
 import com.sbro.emucorex.ui.theme.style.Button
+import com.sbro.emucorex.ui.theme.style.FilledTonalButton
 import com.sbro.emucorex.ui.theme.style.OutlinedButton
 import com.sbro.emucorex.ui.theme.style.Surface
 import com.sbro.emucorex.ui.theme.style.TextButton
@@ -98,6 +105,7 @@ fun StoreItemScreen(
     val actions by viewModel.actions.collectAsState()
     val isPro by viewModel.isPro.collectAsState()
     val proPrice by viewModel.proPrice.collectAsState()
+    val preview by viewModel.preview.collectAsState()
     val locale = viewModel.locale
     val snackbarHost = remember { SnackbarHostState() }
     var showProSheet by rememberSaveable { mutableStateOf(false) }
@@ -110,6 +118,19 @@ fun StoreItemScreen(
         }
     }
     LaunchedEffect(isPro) { if (isPro) showProSheet = false }
+
+    // A preview never outlives the item page or the app being in the foreground.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, itemId, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) viewModel.stopPreview()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            viewModel.stopPreview()
+        }
+    }
 
     val item = snapshot?.catalog?.items?.firstOrNull { it.id == itemId }
 
@@ -152,6 +173,8 @@ fun StoreItemScreen(
                     categoryLabels = snapshot?.catalog?.categories.orEmpty()
                         .filter { it.id in item.categories }
                         .map { it.label(locale) },
+                    preview = preview.takeIf { it.itemId == item.id } ?: SoundPreview(),
+                    onPreview = { part -> viewModel.togglePreview(item, installedItem, part) },
                     onInstall = { viewModel.install(item) },
                     onApply = { if (locked) showProSheet = true else viewModel.apply(item) },
                     onRemove = { viewModel.remove(item) },
@@ -308,6 +331,8 @@ private fun StoreDetails(
     locked: Boolean,
     locale: String,
     categoryLabels: List<String>,
+    preview: SoundPreview,
+    onPreview: (String) -> Unit,
     onInstall: () -> Unit,
     onApply: () -> Unit,
     onRemove: () -> Unit,
@@ -384,6 +409,7 @@ private fun StoreDetails(
                     heading = stringResource(R.string.store_pack_contains),
                     labels = labels.map { soundPartLabel(it) }
                 )
+                SoundPreviewRow(parts = labels, preview = preview, enabled = !busy, onPreview = onPreview)
             }
         }
         if (locked) {
@@ -479,6 +505,69 @@ private fun StoreChipGroup(heading: String, labels: List<String>) {
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                 ) {
                     Text(label, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+    }
+}
+
+/** Play/stop buttons, one per sound part; the active one shows stop (or a spinner while it downloads). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SoundPreviewRow(
+    parts: List<String>,
+    preview: SoundPreview,
+    enabled: Boolean,
+    onPreview: (String) -> Unit
+) {
+    val compactPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            stringResource(R.string.store_preview),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.78f)
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            parts.forEach { part ->
+                val active = preview.part == part
+                val label = soundPartLabel(part)
+                val stateText = stringResource(if (active) R.string.store_preview_stop else R.string.store_preview_play)
+                val content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
+                    if (active && preview.loading) {
+                        if (preview.progress > 0f) {
+                            CircularProgressIndicator(
+                                progress = { preview.progress },
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        }
+                    } else {
+                        Icon(
+                            if (active) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
+                            contentDescription = stateText,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(Modifier.size(6.dp))
+                    Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
+                }
+                if (active) {
+                    FilledTonalButton(
+                        onClick = { onPreview(part) },
+                        shape = neonButtonShape(),
+                        contentPadding = compactPadding,
+                        content = content
+                    )
+                } else {
+                    OutlinedButton(
+                        onClick = { onPreview(part) },
+                        enabled = enabled,
+                        shape = neonButtonShape(),
+                        contentPadding = compactPadding,
+                        content = content
+                    )
                 }
             }
         }

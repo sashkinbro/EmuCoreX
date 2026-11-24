@@ -3418,6 +3418,10 @@
     <string name="store_sound_click">Clicks</string>
     <string name="store_sound_menu">Game menu</string>
     <string name="store_sound_achievement">Achievement</string>
+    <string name="store_preview">Preview</string>
+    <string name="store_preview_play">Play</string>
+    <string name="store_preview_stop">Stop</string>
+    <string name="store_msg_preview_failed">Preview failed. Check your connection.</string>
     <string name="store_font_sample">The quick brown fox jumps over the lazy dog. 0123456789</string>
     <string name="store_search">Search the Store</string>
     <string name="store_search_hint">Name or tag</string>

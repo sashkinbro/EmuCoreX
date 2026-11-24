@@ -111,7 +111,12 @@ object StoreSoundPacks {
     /** [key] is one of [KEYS]. Null when the pack or that sound is not installed. */
     fun file(context: Context, packId: String, key: String): File? {
         if (!StoreInstalls.ID_PATTERN.matches(packId) || key !in KEYS) return null
-        val directory = File(StoreInstalls.kindDirectory(context, StoreKind.SOUNDS), packId)
+        return fileIn(File(StoreInstalls.kindDirectory(context, StoreKind.SOUNDS), packId), key)
+    }
+
+    /** The [key] sound inside an unpacked pack [directory] (installed or preview); null when absent. */
+    fun fileIn(directory: File, key: String): File? {
+        if (key !in KEYS) return null
         return listOf("ogg", "wav").map { File(directory, "$key.$it") }.firstOrNull { it.isFile && it.length() > 0L }
     }
 

@@ -3391,6 +3391,10 @@
     <string name="store_sound_click">クリック音</string>
     <string name="store_sound_menu">ゲームメニュー</string>
     <string name="store_sound_achievement">実績</string>
+    <string name="store_preview">プレビュー</string>
+    <string name="store_preview_play">再生</string>
+    <string name="store_preview_stop">停止</string>
+    <string name="store_msg_preview_failed">プレビューに失敗しました。接続を確認してください。</string>
     <string name="store_font_sample">いろはにほへと ちりぬるを わかよたれそ つねならむ 0123456789</string>
     <string name="store_search">ストアを検索</string>
     <string name="store_search_hint">名前またはタグ</string>

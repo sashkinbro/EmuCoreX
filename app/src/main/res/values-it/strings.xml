@@ -3392,6 +3392,10 @@
     <string name="store_sound_click">Clic</string>
     <string name="store_sound_menu">Menu di gioco</string>
     <string name="store_sound_achievement">Obiettivo</string>
+    <string name="store_preview">Anteprima</string>
+    <string name="store_preview_play">Riproduci</string>
+    <string name="store_preview_stop">Interrompi</string>
+    <string name="store_msg_preview_failed">Anteprima non riuscita. Controlla la connessione.</string>
     <string name="store_font_sample">Quel vituperabile xenofobo zelante assaggia il whisky ed esclama: alleluja! 0123456789</string>
     <string name="store_search">Cerca nello Store</string>
     <string name="store_search_hint">Nome o tag</string>

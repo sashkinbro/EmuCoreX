@@ -3412,6 +3412,10 @@
     <string name="store_sound_click">Kliknutí</string>
     <string name="store_sound_menu">Herní nabídka</string>
     <string name="store_sound_achievement">Úspěch</string>
+    <string name="store_preview">Poslech</string>
+    <string name="store_preview_play">Přehrát</string>
+    <string name="store_preview_stop">Zastavit</string>
+    <string name="store_msg_preview_failed">Náhled se nezdařil. Zkontrolujte připojení.</string>
     <string name="store_font_sample">Příliš žluťoučký kůň úpěl ďábelské ódy. 0123456789</string>
     <string name="store_search">Hledat v Obchodě</string>
     <string name="store_search_hint">Název nebo štítek</string>

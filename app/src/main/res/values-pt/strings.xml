@@ -3394,6 +3394,10 @@
     <string name="store_sound_click">Cliques</string>
     <string name="store_sound_menu">Menu do jogo</string>
     <string name="store_sound_achievement">Conquista</string>
+    <string name="store_preview">Pré-visualização</string>
+    <string name="store_preview_play">Reproduzir</string>
+    <string name="store_preview_stop">Parar</string>
+    <string name="store_msg_preview_failed">Falha na pré-visualização. Verifique a sua ligação.</string>
     <string name="store_font_sample">Um pequeno jabuti xereta viu dez cegonhas felizes. 0123456789</string>
     <string name="store_search">Pesquisar na Loja</string>
     <string name="store_search_hint">Nome ou tag</string>

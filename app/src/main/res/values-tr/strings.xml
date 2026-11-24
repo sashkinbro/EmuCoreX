@@ -3392,6 +3392,10 @@
     <string name="store_sound_click">Tıklamalar</string>
     <string name="store_sound_menu">Oyun menüsü</string>
     <string name="store_sound_achievement">Başarım</string>
+    <string name="store_preview">Önizleme</string>
+    <string name="store_preview_play">Oynat</string>
+    <string name="store_preview_stop">Durdur</string>
+    <string name="store_msg_preview_failed">Önizleme başarısız oldu. Bağlantınızı kontrol edin.</string>
     <string name="store_font_sample">Pijamalı hasta yağız şoföre çabucak güvendi. 0123456789</string>
     <string name="store_search">Mağazada ara</string>
     <string name="store_search_hint">Ad veya etiket</string>

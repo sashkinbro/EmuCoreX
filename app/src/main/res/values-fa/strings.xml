@@ -3407,6 +3407,10 @@
     <string name="store_sound_click">صدای کلیک</string>
     <string name="store_sound_menu">منوی بازی</string>
     <string name="store_sound_achievement">دستاورد</string>
+    <string name="store_preview">پیش‌شنود</string>
+    <string name="store_preview_play">پخش</string>
+    <string name="store_preview_stop">توقف</string>
+    <string name="store_msg_preview_failed">پیش‌شنود ناموفق بود. اتصال خود را بررسی کنید.</string>
     <string name="store_font_sample">متن نمونه: روباه قهوه‌ای چابک از روی سگ تنبل می‌پرد. 0123456789</string>
     <string name="store_search">جستجو در فروشگاه</string>
     <string name="store_search_hint">نام یا برچسب</string>

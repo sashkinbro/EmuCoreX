@@ -3396,6 +3396,10 @@
     <string name="store_sound_click">نقرات الأزرار</string>
     <string name="store_sound_menu">قائمة اللعبة</string>
     <string name="store_sound_achievement">الإنجازات</string>
+    <string name="store_preview">معاينة</string>
+    <string name="store_preview_play">تشغيل</string>
+    <string name="store_preview_stop">إيقاف</string>
+    <string name="store_msg_preview_failed">فشلت المعاينة. تحقق من اتصالك.</string>
     <string name="store_font_sample">نص تجريبي: أسرع ثعلب بني يقفز فوق الكلب الكسول. 0123456789</string>
     <string name="store_search">ابحث في المتجر</string>
     <string name="store_search_hint">الاسم أو الوسم</string>

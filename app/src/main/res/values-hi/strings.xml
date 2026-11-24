@@ -3392,6 +3392,10 @@
     <string name="store_sound_click">क्लिक ध्वनियाँ</string>
     <string name="store_sound_menu">गेम मेनू</string>
     <string name="store_sound_achievement">उपलब्धि</string>
+    <string name="store_preview">पूर्वावलोकन</string>
+    <string name="store_preview_play">चलाएँ</string>
+    <string name="store_preview_stop">रोकें</string>
+    <string name="store_msg_preview_failed">पूर्वावलोकन विफल रहा। अपना कनेक्शन जाँचें।</string>
     <string name="store_font_sample">नमूना पाठ: तेज़ भूरी लोमड़ी आलसी कुत्ते के ऊपर से कूदती है। 0123456789</string>
     <string name="store_search">स्टोर में खोजें</string>
     <string name="store_search_hint">नाम या टैग</string>

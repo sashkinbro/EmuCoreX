@@ -3406,6 +3406,10 @@
     <string name="store_sound_click">Klik</string>
     <string name="store_sound_menu">Menu game</string>
     <string name="store_sound_achievement">Pencapaian</string>
+    <string name="store_preview">Pratinjau</string>
+    <string name="store_preview_play">Putar</string>
+    <string name="store_preview_stop">Berhenti</string>
+    <string name="store_msg_preview_failed">Pratinjau gagal. Periksa koneksi Anda.</string>
     <string name="store_font_sample">Sampel teks: rubah cokelat yang cepat melompati anjing yang malas. 0123456789</string>
     <string name="store_search">Cari di Toko</string>
     <string name="store_search_hint">Nama atau tag</string>

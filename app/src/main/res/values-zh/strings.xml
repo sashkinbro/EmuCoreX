@@ -3393,6 +3393,10 @@
     <string name="store_sound_click">点击音</string>
     <string name="store_sound_menu">游戏菜单</string>
     <string name="store_sound_achievement">成就</string>
+    <string name="store_preview">预览</string>
+    <string name="store_preview_play">播放</string>
+    <string name="store_preview_stop">停止</string>
+    <string name="store_msg_preview_failed">预览失败。请检查网络连接。</string>
     <string name="store_font_sample">敏捷的棕色狐狸跳过了懒惰的狗。 0123456789</string>
     <string name="store_search">搜索商店</string>
     <string name="store_search_hint">名称或标签</string>

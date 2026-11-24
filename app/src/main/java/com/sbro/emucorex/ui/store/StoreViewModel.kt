@@ -7,6 +7,10 @@ import androidx.lifecycle.viewModelScope
 import com.sbro.emucorex.BuildConfig
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.ProPurchaseManager
+import com.sbro.emucorex.core.UiSoundManager
+import com.sbro.emucorex.data.store.StoreSoundPacks
+import kotlinx.coroutines.Job
+import java.io.File
 import com.sbro.emucorex.data.AppFontChoice
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.UiSoundPresets
@@ -61,6 +65,23 @@ enum class StoreActionPhase { DOWNLOADING, INSTALLING, APPLYING, REMOVING }
 
 /** A running action on one item. [progress] is 0..1 while downloading, otherwise unused. */
 data class StoreAction(val phase: StoreActionPhase, val progress: Float = 0f)
+
+/** Sound-pack preview state: [part] is music, click, menu or achievement; [loading] covers the download. */
+data class SoundPreview(
+    val itemId: String? = null,
+    val part: String? = null,
+    val loading: Boolean = false,
+    val playing: Boolean = false,
+    val progress: Float = 0f
+)
+
+private const val MAX_PREVIEW_PACKS = 5
+private val PREVIEW_KEYS = mapOf(
+    "music" to listOf("music"),
+    "click" to listOf("click"),
+    "menu" to listOf("menu_open", "menu_select", "menu_close"),
+    "achievement" to listOf("achievement")
+)
 
 internal fun StoreItem.statusFor(installed: InstalledStoreItem?, applied: Boolean): StoreItemStatus = when {
     minAppVersionCode > BuildConfig.VERSION_CODE -> StoreItemStatus.NEEDS_NEWER_APP
@@ -262,6 +283,101 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
             else post(R.string.store_msg_apply_failed)
         }
     }
+
+    // region Sound-pack preview
+
+    private val _preview = MutableStateFlow(SoundPreview())
+    val preview: StateFlow<SoundPreview> = _preview.asStateFlow()
+    private var previewJob: Job? = null
+    private val previewPlayer = StoreSoundPreviewPlayer { finishPreview() }
+
+    /** Starts the [part] preview of a sound pack, or stops it when it is already the one playing. */
+    fun togglePreview(item: StoreItem, installedItem: InstalledStoreItem?, part: String) {
+        if (item.kind != StoreKind.SOUNDS || part !in PREVIEW_KEYS) return
+        val current = _preview.value
+        if (current.itemId == item.id && current.part == part) {
+            stopPreview()
+            return
+        }
+        if (item.id in _actions.value) return
+        stopPreview()
+        _preview.value = SoundPreview(item.id, part, loading = false)
+        previewJob = viewModelScope.launch {
+            val app = getApplication<Application>()
+            val directory = try {
+                if (installedItem != null) {
+                    File(StoreInstalls.kindDirectory(app, StoreKind.SOUNDS), item.id)
+                } else {
+                    preparePreviewDirectory(item)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _preview.value = SoundPreview()
+                post(R.string.store_msg_preview_failed)
+                return@launch
+            }
+            val files = PREVIEW_KEYS.getValue(part).mapNotNull { StoreSoundPacks.fileIn(directory, it) }
+            if (files.isEmpty()) {
+                _preview.value = SoundPreview()
+                post(R.string.store_msg_preview_failed)
+                return@launch
+            }
+            _preview.value = SoundPreview(item.id, part, loading = false, playing = true)
+            UiSoundManager.setStorePreviewActive(true)
+            previewPlayer.play(files, loop = part == "music", volume = if (part == "music") 0.6f else 0.9f)
+        }
+    }
+
+    fun stopPreview() {
+        previewJob?.cancel()
+        previewJob = null
+        previewPlayer.stop()
+        finishPreview()
+    }
+
+    private fun finishPreview() {
+        if (_preview.value != SoundPreview()) _preview.value = SoundPreview()
+        UiSoundManager.setStorePreviewActive(false)
+    }
+
+    /** Unpacked preview files of [item] under cacheDir/store-preview; downloads and unpacks them on first use. */
+    private suspend fun preparePreviewDirectory(item: StoreItem): File {
+        val root = File(getApplication<Application>().cacheDir, "store-preview")
+        val directory = File(root, "${item.id}-${item.version}")
+        if (StoreSoundPacks.KEYS.any { StoreSoundPacks.fileIn(directory, it) != null }) {
+            directory.setLastModified(System.currentTimeMillis())
+            return directory
+        }
+        var lastReported = -1f
+        _preview.update { it.copy(loading = true, progress = 0f) }
+        val file = repository.download(item) { progress ->
+            if (progress - lastReported >= 0.01f || progress >= 1f) {
+                lastReported = progress
+                _preview.update { it.copy(progress = progress.coerceIn(0f, 1f)) }
+            }
+        }
+        try {
+            installer.extractSoundPreview(item, file, directory).getOrThrow()
+        } finally {
+            file.delete()
+        }
+        _preview.update { it.copy(loading = false) }
+        // Keep only the most recently previewed packs.
+        root.listFiles()?.filter { it.isDirectory && it != directory }
+            ?.sortedByDescending { it.lastModified() }
+            ?.drop(MAX_PREVIEW_PACKS - 1)
+            ?.forEach { it.deleteRecursively() }
+        return directory
+    }
+
+    override fun onCleared() {
+        previewPlayer.stop()
+        UiSoundManager.setStorePreviewActive(false)
+        super.onCleared()
+    }
+
+    // endregion
 
     private fun setAction(id: String, action: StoreAction) {
         _actions.update { it + (id to action) }

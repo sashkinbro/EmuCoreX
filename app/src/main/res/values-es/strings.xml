@@ -3394,6 +3394,10 @@
     <string name="store_sound_click">Clics</string>
     <string name="store_sound_menu">Menú del juego</string>
     <string name="store_sound_achievement">Logro</string>
+    <string name="store_preview">Vista previa</string>
+    <string name="store_preview_play">Reproducir</string>
+    <string name="store_preview_stop">Detener</string>
+    <string name="store_msg_preview_failed">Error en la vista previa. Comprueba tu conexión.</string>
     <string name="store_font_sample">El veloz murciélago hindú comía feliz cardillo y kiwi. 0123456789</string>
     <string name="store_search">Buscar en la Tienda</string>
     <string name="store_search_hint">Nombre o etiqueta</string>

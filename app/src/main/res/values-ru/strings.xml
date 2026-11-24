@@ -3402,6 +3402,10 @@
     <string name="store_sound_click">Клики</string>
     <string name="store_sound_menu">Меню игры</string>
     <string name="store_sound_achievement">Достижение</string>
+    <string name="store_preview">Предпрослушивание</string>
+    <string name="store_preview_play">Воспроизвести</string>
+    <string name="store_preview_stop">Остановить</string>
+    <string name="store_msg_preview_failed">Не удалось загрузить предпрослушивание. Проверьте соединение.</string>
     <string name="store_font_sample">Съешь же ещё этих мягких французских булок, да выпей чаю. 0123456789</string>
     <string name="store_search">Поиск в Магазине</string>
     <string name="store_search_hint">Название или тег</string>

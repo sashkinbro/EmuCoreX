@@ -3414,6 +3414,10 @@
     <string name="store_sound_click">Kliknięcia</string>
     <string name="store_sound_menu">Menu gry</string>
     <string name="store_sound_achievement">Osiągnięcie</string>
+    <string name="store_preview">Podgląd</string>
+    <string name="store_preview_play">Odtwórz</string>
+    <string name="store_preview_stop">Zatrzymaj</string>
+    <string name="store_msg_preview_failed">Podgląd nie powiódł się. Sprawdź połączenie.</string>
     <string name="store_font_sample">Zażółć gęślą jaźń. 0123456789</string>
     <string name="store_search">Szukaj w Sklepie</string>
     <string name="store_search_hint">Nazwa lub tag</string>

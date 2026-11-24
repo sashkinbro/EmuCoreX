@@ -171,7 +171,8 @@ class StorePackageInstaller private constructor(context: Context) {
 
     // region Sounds
 
-    private fun installSounds(item: StoreItem, file: File) {
+    /** Reads and validates a sound package archive in memory; shared by install and Store previews. */
+    private fun readSoundPack(item: StoreItem, file: File): Pair<SoundsManifest, Map<String, ByteArray>> {
         val allowedNames = StoreSoundPacks.KEYS.flatMap { key -> listOf("$key.ogg", "$key.wav") }.toSet()
         val entries = readArchive(file, maxEntries = StoreSoundPacks.KEYS.size + 1, maxTotal = 7L * 1024 * 1024) { name ->
             when {
@@ -195,6 +196,40 @@ class StorePackageInstaller private constructor(context: Context) {
         if (entries.keys.any { it != StoreInstalls.SOUNDS_JSON && it !in manifest.files.values }) {
             throw StorePackageException("Unreferenced file in sound pack")
         }
+        return manifest to entries
+    }
+
+    /**
+     * Unpacks only the validated sound files of a verified [file] into [directory] for a Store preview.
+     * The package is kept; nothing is installed.
+     */
+    suspend fun extractSoundPreview(item: StoreItem, file: File, directory: File): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            if (item.kind != StoreKind.SOUNDS || !StoreInstalls.ID_PATTERN.matches(item.id)) {
+                throw StorePackageException("Not a sound pack")
+            }
+            if (!file.isFile || file.length() == 0L || file.length() > StoreRepository.maxPackageBytes(item.kind)) {
+                throw StorePackageException("Package file is missing or too large")
+            }
+            val (manifest, entries) = readSoundPack(item, file)
+            directory.deleteRecursively()
+            check(directory.mkdirs()) { "Unable to prepare the preview directory" }
+            try {
+                manifest.files.values.forEach { name -> File(directory, name).writeBytes(entries.getValue(name)) }
+            } catch (error: Exception) {
+                directory.deleteRecursively()
+                throw error
+            }
+            Result.success(Unit)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Result.failure(error)
+        }
+    }
+
+    private fun installSounds(item: StoreItem, file: File) {
+        val (manifest, entries) = readSoundPack(item, file)
         commit(StoreKind.SOUNDS, item.id) { staging ->
             entries.forEach { (name, bytes) -> File(staging, name).writeBytes(bytes) }
             manifest.files.forEach { (key, name) ->
