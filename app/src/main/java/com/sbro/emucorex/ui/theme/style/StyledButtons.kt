@@ -6,6 +6,20 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.translate
+import com.sbro.emucorex.data.theme.ButtonVariant
+import com.sbro.emucorex.data.theme.ThemeShapeStyle
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonElevation
@@ -42,9 +56,16 @@ private fun buttonLook(
     shape: Shape,
     border: BorderStroke?,
     interactionSource: MutableInteractionSource,
-    filled: Boolean
+    filled: Boolean,
+    text: Boolean = false
 ): ButtonLook? {
     val pressed by interactionSource.collectIsPressedAsState()
+    val variant = LocalThemeExtras.current.button
+    if (variant != ButtonVariant.DEFAULT &&
+        (!text || variant == ButtonVariant.UNDERLINE || variant == ButtonVariant.BRACKET)
+    ) {
+        return variantButtonLook(variant, base, enabled, shape)
+    }
     val container = if (enabled) base.containerColor else base.disabledContainerColor
     // Text/outlined buttons have a transparent container; styles that draw raised buttons give them one.
     val fill = if (container.alpha < 0.05f) androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant else container
@@ -104,6 +125,111 @@ private fun buttonLook(
     }
 }
 
+/** Structural `components.button` variants; they replace the UI style's button painting. */
+@Composable
+private fun variantButtonLook(variant: ButtonVariant, base: ButtonColors, enabled: Boolean, shape: Shape): ButtonLook {
+    val scheme = MaterialTheme.colorScheme
+    val widthDp = LocalThemeExtras.current.borderWidthDp
+    val container = if (enabled) base.containerColor else base.disabledContainerColor
+    val solid = container.alpha >= 0.05f
+    val fill = when {
+        !enabled -> scheme.onSurface.copy(alpha = 0.12f)
+        solid -> container
+        else -> scheme.primary
+    }
+    val onFill = when {
+        !enabled -> scheme.onSurface.copy(alpha = 0.38f)
+        solid -> base.contentColor
+        else -> scheme.onPrimary
+    }
+    val accent = when {
+        !enabled -> scheme.onSurface.copy(alpha = 0.38f)
+        solid -> container
+        else -> base.contentColor
+    }
+    fun look(modifier: Modifier, content: Color, border: BorderStroke?) = ButtonLook(
+        modifier = modifier,
+        colors = base.copy(
+            containerColor = Color.Transparent, disabledContainerColor = Color.Transparent,
+            contentColor = content, disabledContentColor = content
+        ),
+        border = border, flat = true
+    )
+    fun stroke(c: Color, defaultDp: Float): BorderStroke? {
+        val w = widthDp ?: defaultDp
+        return if (w <= 0f) null else BorderStroke(w.dp, c)
+    }
+    return when (variant) {
+        ButtonVariant.FILLED, ButtonVariant.DEFAULT -> look(Modifier.background(fill, shape), onFill, null)
+        ButtonVariant.OUTLINE -> look(Modifier, accent, stroke(accent, 1.5f))
+        ButtonVariant.SOFT -> look(
+            Modifier.background(accent.copy(alpha = 0.16f), shape),
+            if (enabled) lerp(accent, scheme.onSurface, 0.25f) else accent, null
+        )
+        ButtonVariant.GEL -> look(
+            Modifier.background(
+                Brush.verticalGradient(
+                    0f to lerp(fill, Color.White, 0.45f),
+                    0.48f to lerp(fill, Color.White, 0.10f),
+                    0.52f to fill,
+                    1f to lerp(fill, Color.Black, 0.14f)
+                ), shape
+            ),
+            onFill, stroke(lerp(fill, Color.Black, 0.3f), 1f)
+        )
+        ButtonVariant.RAISED3D -> {
+            val ledge = lerp(fill, Color.Black, 0.38f)
+            look(
+                Modifier
+                    .drawBehind {
+                        val l = 3.dp.toPx()
+                        val outline = shape.createOutline(Size(size.width, size.height - l), layoutDirection, this)
+                        translate(0f, l) { drawOutline(outline, ledge) }
+                    }
+                    .padding(bottom = 3.dp)
+                    .background(fill, shape),
+                onFill, null
+            )
+        }
+        ButtonVariant.UNDERLINE -> look(
+            Modifier.drawBehind {
+                val t = (widthDp ?: 2f).coerceAtLeast(1f).dp.toPx()
+                val inset = 10.dp.toPx()
+                drawLine(accent, Offset(inset, size.height - t / 2), Offset(size.width - inset, size.height - t / 2), t)
+            },
+            accent, null
+        )
+        ButtonVariant.BRACKET -> look(
+            Modifier.drawBehind {
+                val t = (widthDp ?: 1.5f).coerceAtLeast(1f).dp.toPx()
+                val a = 7.dp.toPx()
+                val m = t / 2 + 1.dp.toPx()
+                val h = size.height
+                val w = size.width
+                val left = Path().apply { moveTo(m + a, m); lineTo(m, m); lineTo(m, h - m); lineTo(m + a, h - m) }
+                val right = Path().apply { moveTo(w - m - a, m); lineTo(w - m, m); lineTo(w - m, h - m); lineTo(w - m - a, h - m) }
+                drawPath(left, accent, style = Stroke(t))
+                drawPath(right, accent, style = Stroke(t))
+            },
+            accent, null
+        )
+    }
+}
+
+/**
+ * Buttons without an explicit shape follow the theme's corner style (square in CLASSIC/PIXEL/TERMINAL,
+ * cut in cut-corner themes). With the stock rounded style and scale 1 the Material default is kept.
+ */
+@Composable
+internal fun defaultButtonShape(stock: Shape): Shape {
+    val extras = LocalThemeExtras.current
+    if (extras.shapeStyle == ThemeShapeStyle.ROUNDED &&
+        (extras.uiStyle == UiStyle.CLASSIC || extras.uiStyle == UiStyle.PIXEL || extras.uiStyle == UiStyle.TERMINAL)
+    ) return RectangleShape
+    val themed = neonButtonShape()
+    return if (themed == ButtonDefaults.shape) stock else themed
+}
+
 /**
  * Material silently grows buttons/chips to a 48dp touch target. Painted styles draw on the outer
  * modifier, so that growth would make the painting bigger than the control ("swollen" buttons and a
@@ -128,7 +254,7 @@ fun Button(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    shape: Shape = ButtonDefaults.shape,
+    shape: Shape = defaultButtonShape(ButtonDefaults.shape),
     colors: ButtonColors = ButtonDefaults.buttonColors(),
     elevation: ButtonElevation? = ButtonDefaults.buttonElevation(),
     border: BorderStroke? = null,
@@ -149,7 +275,7 @@ fun FilledTonalButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    shape: Shape = ButtonDefaults.filledTonalShape,
+    shape: Shape = defaultButtonShape(ButtonDefaults.filledTonalShape),
     colors: ButtonColors = ButtonDefaults.filledTonalButtonColors(),
     elevation: ButtonElevation? = ButtonDefaults.filledTonalButtonElevation(),
     border: BorderStroke? = null,
@@ -170,7 +296,7 @@ fun OutlinedButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    shape: Shape = ButtonDefaults.outlinedShape,
+    shape: Shape = defaultButtonShape(ButtonDefaults.outlinedShape),
     colors: ButtonColors = ButtonDefaults.outlinedButtonColors(),
     elevation: ButtonElevation? = null,
     border: BorderStroke? = ButtonDefaults.outlinedButtonBorder(enabled),
@@ -191,7 +317,7 @@ fun TextButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    shape: Shape = ButtonDefaults.textShape,
+    shape: Shape = defaultButtonShape(ButtonDefaults.textShape),
     colors: ButtonColors = ButtonDefaults.textButtonColors(),
     elevation: ButtonElevation? = null,
     border: BorderStroke? = null,
@@ -202,8 +328,11 @@ fun TextButton(
     val source = interactionSource ?: remember { MutableInteractionSource() }
     // Only the "raised button" styles give text buttons a body (classic dialogs had real buttons).
     val style = LocalThemeExtras.current.uiStyle
-    val look = if (style == UiStyle.CLASSIC || style == UiStyle.LUNA || style == UiStyle.PIXEL) {
-        buttonLook(style, colors, enabled, shape, border, source, filled = false)
+    val variant = LocalThemeExtras.current.button
+    val look = if (style == UiStyle.CLASSIC || style == UiStyle.LUNA || style == UiStyle.PIXEL ||
+        variant == ButtonVariant.UNDERLINE || variant == ButtonVariant.BRACKET
+    ) {
+        buttonLook(style, colors, enabled, shape, border, source, filled = false, text = true)
     } else null
     StyledTouchTarget(look != null) {
         M3TextButton(onClick, modifier.then(look?.modifier ?: Modifier), enabled, shape, look?.colors ?: colors,

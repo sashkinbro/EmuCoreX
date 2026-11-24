@@ -4,7 +4,9 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import com.sbro.emucorex.data.theme.ThemeFont
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import com.sbro.emucorex.R
@@ -24,6 +26,38 @@ private val Exo2FontFamily = FontFamily(
     Font(R.font.exo2_variable, FontWeight.SemiBold),
     Font(R.font.exo2_variable, FontWeight.Bold)
 )
+
+// Bundled theme fonts (SIL OFL, see assets/licenses). Static fonts get one file per weight; the
+// variable ones pin the weight axis per entry.
+private val PixelFontFamily = FontFamily(Font(R.font.pressstart2p_regular, FontWeight.Normal))
+
+private val SpaceMonoFontFamily = FontFamily(
+    Font(R.font.spacemono_regular, FontWeight.Normal),
+    Font(R.font.spacemono_regular, FontWeight.Medium),
+    Font(R.font.spacemono_bold, FontWeight.SemiBold),
+    Font(R.font.spacemono_bold, FontWeight.Bold)
+)
+
+private fun variableFamily(res: Int) = FontFamily(
+    listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold).map { weight ->
+        Font(res, weight, variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)))
+    }
+)
+
+private val LoraFontFamily by lazy { variableFamily(R.font.lora_variable) }
+private val OswaldFontFamily by lazy { variableFamily(R.font.oswald_variable) }
+
+/** Family for a bundled theme font, or null for fonts handled elsewhere (system/Rubik/Exo/package). */
+fun bundledThemeFamily(font: ThemeFont?): FontFamily? = when (font) {
+    ThemeFont.PIXEL -> PixelFontFamily
+    ThemeFont.SPACE_MONO -> SpaceMonoFontFamily
+    ThemeFont.LORA -> LoraFontFamily
+    ThemeFont.OSWALD -> OswaldFontFamily
+    else -> null
+}
+
+/** Press Start 2P has a huge em box; shrink it so body text stays near the other fonts' size. */
+fun themeFontSizeFactor(font: ThemeFont?): Float = if (font == ThemeFont.PIXEL) 0.75f else 1f
 
 val Typography = Typography(
     displayLarge = TextStyle(
@@ -146,3 +180,32 @@ private fun TextStyle.withFont(family: FontFamily, scale: Float): TextStyle = co
 
 private fun TextUnit.scaledBy(scale: Float): TextUnit =
     if (this == TextUnit.Unspecified) this else (value * scale).sp
+
+/** Scales every text size/line height by [factor] (used to tame fonts with a large em box). */
+fun Typography.scaledText(factor: Float): Typography = if (factor == 1f) this else copy(
+    displayLarge = displayLarge.scaledText(factor), displayMedium = displayMedium.scaledText(factor),
+    displaySmall = displaySmall.scaledText(factor), headlineLarge = headlineLarge.scaledText(factor),
+    headlineMedium = headlineMedium.scaledText(factor), headlineSmall = headlineSmall.scaledText(factor),
+    titleLarge = titleLarge.scaledText(factor), titleMedium = titleMedium.scaledText(factor),
+    titleSmall = titleSmall.scaledText(factor), bodyLarge = bodyLarge.scaledText(factor),
+    bodyMedium = bodyMedium.scaledText(factor), bodySmall = bodySmall.scaledText(factor),
+    labelLarge = labelLarge.scaledText(factor), labelMedium = labelMedium.scaledText(factor),
+    labelSmall = labelSmall.scaledText(factor)
+)
+
+private fun TextStyle.scaledText(factor: Float): TextStyle = copy(
+    fontSize = fontSize.scaledBy(factor),
+    lineHeight = lineHeight.scaledBy(factor)
+)
+
+/** Adds extra letter spacing (sp) to titles and headlines only. */
+fun Typography.withTitleLetterSpacing(extraSp: Float): Typography = if (extraSp == 0f) this else copy(
+    displayLarge = displayLarge.spaced(extraSp), displayMedium = displayMedium.spaced(extraSp),
+    displaySmall = displaySmall.spaced(extraSp), headlineLarge = headlineLarge.spaced(extraSp),
+    headlineMedium = headlineMedium.spaced(extraSp), headlineSmall = headlineSmall.spaced(extraSp),
+    titleLarge = titleLarge.spaced(extraSp), titleMedium = titleMedium.spaced(extraSp),
+    titleSmall = titleSmall.spaced(extraSp)
+)
+
+private fun TextStyle.spaced(extraSp: Float): TextStyle =
+    copy(letterSpacing = (if (letterSpacing == TextUnit.Unspecified) 0f else letterSpacing.value).plus(extraSp).sp)

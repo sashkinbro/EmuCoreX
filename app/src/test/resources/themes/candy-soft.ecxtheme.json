@@ -1,0 +1,13 @@
+{
+  "formatVersion": 1, "id": "candy-soft", "version": 1,
+  "name": {"en": "Candy Soft"},
+  "colors": {"primary":"#C2185B","onPrimary":"#FFFFFF","secondary":"#8E5BD9","tertiary":"#FF8A65","background":"#FFF4F8","surface":"#FFFFFF","surfaceVariant":"#FCE4EC","onBackground":"#3A1A28","onSurface":"#3A1A28","onSurfaceVariant":"#7A4A5E","outline":"#D8A5BB","error":"#C62828"},
+  "dark": false,
+  "shape": {"style": "rounded", "scale": 1.6},
+  "typography": {"font": "lora"},
+  "effects": {"style": "bubble"},
+  "components": {"card": "elevated", "button": "gel", "chip": "pill", "switch": "led", "header": "large-title"},
+  "borders": {"accentEdge": "bottom"},
+  "background": {"pattern": "dots"},
+  "icons": {"container": "circle"}
+}

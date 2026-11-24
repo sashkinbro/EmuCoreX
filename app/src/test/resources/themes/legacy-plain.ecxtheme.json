@@ -1,0 +1,7 @@
+{
+  "formatVersion": 1, "id": "legacy-plain", "version": 1,
+  "name": {"en": "Legacy Plain"},
+  "colors": {"primary":"#4F8CFF","onPrimary":"#FFFFFF","secondary":"#7A8BA8","tertiary":"#B58CFF","background":"#12151C","surface":"#1B2030","surfaceVariant":"#262C40","onBackground":"#E6E9F2","onSurface":"#E6E9F2","onSurfaceVariant":"#AAB2C8","outline":"#4A5270","error":"#FF6B6B"},
+  "shape": {"style": "rounded", "scale": 1.0},
+  "effects": {"decor": "none", "style": "standard"}
+}

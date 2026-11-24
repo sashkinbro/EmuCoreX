@@ -21,13 +21,20 @@ data class ThemePackageSpec(
     val shape: ShapeSpec = ShapeSpec(),
     val typography: TypographySpec = TypographySpec(),
     val effects: EffectsSpec = EffectsSpec(),
-    val background: BackgroundSpec = BackgroundSpec()
+    val background: BackgroundSpec = BackgroundSpec(),
+    val components: ComponentsSpec = ComponentsSpec(),
+    val borders: BordersSpec = BordersSpec(),
+    val icons: IconsSpec = IconsSpec()
 ) {
     @Serializable
     data class ShapeSpec(val style: String = "rounded", val scale: Float = 1f)
 
     @Serializable
-    data class TypographySpec(val font: String? = null)
+    data class TypographySpec(
+        val font: String? = null,
+        val titleCase: String = "none",
+        val letterSpacing: Float = 0f
+    )
 
     @Serializable
     data class EffectsSpec(
@@ -37,7 +44,24 @@ data class ThemePackageSpec(
     )
 
     @Serializable
-    data class BackgroundSpec(val dim: Float = 0.35f)
+    data class BackgroundSpec(val dim: Float = 0.35f, val pattern: String = "none")
+
+    /** Per-component structural variants; "default" keeps the UI style's own look. */
+    @Serializable
+    data class ComponentsSpec(
+        val card: String = "default",
+        val button: String = "default",
+        val chip: String = "default",
+        val switch: String = "default",
+        val header: String = "default"
+    )
+
+    /** `width` is in dp (0..3); negative/absent keeps the style's own border width. */
+    @Serializable
+    data class BordersSpec(val width: Float = -1f, val accentEdge: String = "none")
+
+    @Serializable
+    data class IconsSpec(val container: String = "default")
 
     fun displayName(locale: String): String {
         val language = locale.substringBefore('-').substringBefore('_').lowercase()
@@ -93,7 +117,24 @@ enum class UiStyle(val wire: String) {
     }
 }
 
-enum class ThemeFont { SYSTEM, RUBIK, EXO2, MONOSPACE, SERIF, PACKAGE }
+enum class ThemeFont { SYSTEM, RUBIK, EXO2, MONOSPACE, SERIF, PACKAGE, PIXEL, SPACE_MONO, LORA, OSWALD }
+
+/* Structural variants (see THEME_FORMAT.md). DEFAULT always means "what the UI style does today". */
+enum class CardVariant { DEFAULT, ELEVATED, OUTLINED, FLAT, GLASS, INSET, NOTCHED, DOUBLE }
+enum class ButtonVariant { DEFAULT, FILLED, OUTLINE, SOFT, GEL, RAISED3D, UNDERLINE, BRACKET }
+enum class ChipVariant { DEFAULT, PILL, SQUARE, TAG }
+enum class SwitchVariant { DEFAULT, TRACK, CHECKBOX, LED }
+enum class HeaderVariant { DEFAULT, SOLID, GRADIENT, UNDERLINE, OUTLINED, GLASS, LARGE_TITLE }
+enum class AccentEdge { NONE, LEFT, TOP, BOTTOM }
+enum class BackgroundPattern { NONE, DOTS, GRID, DIAGONAL, WAVES, NOISE, CIRCUIT, HEX }
+enum class IconContainer { DEFAULT, NONE, CIRCLE, SQUIRCLE, SQUARE }
+enum class TitleCase { NONE, UPPER }
+
+/** Case/dash-insensitive enum lookup; unknown or missing values give [default]. */
+internal fun <E : Enum<E>> Array<E>.byWire(value: String?, default: E): E {
+    val key = value?.trim()?.replace("-", "")?.replace("_", "")?.lowercase() ?: return default
+    return firstOrNull { it.name.replace("_", "").lowercase() == key } ?: default
+}
 
 /** Theme properties beyond the Material color scheme, as plain values (no Compose types). */
 data class ThemeStyleSpec(
@@ -108,7 +149,19 @@ data class ThemeStyleSpec(
     val gold: Int? = null,
     val font: ThemeFont? = null,
     val scanlines: Boolean = false,
-    val backgroundDim: Float = 0.35f
+    val backgroundDim: Float = 0.35f,
+    val card: CardVariant = CardVariant.DEFAULT,
+    val button: ButtonVariant = ButtonVariant.DEFAULT,
+    val chip: ChipVariant = ChipVariant.DEFAULT,
+    val switch: SwitchVariant = SwitchVariant.DEFAULT,
+    val header: HeaderVariant = HeaderVariant.DEFAULT,
+    /** Border width override in dp; null keeps each style's own width. */
+    val borderWidthDp: Float? = null,
+    val accentEdge: AccentEdge = AccentEdge.NONE,
+    val pattern: BackgroundPattern = BackgroundPattern.NONE,
+    val titleCase: TitleCase = TitleCase.NONE,
+    val titleLetterSpacingSp: Float = 0f,
+    val iconContainer: IconContainer = IconContainer.DEFAULT
 )
 
 fun ThemePackageSpec.toCustomThemeConfig(locale: String): CustomThemeConfig {
@@ -174,8 +227,23 @@ fun ThemePackageSpec.toStyleSpec(): ThemeStyleSpec = ThemeStyleSpec(
         "monospace" -> ThemeFont.MONOSPACE
         "serif" -> ThemeFont.SERIF
         "package" -> ThemeFont.PACKAGE
+        "pixel" -> ThemeFont.PIXEL
+        "spacemono" -> ThemeFont.SPACE_MONO
+        "lora" -> ThemeFont.LORA
+        "oswald" -> ThemeFont.OSWALD
         else -> null
     },
     scanlines = effects.scanlines,
-    backgroundDim = background.dim.takeIf { it.isFinite() }?.coerceIn(0f, 0.9f) ?: 0.35f
+    backgroundDim = background.dim.takeIf { it.isFinite() }?.coerceIn(0f, 0.9f) ?: 0.35f,
+    card = CardVariant.entries.toTypedArray().byWire(components.card.removeSuffix("-border").removeSuffix("_border"), CardVariant.DEFAULT),
+    button = ButtonVariant.entries.toTypedArray().byWire(components.button, ButtonVariant.DEFAULT),
+    chip = ChipVariant.entries.toTypedArray().byWire(components.chip, ChipVariant.DEFAULT),
+    switch = SwitchVariant.entries.toTypedArray().byWire(components.switch, SwitchVariant.DEFAULT),
+    header = HeaderVariant.entries.toTypedArray().byWire(components.header, HeaderVariant.DEFAULT),
+    borderWidthDp = borders.width.takeIf { it.isFinite() && it >= 0f }?.coerceIn(0f, 3f),
+    accentEdge = AccentEdge.entries.toTypedArray().byWire(borders.accentEdge, AccentEdge.NONE),
+    pattern = BackgroundPattern.entries.toTypedArray().byWire(background.pattern, BackgroundPattern.NONE),
+    titleCase = TitleCase.entries.toTypedArray().byWire(typography.titleCase, TitleCase.NONE),
+    titleLetterSpacingSp = typography.letterSpacing.takeIf { it.isFinite() }?.coerceIn(-1f, 6f) ?: 0f,
+    iconContainer = IconContainer.entries.toTypedArray().byWire(icons.container, IconContainer.DEFAULT)
 )

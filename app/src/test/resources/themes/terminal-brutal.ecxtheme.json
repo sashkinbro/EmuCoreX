@@ -1,0 +1,12 @@
+{
+  "formatVersion": 1, "id": "terminal-brutal", "version": 1,
+  "name": {"en": "Terminal Brutal"},
+  "colors": {"primary":"#39FF88","onPrimary":"#02140A","secondary":"#1FBF66","tertiary":"#B6FF3A","background":"#050805","surface":"#0B120C","surfaceVariant":"#122016","onBackground":"#C8FFD8","onSurface":"#C8FFD8","onSurfaceVariant":"#7FC99A","outline":"#2C5A3C","error":"#FF5C5C"},
+  "shape": {"style": "square", "scale": 1.0},
+  "typography": {"font": "spacemono", "titleCase": "upper", "letterSpacing": 1.5},
+  "effects": {"style": "terminal", "scanlines": true},
+  "components": {"card": "double-border", "button": "bracket", "chip": "square", "switch": "checkbox", "header": "underline"},
+  "borders": {"width": 1, "accentEdge": "left"},
+  "background": {"dim": 0.5, "pattern": "grid"},
+  "icons": {"container": "square"}
+}

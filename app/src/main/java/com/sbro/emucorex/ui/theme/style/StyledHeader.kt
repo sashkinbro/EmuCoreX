@@ -3,6 +3,13 @@ package com.sbro.emucorex.ui.theme.style
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
+import com.sbro.emucorex.data.theme.HeaderVariant
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -24,7 +31,18 @@ import com.sbro.emucorex.ui.theme.LocalThemeExtras
 fun styledHeaderBrush(): Brush? {
     val primary = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
-    return when (LocalThemeExtras.current.uiStyle) {
+    val extras = LocalThemeExtras.current
+    when (extras.header) {
+        HeaderVariant.SOLID -> return Brush.verticalGradient(listOf(primary, primary))
+        HeaderVariant.GRADIENT -> {
+            val away = if (MaterialTheme.colorScheme.onPrimary.luminance() > 0.5f) Color.Black else Color.White
+            return Brush.horizontalGradient(listOf(primary, lerp(primary, away, 0.25f)))
+        }
+        HeaderVariant.DEFAULT -> Unit
+        // Transparent/outlined/glass/large-title headers are regular panel headers.
+        else -> return null
+    }
+    return when (extras.uiStyle) {
         UiStyle.CLASSIC -> Brush.horizontalGradient(listOf(primary, lerp(primary, Color.White, 0.42f)))
         UiStyle.LUNA -> Brush.verticalGradient(
             0f to lerp(primary, Color.White, 0.45f),
@@ -44,6 +62,7 @@ fun styledHeaderBrush(): Brush? {
 private fun headerFrame(): Modifier {
     val outline = MaterialTheme.colorScheme.outline
     val primary = MaterialTheme.colorScheme.primary
+    if (LocalThemeExtras.current.header != HeaderVariant.DEFAULT) return Modifier
     return when (LocalThemeExtras.current.uiStyle) {
         UiStyle.CLASSIC -> Modifier.drawWithContent {
             drawContent()
@@ -81,12 +100,56 @@ fun HeaderSurface(
 ) {
     val brush = styledHeaderBrush()
     if (brush == null) {
+        val extras = LocalThemeExtras.current
+        val scheme = MaterialTheme.colorScheme
+        val widthDp = extras.borderWidthDp
+        when (extras.header) {
+            HeaderVariant.UNDERLINE -> {
+                val rule = extras.accent1
+                val t = (widthDp ?: 2f).coerceAtLeast(1f)
+                Box(modifier = modifier.drawBehind {
+                    drawLine(rule, Offset(0f, size.height - t.dp.toPx() / 2), Offset(size.width, size.height - t.dp.toPx() / 2), t.dp.toPx())
+                }) { content() }
+                return
+            }
+            HeaderVariant.OUTLINED -> {
+                Surface(modifier = modifier, shape = shape, color = Color.Transparent,
+                    border = BorderStroke(((widthDp ?: 1.5f).takeIf { it > 0f } ?: 1.5f).dp, scheme.primary), content = content)
+                return
+            }
+            HeaderVariant.GLASS -> {
+                Surface(
+                    modifier = modifier.overlayInShape(shape) {
+                        drawRect(Brush.verticalGradient(0f to Color.White.copy(alpha = 0.16f), 0.6f to Color.Transparent))
+                    },
+                    shape = shape, color = color.copy(alpha = color.alpha * 0.45f),
+                    border = BorderStroke(1.dp, lerp(scheme.outline, Color.White, 0.55f).copy(alpha = 0.5f)), content = content
+                )
+                return
+            }
+            HeaderVariant.LARGE_TITLE -> {
+                val typography = MaterialTheme.typography
+                Surface(modifier = modifier, shape = shape, color = color, tonalElevation = tonalElevation,
+                    shadowElevation = shadowElevation, border = border) {
+                    // Taller bar, content sitting on the bottom edge, bigger title text.
+                    MaterialTheme(
+                        colorScheme = scheme, shapes = MaterialTheme.shapes,
+                        typography = typography.copy(titleLarge = typography.headlineMedium, titleMedium = typography.titleLarge)
+                    ) {
+                        Box(Modifier.heightIn(min = 96.dp), contentAlignment = Alignment.BottomStart) { content() }
+                    }
+                }
+                return
+            }
+            else -> Unit
+        }
         Surface(modifier = modifier, shape = shape, color = color, tonalElevation = tonalElevation,
             shadowElevation = shadowElevation, border = border, content = content)
         return
     }
     val scheme = MaterialTheme.colorScheme
-    val onHeader = if (LocalThemeExtras.current.uiStyle == UiStyle.OSD) scheme.onSurface else scheme.onPrimary
+    val headerVariant = LocalThemeExtras.current.header
+    val onHeader = if (headerVariant == HeaderVariant.DEFAULT && LocalThemeExtras.current.uiStyle == UiStyle.OSD) scheme.onSurface else scheme.onPrimary
     val headerScheme = scheme.copy(
         onSurface = onHeader,
         onSurfaceVariant = onHeader.copy(alpha = 0.82f),

@@ -234,12 +234,14 @@ fun EmuCoreXTheme(
             fontScale = safeFontScale
         )
     }
+    val bundledFamily = bundledThemeFamily(packageFont)
     val typography = when {
         effectiveMode == ThemeMode.NEON -> baseTypography.neonMonospace()
         packageFont == ThemeFont.MONOSPACE -> baseTypography.withFamily(FontFamily.Monospace)
         packageFont == ThemeFont.SERIF -> baseTypography.withFamily(FontFamily.Serif)
+        bundledFamily != null -> baseTypography.withFamily(bundledFamily).scaledText(themeFontSizeFactor(packageFont))
         else -> baseTypography
-    }
+    }.withTitleLetterSpacing(if (effectiveMode == ThemeMode.PACKAGE) extras.titleLetterSpacingSp else 0f)
     MaterialTheme(
         colorScheme = colorScheme,
         typography = typography,
@@ -251,6 +253,7 @@ fun EmuCoreXTheme(
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 content()
+                com.sbro.emucorex.ui.theme.style.ThemePatternOverlay(extras.pattern)
                 if (extras.scanlines && enableCrtOverlay) {
                     NeonCrtOverlay()
                 }

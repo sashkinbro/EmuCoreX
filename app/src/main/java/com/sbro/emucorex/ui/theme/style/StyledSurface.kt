@@ -51,6 +51,21 @@ internal fun panelLook(
     shadowElevation: Dp,
     pressed: Boolean = false
 ): PanelLook {
+    val base = stylePanelLook(shape, color, border, tonalElevation, shadowElevation, pressed)
+    // Full-bleed rectangular containers stay undecorated by the structural variants too.
+    if (shape == androidx.compose.ui.graphics.RectangleShape && LocalThemeExtras.current.uiStyle != UiStyle.CLASSIC) return base
+    return structuredPanelLook(base, shape, color, border, shadowElevation)
+}
+
+@Composable
+private fun stylePanelLook(
+    shape: Shape,
+    color: Color,
+    border: BorderStroke?,
+    tonalElevation: Dp,
+    shadowElevation: Dp,
+    pressed: Boolean
+): PanelLook {
     val extras = LocalThemeExtras.current
     val scheme = MaterialTheme.colorScheme
     val visible = color.alpha > 0.04f

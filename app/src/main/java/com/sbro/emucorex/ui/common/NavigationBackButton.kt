@@ -261,4 +261,6 @@ private fun ScreenTopBarContent(
 /** Terminal style shows headers as a prompt line. */
 @Composable
 private fun styledTitle(title: String): String =
-    if (LocalThemeExtras.current.uiStyle == UiStyle.TERMINAL) "> ${title}_" else title
+    com.sbro.emucorex.ui.theme.style.themedTitleCase(title).let {
+        if (LocalThemeExtras.current.uiStyle == UiStyle.TERMINAL) "> ${it}_" else it
+    }

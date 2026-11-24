@@ -1208,7 +1208,7 @@ private fun SettingsCompactTopBar(
                     )
                 } else {
                     Text(
-                        text = title,
+                        text = com.sbro.emucorex.ui.theme.style.themedTitleCase(title),
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
@@ -5780,12 +5780,15 @@ internal fun SettingsItem(
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val iconShape = com.sbro.emucorex.ui.theme.style.themedIconContainerShape(neonShape(12.dp))
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .clip(neonShape(12.dp))
+                        .clip(iconShape ?: androidx.compose.ui.graphics.RectangleShape)
                         .then(
-                            if (LocalNeonTheme.current) {
+                            if (iconShape == null) {
+                                Modifier
+                            } else if (LocalNeonTheme.current) {
                                 Modifier
                                     .background(if (enabled) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.background.copy(alpha = 0.6f))
                                     .border(

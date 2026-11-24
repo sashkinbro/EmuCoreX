@@ -3,7 +3,16 @@ package com.sbro.emucorex.ui.theme
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import com.sbro.emucorex.data.theme.AccentEdge
+import com.sbro.emucorex.data.theme.BackgroundPattern
+import com.sbro.emucorex.data.theme.ButtonVariant
+import com.sbro.emucorex.data.theme.CardVariant
+import com.sbro.emucorex.data.theme.ChipVariant
+import com.sbro.emucorex.data.theme.HeaderVariant
+import com.sbro.emucorex.data.theme.IconContainer
+import com.sbro.emucorex.data.theme.SwitchVariant
 import com.sbro.emucorex.data.theme.ThemeDecor
+import com.sbro.emucorex.data.theme.TitleCase
 import com.sbro.emucorex.data.theme.ThemeShapeStyle
 import com.sbro.emucorex.data.theme.ThemeStyleSpec
 import com.sbro.emucorex.data.theme.UiStyle
@@ -30,7 +39,20 @@ data class ThemeExtras(
     val gold: Color = DefaultGold,
     val scanlines: Boolean = false,
     val backgroundFile: File? = null,
-    val backgroundDim: Float = 0.35f
+    val backgroundDim: Float = 0.35f,
+    // Structural variants; every DEFAULT/NONE value reproduces the UI style's own look.
+    val card: CardVariant = CardVariant.DEFAULT,
+    val button: ButtonVariant = ButtonVariant.DEFAULT,
+    val chip: ChipVariant = ChipVariant.DEFAULT,
+    val switch: SwitchVariant = SwitchVariant.DEFAULT,
+    val header: HeaderVariant = HeaderVariant.DEFAULT,
+    /** Border width override in dp, null = the style's own. */
+    val borderWidthDp: Float? = null,
+    val accentEdge: AccentEdge = AccentEdge.NONE,
+    val pattern: BackgroundPattern = BackgroundPattern.NONE,
+    val titleCase: TitleCase = TitleCase.NONE,
+    val titleLetterSpacingSp: Float = 0f,
+    val iconContainer: IconContainer = IconContainer.DEFAULT
 ) {
     val neonDecor: Boolean get() = decor == ThemeDecor.NEON
 
@@ -69,5 +91,16 @@ internal fun ThemeStyleSpec.toThemeExtras(
     gold = gold?.let(::Color) ?: ThemeExtras.DefaultGold,
     scanlines = scanlines,
     backgroundFile = backgroundFile,
-    backgroundDim = backgroundDim
+    backgroundDim = backgroundDim,
+    card = card,
+    button = button,
+    chip = chip,
+    switch = switch,
+    header = header,
+    borderWidthDp = borderWidthDp,
+    accentEdge = accentEdge,
+    pattern = pattern,
+    titleCase = titleCase,
+    titleLetterSpacingSp = titleLetterSpacingSp,
+    iconContainer = iconContainer
 )
