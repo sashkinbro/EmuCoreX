@@ -34,7 +34,7 @@ class HubUiStateTest {
 
         val visible = HubUiState(
             items = listOf(launch, slim),
-            selectedTab = HubTab.HISTORY
+            section = HubSection.HISTORY
         ).visibleItems
 
         assertEquals(listOf("slim", "launch"), visible.map(HubItem::id))
