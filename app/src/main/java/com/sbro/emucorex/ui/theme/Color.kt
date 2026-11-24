@@ -21,10 +21,11 @@ val AccentPrimaryContainer = Color(0xFF10233D)
 val AccentPrimaryLightContainer = Color(0xFFBFD2F2)
 val OnAccent = Color(0xFFFFFFFF)
 
-val SecondaryAccent = Color(0xFF8669D9)
-val SecondaryAccentDark = Color(0xFF644CB0)
-val SecondaryContainer = Color(0xFF241D3F)
-val SecondaryLightContainer = Color(0xFFDAD2F4)
+// Sky blue, not purple: the app's palette has no purple (badges/chips use secondary roles).
+val SecondaryAccent = Color(0xFF3FA9D6)
+val SecondaryAccentDark = Color(0xFF227AA3)
+val SecondaryContainer = Color(0xFF0F2633)
+val SecondaryLightContainer = Color(0xFFCFE8F3)
 
 val TertiaryAccent = Color(0xFF50D9A0)
 val TertiaryDark = Color(0xFF3BB882)
