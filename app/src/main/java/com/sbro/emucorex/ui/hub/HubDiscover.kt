@@ -29,6 +29,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -108,14 +110,15 @@ internal fun HubModeSwitch(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = horizontalPadding, vertical = 8.dp),
-        shape = neonShape(999.dp),
+        // Outer and inner radii are concentric (inner = outer - padding) so corners line up in every style.
+        shape = neonShape(22.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         Row(modifier = Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             HubMode.entries.forEach { entry ->
                 val selected = entry == mode
                 val interactionSource = remember { MutableInteractionSource() }
-                val shape = neonChipShape()
+                val shape = neonShape(18.dp)
                 Surface(
                     onClick = { onSelected(entry) },
                     interactionSource = interactionSource,
@@ -247,7 +250,26 @@ private fun ShelfHeader(title: String, onSeeAll: () -> Unit) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-        TextButton(onClick = onSeeAll) { Text(stringResource(R.string.hub_see_all)) }
+        // A light link, not a button body: styles give text buttons raised frames, which looked heavy here.
+        Row(
+            modifier = Modifier
+                .clip(neonShape(10.dp))
+                .clickable(onClick = onSeeAll)
+                .padding(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.hub_see_all),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Icon(
+                imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }
 
