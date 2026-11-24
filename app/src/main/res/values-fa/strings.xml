@@ -2419,6 +2419,7 @@
     <string name="settings_language_czech">چکی</string>
     <string name="settings_language_native_czech">Čeština</string>
     <string name="hub_title">EmuCore - هاب</string>
+    <string name="hub_title_short">مرکز</string>
     <string name="hub_tab_news">اخبار</string>
     <string name="hub_tab_videos">ویدیوها</string>
     <string name="hub_tab_history">تاریخچه PS2</string>

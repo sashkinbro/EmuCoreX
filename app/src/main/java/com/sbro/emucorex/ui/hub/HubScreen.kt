@@ -264,7 +264,7 @@ fun HubScreen(
                 item(key = "hub-header", span = { GridItemSpan(maxLineSpan) }) {
                     Column {
                         HubTopBar(
-                            title = section?.title() ?: storeModel.shelfTitle().takeIf { storeActive } ?: stringResource(R.string.hub_title),
+                            title = section?.title() ?: storeModel.shelfTitle().takeIf { storeActive } ?: stringResource(R.string.hub_title_short),
                             topInset = (topInset - stickyTabInset).coerceAtLeast(0.dp),
                             onBackClick = { if (!(storeActive && storeFilters.closeShelf()) && !viewModel.closeSection()) onBackClick() },
                             onSearchClick = {

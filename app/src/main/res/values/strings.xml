@@ -2505,6 +2505,7 @@
     <string name="settings_clear_cover_cache_success">Cover cache cleared. Covers will download again automatically.</string>
     <string name="settings_clear_cover_cache_partial">Some cached covers could not be removed. Try again after current downloads finish.</string>
     <string name="hub_title">EmuCore - Hub</string>
+    <string name="hub_title_short">Hub</string>
     <string name="hub_tab_news">News</string>
     <string name="hub_tab_videos">Videos</string>
     <string name="hub_tab_history">PS2 History</string>

@@ -2403,6 +2403,7 @@
     <string name="settings_language_czech">체코어</string>
     <string name="settings_language_native_czech">Čeština</string>
     <string name="hub_title">EmuCore - 허브</string>
+    <string name="hub_title_short">허브</string>
     <string name="hub_tab_news">뉴스</string>
     <string name="hub_tab_videos">동영상</string>
     <string name="hub_tab_history">PS2 역사</string>

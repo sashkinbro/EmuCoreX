@@ -2404,6 +2404,7 @@
     <string name="settings_language_czech">Çekçe</string>
     <string name="settings_language_native_czech">Čeština</string>
     <string name="hub_title">EmuCore - Merkez</string>
+    <string name="hub_title_short">Hub</string>
     <string name="hub_tab_news">Haberler</string>
     <string name="hub_tab_videos">Videolar</string>
     <string name="hub_tab_history">PS2 Tarihi</string>

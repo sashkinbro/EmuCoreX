@@ -2409,6 +2409,7 @@
     <string name="settings_language_czech">Чешский</string>
     <string name="settings_language_native_czech">Čeština</string>
     <string name="hub_title">EmuCore - Хаб</string>
+    <string name="hub_title_short">Хаб</string>
     <string name="hub_tab_news">Новости</string>
     <string name="hub_tab_videos">Видео</string>
     <string name="hub_tab_history">История PS2</string>

@@ -2408,6 +2408,7 @@
     <string name="settings_language_czech">التشيكية</string>
     <string name="settings_language_native_czech">Čeština</string>
     <string name="hub_title">EmuCore - المركز</string>
+    <string name="hub_title_short">المركز</string>
     <string name="hub_tab_news">الأخبار</string>
     <string name="hub_tab_videos">الفيديوهات</string>
     <string name="hub_tab_history">تاريخ PS2</string>

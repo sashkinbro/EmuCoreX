@@ -2405,6 +2405,7 @@
     <string name="settings_language_czech">捷克语</string>
     <string name="settings_language_native_czech">Čeština</string>
     <string name="hub_title">EmuCore - 枢纽</string>
+    <string name="hub_title_short">中心</string>
     <string name="hub_tab_news">新闻</string>
     <string name="hub_tab_videos">视频</string>
     <string name="hub_tab_history">PS2 历史</string>

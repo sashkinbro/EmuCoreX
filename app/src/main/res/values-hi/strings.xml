@@ -2404,6 +2404,7 @@
     <string name="settings_language_czech">चेक</string>
     <string name="settings_language_native_czech">Čeština</string>
     <string name="hub_title">EmuCore - हब</string>
+    <string name="hub_title_short">हब</string>
     <string name="hub_tab_news">समाचार</string>
     <string name="hub_tab_videos">वीडियो</string>
     <string name="hub_tab_history">PS2 का इतिहास</string>
