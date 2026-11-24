@@ -795,7 +795,7 @@
     <string name="emulation_stick_scale">Масштаб стіка</string>
     <string name="emulation_close_menu">Закрити меню</string>
     <string name="home_sort_title_asc">Назва А-Я</string>
-    <string name="home_sort_title_desc">Название Я-А</string>
+    <string name="home_sort_title_desc">Назва Я-А</string>
     <string name="home_sort_recent_desc">Нещодавно оновлені</string>
     <string name="home_sort_recent_asc">Найстаріші оновлені</string>
     <string name="home_game_menu_start">Почати гру</string>

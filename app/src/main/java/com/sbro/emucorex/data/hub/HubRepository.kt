@@ -2,6 +2,8 @@ package com.sbro.emucorex.data.hub
 
 import android.content.Context
 import androidx.room.withTransaction
+import com.sbro.emucorex.data.store.StoreFile
+import com.sbro.emucorex.data.store.StoreSnapshot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +33,11 @@ class HubRepository private constructor(context: Context) {
 
     /** Last verified theme catalog, persisted so the Themes tab works offline. */
     val themes: StateFlow<HubThemeSnapshot?> = _themes.asStateFlow()
+
+    private val _storeSync = MutableStateFlow<StoreSnapshot?>(null)
+
+    /** Store catalog of the latest successful sync; StoreRepository persists and republishes it. */
+    val storeSync: StateFlow<StoreSnapshot?> = _storeSync.asStateFlow()
 
     fun observeItems(languageTag: String?): Flow<List<HubItem>> {
         val locale = HubLocaleResolver.resolve(languageTag)
@@ -82,6 +89,9 @@ class HubRepository private constructor(context: Context) {
                     updatedAtMillis = now
                 )
             )
+        }
+        snapshot.store?.let { catalog ->
+            _storeSync.value = StoreSnapshot(snapshot.baseUrl, snapshot.manifest.catalogRevision, catalog)
         }
         snapshot.themes?.let { catalog ->
             val themeSnapshot = HubThemeSnapshot(snapshot.baseUrl, snapshot.manifest.catalogRevision, catalog)
@@ -193,6 +203,18 @@ class HubRepository private constructor(context: Context) {
     suspend fun downloadThemePackage(entry: HubThemeEntry): ByteArray = withContext(Dispatchers.IO) {
         val snapshot = _themes.value ?: error("Hub themes are unavailable")
         remote.fetchThemePackage(snapshot.url(entry.packageFile), entry.packageFile)
+    }
+
+    /** Streams a pinned Store file into [target]; see [HubRemoteDataSource.downloadVerified]. */
+    suspend fun downloadStoreFile(
+        url: String,
+        file: StoreFile,
+        hardLimit: Long,
+        target: File,
+        onProgress: (Float) -> Unit
+    ) = withContext(Dispatchers.IO) {
+        val job = coroutineContext[kotlinx.coroutines.Job]
+        remote.downloadVerified(url, file, hardLimit, target, { job?.isActive != false }, onProgress)
     }
 
     @kotlinx.serialization.Serializable

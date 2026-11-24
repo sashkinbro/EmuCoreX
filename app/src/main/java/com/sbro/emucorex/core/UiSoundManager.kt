@@ -17,6 +17,7 @@ import com.sbro.emucorex.data.UiSoundPresets
 import com.sbro.emucorex.data.UiSoundRepository
 import com.sbro.emucorex.data.UiSoundSetting
 import com.sbro.emucorex.data.UiSoundSettings
+import com.sbro.emucorex.data.store.StoreSoundPacks
 
 /**
  * Frontend (non-emulation) sounds: looped background music, UI button clicks and the in-game menu
@@ -40,11 +41,11 @@ object UiSoundManager {
     private const val PREVIEW_RELEASE_DELAY_MS = 2_500L
 
     /** [rawIndex] picks the resource inside the selected preset (menu: open, close, select). */
-    private enum class Sample(val kind: UiSoundKind, val rawIndex: Int) {
-        CLICK(UiSoundKind.BUTTON_CLICK, 0),
-        MENU_OPEN(UiSoundKind.GAME_MENU, 0),
-        MENU_CLOSE(UiSoundKind.GAME_MENU, 1),
-        MENU_SELECT(UiSoundKind.GAME_MENU, 2)
+    private enum class Sample(val kind: UiSoundKind, val rawIndex: Int, val packKey: String) {
+        CLICK(UiSoundKind.BUTTON_CLICK, 0, "click"),
+        MENU_OPEN(UiSoundKind.GAME_MENU, 0, "menu_open"),
+        MENU_CLOSE(UiSoundKind.GAME_MENU, 1, "menu_close"),
+        MENU_SELECT(UiSoundKind.GAME_MENU, 2, "menu_select")
     }
 
     private val shortKinds = listOf(UiSoundKind.BUTTON_CLICK, UiSoundKind.GAME_MENU)
@@ -192,6 +193,10 @@ object UiSoundManager {
         val context = appContext ?: return
         if (kind == UiSoundKind.BACKGROUND_MUSIC || volumePercent <= 0) return
         val raw = UiSoundPresets.find(kind, presetId).raws[0]
+        // Store sound pack ("pack:<id>"): audition its file; a missing pack plays the default preset.
+        val packFile = UiSoundPresets.packIdOf(presetId)?.let { packId ->
+            StoreSoundPacks.file(context, packId, if (kind == UiSoundKind.BUTTON_CLICK) "click" else "menu_open")
+        }
         previewPool?.release()
         val attributes = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
@@ -207,7 +212,8 @@ object UiSoundManager {
                 loaded.release()
             }, PREVIEW_RELEASE_DELAY_MS)
         }
-        if (transient.load(context, raw, 1) == 0) {
+        val loadStarted = if (packFile != null) transient.load(packFile.absolutePath, 1) else transient.load(context, raw, 1)
+        if (loadStarted == 0) {
             previewPool = null
             transient.release()
         }
@@ -233,7 +239,11 @@ object UiSoundManager {
     }
 
     private fun signatureOf(setting: UiSoundSetting) =
-        if (setting.usesCustom) "custom:${setting.revision}" else "preset:${setting.preset}"
+        when {
+            setting.usesCustom -> "custom:${setting.revision}"
+            UiSoundPresets.packIdOf(setting.preset) != null -> "preset:${setting.preset}:${setting.revision}"
+            else -> "preset:${setting.preset}"
+        }
 
     private fun createPool(): SoundPool {
         val attributes = AudioAttributes.Builder()
@@ -284,7 +294,18 @@ object UiSoundManager {
         } else {
             // No custom file, or SoundPool rejected it synchronously: use the selected preset.
             val preset = UiSoundPresets.find(kind, setting.preset)
-            samples.forEach { sampleIds[it] = soundPool.load(context, preset.raws[it.rawIndex], 1) }
+            val packId = if (forceDefault) null else UiSoundPresets.packIdOf(setting.preset)
+            samples.forEach { sample ->
+                // Store pack: per-sample file, falling back to the default preset for files the pack lacks.
+                val packFile = packId?.let { StoreSoundPacks.file(context, it, sample.packKey) }
+                val packSoundId = packFile?.let { soundPool.load(it.absolutePath, 1) } ?: 0
+                if (packSoundId != 0) {
+                    customSoundKinds[packSoundId] = kind
+                    sampleIds[sample] = packSoundId
+                } else {
+                    sampleIds[sample] = soundPool.load(context, preset.raws[sample.rawIndex], 1)
+                }
+            }
         }
         // Recorded even when the default was substituted so a missing/broken file is not retried in a loop.
         loadedSignatures[kind] = signatureOf(setting)
@@ -394,6 +415,11 @@ object UiSoundManager {
         } else {
             null
         }
+        val packMusic = if (custom == null) {
+            UiSoundPresets.packIdOf(settings.music.preset)?.let { StoreSoundPacks.file(context, it, "music") }
+        } else {
+            null
+        }
         val mediaPlayer = MediaPlayer()
         try {
             mediaPlayer.setAudioAttributes(
@@ -404,6 +430,8 @@ object UiSoundManager {
             )
             if (custom != null) {
                 mediaPlayer.setDataSource(custom.absolutePath)
+            } else if (packMusic != null) {
+                mediaPlayer.setDataSource(packMusic.absolutePath)
             } else {
                 val presetRes = UiSoundPresets.find(UiSoundKind.BACKGROUND_MUSIC, settings.music.preset).raws[0]
                 context.resources.openRawResourceFd(presetRes).use { afd ->

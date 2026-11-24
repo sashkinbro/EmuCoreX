@@ -664,6 +664,7 @@ class AppPreferences(private val context: Context) {
         private val CUSTOM_COVERS_REVISION = intPreferencesKey("custom_covers_revision")
         private val TOUCH_CONTROL_VISUAL_STYLE = intPreferencesKey("touch_control_visual_style")
         private val TOUCH_CONTROL_PRESS_EFFECT = intPreferencesKey("touch_control_press_effect")
+        private val TOUCH_CONTROL_SKIN_PACK = stringPreferencesKey("touch_control_skin_pack")
         private val CUSTOM_TOUCH_CONTROLS_JSON = stringPreferencesKey("custom_touch_controls_json")
         private val GAME_MENU_LAYOUT_STYLE = intPreferencesKey("game_menu_layout_style")
         private val DRAWER_VISUAL_STYLE = intPreferencesKey("drawer_visual_style")
@@ -1138,6 +1139,36 @@ class AppPreferences(private val context: Context) {
         .map { prefs -> TouchControlPressEffect.fromPreference(prefs[TOUCH_CONTROL_PRESS_EFFECT]) }
         .distinctUntilChanged()
 
+    /** Id of the applied Store controls skin pack (see data/store/StoreControlSkins), or null. */
+    val touchControlSkinPack: Flow<String?> = context.dataStore.data
+        .map { prefs -> prefs[TOUCH_CONTROL_SKIN_PACK]?.takeIf { it.isNotBlank() } }
+        .distinctUntilChanged()
+
+    suspend fun setTouchControlSkinPack(id: String?) {
+        context.dataStore.edit { prefs ->
+            if (id.isNullOrBlank()) prefs.remove(TOUCH_CONTROL_SKIN_PACK) else prefs[TOUCH_CONTROL_SKIN_PACK] = id
+        }
+    }
+
+    /**
+     * Applies a Store controls package: the skin pack id (null = leave the current skin untouched, "" =
+     * clear it), and optionally a standard-overlay layout and/or a custom button library. Layout JSON goes
+     * through the same decode/encode sanitizing as saved layouts. Pro gating is the caller's job.
+     */
+    suspend fun applyStoreControls(skinPackId: String?, overlayLayoutJson: String?, custom: CustomTouchControlLibrary?) {
+        context.dataStore.edit { prefs ->
+            if (skinPackId != null) {
+                if (skinPackId.isBlank()) prefs.remove(TOUCH_CONTROL_SKIN_PACK) else prefs[TOUCH_CONTROL_SKIN_PACK] = skinPackId
+            }
+            if (overlayLayoutJson != null) {
+                val layouts = decodeControlLayouts(overlayLayoutJson)
+                encodeControlLayouts(layouts)?.let { prefs[CONTROL_LAYOUTS] = it } ?: prefs.remove(CONTROL_LAYOUTS)
+                prefs[OVERLAY_LAYOUT_VERSION] = CURRENT_OVERLAY_LAYOUT_VERSION
+            }
+            if (custom != null) prefs[CUSTOM_TOUCH_CONTROLS_JSON] = custom.sanitized().encode()
+        }
+    }
+
     val gameMenuLayoutStyle: Flow<GameMenuLayoutStyle> = context.dataStore.data
         .map { prefs -> GameMenuLayoutStyle.fromPreference(prefs[GAME_MENU_LAYOUT_STYLE]) }
         .distinctUntilChanged()
@@ -1280,6 +1311,27 @@ class AppPreferences(private val context: Context) {
         }
     }
 
+    /**
+     * Selects Store sound pack [packId] ("pack:<id>" preset) for the click and game-menu kinds, and for
+     * music when [includeMusic]. Enabled/volume are left as the user set them.
+     */
+    suspend fun applyUiSoundPack(packId: String, includeMusic: Boolean) {
+        val presetId = UiSoundPresets.packPresetId(packId)
+        context.dataStore.edit { prefs ->
+            val kinds = buildList {
+                add(UiSoundKind.BUTTON_CLICK)
+                add(UiSoundKind.GAME_MENU)
+                if (includeMusic) add(UiSoundKind.BACKGROUND_MUSIC)
+            }
+            kinds.forEach { kind ->
+                prefs[uiSoundPresetKey(kind)] = UiSoundPresets.sanitizeId(kind, presetId)
+                prefs.remove(uiSoundCustomNameKey(kind))
+                prefs.remove(uiSoundCustomKey(kind))
+                prefs[uiSoundRevisionKey(kind)] = (prefs[uiSoundRevisionKey(kind)] ?: 0) + 1
+            }
+        }
+    }
+
     suspend fun setUiSoundCustomInstalled(kind: UiSoundKind, displayName: String?) {
         context.dataStore.edit { prefs ->
             prefs[uiSoundCustomKey(kind)] = true
@@ -1382,6 +1434,15 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setHomeBackgroundDim(dim: Int) {
         context.dataStore.edit { it[HOME_BACKGROUND_DIM] = dim.coerceIn(0, 85) }
+    }
+
+    /** Selects the installed custom image as Home background and sets its dim in one write. */
+    suspend fun applyStoreWallpaper(dim: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[HOME_BACKGROUND_TYPE] = HomeBackgroundType.IMAGE.preferenceValue
+            prefs[HOME_BACKGROUND_REVISION] = (prefs[HOME_BACKGROUND_REVISION] ?: 0) + 1
+            prefs[HOME_BACKGROUND_DIM] = dim.coerceIn(0, 85)
+        }
     }
 
     suspend fun setEmulationSideArtwork(artwork: EmulationSideArtwork) {

@@ -58,6 +58,41 @@ class HomeBackgroundRepository(context: Context) {
         }
     }
 
+    /**
+     * Installs an already-verified local file (e.g. a Store wallpaper) as the background, skipping the
+     * MIME sniffing of the picker path. The content is still decoded before it replaces anything.
+     */
+    suspend fun install(file: File, type: HomeBackgroundType): Result<HomeBackgroundType> = withContext(Dispatchers.IO) {
+        runCatching {
+            require(type.isCustomMedia) { "Unsupported background format" }
+            require(file.isFile && file.length() in 1..MAX_BACKGROUND_BYTES) { "Background file is missing or too large" }
+
+            backgroundDirectory.mkdirs()
+            val previousModified = installedBackground()?.second?.lastModified() ?: 0L
+            val temporaryFile = File(backgroundDirectory, "$FILE_NAME.tmp")
+            temporaryFile.delete()
+            try {
+                file.inputStream().use { input ->
+                    FileOutputStream(temporaryFile).use { output ->
+                        input.copyTo(output)
+                        output.fd.sync()
+                    }
+                }
+                validateContent(temporaryFile, type)
+                val targetFile = fileFor(type)
+                backgroundDirectory.listFiles()?.forEach { existing ->
+                    if (existing != temporaryFile && existing != targetFile && existing.name.startsWith(FILE_NAME)) existing.delete()
+                }
+                if (targetFile.exists()) targetFile.delete()
+                check(temporaryFile.renameTo(targetFile)) { "Unable to save background" }
+                targetFile.setLastModified(max(System.currentTimeMillis(), previousModified + 1L))
+                type
+            } finally {
+                temporaryFile.delete()
+            }
+        }
+    }
+
     fun fileFor(type: HomeBackgroundType): File =
         File(backgroundDirectory, "$FILE_NAME.${type.fileExtension}")
 

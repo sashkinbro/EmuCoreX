@@ -97,7 +97,57 @@ fun HeaderSurface(
     )
     Box(modifier = modifier.clip(shape).background(brush).then(headerFrame())) {
         MaterialTheme(colorScheme = headerScheme, typography = MaterialTheme.typography, shapes = MaterialTheme.shapes) {
-            CompositionLocalProvider(LocalContentColor provides onHeader) { content() }
+            // Menus opened from the header must use the page's colors, not the header remap.
+            CompositionLocalProvider(LocalContentColor provides onHeader, LocalOuterColorScheme provides scheme) { content() }
+        }
+    }
+}
+
+/** The page color scheme outside a styled header (null when not inside one). */
+val LocalOuterColorScheme = androidx.compose.runtime.compositionLocalOf<androidx.compose.material3.ColorScheme?> { null }
+
+/**
+ * Drop-in for material3.DropdownMenu. A menu opened from a title-bar header renders with the page's
+ * normal colors instead of inheriting the header's remapped "on header" colors (white on white).
+ */
+@Composable
+fun DropdownMenu(
+    expanded: Boolean,
+    onDismissRequest: () -> Unit,
+    modifier: Modifier = Modifier,
+    offset: androidx.compose.ui.unit.DpOffset = androidx.compose.ui.unit.DpOffset(0.dp, 0.dp),
+    scrollState: androidx.compose.foundation.ScrollState = androidx.compose.foundation.rememberScrollState(),
+    properties: androidx.compose.ui.window.PopupProperties = androidx.compose.ui.window.PopupProperties(focusable = true),
+    shape: Shape? = null,
+    containerColor: Color? = null,
+    tonalElevation: Dp? = null,
+    shadowElevation: Dp? = null,
+    border: BorderStroke? = null,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
+) {
+    val outer = LocalOuterColorScheme.current
+    @Composable
+    fun menu() {
+        androidx.compose.material3.DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = onDismissRequest,
+            modifier = modifier,
+            offset = offset,
+            scrollState = scrollState,
+            properties = properties,
+            shape = shape ?: androidx.compose.material3.MenuDefaults.shape,
+            containerColor = containerColor ?: androidx.compose.material3.MenuDefaults.containerColor,
+            tonalElevation = tonalElevation ?: androidx.compose.material3.MenuDefaults.TonalElevation,
+            shadowElevation = shadowElevation ?: androidx.compose.material3.MenuDefaults.ShadowElevation,
+            border = border,
+            content = content
+        )
+    }
+    if (outer == null) {
+        menu()
+    } else {
+        MaterialTheme(colorScheme = outer, typography = MaterialTheme.typography, shapes = MaterialTheme.shapes) {
+            CompositionLocalProvider(LocalContentColor provides outer.onSurface, LocalOuterColorScheme provides null) { menu() }
         }
     }
 }

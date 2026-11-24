@@ -51,7 +51,8 @@ data class HubManifest(
     val indexes: Map<String, Map<String, List<HubFileReference>>>,
     val assets: HubFileReference,
     val tombstones: HubFileReference,
-    val themes: HubFileReference? = null
+    val themes: HubFileReference? = null,
+    val store: HubFileReference? = null
 )
 
 @Serializable

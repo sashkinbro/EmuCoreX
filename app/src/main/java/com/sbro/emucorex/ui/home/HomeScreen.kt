@@ -89,7 +89,7 @@ import androidx.compose.material.icons.rounded.Warning
 import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
 import com.sbro.emucorex.ui.theme.style.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
+import com.sbro.emucorex.ui.theme.style.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import com.sbro.emucorex.ui.theme.style.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider

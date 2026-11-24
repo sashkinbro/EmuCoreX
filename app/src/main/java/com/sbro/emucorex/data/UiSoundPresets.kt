@@ -63,5 +63,17 @@ object UiSoundPresets {
     fun find(kind: UiSoundKind, id: String?): UiSoundPreset =
         forKind(kind).firstOrNull { it.id == id } ?: forKind(kind).first()
 
-    fun sanitizeId(kind: UiSoundKind, id: String?): String = find(kind, id).id
+    /** Store sound packs on disk are presets with id "pack:<store id>"; resolved by UiSoundManager. */
+    const val PACK_PREFIX = "pack:"
+    private val packIdPattern = Regex("[a-z0-9-]{3,48}")
+
+    fun packPresetId(packId: String): String = PACK_PREFIX + packId
+
+    /** The store id behind a "pack:<id>" preset id, or null for built-in / malformed ids. */
+    fun packIdOf(presetId: String?): String? =
+        presetId?.takeIf { it.startsWith(PACK_PREFIX) }?.substring(PACK_PREFIX.length)?.takeIf { packIdPattern.matches(it) }
+
+    /** A well-formed pack id is kept even if the pack is gone; the manager then plays the default. */
+    fun sanitizeId(kind: UiSoundKind, id: String?): String =
+        if (packIdOf(id) != null) id!! else find(kind, id).id
 }
