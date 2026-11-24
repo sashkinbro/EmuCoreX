@@ -55,6 +55,7 @@ import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.tvFocusGroup
 import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 import com.sbro.emucorex.ui.theme.style.Button
 import com.sbro.emucorex.ui.theme.style.FilledTonalButton
 import com.sbro.emucorex.ui.theme.style.OutlinedButton
@@ -147,10 +148,19 @@ fun OurProjectsScreen(onBackClick: () -> Unit) {
 
 @Composable
 private fun ProjectIcon(project: OurProject, modifier: Modifier = Modifier) {
+    if (project.iconRes != 0) {
+        // Real launcher artwork of the app (shipped as drawable-nodpi/project_icon_*.webp).
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(project.iconRes),
+            contentDescription = null,
+            modifier = modifier.size(60.dp).clip(neonShape(16.dp))
+        )
+        return
+    }
     Box(
         modifier = modifier
-            .size(56.dp)
-            .clip(neonShape(14.dp))
+            .size(60.dp)
+            .clip(neonShape(16.dp))
             .background(Brush.linearGradient(listOf(project.gradientStart, project.gradientEnd))),
         contentAlignment = Alignment.Center
     ) {
@@ -265,31 +275,48 @@ private fun ProjectCard(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ProjectsFooter(context: Context, failedMessage: String) {
-    Column(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .widthIn(max = 1000.dp)
-            .padding(top = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+            .padding(top = 4.dp, bottom = 12.dp),
+        shape = neonShape(22.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
     ) {
-        Text(
-            text = stringResource(R.string.projects_footer),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            TextButton(onClick = { openLink(context, OUR_PROJECTS_PATREON_URL, failedMessage) }) {
-                Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.size(6.dp))
-                Text(stringResource(R.string.projects_patreon))
-            }
-            TextButton(onClick = { openLink(context, OUR_PROJECTS_GITHUB_PROFILE_URL, failedMessage) }) {
-                Icon(Icons.Rounded.Code, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.size(6.dp))
-                Text(stringResource(R.string.projects_github_profile))
+            Text(
+                text = stringResource(R.string.projects_footer),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilledTonalButton(
+                    onClick = { openLink(context, OUR_PROJECTS_PATREON_URL, failedMessage) },
+                    shape = neonButtonShape()
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.size(8.dp))
+                    Text(stringResource(R.string.projects_patreon))
+                }
+                OutlinedButton(
+                    onClick = { openLink(context, OUR_PROJECTS_GITHUB_PROFILE_URL, failedMessage) },
+                    shape = neonButtonShape()
+                ) {
+                    Icon(Icons.Rounded.Code, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.size(8.dp))
+                    Text(stringResource(R.string.projects_github_profile))
+                }
             }
         }
     }
