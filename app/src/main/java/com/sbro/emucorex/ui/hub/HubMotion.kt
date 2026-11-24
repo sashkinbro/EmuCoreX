@@ -120,7 +120,9 @@ internal fun SegmentedSwitch(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = neonShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
+        // No gray slab: an outline like the Settings tab chips, the indicator is the only fill.
+        color = Color.Transparent,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         BoxWithConstraints(modifier = Modifier.padding(4.dp)) {
             val segmentWidth = (maxWidth - gap * (count - 1)) / count
