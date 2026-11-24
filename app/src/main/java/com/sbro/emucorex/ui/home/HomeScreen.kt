@@ -1,5 +1,6 @@
 package com.sbro.emucorex.ui.home
 
+import com.sbro.emucorex.ui.theme.LocalThemeExtras
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.net.Uri
@@ -488,15 +489,21 @@ fun HomeScreen(
             .background(MaterialTheme.colorScheme.background)
             .padding(horizontalSystemBarPadding)
     ) {
+        // A theme package may ship a background; it shows only when the user picked none.
+        val themeExtras = LocalThemeExtras.current
+        val themeBackground = themeExtras.backgroundFile?.takeIf {
+            uiState.homeBackgroundType == HomeBackgroundType.NONE
+        }
         AnimatedVisibility(
-            visible = !isShelfView && uiState.homeBackgroundType != HomeBackgroundType.NONE,
+            visible = !isShelfView &&
+                (uiState.homeBackgroundType != HomeBackgroundType.NONE || themeBackground != null),
             enter = fadeIn(animationSpec = tween(180, easing = EaseOut)),
             exit = fadeOut(animationSpec = tween(140, easing = EaseIn))
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 HomeBackgroundMedia(
-                    type = uiState.homeBackgroundType,
-                    file = homeBackgroundRepository.existingFile(uiState.homeBackgroundType),
+                    type = if (themeBackground != null) HomeBackgroundType.IMAGE else uiState.homeBackgroundType,
+                    file = themeBackground ?: homeBackgroundRepository.existingFile(uiState.homeBackgroundType),
                     preset = uiState.homeBackgroundPreset,
                     revision = uiState.homeBackgroundRevision,
                     modifier = Modifier.fillMaxSize()
@@ -506,7 +513,11 @@ fun HomeScreen(
                         .fillMaxSize()
                         .background(
                             MaterialTheme.colorScheme.background.copy(
-                                alpha = uiState.homeBackgroundDim / 100f
+                                alpha = if (themeBackground != null) {
+                                    themeExtras.backgroundDim
+                                } else {
+                                    uiState.homeBackgroundDim / 100f
+                                }
                             )
                         )
                 )

@@ -21,7 +21,8 @@ data class HubRemoteSnapshot(
     val requestedLocale: String,
     val baseUrl: String,
     val items: List<HubIndexItem>,
-    val assets: List<HubAsset>
+    val assets: List<HubAsset>,
+    val themes: HubThemeCatalog?
 )
 
 class HubRemoteDataSource(context: Context) {
@@ -80,6 +81,22 @@ class HubRemoteDataSource(context: Context) {
         val assets = json.decodeFromString<HubAssetCatalog>(assetBytes.toString(Charsets.UTF_8))
         require(assets.releaseId == manifest.releaseId)
 
+        // Optional section: a broken theme catalog must not take the rest of the Hub down.
+        val themes = manifest.themes?.let { reference ->
+            runCatching {
+                val themesUrl = resolvePinnedUrl(baseUrl, reference.path)
+                val bytes = fetchVerified(themesUrl, reference, MAX_THEME_CATALOG_BYTES)
+                json.decodeFromString<HubThemeCatalog>(bytes.toString(Charsets.UTF_8)).also { catalog ->
+                    require(catalog.formatVersion == SUPPORTED_THEME_CATALOG_FORMAT)
+                    require(catalog.releaseId == manifest.releaseId)
+                    catalog.themes.forEach { entry ->
+                        resolvePinnedUrl(baseUrl, entry.preview.path)
+                        resolvePinnedUrl(baseUrl, entry.packageFile.path)
+                    }
+                }
+            }.getOrNull()
+        }
+
         return HubRemoteSnapshot(
             channel = channel,
             manifest = manifest,
@@ -87,7 +104,8 @@ class HubRemoteDataSource(context: Context) {
             requestedLocale = HubLocaleResolver.resolve(requestedLocale),
             baseUrl = baseUrl,
             items = items,
-            assets = assets.assets
+            assets = assets.assets,
+            themes = themes
         )
     }
 
@@ -100,6 +118,12 @@ class HubRemoteDataSource(context: Context) {
         url = url,
         reference = HubFileReference(url = url, sha256 = sha256, bytes = bytes, contentType = "application/octet-stream"),
         hardLimit = MAX_IMAGE_BYTES
+    )
+
+    fun fetchThemePackage(url: String, file: HubThemeFile): ByteArray = fetchVerified(
+        url = url,
+        reference = HubFileReference(url = url, sha256 = file.sha256, bytes = file.bytes, contentType = "application/zip"),
+        hardLimit = MAX_THEME_PACKAGE_BYTES
     )
 
     private fun fetchVerified(url: String, reference: HubFileReference, hardLimit: Long): ByteArray {
@@ -200,6 +224,9 @@ class HubRemoteDataSource(context: Context) {
         private const val MAX_ASSET_CATALOG_BYTES = 2L * 1024L * 1024L
         private const val MAX_DOCUMENT_BYTES = 512L * 1024L
         private const val MAX_IMAGE_BYTES = 8L * 1024L * 1024L
+        private const val MAX_THEME_CATALOG_BYTES = 2L * 1024L * 1024L
+        private const val MAX_THEME_PACKAGE_BYTES = 4L * 1024L * 1024L
+        private const val SUPPORTED_THEME_CATALOG_FORMAT = 1
     }
 }
 

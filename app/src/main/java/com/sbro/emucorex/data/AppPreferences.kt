@@ -636,6 +636,8 @@ class AppPreferences(private val context: Context) {
         )
 
         private val THEME_MODE = intPreferencesKey("theme_mode")
+        private val THEME_PACKAGE_ID = stringPreferencesKey("theme_package_id")
+        private val THEME_PACKAGE_REQUIRES_PRO = booleanPreferencesKey("theme_package_requires_pro")
         private val CUSTOM_THEME_JSON = stringPreferencesKey("custom_theme_json")
         private val CUSTOM_THEME_LIBRARY_JSON = stringPreferencesKey("custom_theme_library_json")
         private val TV_INTERFACE_MODE = intPreferencesKey("tv_interface_mode")
@@ -993,6 +995,11 @@ class AppPreferences(private val context: Context) {
             3 -> if (prefs[PRO_UNLOCKED] == true) ThemeMode.PRO else ThemeMode.SYSTEM
             4 -> if (prefs[PRO_UNLOCKED] == true) ThemeMode.CUSTOM else ThemeMode.SYSTEM
             5 -> ThemeMode.NEON
+            6 -> when {
+                prefs[THEME_PACKAGE_ID].isNullOrBlank() -> ThemeMode.SYSTEM
+                prefs[THEME_PACKAGE_REQUIRES_PRO] == true && prefs[PRO_UNLOCKED] != true -> ThemeMode.SYSTEM
+                else -> ThemeMode.PACKAGE
+            }
             else -> ThemeMode.SYSTEM
         }
     }
@@ -1012,6 +1019,38 @@ class AppPreferences(private val context: Context) {
     val customThemeLibrary: Flow<CustomThemeLibrary> = context.dataStore.data
         .map(::readCustomThemeLibrary)
         .distinctUntilChanged()
+
+    /** Id of the applied theme package; meaningful only while [themeMode] is PACKAGE. */
+    val themePackageId: Flow<String?> = context.dataStore.data
+        .map { prefs -> prefs[THEME_PACKAGE_ID] }
+        .distinctUntilChanged()
+
+    /**
+     * Applies an installed theme package. Pro-only packages are refused without Pro, like the
+     * built-in Pro and custom themes.
+     */
+    suspend fun applyThemePackage(id: String, requiresPro: Boolean): Boolean {
+        var applied = false
+        context.dataStore.edit { prefs ->
+            if (requiresPro && prefs[PRO_UNLOCKED] != true) return@edit
+            prefs[THEME_PACKAGE_ID] = id
+            prefs[THEME_PACKAGE_REQUIRES_PRO] = requiresPro
+            prefs[THEME_MODE] = 6
+            applied = true
+        }
+        return applied
+    }
+
+    /** Called when an installed package is deleted: falls back to SYSTEM if it was applied. */
+    suspend fun clearThemePackage(id: String) {
+        context.dataStore.edit { prefs ->
+            if (prefs[THEME_PACKAGE_ID] == id) {
+                prefs.remove(THEME_PACKAGE_ID)
+                prefs.remove(THEME_PACKAGE_REQUIRES_PRO)
+                if (prefs[THEME_MODE] == 6) prefs[THEME_MODE] = 0
+            }
+        }
+    }
 
     val customTheme: Flow<CustomThemeConfig> = customThemeLibrary
         .map { library -> library.activeTheme()?.config ?: CustomThemeConfig.Default }
@@ -1137,6 +1176,8 @@ class AppPreferences(private val context: Context) {
                 ThemeMode.PRO -> 3
                 ThemeMode.CUSTOM -> 4
                 ThemeMode.NEON -> 5
+                // Packages are applied through applyThemePackage(); keep the stored id.
+                ThemeMode.PACKAGE -> if (prefs[THEME_PACKAGE_ID].isNullOrBlank()) 0 else 6
             }
         }
     }
@@ -1480,6 +1521,9 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { prefs ->
             prefs[PRO_UNLOCKED] = unlocked
             if (!unlocked && prefs[THEME_MODE] in setOf(3, 4)) {
+                prefs[THEME_MODE] = 0
+            }
+            if (!unlocked && prefs[THEME_MODE] == 6 && prefs[THEME_PACKAGE_REQUIRES_PRO] == true) {
                 prefs[THEME_MODE] = 0
             }
         }

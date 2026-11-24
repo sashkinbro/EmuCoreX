@@ -6,7 +6,20 @@ import androidx.lifecycle.viewModelScope
 import com.sbro.emucorex.data.hub.HubItem
 import com.sbro.emucorex.data.hub.HubKind
 import com.sbro.emucorex.data.hub.HubLocaleResolver
+import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.hub.HubRepository
+import com.sbro.emucorex.data.hub.HubThemeEntry
+import com.sbro.emucorex.data.hub.HubThemeSnapshot
+import com.sbro.emucorex.data.theme.InstalledThemePackage
+import com.sbro.emucorex.data.theme.ThemePackageRepository
+import com.sbro.emucorex.core.ProPurchaseManager
+import com.sbro.emucorex.R
+import com.sbro.emucorex.ui.theme.ThemeMode
+import android.app.Activity
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +35,7 @@ enum class HubTab {
     VIDEOS,
     HISTORY,
     MANUALS,
+    THEMES,
     FAVORITES
 }
 
@@ -38,6 +52,22 @@ enum class HubProductFilter {
     PLAYSTATION_2,
     OTHER_EMULATORS
 }
+
+enum class HubThemeAccessFilter { ALL, FREE, PRO }
+
+enum class HubThemeToneFilter { ALL, DARK, LIGHT }
+
+data class HubThemeFilters(
+    val access: HubThemeAccessFilter = HubThemeAccessFilter.ALL,
+    val tone: HubThemeToneFilter = HubThemeToneFilter.ALL,
+    val categoryId: String? = null,
+    val installedOnly: Boolean = false
+)
+
+data class HubThemeActionState(
+    val busyIds: Set<String> = emptySet(),
+    val message: String? = null
+)
 
 data class HubUiState(
     val items: List<HubItem> = emptyList(),
@@ -63,6 +93,7 @@ data class HubUiState(
                 HubTab.VIDEOS -> items.filter { it.kind == HubKind.VIDEOS }
                 HubTab.HISTORY -> items.filter { it.kind == HubKind.HISTORY }
                 HubTab.MANUALS -> items.filter { it.kind == HubKind.MANUALS }
+                HubTab.THEMES -> emptyList()
                 HubTab.FAVORITES -> items.filter(HubItem::isFavorite)
             }
             selected = selected.filter { it.matchesProductFilter(productFilter) }
@@ -140,6 +171,91 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
                 productFilter = HubProductFilter.ALL,
                 featuredOnly = false
             )
+        }
+    }
+
+    private val themePackages = ThemePackageRepository.getInstance(application)
+    private val preferences = AppPreferences(application)
+    private val proPurchaseManager = ProPurchaseManager.getInstance(application)
+
+    val themes: StateFlow<HubThemeSnapshot?> = repository.themes
+    val installedThemes: StateFlow<List<InstalledThemePackage>> = themePackages.installed
+    val appliedThemeId: StateFlow<String?> = combine(
+        preferences.themeMode,
+        preferences.themePackageId
+    ) { mode, id -> if (mode == ThemeMode.PACKAGE) id else null }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    val isProUnlocked: StateFlow<Boolean> = proPurchaseManager.state
+        .map { it.isProUnlocked }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, proPurchaseManager.state.value.isProUnlocked)
+
+    private val _themeFilters = MutableStateFlow(HubThemeFilters())
+    val themeFilters: StateFlow<HubThemeFilters> = _themeFilters.asStateFlow()
+    private val _themeActions = MutableStateFlow(HubThemeActionState())
+    val themeActions: StateFlow<HubThemeActionState> = _themeActions.asStateFlow()
+
+    fun updateThemeFilters(transform: (HubThemeFilters) -> HubThemeFilters) {
+        _themeFilters.update(transform)
+    }
+
+    fun consumeThemeMessage() {
+        _themeActions.update { it.copy(message = null) }
+    }
+
+    fun purchasePro(activity: Activity) {
+        proPurchaseManager.purchase(activity, source = "hub_themes")
+    }
+
+    /** Installs (or updates) [entry]; when [apply] is set, applies it right after a successful install. */
+    fun installTheme(entry: HubThemeEntry, apply: Boolean) {
+        runThemeAction(entry.id) {
+            val bytes = repository.downloadThemePackage(entry)
+            val installed = themePackages.install(bytes)
+            val pkg = installed.getOrNull()
+            if (pkg == null) {
+                postThemeMessage(R.string.hub_theme_install_failed, installed.exceptionOrNull()?.message)
+            } else if (apply) {
+                applyInstalled(entry)
+            } else {
+                postThemeMessage(R.string.hub_theme_installed_message, null)
+            }
+        }
+    }
+
+    fun applyTheme(entry: HubThemeEntry) {
+        runThemeAction(entry.id) { applyInstalled(entry) }
+    }
+
+    fun removeTheme(entry: HubThemeEntry) {
+        runThemeAction(entry.id) {
+            if (themePackages.remove(entry.id)) preferences.clearThemePackage(entry.id)
+        }
+    }
+
+    private suspend fun applyInstalled(entry: HubThemeEntry) {
+        if (!preferences.applyThemePackage(entry.id, entry.requiresPro)) {
+            postThemeMessage(R.string.hub_theme_requires_pro, null)
+        }
+    }
+
+    private fun postThemeMessage(resId: Int, detail: String?) {
+        val base = getApplication<Application>().getString(resId)
+        _themeActions.update { it.copy(message = if (detail.isNullOrBlank()) base else "$base: $detail") }
+    }
+
+    private fun runThemeAction(id: String, block: suspend () -> Unit) {
+        if (id in _themeActions.value.busyIds) return
+        _themeActions.update { it.copy(busyIds = it.busyIds + id) }
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (cancel: kotlinx.coroutines.CancellationException) {
+                throw cancel
+            } catch (error: Throwable) {
+                postThemeMessage(R.string.hub_theme_install_failed, error.message)
+            } finally {
+                _themeActions.update { it.copy(busyIds = it.busyIds - id) }
+            }
         }
     }
 

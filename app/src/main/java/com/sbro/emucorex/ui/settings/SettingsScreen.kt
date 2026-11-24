@@ -1,5 +1,9 @@
 package com.sbro.emucorex.ui.settings
 
+import androidx.compose.ui.platform.LocalConfiguration
+import com.sbro.emucorex.data.theme.ThemePackageRepository
+import com.sbro.emucorex.data.theme.InstalledThemePackage
+import com.sbro.emucorex.ui.theme.LocalThemeExtras
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.ClipData
@@ -268,10 +272,6 @@ import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
 import com.sbro.emucorex.ui.theme.neon.neonShape
 import com.sbro.emucorex.ui.theme.neon.neonShapeCorners
 import com.sbro.emucorex.ui.theme.neon.LocalNeonTheme
-import com.sbro.emucorex.ui.theme.neon.NeonBlack
-import com.sbro.emucorex.ui.theme.neon.NeonBlue
-import com.sbro.emucorex.ui.theme.neon.NeonRed
-import com.sbro.emucorex.ui.theme.neon.NeonYellow
 import com.sbro.emucorex.ui.theme.neon.neonAccentColor
 import com.sbro.emucorex.ui.theme.neon.neonChipShape
 import com.sbro.emucorex.ui.theme.neon.neonCornerAccent
@@ -1407,11 +1407,24 @@ private fun SettingsContent(
                                 viewModel.setOrientationLock(AppPreferences.ORIENTATION_LOCK_AUTO)
                             }
                         )
+                        val installedThemePackages by remember {
+                            ThemePackageRepository.getInstance(context)
+                        }.installed.collectAsState()
+                        val themePackageId by viewModel.themePackageId.collectAsState(initial = null)
                         ThemeSelector(
                             selected = uiState.themeMode,
                             isProUnlocked = uiState.isProUnlocked,
                             customThemeLibrary = uiState.customThemeLibrary,
+                            themePackages = installedThemePackages,
+                            activeThemePackageId = themePackageId,
                             onSelected = viewModel::setThemeMode,
+                            onThemePackageSelected = { pkg ->
+                                if (pkg.spec.requiresPro && !uiState.isProUnlocked) {
+                                    (context as? Activity)?.let { viewModel.purchasePro(it, source = "theme_package") }
+                                } else {
+                                    viewModel.applyThemePackage(pkg.id, pkg.spec.requiresPro)
+                                }
+                            },
                             onCustomThemeSelected = { themeId ->
                                 viewModel.saveCustomThemeLibrary(
                                     uiState.customThemeLibrary.copy(activeThemeId = themeId),
@@ -5513,13 +5526,19 @@ private fun ThemeSelector(
     selected: ThemeMode,
     isProUnlocked: Boolean,
     customThemeLibrary: CustomThemeLibrary,
+    themePackages: List<InstalledThemePackage>,
+    activeThemePackageId: String?,
     onSelected: (ThemeMode) -> Unit,
+    onThemePackageSelected: (InstalledThemePackage) -> Unit,
     onCustomThemeSelected: (String) -> Unit,
     onProLockedSelected: () -> Unit
 ) {
     val customThemes = customThemeLibrary.sanitized().themes
     val customThemeOptionStart = 100
     val neonThemeOptionValue = 50
+    val packageOptionStart = 1000
+    val supportedPackages = themePackages.filter { it.isSupported }
+    val localeTag = LocalConfiguration.current.locales[0]?.language ?: "en"
     val defaultThemeName = stringResource(R.string.theme_manager_default_name)
     val options = buildList {
         add(0 to stringResource(R.string.settings_theme_system))
@@ -5538,6 +5557,10 @@ private fun ThemeSelector(
                 .takeUnless { it == CustomThemeConfig.DEFAULT_NAME }
                 ?: defaultThemeName
             add((customThemeOptionStart + index) to name)
+        }
+        supportedPackages.forEachIndexed { index, pkg ->
+            val name = pkg.spec.displayName(localeTag)
+            add((packageOptionStart + index) to if (pkg.spec.requiresPro && !isProUnlocked) "$name (Pro)" else name)
         }
     }
     val activeCustomThemeIndex = customThemes.indexOfFirst {
@@ -5558,6 +5581,8 @@ private fun ThemeSelector(
             } else {
                 -1
             }
+            ThemeMode.PACKAGE -> supportedPackages.indexOfFirst { it.id == activeThemePackageId }
+                .let { index -> if (index >= 0) packageOptionStart + index else -1 }
         },
         onResetToDefault = { onSelected(ThemeMode.SYSTEM) },
         onSelect = { value ->
@@ -5572,6 +5597,9 @@ private fun ThemeSelector(
                     } else {
                         onProLockedSelected()
                     }
+                }
+                in packageOptionStart until packageOptionStart + supportedPackages.size -> {
+                    onThemePackageSelected(supportedPackages[value - packageOptionStart])
                 }
                 else -> onSelected(ThemeMode.SYSTEM)
             }
@@ -5641,7 +5669,7 @@ internal fun SettingsSection(
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = if (neon) 1.2.sp else MaterialTheme.typography.titleLarge.letterSpacing
             ),
-            color = if (neon) NeonYellow else MaterialTheme.colorScheme.onBackground,
+            color = if (neon) LocalThemeExtras.current.accent1 else MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)
         )
         if (neon) {
@@ -5652,7 +5680,7 @@ internal fun SettingsSection(
                     .height(1.dp)
                     .background(
                         Brush.horizontalGradient(
-                            listOf(NeonRed, NeonYellow, Color.Transparent)
+                            listOf(LocalThemeExtras.current.accent3, LocalThemeExtras.current.accent1, Color.Transparent)
                         )
                     )
             ) {
@@ -5667,7 +5695,7 @@ internal fun SettingsSection(
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 2.dp,
             border = if (neon) {
-                BorderStroke(1.dp, NeonYellow.copy(alpha = 0.14f))
+                BorderStroke(1.dp, LocalThemeExtras.current.accent1.copy(alpha = 0.14f))
             } else {
                 null
             }
@@ -5753,10 +5781,10 @@ internal fun SettingsItem(
                         .then(
                             if (LocalNeonTheme.current) {
                                 Modifier
-                                    .background(if (enabled) NeonBlack else NeonBlack.copy(alpha = 0.6f))
+                                    .background(if (enabled) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.background.copy(alpha = 0.6f))
                                     .border(
                                         1.dp,
-                                        NeonBlue.copy(alpha = if (enabled) 0.35f else 0.18f),
+                                        LocalThemeExtras.current.accent2.copy(alpha = if (enabled) 0.35f else 0.18f),
                                         neonShape(12.dp)
                                     )
                             } else {
@@ -5771,7 +5799,7 @@ internal fun SettingsItem(
                         imageVector = icon,
                         contentDescription = null,
                         tint = if (LocalNeonTheme.current) {
-                            NeonBlue.copy(alpha = if (enabled) 1f else 0.5f)
+                            LocalThemeExtras.current.accent2.copy(alpha = if (enabled) 1f else 0.5f)
                         } else {
                             MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.5f)
                         },

@@ -1,5 +1,6 @@
 package com.sbro.emucorex.ui.common
 
+import com.sbro.emucorex.ui.theme.LocalThemeExtras
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -36,17 +37,14 @@ import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.LocalTvUiEnvironment
 import com.sbro.emucorex.ui.theme.neon.LocalNeonTheme
-import com.sbro.emucorex.ui.theme.neon.NeonDark
-import com.sbro.emucorex.ui.theme.neon.NeonRed
 import com.sbro.emucorex.ui.theme.neon.NeonTricolorDivider
-import com.sbro.emucorex.ui.theme.neon.NeonYellow
 import com.sbro.emucorex.ui.theme.neon.neonShape
 import com.sbro.emucorex.ui.theme.neon.neonShapeRight
 
 @Composable
 private fun defaultBackContainer(): Color =
     if (LocalNeonTheme.current) {
-        NeonDark
+        MaterialTheme.colorScheme.surface
     } else {
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f)
     }
@@ -54,7 +52,7 @@ private fun defaultBackContainer(): Color =
 @Composable
 private fun defaultBackContent(): Color =
     if (LocalNeonTheme.current) {
-        NeonRed
+        LocalThemeExtras.current.accent3
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
@@ -62,7 +60,7 @@ private fun defaultBackContent(): Color =
 @Composable
 private fun defaultTopBarTitle(): Color =
     if (LocalNeonTheme.current) {
-        NeonYellow
+        LocalThemeExtras.current.accent1
     } else {
         MaterialTheme.colorScheme.onSurface
     }
@@ -151,7 +149,7 @@ fun ScreenTopBar(
             border = BorderStroke(
                 1.dp,
                 if (LocalNeonTheme.current) {
-                    NeonYellow.copy(alpha = 0.35f)
+                    LocalThemeExtras.current.accent1.copy(alpha = 0.35f)
                 } else {
                     MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)
                 }
@@ -212,14 +210,14 @@ private fun ScreenTopBarContent(
                 .weight(1f)
                 .padding(end = 8.dp)
         ) {
-            val neonGlowTitle = LocalNeonTheme.current && titleColor == NeonYellow
+            val neonGlowTitle = LocalNeonTheme.current && titleColor == LocalThemeExtras.current.accent1
             Text(
                 text = title,
                 style = if (neonGlowTitle) {
                     MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Bold,
                         shadow = Shadow(
-                            color = NeonYellow.copy(alpha = 0.85f),
+                            color = LocalThemeExtras.current.accent1.copy(alpha = 0.85f),
                             blurRadius = 18f
                         )
                     )

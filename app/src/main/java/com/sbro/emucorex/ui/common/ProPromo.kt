@@ -1,5 +1,6 @@
 package com.sbro.emucorex.ui.common
 
+import com.sbro.emucorex.ui.theme.LocalThemeExtras
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -69,8 +70,6 @@ import com.sbro.emucorex.core.ProPurchaseTier
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 import com.sbro.emucorex.ui.theme.neon.LocalNeonTheme
-import com.sbro.emucorex.ui.theme.neon.NeonRed
-import com.sbro.emucorex.ui.theme.neon.NeonYellow
 import com.sbro.emucorex.ui.theme.neon.neonChipShape
 import com.sbro.emucorex.ui.theme.neon.neonCornerAccent
 import com.sbro.emucorex.ui.theme.neon.neonShape
@@ -180,7 +179,7 @@ fun ProPromoCard(
     // Neon theme: cut corners, neon yellow/red frame, corner marks, uppercase title.
     val neon = LocalNeonTheme.current
     val primary = colors.primary
-    val gold = Color(0xFFE9B949)
+    val gold = LocalThemeExtras.current.gold
     val shape = neonShape(20.dp)
     val backgroundBrush = Brush.linearGradient(
         colors = listOf(
@@ -190,7 +189,7 @@ fun ProPromoCard(
         )
     )
     val borderBrush = if (neon) {
-        Brush.linearGradient(listOf(NeonYellow.copy(alpha = 0.70f), NeonRed.copy(alpha = 0.55f)))
+        Brush.linearGradient(listOf(LocalThemeExtras.current.accent1.copy(alpha = 0.70f), LocalThemeExtras.current.accent3.copy(alpha = 0.55f)))
     } else {
         Brush.linearGradient(listOf(gold.copy(alpha = 0.60f), primary.copy(alpha = 0.35f)))
     }
@@ -200,7 +199,7 @@ fun ProPromoCard(
             modifier = Modifier
                 .height(22.dp)
                 .clip(if (neon) neonChipShape() else RoundedCornerShape(50))
-                .background(if (neon) Brush.horizontalGradient(listOf(NeonYellow, NeonYellow))
+                .background(if (neon) Brush.horizontalGradient(listOf(LocalThemeExtras.current.accent1, LocalThemeExtras.current.accent1))
                     else Brush.horizontalGradient(listOf(Color(0xFFF6D06B), Color(0xFFD99A2B))))
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -313,7 +312,7 @@ fun ProPromoCard(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .neonCornerAccent(NeonYellow, markSize = 10.dp, bracket = true),
+            .neonCornerAccent(LocalThemeExtras.current.accent1, markSize = 10.dp, bracket = true),
         shape = shape,
         color = Color.Transparent,
         border = BorderStroke(1.dp, borderBrush)

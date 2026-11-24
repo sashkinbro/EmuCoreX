@@ -1,5 +1,7 @@
 package com.sbro.emucorex
 
+import com.sbro.emucorex.ui.theme.isDark
+import com.sbro.emucorex.data.theme.ThemePackageRepository
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.ActivityInfo
@@ -208,6 +210,14 @@ open class MainActivity : ComponentActivity() {
             val themeMode by preferences.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
             val coverStyle by preferences.coverArtStyle.collectAsState(initial = preferences.getCoverArtStyleSync())
             val customTheme by preferences.customTheme.collectAsState(initial = CustomThemeConfig.Default)
+            val themePackageRepository = remember { ThemePackageRepository.getInstance(applicationContext) }
+            val themePackageId by preferences.themePackageId.collectAsState(initial = null)
+            val installedThemePackages by themePackageRepository.installed.collectAsState(
+                initial = themePackageRepository.installedSync()
+            )
+            val themePackage = remember(themePackageId, installedThemePackages) {
+                installedThemePackages.firstOrNull { it.id == themePackageId }
+            }
             val fontChoice by preferences.appFontChoice.collectAsState(initial = AppFontChoice.SYSTEM)
             val appFontScale by preferences.appFontScale.collectAsState(initial = 1f)
             val customFontRevision by preferences.customFontRevision.collectAsState(initial = 0)
@@ -221,14 +231,7 @@ open class MainActivity : ComponentActivity() {
             }
             var isEmulationActive by remember { mutableStateOf(false) }
             val systemDarkTheme = isSystemInDarkTheme()
-            val darkTheme = when (themeMode) {
-                ThemeMode.SYSTEM -> systemDarkTheme
-                ThemeMode.LIGHT -> false
-                ThemeMode.DARK -> true
-                ThemeMode.PRO -> true
-                ThemeMode.CUSTOM -> customTheme.dark
-                ThemeMode.NEON -> true
-            }
+            val darkTheme = themeMode.isDark(systemDarkTheme, customTheme, themePackage)
 
             SideEffect {
                 appliedDarkTheme = darkTheme
@@ -243,6 +246,7 @@ open class MainActivity : ComponentActivity() {
                 EmuCoreXTheme(
                     themeMode = themeMode,
                     customTheme = customTheme,
+                    themePackage = themePackage,
                     fontChoice = fontChoice,
                     fontScale = appFontScale,
                     customFontFile = customFontRepository.installedFile(),
