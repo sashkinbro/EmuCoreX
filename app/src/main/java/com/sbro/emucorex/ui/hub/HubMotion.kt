@@ -181,9 +181,9 @@ internal fun SegmentedSwitch(
 
 /** Accent for text links drawn straight on the screen background: primary when it reads (WCAG 3:1), else onBackground. */
 @Composable
-internal fun readableAccentOnBackground(): Color {
+internal fun readableAccentOnBackground(accent: Color = MaterialTheme.colorScheme.primary): Color {
     val scheme = MaterialTheme.colorScheme
-    val a = scheme.primary.luminance() + 0.05f
+    val a = accent.luminance() + 0.05f
     val b = scheme.background.luminance() + 0.05f
-    return if (maxOf(a, b) / minOf(a, b) >= 3f) scheme.primary else scheme.onBackground
+    return if (maxOf(a, b) / minOf(a, b) >= 3f) accent else scheme.onBackground
 }

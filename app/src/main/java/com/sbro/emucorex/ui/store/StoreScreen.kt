@@ -50,6 +50,10 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.WorkspacePremium
+import androidx.compose.material.icons.rounded.Redeem
+import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudOff
@@ -303,6 +307,21 @@ fun rememberStoreContentModel(
     )
 }
 
+private fun storeShelfIcon(key: String): androidx.compose.ui.graphics.vector.ImageVector = when (key) {
+    STORE_SHELF_NEW -> Icons.Rounded.AutoAwesome
+    STORE_SHELF_PRO -> Icons.Rounded.WorkspacePremium
+    STORE_SHELF_FREE -> Icons.Rounded.Redeem
+    else -> Icons.Rounded.Category
+}
+
+@Composable
+private fun storeShelfAccent(key: String): Color? = when (key) {
+    STORE_SHELF_PRO -> com.sbro.emucorex.ui.theme.LocalThemeExtras.current.gold
+    STORE_SHELF_FREE -> com.sbro.emucorex.ui.theme.LocalThemeExtras.current.success
+    STORE_SHELF_NEW -> null
+    else -> MaterialTheme.colorScheme.tertiary
+}
+
 @Composable
 private fun storeShelfTitle(key: String, categories: List<StoreCategory>, locale: String): String = when (key) {
     STORE_SHELF_NEW -> stringResource(R.string.store_shelf_new)
@@ -394,7 +413,9 @@ fun LazyGridScope.storeContent(
                     Box(Modifier.animateItem().enterRise("store-shelf-${tab.key}-${shelf.key}-header", shelfIndex + 1)) {
                         ShelfHeader(
                             title = storeShelfTitle(shelf.key, model.categories, locale),
-                            onSeeAll = { filters.openShelf(shelf.key) }
+                            onSeeAll = { filters.openShelf(shelf.key) },
+                            icon = storeShelfIcon(shelf.key),
+                            accent = storeShelfAccent(shelf.key)
                         )
                     }
                 }

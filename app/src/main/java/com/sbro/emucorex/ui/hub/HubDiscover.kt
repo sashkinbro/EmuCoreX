@@ -21,6 +21,11 @@ import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Newspaper
+import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -85,6 +90,15 @@ internal fun buildDiscoverFeed(items: List<HubItem>): DiscoverFeed {
         history = newest(HubKind.HISTORY).filter { it.id != hero?.id }.take(SHELF_LIMIT),
         manuals = newest(HubKind.MANUALS).filter { it.id != hero?.id }.take(SHELF_LIMIT)
     )
+}
+
+@Composable
+private fun HubSection.shelfIcon(): androidx.compose.ui.graphics.vector.ImageVector = when (this) {
+    HubSection.NEWS -> androidx.compose.material.icons.Icons.Rounded.Newspaper
+    HubSection.VIDEOS -> androidx.compose.material.icons.Icons.Rounded.PlayCircle
+    HubSection.HISTORY -> androidx.compose.material.icons.Icons.Rounded.History
+    HubSection.MANUALS -> androidx.compose.material.icons.Icons.AutoMirrored.Rounded.MenuBook
+    HubSection.SAVED -> androidx.compose.material.icons.Icons.Rounded.Bookmark
 }
 
 @Composable
@@ -168,7 +182,7 @@ internal fun LazyGridScope.discoverContent(
     if (storeItems.isNotEmpty()) {
         item(key = "shelf-store-header", span = { GridItemSpan(maxLineSpan) }) {
             Box(Modifier.animateItem().enterRise("shelf-store-header", 4)) {
-                ShelfHeader(stringResource(R.string.hub_new_in_store), onSeeAll = onSeeAllStore)
+                ShelfHeader(stringResource(R.string.hub_new_in_store), onSeeAll = onSeeAllStore, icon = androidx.compose.material.icons.Icons.Rounded.Storefront)
             }
         }
         item(key = "shelf-store-row", span = { GridItemSpan(maxLineSpan) }) {
@@ -202,7 +216,7 @@ private fun LazyGridScope.shelf(
     if (items.isEmpty()) return
     item(key = "shelf-${section.name}-header", span = { GridItemSpan(maxLineSpan) }) {
         Box(Modifier.animateItem().enterRise("shelf-${section.name}-header", section.ordinal)) {
-            ShelfHeader(section.title(), onSeeAll = { onSeeAll(section) })
+            ShelfHeader(section.title(), onSeeAll = { onSeeAll(section) }, icon = section.shelfIcon())
         }
     }
     item(key = "shelf-${section.name}-row", span = { GridItemSpan(maxLineSpan) }) {
@@ -224,38 +238,59 @@ private fun LazyGridScope.shelf(
 }
 
 @Composable
-internal fun ShelfHeader(title: String, onSeeAll: () -> Unit) {
+internal fun ShelfHeader(
+    title: String,
+    onSeeAll: () -> Unit,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    accent: Color? = null
+) {
+    // Shelf titles carry a tinted icon tile and an accent "See all" pill so sections read as sections,
+    // not as loose text between rows of cards.
+    val tint = readableAccentOnBackground(accent ?: MaterialTheme.colorScheme.primary)
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        if (icon != null) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(neonShape(11.dp))
+                    .background(tint.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+            }
+        }
         Text(
             text = title,
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.ExtraBold,
             color = MaterialTheme.colorScheme.onBackground,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-        // A light link, not a button body: styles give text buttons raised frames, which looked heavy here.
         Row(
             modifier = Modifier
-                .clip(neonShape(10.dp))
+                .clip(neonShape(999.dp))
+                .background(tint.copy(alpha = 0.14f))
                 .clickable(onClick = onSeeAll)
-                .padding(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                .padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = stringResource(R.string.hub_see_all),
                 style = MaterialTheme.typography.labelLarge,
-                color = readableAccentOnBackground()
+                fontWeight = FontWeight.Bold,
+                color = tint
             )
             Icon(
                 imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                 contentDescription = null,
-                tint = readableAccentOnBackground(),
-                modifier = Modifier.size(20.dp)
+                tint = tint,
+                modifier = Modifier.size(18.dp)
             )
         }
     }
