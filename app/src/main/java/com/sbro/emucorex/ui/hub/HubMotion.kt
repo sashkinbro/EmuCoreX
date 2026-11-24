@@ -11,6 +11,9 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -144,19 +147,21 @@ internal fun SegmentedSwitch(
                         animationSpec = if (motion) tween(200) else snap(),
                         label = "switch-content"
                     )
-                    Surface(
-                        onClick = { onSelected(index) },
-                        interactionSource = interactionSource,
+                    // A bare tap target: the moving indicator is the only fill, so segments never read as
+                    // separate cards (a Surface here picked up style fills and idle borders).
+                    androidx.compose.foundation.layout.Box(
                         modifier = Modifier
                             .weight(1f)
                             .height(segmentHeight)
                             .then(if (selected && selectedFocusRequester != null) Modifier.focusRequester(selectedFocusRequester) else Modifier)
-                            .gamepadFocusableCard(shape = shape, interactionSource = interactionSource, addFocusTarget = false),
-                        shape = shape,
-                        color = Color.Transparent,
-                        contentColor = contentColor
+                            .gamepadFocusableCard(shape = shape, interactionSource = interactionSource, addFocusTarget = false, showIdleBorder = false)
+                            .clip(shape)
+                            .clickable(interactionSource = interactionSource, indication = androidx.compose.material3.ripple(), role = androidx.compose.ui.semantics.Role.Tab, onClick = { onSelected(index) }),
+                        contentAlignment = Alignment.Center
                     ) {
-                        segment(index, selected)
+                        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides contentColor) {
+                            segment(index, selected)
+                        }
                     }
                 }
             }
