@@ -131,12 +131,16 @@ fun HeaderSurface(
                 val typography = MaterialTheme.typography
                 Surface(modifier = modifier, shape = shape, color = color, tonalElevation = tonalElevation,
                     shadowElevation = shadowElevation, border = border) {
-                    // Taller bar, content sitting on the bottom edge, bigger title text.
+                    // Heavier title only: a taller bar with bigger text truncated titles and swelled bars
+                    // that carry several action icons (Hub, Settings).
                     MaterialTheme(
                         colorScheme = scheme, shapes = MaterialTheme.shapes,
-                        typography = typography.copy(titleLarge = typography.headlineMedium, titleMedium = typography.titleLarge)
+                        typography = typography.copy(
+                            titleLarge = typography.titleLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold),
+                            titleMedium = typography.titleMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold)
+                        )
                     ) {
-                        Box(Modifier.heightIn(min = 96.dp), contentAlignment = Alignment.BottomStart) { content() }
+                        content()
                     }
                 }
                 return

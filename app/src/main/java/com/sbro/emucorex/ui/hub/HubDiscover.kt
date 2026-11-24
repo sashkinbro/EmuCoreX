@@ -247,8 +247,24 @@ internal fun ShelfHeader(
     // Shelf titles carry a tinted icon tile and an accent "See all" pill so sections read as sections,
     // not as loose text between rows of cards.
     val tint = readableAccentOnBackground(accent ?: MaterialTheme.colorScheme.primary)
+    val fade = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)
+    Column(Modifier.fillMaxWidth()) {
+    // Divider: a thin line in the shelf colour fading out, so each section has an edge instead of floating.
+    Box(
+        Modifier
+            .padding(top = 14.dp)
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(
+                androidx.compose.ui.graphics.Brush.horizontalGradient(
+                    0f to tint.copy(alpha = 0.7f),
+                    0.35f to fade,
+                    1f to Color.Transparent
+                )
+            )
+    )
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 2.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -293,6 +309,7 @@ internal fun ShelfHeader(
                 modifier = Modifier.size(18.dp)
             )
         }
+    }
     }
 }
 

@@ -132,9 +132,7 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
     private val proPurchaseManager = ProPurchaseManager.getInstance(application)
 
     /** The Hub/Store catalog language: the device language resolved to a supported catalog locale. */
-    val locale: String = HubLocaleResolver.resolve(
-        application.resources.configuration.locales.get(0)?.toLanguageTag()
-    )
+    val locale: String = HubLocaleResolver.current() // the app language (AppLocaleManager sets the default), not the device one
 
     val catalog: StateFlow<StoreSnapshot?> = repository.catalog
     val installed: StateFlow<Map<String, InstalledStoreItem>> = installs.installed

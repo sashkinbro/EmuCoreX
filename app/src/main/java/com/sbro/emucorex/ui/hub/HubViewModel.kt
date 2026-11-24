@@ -104,9 +104,7 @@ data class HubUiState(
 
 class HubViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = HubRepository.get(application)
-    private val locale = HubLocaleResolver.resolve(
-        application.resources.configuration.locales.get(0)?.toLanguageTag()
-    )
+    private val locale = HubLocaleResolver.current() // the app language (AppLocaleManager sets the default), not the device one
     private val _uiState = MutableStateFlow(HubUiState())
     val uiState: StateFlow<HubUiState> = _uiState.asStateFlow()
     private var itemsJob: Job? = null
