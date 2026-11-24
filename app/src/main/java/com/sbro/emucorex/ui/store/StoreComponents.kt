@@ -73,6 +73,7 @@ fun StoreEntryButton(tab: String, modifier: Modifier = Modifier) {
         FilledTonalButton(
             onClick = { open(tab) },
             shape = neonButtonShape(),
+            colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
         ) {
             Icon(Icons.Rounded.Storefront, contentDescription = null, modifier = Modifier.size(18.dp))

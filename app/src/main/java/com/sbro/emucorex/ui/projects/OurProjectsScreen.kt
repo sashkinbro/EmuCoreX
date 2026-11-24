@@ -244,9 +244,9 @@ private fun ProjectCard(
                 if (project.onGooglePlay) {
                     Badge(stringResource(R.string.projects_badge_on_play), MaterialTheme.colorScheme.primary)
                 } else {
-                    Badge(stringResource(R.string.projects_badge_coming_to_play), MaterialTheme.colorScheme.tertiary)
+                    Badge(stringResource(R.string.projects_badge_coming_to_play), MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Badge(stringResource(R.string.projects_badge_open_source), MaterialTheme.colorScheme.secondary)
+                Badge(stringResource(R.string.projects_badge_open_source), MaterialTheme.colorScheme.onSurfaceVariant)
             }
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -259,7 +259,7 @@ private fun ProjectCard(
                         Text(stringResource(R.string.projects_google_play))
                     }
                 }
-                FilledTonalButton(onClick = { openLink(context, project.githubUrl, failedMessage) }) {
+                FilledTonalButton(onClick = { openLink(context, project.githubUrl, failedMessage) }, colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
                     Icon(Icons.Rounded.Code, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(6.dp))
                     Text(stringResource(R.string.projects_github))
@@ -307,7 +307,8 @@ private fun ProjectsFooter(context: Context, failedMessage: String) {
             ) {
                 FilledTonalButton(
                     onClick = { openLink(context, OUR_PROJECTS_PATREON_URL, failedMessage) },
-                    shape = neonButtonShape()
+                    shape = neonButtonShape(),
+                    colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
                 ) {
                     Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(8.dp))

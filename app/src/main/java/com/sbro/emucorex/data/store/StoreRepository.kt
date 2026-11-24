@@ -1,6 +1,7 @@
 package com.sbro.emucorex.data.store
 
 import android.content.Context
+import android.util.Log
 import com.sbro.emucorex.data.hub.HubRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -33,12 +34,14 @@ class StoreRepository private constructor(context: Context) {
     /** Syncs the Hub (which carries the catalog) and publishes the result. Offline failure keeps the cache. */
     suspend fun refresh(languageTag: String?, forceRefresh: Boolean = false): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            hub.sync(languageTag, forceRefresh)
+            // The Hub sync cooldown must not keep an empty Store empty: without a catalog, always fetch.
+            hub.sync(languageTag, forceRefresh || _catalog.value == null)
             hub.storeSync.value?.let(::publish)
             Result.success(Unit)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
+            Log.w("EmuCoreStore", "Store refresh failed", error)
             Result.failure(error)
         }
     }

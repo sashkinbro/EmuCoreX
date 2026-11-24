@@ -334,8 +334,8 @@ fun LazyGridScope.storeContent(
         item(key = "store-offline", span = { GridItemSpan(maxLineSpan) }) {
             Surface(
                 shape = neonShape(12.dp),
-                color = MaterialTheme.colorScheme.tertiaryContainer,
-                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
             ) {
                 Text(
                     stringResource(R.string.hub_offline_cached),
@@ -356,7 +356,7 @@ fun LazyGridScope.storeContent(
                     title = stringResource(R.string.store_unavailable_title),
                     body = stringResource(R.string.store_unavailable_body)
                 ) {
-                    FilledTonalButton(onClick = { model.viewModel.refresh(force = true) }, shape = neonButtonShape()) {
+                    FilledTonalButton(onClick = { model.viewModel.refresh(force = true) }, shape = neonButtonShape(), colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
                         Text(stringResource(R.string.store_retry))
                     }
                 }

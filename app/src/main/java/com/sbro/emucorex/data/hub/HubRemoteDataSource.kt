@@ -115,7 +115,7 @@ class HubRemoteDataSource(context: Context) {
                         resolvePinnedUrl(baseUrl, item.packageFile.path)
                     }
                 }
-            }.getOrNull()
+            }.onFailure { android.util.Log.w("EmuCoreStore", "Store catalog rejected", it) }.getOrNull()
         }
 
         return HubRemoteSnapshot(
