@@ -25,9 +25,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
+import com.sbro.emucorex.ui.theme.style.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.sbro.emucorex.ui.theme.style.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue

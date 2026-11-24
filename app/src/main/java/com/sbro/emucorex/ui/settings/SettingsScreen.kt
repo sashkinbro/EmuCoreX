@@ -113,7 +113,7 @@ import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Button
+import com.sbro.emucorex.ui.theme.style.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -124,14 +124,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import com.sbro.emucorex.ui.theme.style.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import com.sbro.emucorex.ui.common.SyncedSlider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Surface
+import com.sbro.emucorex.ui.theme.style.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.sbro.emucorex.ui.theme.style.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect

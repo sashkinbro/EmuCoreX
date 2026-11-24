@@ -34,6 +34,7 @@ import com.sbro.emucorex.data.theme.InstalledThemePackage
 import com.sbro.emucorex.data.theme.ThemeDecor
 import com.sbro.emucorex.data.theme.ThemeFont
 import com.sbro.emucorex.data.theme.ThemeShapeStyle
+import com.sbro.emucorex.data.theme.UiStyle
 import com.sbro.emucorex.data.theme.toCustomThemeConfig
 import com.sbro.emucorex.data.theme.toStyleSpec
 import com.sbro.emucorex.ui.theme.neon.NeonBlue
@@ -145,6 +146,7 @@ fun ThemeMode.isDark(
 private val NeonExtras = ThemeExtras(
     shapeStyle = ThemeShapeStyle.CUT_DIAGONAL,
     decor = ThemeDecor.NEON,
+    uiStyle = UiStyle.NEON,
     accent1 = NeonYellow,
     accent2 = NeonBlue,
     accent3 = NeonRed,

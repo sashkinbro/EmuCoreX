@@ -32,6 +32,7 @@ data class ThemePackageSpec(
     @Serializable
     data class EffectsSpec(
         val decor: String = "none",
+        val style: String = "standard",
         val scanlines: Boolean = false
     )
 
@@ -82,6 +83,16 @@ enum class ThemeShapeStyle { ROUNDED, CUT, CUT_DIAGONAL, SQUARE }
 
 enum class ThemeDecor { NONE, NEON }
 
+/** Whole-UI drawing style (panels, buttons, headers). Each one is implemented in ui/theme/style. */
+enum class UiStyle(val wire: String) {
+    STANDARD("standard"), NEON("neon"), CLASSIC("classic"), LUNA("luna"), S60("s60"), AERO("aero"),
+    METRO("metro"), OSD("osd"), PIXEL("pixel"), TERMINAL("terminal"), PAPER("paper");
+
+    companion object {
+        fun fromWire(value: String?): UiStyle = entries.firstOrNull { it.wire.equals(value, ignoreCase = true) } ?: STANDARD
+    }
+}
+
 enum class ThemeFont { SYSTEM, RUBIK, EXO2, MONOSPACE, SERIF, PACKAGE }
 
 /** Theme properties beyond the Material color scheme, as plain values (no Compose types). */
@@ -89,6 +100,7 @@ data class ThemeStyleSpec(
     val shapeStyle: ThemeShapeStyle = ThemeShapeStyle.ROUNDED,
     val shapeScale: Float = 1f,
     val decor: ThemeDecor = ThemeDecor.NONE,
+    val uiStyle: UiStyle = UiStyle.STANDARD,
     val accents: List<Int> = emptyList(),
     val success: Int? = null,
     val warning: Int? = null,
@@ -149,6 +161,7 @@ fun ThemePackageSpec.toStyleSpec(): ThemeStyleSpec = ThemeStyleSpec(
     },
     shapeScale = shape.scale.takeIf { it.isFinite() }?.coerceIn(0f, 2f) ?: 1f,
     decor = if (effects.decor.equals("neon", ignoreCase = true)) ThemeDecor.NEON else ThemeDecor.NONE,
+    uiStyle = UiStyle.fromWire(effects.style),
     accents = accents.mapNotNull(ThemePackageSpec::parseHexColor).take(3),
     success = ThemePackageSpec.parseHexColor(semantic["success"]),
     warning = ThemePackageSpec.parseHexColor(semantic["warning"]),

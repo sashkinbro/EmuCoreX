@@ -30,12 +30,12 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Visibility
-import androidx.compose.material3.Button
+import com.sbro.emucorex.ui.theme.style.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
+import com.sbro.emucorex.ui.theme.style.OutlinedButton
+import com.sbro.emucorex.ui.theme.style.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable

@@ -42,13 +42,13 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.WarningAmber
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
+import com.sbro.emucorex.ui.theme.style.Button
+import com.sbro.emucorex.ui.theme.style.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import com.sbro.emucorex.ui.theme.style.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect

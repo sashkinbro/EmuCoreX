@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.Color
 import com.sbro.emucorex.data.theme.ThemeDecor
 import com.sbro.emucorex.data.theme.ThemeShapeStyle
 import com.sbro.emucorex.data.theme.ThemeStyleSpec
+import com.sbro.emucorex.data.theme.UiStyle
 import java.io.File
 
 /**
@@ -19,6 +20,7 @@ data class ThemeExtras(
     val shapeStyle: ThemeShapeStyle = ThemeShapeStyle.ROUNDED,
     val shapeScale: Float = 1f,
     val decor: ThemeDecor = ThemeDecor.NONE,
+    val uiStyle: UiStyle = UiStyle.STANDARD,
     val accent1: Color = Color.Unspecified,
     val accent2: Color = Color.Unspecified,
     val accent3: Color = Color.Unspecified,
@@ -57,6 +59,7 @@ internal fun ThemeStyleSpec.toThemeExtras(
     shapeStyle = shapeStyle,
     shapeScale = shapeScale,
     decor = decor,
+    uiStyle = uiStyle,
     accent1 = accents.getOrNull(0)?.let(::Color) ?: primary,
     accent2 = accents.getOrNull(1)?.let(::Color) ?: tertiary,
     accent3 = accents.getOrNull(2)?.let(::Color) ?: secondary,

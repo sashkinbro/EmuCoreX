@@ -1,5 +1,11 @@
 package com.sbro.emucorex.ui.common
 
+import com.sbro.emucorex.data.theme.UiStyle
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
 import com.sbro.emucorex.ui.theme.LocalThemeExtras
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -20,7 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import com.sbro.emucorex.ui.theme.style.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -139,6 +145,34 @@ fun ScreenTopBar(
         return
     }
 
+    val headerBrush = styledHeaderBrush()
+    if (headerBrush != null) {
+        // Title-bar styles (Classic 9x, Luna, S60, Pixel): a filled header in the theme's primary.
+        val onHeader = MaterialTheme.colorScheme.onPrimary
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .clip(neonShape(24.dp))
+                .background(headerBrush)
+                .then(styledHeaderFrame())
+        ) {
+            ScreenTopBarContent(
+                title = styledTitle(title),
+                subtitle = subtitle,
+                onBackClick = onBackClick,
+                backButtonModifier = backButtonModifier,
+                titleColor = onHeader,
+                subtitleColor = onHeader.copy(alpha = 0.82f),
+                backContentColor = onHeader,
+                titleMaxLines = titleMaxLines,
+                subtitleMaxLines = subtitleMaxLines,
+                actions = actions,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+            )
+        }
+        return
+    }
+
     val barSurface: @Composable (Modifier) -> Unit = { surfaceModifier ->
         Surface(
             modifier = surfaceModifier,
@@ -156,7 +190,7 @@ fun ScreenTopBar(
             )
         ) {
             ScreenTopBarContent(
-                title = title,
+                title = styledTitle(title),
                 subtitle = subtitle,
                 onBackClick = onBackClick,
                 backButtonModifier = backButtonModifier,
@@ -246,3 +280,43 @@ private fun ScreenTopBarContent(
         )
     }
 }
+
+/** Header fill for title-bar UI styles; null keeps the regular panel header. */
+@Composable
+private fun styledHeaderBrush(): Brush? {
+    val primary = MaterialTheme.colorScheme.primary
+    return when (LocalThemeExtras.current.uiStyle) {
+        UiStyle.CLASSIC -> Brush.horizontalGradient(listOf(primary, lerp(primary, Color.White, 0.42f)))
+        UiStyle.LUNA -> Brush.verticalGradient(
+            0f to lerp(primary, Color.White, 0.45f),
+            0.18f to lerp(primary, Color.White, 0.12f),
+            0.8f to primary,
+            1f to lerp(primary, Color.Black, 0.22f)
+        )
+        UiStyle.S60 -> Brush.verticalGradient(listOf(lerp(primary, Color.White, 0.28f), lerp(primary, Color.Black, 0.18f)))
+        UiStyle.PIXEL -> Brush.verticalGradient(listOf(primary, primary))
+        else -> null
+    }
+}
+
+@Composable
+private fun styledHeaderFrame(): Modifier {
+    val style = LocalThemeExtras.current.uiStyle
+    val outline = MaterialTheme.colorScheme.outline
+    return when (style) {
+        UiStyle.CLASSIC -> Modifier.drawWithContent {
+            drawContent()
+            com.sbro.emucorex.ui.theme.style.drawBevelPublic(this, sunken = false)
+        }
+        UiStyle.PIXEL -> Modifier.drawWithContent {
+            drawContent()
+            com.sbro.emucorex.ui.theme.style.drawPixelFramePublic(this, outline)
+        }
+        else -> Modifier
+    }
+}
+
+/** Terminal style shows headers as a prompt line. */
+@Composable
+private fun styledTitle(title: String): String =
+    if (LocalThemeExtras.current.uiStyle == UiStyle.TERMINAL) "> ${title}_" else title

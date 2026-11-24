@@ -9,6 +9,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import com.sbro.emucorex.ui.theme.style.TextButton
+import com.sbro.emucorex.ui.theme.style.OutlinedButton
+import com.sbro.emucorex.ui.theme.style.FilledTonalButton
+import com.sbro.emucorex.ui.theme.style.Button
+import com.sbro.emucorex.ui.theme.style.Surface
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pause

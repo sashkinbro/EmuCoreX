@@ -17,9 +17,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import com.sbro.emucorex.ui.common.SyncedSlider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Surface
+import com.sbro.emucorex.ui.theme.style.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.sbro.emucorex.ui.theme.style.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
