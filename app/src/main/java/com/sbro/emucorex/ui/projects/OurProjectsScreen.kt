@@ -58,10 +58,12 @@ import com.sbro.emucorex.ui.common.tvFocusGroup
 import com.sbro.emucorex.ui.theme.neon.neonShape
 import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 import com.sbro.emucorex.ui.theme.style.Button
-import com.sbro.emucorex.ui.theme.style.FilledTonalButton
 import com.sbro.emucorex.ui.theme.style.OutlinedButton
 import com.sbro.emucorex.ui.theme.style.Surface
 import com.sbro.emucorex.ui.theme.style.TextButton
+
+/** Patreon's brand coral: the support button stays recognisable and clearly active in every theme. */
+private val PatreonCoral = Color(0xFFFF424D)
 
 private fun openLink(context: Context, url: String, failedMessage: String) {
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -209,7 +211,7 @@ private fun ProjectCard(
     Surface(
         modifier = modifier.gamepadFocusableCard(shape = shape),
         shape = shape,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Column(
@@ -262,7 +264,7 @@ private fun ProjectCard(
                         Text(stringResource(R.string.projects_google_play))
                     }
                 }
-                FilledTonalButton(onClick = { openLink(context, project.githubUrl, failedMessage) }, shape = neonButtonShape(), colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
+                Button(onClick = { openLink(context, project.githubUrl, failedMessage) }, shape = neonButtonShape(), colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary)) {
                     Icon(Icons.Rounded.Code, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(6.dp))
                     Text(stringResource(R.string.projects_github))
@@ -288,7 +290,7 @@ private fun ProjectsFooter(context: Context, failedMessage: String) {
             .widthIn(max = 1000.dp)
             .padding(top = 4.dp, bottom = 12.dp),
         shape = neonShape(22.dp),
-        color = MaterialTheme.colorScheme.surface,
+        color = MaterialTheme.colorScheme.surfaceVariant,
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
     ) {
         Column(
@@ -308,18 +310,19 @@ private fun ProjectsFooter(context: Context, failedMessage: String) {
                 horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FilledTonalButton(
+                Button(
                     onClick = { openLink(context, OUR_PROJECTS_PATREON_URL, failedMessage) },
                     shape = neonButtonShape(),
-                    colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = PatreonCoral, contentColor = Color.White)
                 ) {
                     Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(8.dp))
                     Text(stringResource(R.string.projects_patreon))
                 }
-                OutlinedButton(
+                Button(
                     onClick = { openLink(context, OUR_PROJECTS_GITHUB_PROFILE_URL, failedMessage) },
-                    shape = neonButtonShape()
+                    shape = neonButtonShape(),
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary)
                 ) {
                     Icon(Icons.Rounded.Code, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(8.dp))
