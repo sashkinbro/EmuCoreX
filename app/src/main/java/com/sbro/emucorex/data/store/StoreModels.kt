@@ -137,3 +137,19 @@ internal fun Map<String, String>.localizedValue(locale: String): String? {
     val language = locale.substringBefore('-').substringBefore('_').lowercase()
     return this[locale] ?: this[language] ?: this["en"] ?: values.firstOrNull()
 }
+
+/**
+ * Controller skins are drawn for one console family's buttons. Items tagged `platform:<family>` only show in apps of that
+ * family; untagged items show everywhere. EmuCoreX is a PlayStation app (sibling apps set their own family).
+ */
+object StorePlatform {
+    const val CURRENT = "playstation"
+}
+
+fun StoreItem.fitsThisApp(): Boolean {
+    val platforms = tags.filter { it.startsWith("platform:") }
+    return platforms.isEmpty() || "platform:${StorePlatform.CURRENT}" in platforms
+}
+
+fun StoreSnapshot.forThisApp(): StoreSnapshot =
+    copy(catalog = catalog.copy(items = catalog.items.filter(StoreItem::fitsThisApp)))

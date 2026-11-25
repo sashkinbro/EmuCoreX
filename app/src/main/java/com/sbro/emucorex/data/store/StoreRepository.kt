@@ -76,7 +76,7 @@ class StoreRepository private constructor(context: Context) {
     private fun publish(snapshot: StoreSnapshot) {
         val current = _catalog.value
         if (current != null && snapshot.catalogRevision < current.catalogRevision) return
-        _catalog.value = snapshot
+        _catalog.value = snapshot.forThisApp()
         runCatching {
             val temporary = File(catalogFile.parentFile, "${catalogFile.name}.tmp")
             temporary.writeText(
@@ -101,7 +101,7 @@ class StoreRepository private constructor(context: Context) {
             require(isSafePath(item.cover.path) && isSafePath(item.packageFile.path))
             item.gallery.forEach { require(isSafePath(it.path)) }
         }
-        StoreSnapshot(stored.baseUrl, stored.catalogRevision, stored.catalog)
+        StoreSnapshot(stored.baseUrl, stored.catalogRevision, stored.catalog).forThisApp()
     }.getOrNull()
 
     @Serializable
