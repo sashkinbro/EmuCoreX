@@ -197,10 +197,10 @@ open class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             com.sbro.emucorex.core.AgeSignalsController.publishStored(preferences)
             // Once per process, after the first frames, only while resumed (Play may show a consent prompt).
-            repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
-                delay(1500)
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                delay(1500.milliseconds)
                 com.sbro.emucorex.core.AgeSignalsController.run(
-                    this@MainActivity, preferences, com.sbro.emucorex.BuildConfig.DEBUG
+                    this@MainActivity, preferences, BuildConfig.DEBUG
                 )
             }
         }
